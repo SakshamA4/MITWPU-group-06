@@ -9,9 +9,31 @@ import UIKit
 
 class PropsCollectionViewCell: UICollectionViewCell {
 
+    @IBOutlet weak var imageView: UIImageView!
+    
+    @IBOutlet weak var titleLabel: UILabel!
+    
     override func awakeFromNib() {
         super.awakeFromNib()
+        
+        contentView.layer.cornerRadius = 20
+        contentView.layer.masksToBounds = true
+
+        // Round the imageView
+        imageView.layer.cornerRadius = 20
+        imageView.layer.masksToBounds = true
         // Initialization code
     }
+   
+    
+    func configureCell(prop: Prop) {
+        if let imageName = prop.image.first {
+            imageView.image = UIImage(named: imageName)
+        } else {
+            imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
+        }
+        titleLabel.text = prop.name.capitalized
+    }
+
 
 }

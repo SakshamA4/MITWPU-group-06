@@ -1,5 +1,5 @@
 //
-//  CharactersCollectionViewCell.swift
+//  ScenesCollectionViewCell.swift
 //  FilmsPage
 //
 //  Created by SDC-USER on 26/11/25.
@@ -7,10 +7,9 @@
 
 import UIKit
 
-class CharactersCollectionViewCell: UICollectionViewCell {
+class SequencesCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var imageView: UIImageView!
-    
     @IBOutlet weak var titleLabel: UILabel!
     
     override func awakeFromNib() {
@@ -26,13 +25,13 @@ class CharactersCollectionViewCell: UICollectionViewCell {
     }
    
     
-    func configureCell(character: Character) {
-        if let imageName = character.image.first {
+    func configureCell(sequences: Sequence) {
+        if let imageName = sequences.image.first {
             imageView.image = UIImage(named: imageName)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }
-        titleLabel.text = character.name.capitalized
+        titleLabel.text = sequences.name.capitalized
     }
 
 

@@ -180,7 +180,9 @@ extension FilmsViewController:  UICollectionViewDataSource, UICollectionViewDele
         return headerView
     }
     
-
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        performSegue(withIdentifier: "myFilmSegue", sender: nil)
+    }
     
     
     }

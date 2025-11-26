@@ -8,20 +8,7 @@
 import Foundation
 import UIKit
 
-struct favFilms {
-    var id: Int
-    var name : String
-    var sequences: Int
-    var scenes: Int
-    var time : String
-    var characters: Int
-    var image : String
-}
 
-struct otherFilms {
-    var name: String
-    var image: [String]
-}
 struct Film {
     var id: Int
     var name : String
@@ -30,24 +17,23 @@ struct Film {
     var time : String
     var characters: Int
     var image : [String]
-//    var favorite: Bool
 }
-struct Sequences {
+
+
+struct Sequence {
     var name: String
     var image: [String]
 }
 
-struct Scenes {
+struct Character {
     var name: String
     var image: [String]
 }
 
-struct Characters {
+struct Prop {
     var name: String
     var image: [String]
 }
 
-struct Props {
-    var name: String
-    var image: [String]
-}
+
+

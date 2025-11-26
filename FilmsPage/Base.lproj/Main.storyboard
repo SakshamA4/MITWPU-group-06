@@ -27,7 +27,7 @@
         <!--Library -->
         <scene sceneID="SbB-qD-yui">
             <objects>
-                <viewController title="Library " id="C2a-DA-On1" sceneMemberID="viewController">
+                <viewController title="Library " id="C2a-DA-On1" customClass="LibraryViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="bbN-8C-zw4">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -86,12 +86,20 @@
                     </navigationItem>
                     <connections>
                         <outlet property="collectionView" destination="X85-hE-StN" id="g2o-QM-jdC"/>
-                        <segue destination="ZKF-im-qT0" kind="show" id="bUG-mf-0uq"/>
+                        <segue destination="ZKF-im-qT0" kind="show" identifier="myFilmSegue" id="bUG-mf-0uq"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="836" y="61"/>
+        </scene>
+        <!--Storyboard Reference-->
+        <scene sceneID="eMG-P7-vox">
+            <objects>
+                <viewControllerPlaceholder id="6u7-Jh-PIC" sceneMemberID="viewController"/>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="njW-fh-1Vh" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="1676" y="-877"/>
         </scene>
         <!--MyFilm-->
         <scene sceneID="enH-Il-RqO">
@@ -102,7 +110,7 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="e1k-4p-clf">
-                                <rect key="frame" x="0.0" y="78" width="1180" height="692"/>
+                                <rect key="frame" x="0.0" y="184" width="1180" height="586"/>
                                 <color key="backgroundColor" red="0.042358394709999997" green="0.042358394709999997" blue="0.08166503906" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                 <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="6am-Ak-joW">
                                     <size key="itemSize" width="128" height="128"/>
@@ -131,7 +139,7 @@
                             <constraint firstItem="e1k-4p-clf" firstAttribute="top" secondItem="H4N-aB-brq" secondAttribute="top" id="t3U-vb-SRl"/>
                         </constraints>
                     </view>
-                    <navigationItem key="navigationItem" id="WJs-2d-3qa"/>
+                    <navigationItem key="navigationItem" title="My Film" largeTitleDisplayMode="always" id="WJs-2d-3qa"/>
                     <connections>
                         <outlet property="collectionView" destination="e1k-4p-clf" id="09Q-GZ-XF8"/>
                     </connections>
@@ -149,6 +157,9 @@
                     <navigationBar key="navigationBar" contentMode="scaleToFill" largeTitles="YES" id="Gl9-Sc-mHg">
                         <rect key="frame" x="0.0" y="24" width="1180" height="54"/>
                         <autoresizingMask key="autoresizingMask"/>
+                        <textAttributes key="largeTitleTextAttributes">
+                            <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        </textAttributes>
                     </navigationBar>
                     <nil name="viewControllers"/>
                     <connections>
