@@ -32,6 +32,10 @@ struct Film {
     var image : [String]
 //    var favorite: Bool
 }
+struct Sequences {
+    var name: String
+    var image: [String]
+}
 
 struct scenes {
     var name: String
