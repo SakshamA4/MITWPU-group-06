@@ -37,17 +37,17 @@ struct Sequences {
     var image: [String]
 }
 
-struct scenes {
+struct Scenes {
     var name: String
     var image: [String]
 }
 
-struct characters {
+struct Characters {
     var name: String
     var image: [String]
 }
 
-struct props {
+struct Props {
     var name: String
     var image: [String]
 }

@@ -13,12 +13,12 @@ class DataStore {
     
     private var films: [Film] = []
     
-    private var Scenes: [scenes] = []
-    private var Props: [props] = []
-    private var Characters: [characters] = []
+    private var Scenes: [Scenes] = []
+    private var Props: [Props] = []
+    private var Characters: [Characters] = []
     
     
-    init(films: [Film] = [], favFilms: [Film] = [], Scenes: [scenes] = [], Props: [props] = [], Characters: [characters] = []) {
+    init(films: [Film] = [], favFilms: [Film] = [], Scenes: [Scenes] = [], Props: [Props] = [], Characters: [Characters] = []) {
         self.films = films
         self.Scenes = Scenes
         self.Props = Props
@@ -32,17 +32,17 @@ class DataStore {
             Film(id: 3, name: "My Film 3", sequences: 0, scenes: 0, time: "0", characters: 0, image: ["Image"])
         ]
         
-        let sampleData3: [scenes] = [
-            FilmsPage.scenes(name: "Scene 1", image: ["Image"])
+        let sampleData3: [Scenes] = [
+            FilmsPage.Scenes(name: "Scene 1", image: ["Image"])
         ]
-        let sampleData4: [props] = [
-            FilmsPage.props(name: "Table", image: ["Image"]),
-            FilmsPage.props(name: "Chair", image: ["Image"]),
-            FilmsPage.props(name: "Bookshelf", image: ["Image"])
+        let sampleData4: [Props] = [
+            FilmsPage.Props(name: "Table", image: ["Image"]),
+            FilmsPage.Props(name: "Chair", image: ["Image"]),
+            FilmsPage.Props(name: "Bookshelf", image: ["Image"])
         ]
-        let sampleData5: [characters] = [
-            FilmsPage.characters(name: "Character 1", image: ["Image"]),
-            FilmsPage.characters(name: "Character 2", image: ["Image"])
+        let sampleData5: [Characters] = [
+            FilmsPage.Characters(name: "Character 1", image: ["Image"]),
+            FilmsPage.Characters(name: "Character 2", image: ["Image"])
         ]
             
         self.films = films
@@ -62,13 +62,13 @@ class DataStore {
     }
     
     
-    func getScenes() -> [scenes] {
+    func getScenes() -> [Scenes] {
         Scenes
     }
-    func getProps() -> [props] {
+    func getProps() -> [Props] {
         Props
     }
-    func getCharacters() -> [characters] {
+    func getCharacters() -> [Characters] {
         Characters
     }
 
