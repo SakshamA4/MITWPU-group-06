@@ -1,45 +1,13 @@
 //
-//  ScenesCollectionViewCell.swift
+//  SceneCollectionViewCell.swift
 //  FilmsPage
 //
-//  Created by SDC-USER on 26/11/25.
+//  Created by SDC-USER on 28/11/25.
 //
-
-//import UIKit
-//
-//class SequencesCollectionViewCell: UICollectionViewCell {
-//
-//    @IBOutlet weak var imageView: UIImageView!
-//    @IBOutlet weak var titleLabel: UILabel!
-//    
-//    override func awakeFromNib() {
-//        super.awakeFromNib()
-//        
-//        contentView.layer.cornerRadius = 20
-//        contentView.layer.masksToBounds = true
-//
-//        // Round the imageView
-//        imageView.layer.cornerRadius = 20
-//        imageView.layer.masksToBounds = true
-//        // Initialization code
-//    }
-//   
-//    
-//    func configureCell(sequence: Sequence) {
-//        if !sequence.image.isEmpty {
-//            imageView.image = UIImage(named: sequence.image)
-//        } else {
-//            imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
-//        }
-//        titleLabel.text = sequence.name.capitalized
-//    }
-//
-//
-//}
 
 import UIKit
 
-class SequencesCollectionViewCell: UICollectionViewCell {
+class SceneCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var imageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
@@ -63,9 +31,9 @@ class SequencesCollectionViewCell: UICollectionViewCell {
         updateGradientFrame()
     }
 
-    func configureCell(sequence: Sequence) {
+    func configureCell(scene: Scene) {
 
-        if let image = UIImage(named: sequence.image) {
+        if let image = UIImage(named: scene.image) {
             imageView.image = image
             
             if let color = image.dominantColor() {
@@ -76,12 +44,11 @@ class SequencesCollectionViewCell: UICollectionViewCell {
             imageView.image = nil
         }
 
-        titleLabel.text = sequence.name.capitalized
+        titleLabel.text = scene.name.capitalized
     }
     
     
-    // MARK: - GRADIENT BEHIND LABEL (without overlapping text)
-    
+    // MARK: - GRADIENT BEHIND LABEL
     func applyGradientBehindLabel(using color: UIColor) {
         
         gradientLayer?.removeFromSuperlayer()
@@ -99,14 +66,14 @@ class SequencesCollectionViewCell: UICollectionViewCell {
 
         gradient.cornerRadius = contentView.layer.cornerRadius
         
-        // Insert behind label but above image
+        // Insert gradient between image and label
         contentView.layer.insertSublayer(gradient, above: imageView.layer)
         
         gradientLayer = gradient
         
         updateGradientFrame()
         
-        // Make sure label stays above gradient
+        // Keep label above gradient always
         contentView.bringSubviewToFront(titleLabel)
 
         // Border
@@ -120,10 +87,8 @@ class SequencesCollectionViewCell: UICollectionViewCell {
         
         contentView.layoutIfNeeded()
         
-        // Gradient starts BELOW label so the text stays white
+        // Where gradient should start (slightly below the label)
         let labelY = titleLabel.frame.minY
-        
-        // Safe space to prevent text from being tinted
         let safeOffset: CGFloat = 8
         
         let gradientStartY = labelY + safeOffset
@@ -139,9 +104,9 @@ class SequencesCollectionViewCell: UICollectionViewCell {
 
 
 // MARK: - Dominant Color Extraction
-
 extension UIImage {
-    func dominantColor() -> UIColor? {
+
+    func SceneCelldominantColor() -> UIColor? {
 
         let size = CGSize(width: 10, height: 10)
         UIGraphicsBeginImageContext(size)

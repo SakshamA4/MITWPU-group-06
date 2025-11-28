@@ -8,6 +8,8 @@
 import UIKit
 
 class MyFilmViewController: UIViewController {
+    
+    var film: Film?
 
     @IBOutlet weak var collectionView: UICollectionView!
     
@@ -18,16 +20,15 @@ class MyFilmViewController: UIViewController {
     var sequence: [Sequence] = []
     var character: [Character] = []
     var prop: [Prop] = []
-    let dataStore = DataStore(Sequence: [], Props: [], Characters: [])
+    var dataStore: DataStore?
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        dataStore.loadData()
-        
-        sequence = dataStore.getSequence()
-        character = dataStore.getCharacters()
-        prop = dataStore.getProps()
+        sequence = dataStore!.getSequenceByFilmID(filmId: film!.id )
+        character = dataStore!.getCharacters()
+        prop = dataStore!.getProps()
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
@@ -39,6 +40,8 @@ class MyFilmViewController: UIViewController {
         collectionView.collectionViewLayout = generateLayout()
 
         collectionView.reloadData()
+        
+        navigationItem.title = film?.name ?? "My Film"
         // Do any additional setup after loading the view.
     }
     
@@ -50,7 +53,7 @@ class MyFilmViewController: UIViewController {
         
         collectionView.register(UINib(nibName: "PropsCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "prop_cell")
         
-        //collectionView.register(UINib(nibName: "HeaderView",bundle: nil),forSupplementaryViewOfKind: "header",withReuseIdentifier: "header_cell")
+        collectionView.register(UINib(nibName: "HeaderView",bundle: nil),forSupplementaryViewOfKind: "header",withReuseIdentifier: "header_cell")
         
     }
     
@@ -59,18 +62,21 @@ class MyFilmViewController: UIViewController {
         let layout = UICollectionViewCompositionalLayout {
             section, env in
             
-//            let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(50))
-//            let headerItem = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize, elementKind: "header", alignment: .top)
+             let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(50))
+             let headerItem = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize, elementKind: "header", alignment: .top)
             
             if section == 0 {
                 //set item size
-                let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .fractionalHeight(1.0))
+                let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
                 //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
                 
                 //create the group
-                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.90), heightDimension: .estimated(235))
-                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.9), heightDimension: .estimated(235))
+                let group = NSCollectionLayoutGroup.horizontal(
+                    layoutSize: groupSize,
+                    subitems: [item]
+                )
                 
                 group.interItemSpacing = .fixed(10)
                 //create the section
@@ -82,69 +88,70 @@ class MyFilmViewController: UIViewController {
                 item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
                 //spacing between next block
                 //section.interGroupSpacing = 10
-                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 48, trailing: 12)
-                //section.boundarySupplementaryItems = [headerItem]
+                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
+                section.boundarySupplementaryItems = [headerItem]
                 
                 return section
             }
             else if section == 1 {
                 //set item size
-                let itemSize = NSCollectionLayoutSize(widthDimension: .absolute(221), heightDimension: .absolute(261))
+                let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
                 //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
                 
-                item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10)
+                item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
                 
                 //create the group
-                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.9), heightDimension: .estimated(261))
+                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.90), heightDimension: .estimated(235))
                 
                 //                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
                 let group = NSCollectionLayoutGroup.horizontal(
                     layoutSize: groupSize,
                     repeatingSubitem: item,
-                    count: 4
+                    count: self.character.count
                 )
                 
                 //create the section
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 
-                group.interItemSpacing = .fixed(20)
+                group.interItemSpacing = .fixed(10)
                 //spacing between next block
                 section.interGroupSpacing = 50
                 section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
                 
                 //add header
-                
+                section.boundarySupplementaryItems = [headerItem]
                 
                 return section
             }
             
             else {
-                let itemSize = NSCollectionLayoutSize(widthDimension: .absolute(221), heightDimension: .absolute(261))
+                let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
                 //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
                 
-                item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10)
+                item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
                 
                 //create the group
-                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.9), heightDimension: .estimated(261))
+                let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.90), heightDimension: .estimated(235))
                 
                 //                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
                 let group = NSCollectionLayoutGroup.horizontal(
                     layoutSize: groupSize,
                     repeatingSubitem: item,
-                    count: 4
+                    count: self.prop.count
                 )
                 
                 //create the section
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 
-                group.interItemSpacing = .fixed(20)
+                group.interItemSpacing = .fixed(10)
                 //spacing between next block
                 section.interGroupSpacing = 50
                 section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
+                section.boundarySupplementaryItems = [headerItem]
                 
                 return section
                 
@@ -188,7 +195,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
                 return UICollectionViewCell()
             }
             let sequence = sequence[indexPath.item]
-            cell.configureCell(sequences: sequence)
+            cell.configureCell(sequence: sequence)
             return cell
 
         } else if indexPath.section == 1  {
@@ -215,11 +222,41 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         //headerView.backgroundColor = .blue
         
         if indexPath.section == 0 {
-            headerView.configureHeader(text: "My Film")
+            headerView.configureHeader(text: "Sequences")
+        } else if indexPath.section == 1 {
+            headerView.configureHeader(text: "Characters")
+            
+        } else {
+            headerView.configureHeader(text: "Props")
         }
         
         return headerView
     }
     
+  
+    func collectionView(
+        _ collectionView: UICollectionView,
+        didSelectItemAt indexPath: IndexPath
+    ) {
+        var selectedSequence: Sequence?
+
+       selectedSequence = sequence[indexPath.item]
+
+        performSegue(withIdentifier: "sequenceSegue", sender: selectedSequence)
+    }
     
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "SequenceSegue" {
+            let selected = sender as! Sequence
+            let vc = segue.destination as! SequenceViewController
+            vc.sequence = selected
+            vc.dataStore = dataStore
+        }
+    }
+
+
 }
+
+    
+    
+

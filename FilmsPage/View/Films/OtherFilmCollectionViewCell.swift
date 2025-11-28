@@ -36,8 +36,8 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
         
     }
     func configureCell(film: Film) {
-        if let imageName = film.image.first {
-            imageView.image = UIImage(named: imageName)
+        if !film.image.isEmpty {
+            imageView.image = UIImage(named: film.image)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }

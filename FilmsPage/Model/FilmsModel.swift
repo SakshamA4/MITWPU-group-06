@@ -10,30 +10,42 @@ import UIKit
 
 
 struct Film {
-    var id: Int
+    var id: UUID
     var name : String
     var sequences: Int
     var scenes: Int
     var time : String
     var characters: Int
-    var image : [String]
+    var image : String
 }
 
 
 struct Sequence {
+    var id: UUID
     var name: String
-    var image: [String]
+    var image: String
+    var filmId: UUID
 }
 
 struct Character {
+    var id: UUID
     var name: String
-    var image: [String]
+    var image: String
 }
 
 struct Prop {
+    
+    var id: UUID
     var name: String
-    var image: [String]
+    var image: String
 }
 
+struct Scene {
+    
+    var id: UUID
+    var name: String
+    var image: String
+    var SequenceId: UUID
 
+}
 

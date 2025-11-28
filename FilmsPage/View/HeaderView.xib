@@ -14,18 +14,18 @@
             <autoresizingMask key="autoresizingMask"/>
             <subviews>
                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OPq-YG-vRd">
-                    <rect key="frame" x="50" y="24" width="330" height="52"/>
-                    <fontDescription key="fontDescription" type="boldSystem" pointSize="44"/>
+                    <rect key="frame" x="50" y="0.0" width="340" height="101"/>
+                    <fontDescription key="fontDescription" type="boldSystem" pointSize="30"/>
                     <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                     <nil key="highlightedColor"/>
                 </label>
             </subviews>
             <viewLayoutGuide key="safeArea" id="VXr-Tz-HHm"/>
             <constraints>
-                <constraint firstItem="VXr-Tz-HHm" firstAttribute="bottom" secondItem="OPq-YG-vRd" secondAttribute="bottom" id="24k-PA-EWd"/>
-                <constraint firstItem="VXr-Tz-HHm" firstAttribute="trailing" secondItem="OPq-YG-vRd" secondAttribute="trailing" constant="10" id="ML4-ZA-CGP"/>
-                <constraint firstItem="OPq-YG-vRd" firstAttribute="leading" secondItem="VXr-Tz-HHm" secondAttribute="leading" constant="50" id="V7C-32-asJ"/>
-                <constraint firstItem="OPq-YG-vRd" firstAttribute="top" secondItem="VXr-Tz-HHm" secondAttribute="top" id="vQE-8T-Xx2"/>
+                <constraint firstItem="OPq-YG-vRd" firstAttribute="top" secondItem="U6b-Vx-4bR" secondAttribute="top" id="6Im-f6-FQc"/>
+                <constraint firstItem="OPq-YG-vRd" firstAttribute="trailing" secondItem="VXr-Tz-HHm" secondAttribute="trailing" id="Ygh-gT-crJ"/>
+                <constraint firstAttribute="bottom" secondItem="OPq-YG-vRd" secondAttribute="bottom" id="prb-6k-bQG"/>
+                <constraint firstItem="OPq-YG-vRd" firstAttribute="leading" secondItem="VXr-Tz-HHm" secondAttribute="leading" constant="50" id="y1L-PF-r8Q"/>
             </constraints>
             <connections>
                 <outlet property="headerLabel" destination="OPq-YG-vRd" id="z6l-Fh-1uy"/>

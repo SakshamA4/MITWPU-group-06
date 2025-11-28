@@ -20,15 +20,15 @@ class CharactersCollectionViewCell: UICollectionViewCell {
         contentView.layer.masksToBounds = true
 
         // Round the imageView
-        imageView.layer.cornerRadius = 20
+        imageView.layer.cornerRadius = 16
         imageView.layer.masksToBounds = true
         // Initialization code
     }
    
     
     func configureCell(character: Character) {
-        if let imageName = character.image.first {
-            imageView.image = UIImage(named: imageName)
+        if !character.image.isEmpty {
+            imageView.image = UIImage(named: character.image)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }
