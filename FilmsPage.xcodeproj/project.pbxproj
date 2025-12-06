@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		198E4F712EE403490030FE85 /* MyFeatueCanvasVCViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */; };
+		198E4F732EE4048E0030FE85 /* ItemPicker.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */; };
+		198E4F752EE404E20030FE85 /* ItemPickerVCViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */; };
+		198E4F772EE406BA0030FE85 /* BottomSheetPresentationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 198E4F762EE406BA0030FE85 /* BottomSheetPresentationController.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		19075A4B2ED4646D00B3A488 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmsPage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyFeatueCanvasVCViewController.swift; sourceTree = "<group>"; };
+		198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = ItemPicker.storyboard; sourceTree = "<group>"; };
+		198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemPickerVCViewController.swift; sourceTree = "<group>"; };
+		198E4F762EE406BA0030FE85 /* BottomSheetPresentationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheetPresentationController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,6 +57,8 @@
 			isa = PBXGroup;
 			children = (
 				19075A4D2ED4646D00B3A488 /* FilmsPage */,
+				198E4F6F2EE3FE830030FE85 /* CustomPresentation */,
+				198E4F6E2EE3FE630030FE85 /* CanvasViewControllers */,
 				19075A4C2ED4646D00B3A488 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -56,6 +69,24 @@
 				19075A4B2ED4646D00B3A488 /* FilmsPage.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		198E4F6E2EE3FE630030FE85 /* CanvasViewControllers */ = {
+			isa = PBXGroup;
+			children = (
+				198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */,
+				198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */,
+				198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */,
+			);
+			path = CanvasViewControllers;
+			sourceTree = "<group>";
+		};
+		198E4F6F2EE3FE830030FE85 /* CustomPresentation */ = {
+			isa = PBXGroup;
+			children = (
+				198E4F762EE406BA0030FE85 /* BottomSheetPresentationController.swift */,
+			);
+			path = CustomPresentation;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,6 +153,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				198E4F732EE4048E0030FE85 /* ItemPicker.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,6 +164,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				198E4F772EE406BA0030FE85 /* BottomSheetPresentationController.swift in Sources */,
+				198E4F752EE404E20030FE85 /* ItemPickerVCViewController.swift in Sources */,
+				198E4F712EE403490030FE85 /* MyFeatueCanvasVCViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
