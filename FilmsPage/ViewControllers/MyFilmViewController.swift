@@ -246,11 +246,11 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "SequenceSegue" {
+        if segue.identifier == "sequenceSegue" {
             let selected = sender as! Sequence
             let vc = segue.destination as! SequenceViewController
             vc.sequence = selected
-            vc.dataStore = dataStore
+            vc.dataStore = self.dataStore
         }
     }
 

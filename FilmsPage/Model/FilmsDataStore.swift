@@ -44,19 +44,20 @@ class DataStore {
             
         ]
         let sampleData4: [Prop] = [
-            FilmsPage.Prop(id: UUID() ,name: "Table", image: "Image"),
-            FilmsPage.Prop(id: UUID() ,name: "Chair", image: "Image"),
-            FilmsPage.Prop(id: UUID() ,name: "Bookshelf", image: "Image")
+            Prop(id: UUID() ,name: "Table", image: "Image"),
+            Prop(id: UUID() ,name: "Chair", image: "Image"),
+            Prop(id: UUID() ,name: "Bookshelf", image: "Image")
         ]
         let sampleData5: [Character] = [
-            FilmsPage.Character(id: UUID() ,name: "Character 1", image: "Image"),
-            FilmsPage.Character(id: UUID() ,name: "Character 2", image: "Image")
+            Character(id: UUID() ,name: "Character 1", image: "Image"),
+            Character(id: UUID() ,name: "Character 2", image: "Image")
         ]
         
         self.scenes = [
-            Scene(id: self.sequence[0].id, name: "Scene 1", image: "Image", SequenceId: UUID()),
-            Scene(id: self.sequence[0].id, name: "Scene 2", image: "Image", SequenceId: UUID()),
-            Scene(id: self.sequence[0].id, name: "Scene 3", image: "Image", SequenceId: UUID())
+            Scene(id: UUID(), name: "Scene 1", image: "Image", SequenceId: self.sequence[0].id),
+            Scene(id: UUID(), name: "Scene 2", image: "Image", SequenceId: self.sequence[0].id),
+            Scene(id: UUID(), name: "Scene 3", image: "Image", SequenceId: self.sequence[0].id),
+            Scene(id: UUID(), name: "Scene 4", image: "Image", SequenceId: self.sequence[0].id)
             
         ]
 
