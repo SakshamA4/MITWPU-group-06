@@ -216,47 +216,107 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         
     }
     
-    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        //create headerView
-        let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: "header", withReuseIdentifier: "header_cell", for: indexPath) as! HeaderView
-        //headerView.backgroundColor = .blue
-        
+    func collectionView(_ collectionView: UICollectionView,
+                        viewForSupplementaryElementOfKind kind: String,
+                        at indexPath: IndexPath) -> UICollectionReusableView {
+
+        let headerView = collectionView.dequeueReusableSupplementaryView(
+            ofKind: "header",
+            withReuseIdentifier: "header_cell",
+            for: indexPath
+        ) as! HeaderView
+
         if indexPath.section == 0 {
-            headerView.configureHeader(text: "Sequences")
+            headerView.configureHeader(text: "Sequences", section: 0)
         } else if indexPath.section == 1 {
-            headerView.configureHeader(text: "Characters")
-            
+            headerView.configureHeader(text: "Characters", section: 1)
         } else {
-            headerView.configureHeader(text: "Props")
+            headerView.configureHeader(text: "Props", section: 2)
         }
-        
+
+        headerView.delegate = self
         return headerView
     }
+
     
   
-    func collectionView(
-        _ collectionView: UICollectionView,
-        didSelectItemAt indexPath: IndexPath
-    ) {
-        var selectedSequence: Sequence?
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
 
-       selectedSequence = sequence[indexPath.item]
+        if indexPath.section == 0 {
+            // Sequences
+            let selected = sequence[indexPath.item]
+            performSegue(withIdentifier: "sequenceSegue", sender: selected)
 
-        performSegue(withIdentifier: "sequenceSegue", sender: selectedSequence)
+        } else if indexPath.section == 1 {
+            // Characters
+            let selected = character[indexPath.item]
+            performSegue(withIdentifier: "characterSegue", sender: selected)
+
+        } else {
+            // Props
+            let selected = prop[indexPath.item]
+            performSegue(withIdentifier: "propSegue", sender: selected)
+        }
     }
+
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        
         if segue.identifier == "sequenceSegue" {
             let selected = sender as! Sequence
             let vc = segue.destination as! SequenceViewController
             vc.sequence = selected
             vc.dataStore = self.dataStore
         }
+
+        if segue.identifier == "characterSegue" {
+            let selected = sender as! Character
+            let vc = segue.destination as! CharacterViewController
+            vc.character = selected
+            vc.dataStore = self.dataStore
+        }
+
+        if segue.identifier == "propSegue" {
+            let selected = sender as! Prop
+            let vc = segue.destination as! PropViewController
+            vc.prop = selected
+            vc.dataStore = self.dataStore
+        }
+        
+        if segue.identifier == "allSequencesSegue" {
+             let vc = segue.destination as! AllSequencesViewController
+             vc.dataStore = self.dataStore
+             vc.sequence = sender as! [Sequence]
+         }
+
+         if segue.identifier == "allCharactersSegue" {
+             let vc = segue.destination as! AllCharactersViewController
+             vc.dataStore = self.dataStore
+             vc.character = sender as! [Character]
+         }
+
+         if segue.identifier == "allPropsSegue" {
+             let vc = segue.destination as! AllPropsViewController
+             vc.dataStore = self.dataStore       // IMPORTANT!
+             vc.prop = sender as! [Prop]                // IMPORTANT!
+         }
     }
 
 
+    }
+
+
+extension MyFilmViewController: HeaderViewDelegate {
+    func didTapHeader(section: Int) {
+        if section == 0 {
+            performSegue(withIdentifier: "allSequencesSegue", sender: sequence)
+            
+        } else if section == 1 {
+            performSegue(withIdentifier: "allCharactersSegue", sender: character)
+        } else if section == 2 {
+            performSegue(withIdentifier: "allPropsSegue", sender: prop)
+        }
+    }
+    
+    
 }
-
-    
-    
-

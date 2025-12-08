@@ -1,23 +1,19 @@
 //
-//  ViewController.swift
+//  CharacterViewController.swift
 //  FilmsPage
 //
-//  Created by SDC-USER on 06/12/25.
+//  Created by SDC-USER on 08/12/25.
 //
 
 import UIKit
 
-class NewFilmViewController: UIViewController {
+class CharacterViewController: UIViewController {
 
-    @IBOutlet weak var NewFilmView: UIView!
-    @IBOutlet weak var BoxView: UIView!
+    var character: Character?
+    var dataStore: DataStore?
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        NewFilmView.layer.cornerRadius = 20
-        NewFilmView.layer.masksToBounds = true
-        BoxView.layer.cornerRadius = 20
-        BoxView.layer.masksToBounds = true
 
         // Do any additional setup after loading the view.
     }

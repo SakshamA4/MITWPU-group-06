@@ -110,7 +110,7 @@ class FilmsViewController: UIViewController {
             } else {
                 //set item size
                 let itemSize = NSCollectionLayoutSize(
-                    widthDimension: .absolute(221),
+                    widthDimension: .fractionalWidth(0.2),
                     heightDimension: .absolute(261)
                 )
                 //create item
@@ -133,7 +133,9 @@ class FilmsViewController: UIViewController {
                 let group = NSCollectionLayoutGroup.horizontal(
                     layoutSize: groupSize,
                     repeatingSubitem: item,
-                    count: 4
+                    count: 5
+                    
+                    
                 )
 
                 //create the section
@@ -162,7 +164,7 @@ class FilmsViewController: UIViewController {
 }
 
 extension FilmsViewController: UICollectionViewDataSource,
-    UICollectionViewDelegate, OtherFilmDelegate
+    UICollectionViewDelegate, OtherFilmDelegate, AddFilmDelegate
 {
     func setFavFilm(film: Film) {
         self.allFilms.append(self.favouriteFilm)
@@ -251,7 +253,18 @@ extension FilmsViewController: UICollectionViewDataSource,
             let vc = segue.destination as! MyFilmViewController
             vc.film = film
             vc.dataStore = dataStore
+        } else if(segue.identifier == "addFilmSegue") {
+            let vc = segue.destination as! AddFilmViewController
+            vc.delegate = self
         }
+        
+    }
+    
+    func addFilm(film: Film){
+        allFilms.append(favouriteFilm)
+        favouriteFilm = film
+        collectionView.reloadData()
     }
 
 }
+
