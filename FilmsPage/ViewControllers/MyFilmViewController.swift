@@ -5,6 +5,7 @@
 //  Created by SDC-USER on 26/11/25.
 //
 
+
 import UIKit
 
 class MyFilmViewController: UIViewController {
@@ -27,8 +28,8 @@ class MyFilmViewController: UIViewController {
         super.viewDidLoad()
         
         sequence = dataStore!.getSequenceByFilmID(filmId: film!.id )
-        character = dataStore!.getCharacters()
-        prop = dataStore!.getProps()
+        character = dataStore!.getCharacters(filmId: film!.id)
+        prop = dataStore!.getProps(filmId: film!.id)
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
@@ -42,19 +43,14 @@ class MyFilmViewController: UIViewController {
         collectionView.reloadData()
         
         navigationItem.title = film?.name ?? "My Film"
-        // Do any additional setup after loading the view.
     }
     
     func registerCells() {
-        
         collectionView.register(UINib(nibName: "SequencesCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "sequence_cell")
-        
         collectionView.register(UINib(nibName: "CharactersCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "character_cell")
-        
         collectionView.register(UINib(nibName: "PropsCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "prop_cell")
-        
         collectionView.register(UINib(nibName: "HeaderView",bundle: nil),forSupplementaryViewOfKind: "header",withReuseIdentifier: "header_cell")
-        
+        collectionView.register(UINib(nibName: "PlaceholderCollectionViewCell",bundle: nil), forCellWithReuseIdentifier: "placeholder_cell")
     }
     
 
@@ -66,155 +62,118 @@ class MyFilmViewController: UIViewController {
              let headerItem = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize, elementKind: "header", alignment: .top)
             
             if section == 0 {
-                //set item size
                 let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
-                //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
                 
-                //create the group
                 let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.9), heightDimension: .estimated(235))
-                let group = NSCollectionLayoutGroup.horizontal(
-                    layoutSize: groupSize,
-                    subitems: [item]
-                )
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
                 
                 group.interItemSpacing = .fixed(10)
-                //create the section
                 let section = NSCollectionLayoutSection(group: group)
-                //scrolling
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 
-                
                 item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-                //spacing between next block
-                //section.interGroupSpacing = 10
                 section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section
             }
             else if section == 1 {
-                //set item size
                 let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
-                //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
-                
                 item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-                
-                //create the group
+
                 let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.90), heightDimension: .estimated(235))
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
                 
-                //                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
-                let group = NSCollectionLayoutGroup.horizontal(
-                    layoutSize: groupSize,
-                    repeatingSubitem: item,
-                    count: self.character.count
-                )
-                
-                //create the section
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
-                
                 group.interItemSpacing = .fixed(10)
-                //spacing between next block
                 section.interGroupSpacing = 50
                 section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
-                
-                //add header
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section
             }
-            
             else {
                 let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.25), heightDimension: .fractionalHeight(1.0))
-                //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
-                
                 item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-                
-                //create the group
+
                 let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.90), heightDimension: .estimated(235))
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
                 
-                //                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
-                let group = NSCollectionLayoutGroup.horizontal(
-                    layoutSize: groupSize,
-                    repeatingSubitem: item,
-                    count: self.prop.count
-                )
-                
-                //create the section
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .groupPagingCentered
-                
                 group.interItemSpacing = .fixed(10)
-                //spacing between next block
                 section.interGroupSpacing = 50
                 section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section
-                
             }
-            
         }
-            
-            return layout
-       
+        return layout
     }
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
-    }
-    */
-
 }
 
-extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate{
-    func numberOfSections(in collectionView: UICollectionView) -> Int {
-        3
-    }
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        if section == 0 {
-            return sequence.count
-        } else if section == 1 {
-            return character.count
-        } else {
-            return prop.count
-        }
-    }
-    
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if indexPath.section == 0 {
-            
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: sequenceCellId , for: indexPath) as? SequencesCollectionViewCell else {
-                return UICollectionViewCell()
-            }
-            let sequence = sequence[indexPath.item]
-            cell.configureCell(sequence: sequence)
-            return cell
 
-        } else if indexPath.section == 1  {
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: characterCellId, for: indexPath) as? CharactersCollectionViewCell else {
-                return UICollectionViewCell()
-            }
-            let character = character[indexPath.item]
-            cell.configureCell(character: character)
-            return cell
-        } else {
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: propCellId, for: indexPath) as? PropsCollectionViewCell else {
-                return UICollectionViewCell()
-            }
-            let prop = prop[indexPath.item]
-            cell.configureCell(prop: prop)
-            return cell
-        }
+extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate {
+    func addSequence(sequence: Sequence) {
+        
+        dataStore?.createNewSequence(newSequence: sequence)
+        collectionView.reloadData()
         
     }
+    
+
+    // Helper — generic dequeue
+    private func dequeue<T: UICollectionViewCell>(_ id: String, as: T.Type, _ cv: UICollectionView, _ index: IndexPath) -> T {
+        return cv.dequeueReusableCell(withReuseIdentifier: id, for: index) as! T
+    }
+
+    // Helper — placeholder cell
+    private func placeholder(_ cv: UICollectionView, _ index: IndexPath) -> PlaceholderCollectionViewCell {
+        return dequeue("placeholder_cell", as: PlaceholderCollectionViewCell.self, cv, index)
+    }
+
+    
+    func numberOfSections(in collectionView: UICollectionView) -> Int { 3 }
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        numberOfItemsInSection section: Int) -> Int {
+        if section == 0 { return sequence.isEmpty ? 1 : sequence.count }
+        if section == 1 { return character.isEmpty ? 1 : character.count }
+        return prop.isEmpty ? 1 : prop.count
+    }
+
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+
+        switch indexPath.section {
+
+        case 0:
+            if sequence.isEmpty { return placeholder(collectionView, indexPath) }
+            let cell = dequeue(sequenceCellId, as: SequencesCollectionViewCell.self, collectionView, indexPath)
+            cell.configureCell(sequence: sequence[indexPath.item])
+            
+            return cell
+
+        case 1:
+            if character.isEmpty { return placeholder(collectionView, indexPath) }
+            let cell = dequeue(characterCellId, as: CharactersCollectionViewCell.self, collectionView, indexPath)
+            cell.configureCell(character: character[indexPath.item])
+            return cell
+
+        default:
+            if prop.isEmpty { return placeholder(collectionView, indexPath) }
+            let cell = dequeue(propCellId, as: PropsCollectionViewCell.self, collectionView, indexPath)
+            cell.configureCell(prop: prop[indexPath.item])
+            return cell
+        }
+    }
+
     
     func collectionView(_ collectionView: UICollectionView,
                         viewForSupplementaryElementOfKind kind: String,
@@ -223,8 +182,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         let headerView = collectionView.dequeueReusableSupplementaryView(
             ofKind: "header",
             withReuseIdentifier: "header_cell",
-            for: indexPath
-        ) as! HeaderView
+            for: indexPath) as! HeaderView
 
         if indexPath.section == 0 {
             headerView.configureHeader(text: "Sequences", section: 0)
@@ -239,23 +197,22 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     }
 
     
-  
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
+        if indexPath.section == 0 && sequence.isEmpty { return false }
+        if indexPath.section == 1 && character.isEmpty { return false }
+        if indexPath.section == 2 && prop.isEmpty { return false }
+        return true
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        didSelectItemAt indexPath: IndexPath) {
 
         if indexPath.section == 0 {
-            // Sequences
-            let selected = sequence[indexPath.item]
-            performSegue(withIdentifier: "sequenceSegue", sender: selected)
-
+            performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
         } else if indexPath.section == 1 {
-            // Characters
-            let selected = character[indexPath.item]
-            performSegue(withIdentifier: "characterSegue", sender: selected)
-
+            performSegue(withIdentifier: "characterSegue", sender: character[indexPath.item])
         } else {
-            // Props
-            let selected = prop[indexPath.item]
-            performSegue(withIdentifier: "propSegue", sender: selected)
+            performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
         }
     }
 
@@ -263,60 +220,57 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         
         if segue.identifier == "sequenceSegue" {
-            let selected = sender as! Sequence
             let vc = segue.destination as! SequenceViewController
-            vc.sequence = selected
-            vc.dataStore = self.dataStore
+            vc.sequence = sender as? Sequence
+            vc.dataStore = dataStore
         }
 
         if segue.identifier == "characterSegue" {
-            let selected = sender as! Character
             let vc = segue.destination as! CharacterViewController
-            vc.character = selected
-            vc.dataStore = self.dataStore
+            vc.character = sender as? Character
+            vc.dataStore = dataStore
         }
 
         if segue.identifier == "propSegue" {
-            let selected = sender as! Prop
             let vc = segue.destination as! PropViewController
-            vc.prop = selected
-            vc.dataStore = self.dataStore
+            vc.prop = sender as? Prop
+            vc.dataStore = dataStore
         }
-        
+
         if segue.identifier == "allSequencesSegue" {
-             let vc = segue.destination as! AllSequencesViewController
-             vc.dataStore = self.dataStore
-             vc.sequence = sender as! [Sequence]
-         }
+            let vc = segue.destination as! AllSequencesViewController
+            vc.dataStore = dataStore
+            vc.sequence = sender as! [Sequence]
+        }
 
-         if segue.identifier == "allCharactersSegue" {
-             let vc = segue.destination as! AllCharactersViewController
-             vc.dataStore = self.dataStore
-             vc.character = sender as! [Character]
-         }
+        if segue.identifier == "allCharactersSegue" {
+            let vc = segue.destination as! AllCharactersViewController
+            vc.dataStore = dataStore
+            vc.character = sender as! [Character]
+        }
 
-         if segue.identifier == "allPropsSegue" {
-             let vc = segue.destination as! AllPropsViewController
-             vc.dataStore = self.dataStore       // IMPORTANT!
-             vc.prop = sender as! [Prop]                // IMPORTANT!
-         }
+        if segue.identifier == "allPropsSegue" {
+            let vc = segue.destination as! AllPropsViewController
+            vc.dataStore = dataStore
+            vc.prop = sender as! [Prop]
+        }
     }
+}
 
 
-    }
-
+// ---------------------------------------------------------
+// MARK: - HEADER TAP HANDLER
+// ---------------------------------------------------------
 
 extension MyFilmViewController: HeaderViewDelegate {
     func didTapHeader(section: Int) {
         if section == 0 {
             performSegue(withIdentifier: "allSequencesSegue", sender: sequence)
-            
         } else if section == 1 {
             performSegue(withIdentifier: "allCharactersSegue", sender: character)
         } else if section == 2 {
             performSegue(withIdentifier: "allPropsSegue", sender: prop)
         }
     }
-    
-    
 }
+

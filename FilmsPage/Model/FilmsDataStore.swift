@@ -29,8 +29,24 @@ class DataStore {
     }
         
     func loadData() {
+        
+        if let savedData = UserDefaults.standard.data(forKey: "films") {
+            let decoder = JSONDecoder()
+            if let decoded = try? decoder.decode([Film].self, from: savedData) {
+                self.films = decoded
+            }
+        }
+
+        if let savedFav = UserDefaults.standard.data(forKey: "favFilm") {
+            let decoder = JSONDecoder()
+            if let decodedFav = try? decoder.decode(Film.self, from: savedFav) {
+                self.favFilms = decodedFav
+            }
+        }
+        
+        
         self.films = [
-            Film(id: UUID(), name: "Sample Film", sequences: 0, scenes: 0, time: "0", characters: 0, image: "Image"),
+            Film(id: UUID(), name: "Sample Film", sequences: 0, scenes: 0, time: "0", characters: 0, props: 3, image: "Image"),
             Film(id: UUID(), name: "Templates", sequences: 0, scenes: 0, time: "0", characters: 0, image: "Image")
             
         ]
@@ -44,13 +60,13 @@ class DataStore {
             
         ]
         let sampleData4: [Prop] = [
-            Prop(id: UUID() ,name: "Table", image: "Image"),
-            Prop(id: UUID() ,name: "Chair", image: "Image"),
-            Prop(id: UUID() ,name: "Bookshelf", image: "Image")
+            Prop(id: UUID() ,name: "Table", image: "Image",filmId: self.films[0].id ),
+            Prop(id: UUID() ,name: "Chair", image: "Image",filmId: self.films[0].id),
+            Prop(id: UUID() ,name: "Bookshelf", image: "Image",filmId: self.films[0].id)
         ]
         let sampleData5: [Character] = [
-            Character(id: UUID() ,name: "Character 1", image: "Image"),
-            Character(id: UUID() ,name: "Character 2", image: "Image")
+            Character(id: UUID() ,name: "Character 1", image: "Image",filmId: self.films[0].id),
+            Character(id: UUID() ,name: "Character 2", image: "Image",filmId: self.films[0].id)
         ]
         
         self.scenes = [
@@ -64,6 +80,24 @@ class DataStore {
         self.Props = sampleData4
         self.Characters = sampleData5
     }
+    
+    func saveData() {
+        let encoder = JSONEncoder()
+
+        if let encoded = try? encoder.encode(films) {
+            UserDefaults.standard.set(encoded, forKey: "films")
+        }
+
+        if let fav = favFilms {
+            if let encodedFav = try? encoder.encode(fav) {
+                UserDefaults.standard.set(encodedFav, forKey: "favFilm")
+            }
+        }
+    }
+    
+
+
+
     
     func getOtherFilms() -> [Film] {
         return self.films
@@ -82,19 +116,26 @@ class DataStore {
 
         return sequence.filter { $0.filmId == filmId }
     }
-    func getProps() -> [Prop] {
-        Props
+    func getProps(filmId: UUID) -> [Prop] {
+        return Props.filter { $0.filmId == filmId }
     }
-    func getCharacters() -> [Character] {
-        Characters
+    func getCharacters(filmId: UUID) -> [Character] {
+        return Characters.filter { $0.filmId == filmId }
     }
     
-    func createNewFilm(newFilm: Film){
-        films.append(newFilm)
-    }
     
     func getScenes(sequenceId: UUID) -> [Scene] {
         return scenes.filter{ $0.SequenceId == sequenceId }
+    }
+
+    func createNewFilm(newFilm: Film) {
+        films.append(newFilm)
+        saveData()
+    }
+    
+    func createNewSequence(newSequence: Sequence) {
+        sequence.append(newSequence)
+        saveData()
     }
 
 }

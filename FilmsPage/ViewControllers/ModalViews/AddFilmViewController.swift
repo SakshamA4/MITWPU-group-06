@@ -25,10 +25,20 @@ class AddFilmViewController: UIViewController {
     
     
     @IBAction func addFilm(_ sender: Any) {
-        let film = Film(id: UUID(), name: nameTextField.text ?? "", sequences: 0, scenes: 0, time: "", characters: 0, image: "Image")
+        let film = Film(
+            id: UUID(),
+            name: nameTextField.text ?? "",
+            sequences: 0,
+            scenes: 0,
+            time: "",
+            characters: 0,
+            image: "Image"
+        )
+
         delegate?.addFilm(film: film)
-        
+        dismiss(animated: true)
     }
+
     /*
     // MARK: - Navigation
 

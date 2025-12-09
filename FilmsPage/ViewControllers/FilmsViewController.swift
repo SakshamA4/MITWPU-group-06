@@ -260,9 +260,20 @@ extension FilmsViewController: UICollectionViewDataSource,
         
     }
     
-    func addFilm(film: Film){
-        allFilms.append(favouriteFilm)
+    func addFilm(film: Film) {
+
+        // 1. Move current favourite to allFilms
+        if let fav = favouriteFilm {
+            allFilms.append(fav)
+        }
+
+        // 2. Set new favourite
         favouriteFilm = film
+
+        // 3. Save to datastore
+        dataStore.createNewFilm(newFilm: film)
+
+        // 4. Reload UI
         collectionView.reloadData()
     }
 
