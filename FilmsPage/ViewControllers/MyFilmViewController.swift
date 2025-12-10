@@ -28,8 +28,8 @@ class MyFilmViewController: UIViewController {
         super.viewDidLoad()
         
         sequence = dataStore!.getSequenceByFilmID(filmId: film!.id )
-        character = dataStore!.getCharacters(filmId: film!.id)
-        prop = dataStore!.getProps(filmId: film!.id)
+        character = dataStore!.getCharactersByFilmId(filmId: film!.id)
+        prop = dataStore!.getPropsbyFilmId(filmId: film!.id)
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
@@ -121,7 +121,14 @@ class MyFilmViewController: UIViewController {
 extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate {
     func addSequence(sequence: Sequence) {
         
+        // Save into datastore
         dataStore?.createNewSequence(newSequence: sequence)
+
+        // Refresh ONLY sequences for the current film
+        if let film = film {
+            self.sequence = dataStore!.getSequenceByFilmID(filmId: film.id)
+        }
+
         collectionView.reloadData()
         
     }
@@ -225,18 +232,23 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             vc.dataStore = dataStore
         }
 
-        if segue.identifier == "characterSegue" {
-            let vc = segue.destination as! CharacterViewController
-            vc.character = sender as? Character
-            vc.dataStore = dataStore
-        }
+//        if segue.identifier == "characterSegue" {
+//            let vc = segue.destination as! AddCharacterViewController
+//            vc.character = sender as? Character
+//            vc.dataStore = dataStore
+//        }
 
-        if segue.identifier == "propSegue" {
-            let vc = segue.destination as! PropViewController
-            vc.prop = sender as? Prop
-            vc.dataStore = dataStore
-        }
+//        if segue.identifier == "propSegue" {
+//            let vc = segue.destination as! AddPropViewController
+//            vc.prop = sender as? Prop
+//            vc.dataStore = dataStore
+//        }
 
+        if segue.identifier == "addButtonSegue" {   // the segue that opens AddViewController
+            let vc = segue.destination as! AddViewController
+            vc.dataStore = self.dataStore        // ← pass datastore
+            vc.film = self.film                  // ← pass film
+        }
         if segue.identifier == "allSequencesSegue" {
             let vc = segue.destination as! AllSequencesViewController
             vc.dataStore = dataStore

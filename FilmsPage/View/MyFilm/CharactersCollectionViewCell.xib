@@ -21,9 +21,6 @@
                         <subviews>
                             <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="L5R-V2-i8D">
                                 <rect key="frame" x="10" y="10" width="283" height="150"/>
-                                <constraints>
-                                    <constraint firstAttribute="height" constant="150" id="UBU-mi-iXz"/>
-                                </constraints>
                             </imageView>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="ogq-08-AW5">
                                 <rect key="frame" x="0.0" y="197" width="303" height="24"/>
@@ -36,6 +33,7 @@
                         <constraints>
                             <constraint firstAttribute="bottom" secondItem="ogq-08-AW5" secondAttribute="bottom" constant="30" id="0fd-V1-ByT"/>
                             <constraint firstItem="L5R-V2-i8D" firstAttribute="top" secondItem="jw9-FB-VKs" secondAttribute="top" constant="10" id="91q-if-OqE"/>
+                            <constraint firstItem="ogq-08-AW5" firstAttribute="top" secondItem="L5R-V2-i8D" secondAttribute="bottom" constant="37" id="ADc-sI-8vz"/>
                             <constraint firstItem="L5R-V2-i8D" firstAttribute="leading" secondItem="jw9-FB-VKs" secondAttribute="leading" constant="10" id="Jqv-Jg-RwF"/>
                             <constraint firstAttribute="trailing" secondItem="ogq-08-AW5" secondAttribute="trailing" id="TmF-ou-8Xl"/>
                             <constraint firstItem="ogq-08-AW5" firstAttribute="leading" secondItem="jw9-FB-VKs" secondAttribute="leading" id="bJh-tx-Ltj"/>

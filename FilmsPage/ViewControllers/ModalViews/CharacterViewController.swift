@@ -2,23 +2,28 @@
 //  CharacterViewController.swift
 //  FilmsPage
 //
-//  Created by SDC-USER on 08/12/25.
+//  Created by SDC-USER on 10/12/25.
 //
 
 import UIKit
 
 class CharacterViewController: UIViewController {
 
-    var character: Character?
+    @IBOutlet weak var characterTitle: UILabel!
+    
+    var film: Film?
     var dataStore: DataStore?
+    var characters: Character?
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+       updateTitle()
         // Do any additional setup after loading the view.
     }
     
-
+    private func updateTitle() {
+        characterTitle.text = characters?.name ?? "Character"
+    }
     /*
     // MARK: - Navigation
 

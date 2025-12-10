@@ -16,6 +16,7 @@ class AddSequenceViewController: UIViewController {
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
     var delegate: AddSequenceDelegate?
+    var film: Film?
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -23,7 +24,16 @@ class AddSequenceViewController: UIViewController {
     }
     
     @IBAction func AddNewSequence(_ sender: Any) {
-        let sequence = Sequence(id: UUID(), name: nameTextField.text!, image: "Image", filmId: UUID())
+        guard let film = film else { return }
+        guard let name = nameTextField.text, !name.isEmpty else { return }
+
+        let sequence = Sequence(
+            id: UUID(),
+            name: nameTextField.text!,
+            image: "Image",
+            filmId: film.id   // attach to the correct film!// ← use existing film id
+        )
+        
         delegate?.addSequence(sequence: sequence)
         dismiss(animated: true)
     }

@@ -32,7 +32,7 @@ struct Character {
     var id: UUID
     var name: String
     var image: String
-    var filmId: UUID
+    var filmId: UUID = UUID()
 }
 
 struct Prop {
@@ -40,7 +40,7 @@ struct Prop {
     var id: UUID
     var name: String
     var image: String
-    var filmId: UUID
+    var filmId: UUID = UUID()
 }
 
 struct Scene {

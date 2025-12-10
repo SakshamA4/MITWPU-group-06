@@ -64,9 +64,13 @@ class DataStore {
             Prop(id: UUID() ,name: "Chair", image: "Image",filmId: self.films[0].id),
             Prop(id: UUID() ,name: "Bookshelf", image: "Image",filmId: self.films[0].id)
         ]
-        let sampleData5: [Character] = [
+        self.Characters = [
             Character(id: UUID() ,name: "Character 1", image: "Image",filmId: self.films[0].id),
-            Character(id: UUID() ,name: "Character 2", image: "Image",filmId: self.films[0].id)
+            Character(id: UUID() ,name: "Character 2", image: "Image",filmId: self.films[0].id),
+            Character(id: UUID(), name: "Character 3", image: "Image"),
+            Character(id: UUID(), name: "Character 4", image: "Image"),
+            Character(id: UUID(), name: "Character 5", image: "Image"),
+            Character(id: UUID(), name: "Character 6", image: "Image")
         ]
         
         self.scenes = [
@@ -78,7 +82,7 @@ class DataStore {
         ]
 
         self.Props = sampleData4
-        self.Characters = sampleData5
+       // self.Characters = sampleData5
     }
     
     func saveData() {
@@ -116,13 +120,22 @@ class DataStore {
 
         return sequence.filter { $0.filmId == filmId }
     }
-    func getProps(filmId: UUID) -> [Prop] {
+    
+    func getPropsbyFilmId(filmId: UUID) -> [Prop] {
         return Props.filter { $0.filmId == filmId }
     }
-    func getCharacters(filmId: UUID) -> [Character] {
+    
+    func getProps() -> [Prop] {
+        return Props
+    }
+    
+    func getCharactersByFilmId(filmId: UUID) -> [Character] {
         return Characters.filter { $0.filmId == filmId }
     }
     
+    func getCharacters() -> [Character] {
+        return self.Characters
+    }
     
     func getScenes(sequenceId: UUID) -> [Scene] {
         return scenes.filter{ $0.SequenceId == sequenceId }
