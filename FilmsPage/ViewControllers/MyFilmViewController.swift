@@ -118,7 +118,7 @@ class MyFilmViewController: UIViewController {
 }
 
 
-extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate {
+extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate {
     func addSequence(sequence: Sequence) {
         
         // Save into datastore
@@ -133,6 +133,15 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         
     }
     
+    func addProp(prop: Prop) {
+        print(self.prop)
+        DataStore.shared.createNewProp(newProp: prop)
+
+        self.prop = DataStore.shared.getPropsbyFilmId(filmId: film!.id)
+
+        collectionView.reloadData()
+    }
+
 
     // Helper — generic dequeue
     private func dequeue<T: UICollectionViewCell>(_ id: String, as: T.Type, _ cv: UICollectionView, _ index: IndexPath) -> T {
@@ -246,8 +255,10 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
         if segue.identifier == "addButtonSegue" {   // the segue that opens AddViewController
             let vc = segue.destination as! AddViewController
-            vc.dataStore = self.dataStore        // ← pass datastore
-            vc.film = self.film                  // ← pass film
+            vc.sequenceDelegate = self
+            vc.propDelegate = self
+            vc.dataStore = dataStore
+            vc.film = film
         }
         if segue.identifier == "allSequencesSegue" {
             let vc = segue.destination as! AllSequencesViewController
@@ -285,4 +296,6 @@ extension MyFilmViewController: HeaderViewDelegate {
         }
     }
 }
+
+
 

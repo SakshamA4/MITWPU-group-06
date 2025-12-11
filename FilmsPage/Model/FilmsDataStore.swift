@@ -8,6 +8,8 @@
 import Foundation
 
 class DataStore {
+    static let shared = DataStore()
+
 //    private var films: [favFilms] = []
     private var favFilms: Film? = nil
     
@@ -64,13 +66,23 @@ class DataStore {
             Prop(id: UUID() ,name: "Chair", image: "Image",filmId: self.films[0].id),
             Prop(id: UUID() ,name: "Bookshelf", image: "Image",filmId: self.films[0].id)
         ]
+        
+        let fixedPoses = [
+            Pose(id: UUID(), name: "Idle", image: "pose_idle"),
+            Pose(id: UUID(), name: "Run", image: "pose_run"),
+            Pose(id: UUID(), name: "Jump", image: "pose_jump"),
+            Pose(id: UUID(), name: "Attack", image: "pose_attack"),
+            Pose(id: UUID(), name: "Defend", image: "pose_defend"),
+            Pose(id: UUID(), name: "Sit", image: "pose_sit")
+        ]
+        
         self.Characters = [
-            Character(id: UUID() ,name: "Character 1", image: "Image",filmId: self.films[0].id),
-            Character(id: UUID() ,name: "Character 2", image: "Image",filmId: self.films[0].id),
-            Character(id: UUID(), name: "Character 3", image: "Image"),
-            Character(id: UUID(), name: "Character 4", image: "Image"),
-            Character(id: UUID(), name: "Character 5", image: "Image"),
-            Character(id: UUID(), name: "Character 6", image: "Image")
+            Character(id: UUID() ,name: "Character 1", image: "Image",filmId: self.films[0].id, pose: fixedPoses),
+            Character(id: UUID() ,name: "Character 2", image: "Image",filmId: self.films[0].id, pose: fixedPoses),
+            Character(id: UUID(), name: "Character 3", image: "Image", pose: fixedPoses),
+            Character(id: UUID(), name: "Character 4", image: "Image", pose: fixedPoses),
+            Character(id: UUID(), name: "Character 5", image: "Image", pose: fixedPoses),
+            Character(id: UUID(), name: "Character 6", image: "Image", pose: fixedPoses)
         ]
         
         self.scenes = [
@@ -137,6 +149,11 @@ class DataStore {
         return self.Characters
     }
     
+    func getPoses(forCharacter characterId: UUID) -> [Pose]? {
+        return Characters.first(where: { $0.id == characterId })?.pose
+    }
+
+    
     func getScenes(sequenceId: UUID) -> [Scene] {
         return scenes.filter{ $0.SequenceId == sequenceId }
     }
@@ -150,5 +167,29 @@ class DataStore {
         sequence.append(newSequence)
         saveData()
     }
+    
+    func createNewProp(newProp: Prop) {
+        Props.append(newProp)
+        saveData()
+    }
+    func addCharacter(_ character: Character) {
+        Characters.append(character)
+        saveData()  // optional, if you want to persist
+    }
+
 
 }
+
+extension DataStore {
+    func getFixedPoses() -> [Pose] {
+        return [
+            Pose(id: UUID(), name: "Idle", image: "Image"),
+            Pose(id: UUID(), name: "Run", image: "Image"),
+            Pose(id: UUID(), name: "Jump", image: "Image"),
+            Pose(id: UUID(), name: "Attack", image: "Image"),
+            Pose(id: UUID(), name: "Defend", image: "Image"),
+            Pose(id: UUID(), name: "Sit", image: "Image")
+        ]
+    }
+}
+

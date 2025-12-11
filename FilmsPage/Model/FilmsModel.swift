@@ -33,7 +33,15 @@ struct Character {
     var name: String
     var image: String
     var filmId: UUID = UUID()
+    var pose: [Pose]
 }
+
+struct Pose: Codable {
+    var id: UUID
+    var name: String
+    var image: String
+}
+
 
 struct Prop {
     

@@ -7,6 +7,11 @@
 
 import UIKit
 
+protocol AddPropDelegate {
+    func addProp(prop: Prop)
+}
+
+
 class AddPropViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
@@ -15,6 +20,8 @@ class AddPropViewController: UIViewController {
     var dataStore: DataStore?
     var film: Film?
     let propCellId = "prop_cell"
+    var delegate: AddPropDelegate?
+
     
     
     override func viewDidLoad() {
@@ -87,5 +94,23 @@ extension AddPropViewController: UICollectionViewDelegateFlowLayout {
                         layout collectionViewLayout: UICollectionViewLayout,
                         insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+    }
+}
+
+extension AddPropViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+
+        guard let film = film else { return }
+
+        var selectedProp = prop[indexPath.item]
+        selectedProp.filmId = film.id      // attach the film ID
+
+
+        // Notify MyFilmViewController
+        delegate?.addProp(prop: selectedProp)
+
+        // Close the view
+        self.dismiss(animated: true)
     }
 }

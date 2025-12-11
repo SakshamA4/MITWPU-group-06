@@ -12,10 +12,12 @@ protocol AddSequenceDelegate {
 }
 
 class AddSequenceViewController: UIViewController {
-
+    
+    var delegate: AddSequenceDelegate?
+    var dataStore: DataStore?
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
-    var delegate: AddSequenceDelegate?
+
     var film: Film?
     override func viewDidLoad() {
         super.viewDidLoad()
