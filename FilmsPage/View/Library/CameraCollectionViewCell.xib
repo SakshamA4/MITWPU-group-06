@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" id="gTV-IL-0wX" customClass="CameraCollectionViewCell" customModule="FilmsPage" customModuleProvider="target">
+            <rect key="frame" x="0.0" y="0.0" width="244" height="254"/>
+            <autoresizingMask key="autoresizingMask"/>
+            <view key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center">
+                <rect key="frame" x="0.0" y="0.0" width="244" height="254"/>
+                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                <subviews>
+                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="8rM-4e-Dje">
+                        <rect key="frame" x="0.0" y="0.0" width="244" height="154"/>
+                    </imageView>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="cVE-TA-6ok">
+                        <rect key="frame" x="0.0" y="156" width="244" height="38"/>
+                        <fontDescription key="fontDescription" type="system" pointSize="20"/>
+                        <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <nil key="highlightedColor"/>
+                    </label>
+                </subviews>
+            </view>
+            <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <constraints>
+                <constraint firstAttribute="bottom" secondItem="8rM-4e-Dje" secondAttribute="bottom" constant="100" id="CKC-jG-voH"/>
+                <constraint firstItem="cVE-TA-6ok" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" constant="156" id="HdB-Zp-NZo"/>
+                <constraint firstItem="8rM-4e-Dje" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="LfG-e6-D9j"/>
+                <constraint firstAttribute="trailing" secondItem="8rM-4e-Dje" secondAttribute="trailing" id="M3S-Ir-qQc"/>
+                <constraint firstItem="cVE-TA-6ok" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="Yu9-Jp-s1v"/>
+                <constraint firstItem="8rM-4e-Dje" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="Z9A-d2-jSs"/>
+                <constraint firstAttribute="bottom" secondItem="cVE-TA-6ok" secondAttribute="bottom" constant="60" id="bk8-H6-T2T"/>
+                <constraint firstAttribute="trailing" secondItem="cVE-TA-6ok" secondAttribute="trailing" id="rKf-Jf-12o"/>
+            </constraints>
+            <size key="customSize" width="244" height="254"/>
+            <connections>
+                <outlet property="cameraImage" destination="8rM-4e-Dje" id="18r-i3-w4W"/>
+                <outlet property="cameraLabel" destination="cVE-TA-6ok" id="E0Y-4a-MML"/>
+            </connections>
+            <point key="canvasLocation" x="209.26829268292681" y="205.42372881355934"/>
+        </collectionViewCell>
+    </objects>
+</document>
