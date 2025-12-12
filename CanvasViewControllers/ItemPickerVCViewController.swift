@@ -654,19 +654,30 @@ extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlow
             
             if itemType == "Camera" || itemType == "Lights" {
                 // Horizontal scroll cards (Tall and narrow)
-                let width: CGFloat = 280
-                let height: CGFloat = 300
+                let width: CGFloat = 232
+                let height: CGFloat = 232
                 return CGSize(width: width, height: height)
                 
             } else {
-                // Vertical scroll grid (Character/Props/Background 3-column block layout)
-                let totalPadding: CGFloat = 16 * 4 // Padding on left/right edges + between items (two 16px margins)
-                
-                // Calculate width for 3 columns
-                let width = (collectionView.bounds.width - totalPadding) / 3
-                let height: CGFloat = 1.3 * width // Maintain card aspect ratio (e.g., 130%)
-                
-                return CGSize(width: width, height: height)
+                // Vertical scroll grid (Character/Props/Wall/Background: 4-column square cards)
+                            
+                            let numColumns: CGFloat = 4 // Changed from 3 to 4
+                            let spacing: CGFloat = 16
+                            
+                            // 5 paddings: 2 edges (16*2) + 3 spaces between cards (16*3)
+                            let totalPadding = (spacing * (numColumns + 1))
+                            
+                            // Calculate width for 4 columns
+                            let availableWidth = collectionView.bounds.width - totalPadding
+                            let width = availableWidth / numColumns
+                            
+                            // Maintain a square size, approximating the 232 height/width requested
+                            let height: CGFloat = width
+                            
+                            // Check if calculated size is large enough (Optional: for safety)
+                            // If width is too small, we cap it, but usually, automatic sizing is best.
+                            
+                            return CGSize(width: width, height: height)
             }
         }
     
