@@ -47,3 +47,6 @@ struct props {
     var name: String
     var image: [String]
 }
+
+
+

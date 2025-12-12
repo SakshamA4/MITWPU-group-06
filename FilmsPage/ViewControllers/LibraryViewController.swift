@@ -7,7 +7,7 @@
 
 import UIKit
 
-class LibraryViewController: UIViewController {
+class LibraryViewController: UIViewController, UICollectionViewDelegate {
     
     
     @IBOutlet weak var libraryCollectionView: UICollectionView!
@@ -18,12 +18,69 @@ class LibraryViewController: UIViewController {
         super.viewDidLoad()
                 
                 registerCell()
-                
+        libraryCollectionView.delegate = self
                 libraryCollectionView.dataSource = self
                 libraryCollectionView.setCollectionViewLayout(generateLayout(), animated: false)
             }
 
         // Do any additional setup after loading the view.
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        didSelectItemAt indexPath: IndexPath) {
+        
+        let sectionType = LibrarySection.allCases[indexPath.section]
+        guard let items = LibraryModel.sections[sectionType] else { return }
+        let item = items[indexPath.row]
+        
+        let storyboard = UIStoryboard(name: "Library", bundle: nil)  // or "Main" if that's where it is
+
+            switch item.destinationKey {
+
+            case "background":
+                guard let backgroundVC = storyboard.instantiateViewController(
+                    withIdentifier: "BackgroundViewController"
+                ) as? BackgroundViewController else { return }
+
+                navigationController?.pushViewController(backgroundVC, animated: true)
+
+            case "scenes":
+                guard let scenesVC = storyboard.instantiateViewController(
+                    withIdentifier: "SceneViewController"
+                ) as? SceneViewController else { return }
+
+                navigationController?.pushViewController(scenesVC, animated: true)
+
+            case "camerasAndMovements":
+                
+                guard let cameraVC = storyboard.instantiateViewController(
+                    withIdentifier: "CameraViewController"   // storyboard ID
+                ) as? CameraViewController else { return }
+
+                navigationController?.pushViewController(cameraVC, animated: true)
+                
+            case "props":
+                
+                guard let propsVC = storyboard.instantiateViewController(
+                        withIdentifier: "LibraryPropsViewController"
+                    ) as? LibraryPropsViewController else { return }
+                    navigationController?.pushViewController(propsVC, animated: true)
+                    
+            case "lights":
+                    guard let lightsVC = storyboard.instantiateViewController(
+                        withIdentifier: "LightsViewController"
+                    ) as? LightsViewController else { return }
+                    navigationController?.pushViewController(lightsVC, animated: true)
+                    
+            case "characters":
+                    guard let charactersVC = storyboard.instantiateViewController(
+                        withIdentifier: "LibraryCharactersViewController"
+                    ) as? LibraryCharactersViewController else { return }
+                    navigationController?.pushViewController(charactersVC, animated: true)
+
+            default:
+                break
+            }
+        }
     
     func generateLayout() -> UICollectionViewLayout {
         let layout = UICollectionViewCompositionalLayout { sectionIndex, environment in
