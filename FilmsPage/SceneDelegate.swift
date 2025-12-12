@@ -15,10 +15,34 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-        // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
-        // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
-        guard let _ = (scene as? UIWindowScene) else { return }
+       
+        guard let windowScene = (scene as? UIWindowScene) else { return }
+                
+                // =========================================================================
+                // START: TEMPORARY OVERRIDE FOR [YOUR NAME]'s FEATURE (Character Canvas)
+                // This block ensures the application launches the custom feature view
+                // for development purposes. It must be REMOVED before merging to main.
+                // =========================================================================
+                
+                window = UIWindow(windowScene: windowScene)
+                
+                // 1. Instantiate YOUR custom View Controller
+                let rootVC = MyFeatureCanvasVC()
+                
+                // 2. Embed YOUR View Controller in a Navigation Controller (Needed for the Layers Icon)
+                let navigationController = UINavigationController(rootViewController: rootVC)
+                
+                // 3. Set the Navigation Controller as the root view controller
+                window?.rootViewController = navigationController
+                
+                window?.makeKeyAndVisible()
+                
+                // =========================================================================
+                // END: TEMPORARY OVERRIDE
+                // =========================================================================
+                
+                // NOTE: If the original code used Storyboard launch, it was usually below here
+                // and is commented out by this override block.
 
 
     }
