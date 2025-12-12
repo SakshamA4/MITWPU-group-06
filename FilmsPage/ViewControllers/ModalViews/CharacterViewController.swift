@@ -4,119 +4,171 @@
 //
 //  Created by SDC-USER on 10/12/25.
 //
-
 import UIKit
 
 class CharacterViewController: UIViewController {
-
-    @IBOutlet weak var nameTextField: UITextField!      // Input for character name
-    @IBOutlet weak var characterTitle: UILabel!         // Display entered name
+    
+    @IBOutlet weak var characterTitle: UILabel!
     @IBOutlet weak var collectionView: UICollectionView!
-
+    
+    // Film passed from previous screen
     var film: Film?
-    // use the shared datastore
+    
+    // Shared DataStore
     var dataStore: DataStore = DataStore.shared
-
-    // store characters for the current film
+    
+    // Characters for this film
     var characters: [Character] = []
-
-    // currently selected/created character whose poses we display
+    
+    // The currently selected character
     var character: Character?
-
+    
     private let posesCellId = "poses_cell"
-
+    private let infoCellId = "info_cell"
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
         registerCells()
-        collectionView.delegate = self
-        collectionView.dataSource = self
-
-        // load datastore (if you rely on loadData to populate defaults)
+        
+        // Load data
         dataStore.loadData()
-
-        // load characters for the current film (if film is nil, load all characters)
+        
+        // Load characters belonging to the film
         if let film = film {
             characters = dataStore.getCharactersByFilmId(filmId: film.id)
         } else {
             characters = dataStore.getCharacters()
         }
-
-        // If there is at least one character for the film, show the first one's poses by default
+        
+        // Use first character by default
         if let first = characters.first {
             character = first
         }
-
+        
         updateTitle()
+        
+        // Apply compositional layout
+        collectionView.collectionViewLayout = createLayout()
+        
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        
         collectionView.reloadData()
     }
-
+    
     private func updateTitle() {
         characterTitle.text = character?.name ?? "Character"
     }
-
-    func registerCells() {
-        collectionView.register(UINib(nibName: "CharacterPosesCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: posesCellId)
+    
+    private func registerCells() {
+        collectionView.register(UINib(nibName: "CharacterInfoCollectionViewCell", bundle: nil),
+                                forCellWithReuseIdentifier: infoCellId)
+        
+        collectionView.register(UINib(nibName: "CharacterPosesCollectionViewCell", bundle: nil),
+                                forCellWithReuseIdentifier: posesCellId)
     }
-
-    @IBAction func nameTextChanged(_ sender: UITextField) {
-        characterTitle.text = sender.text
-    }
-
-    @IBAction func addButtonTapped(_ sender: UIButton) {
-        guard let name = nameTextField.text, !name.isEmpty,
-              let film = film else {
-            // show an alert if film is missing or name empty (optional)
-            let alert = UIAlertController(title: "Error", message: "Please enter a name and make sure a film is selected.", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            present(alert, animated: true)
-            return
+    
+    
+    // MARK: - Layout
+    func createLayout() -> UICollectionViewCompositionalLayout {
+        return UICollectionViewCompositionalLayout { section, _ in
+            
+            if section == 0 {
+                // Large info cell section
+                let item = NSCollectionLayoutItem(
+                    layoutSize: .init(
+                        widthDimension: .fractionalWidth(1),
+                        heightDimension: .fractionalHeight(1)
+                    )
+                )
+                
+                let group = NSCollectionLayoutGroup.vertical(
+                    layoutSize: .init(
+                        widthDimension: .fractionalWidth(1),
+                        heightDimension: .fractionalHeight(0.45)
+                    ),
+                    subitems: [item]
+                )
+                
+                let section = NSCollectionLayoutSection(group: group)
+                section.contentInsets = .init(top: 10, leading: 10, bottom: 10, trailing: 10)
+                return section
+            }
+            
+            // Section 1 → Horizontal pose cells
+            let item = NSCollectionLayoutItem(
+                layoutSize: .init(
+                    widthDimension: .absolute(100),
+                    heightDimension: .absolute(100)
+                )
+            )
+            
+            let group = NSCollectionLayoutGroup.horizontal(
+                layoutSize: .init(
+                    widthDimension: .estimated(100),
+                    heightDimension: .absolute(100)
+                ),
+                subitems: [item]
+            )
+            
+            let section = NSCollectionLayoutSection(group: group)
+            section.orthogonalScrollingBehavior = .continuous
+            section.contentInsets = .init(top: 10, leading: 10, bottom: 10, trailing: 10)
+            section.interGroupSpacing = 10
+            
+            return section
         }
-
-        // Get fixed poses from datastore
-        let fixedPoses = dataStore.getFixedPoses()
-
-        // Create new character
-        let newCharacter = Character(
-            id: UUID(),
-            name: name,
-            image: "Image",          // default image
-            filmId: film.id,
-            pose: fixedPoses
-        )
-
-        // Add character to datastore (use the public API)
-        dataStore.addCharacter(newCharacter)
-
-        // Add to local array and set as currently selected
-        characters.append(newCharacter)
-        self.character = newCharacter
-
-        // Reload collection view to show poses
-        collectionView.reloadData()
-
-        // Clear input
-        nameTextField.text = ""
-        characterTitle.text = "Character"
     }
 }
 
-// MARK: - CollectionView DataSource
-extension CharacterViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+// MARK: - Data Source
+extension CharacterViewController: UICollectionViewDataSource {
+    
+    func numberOfSections(in collectionView: UICollectionView) -> Int {
+        2
+    }
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        numberOfItemsInSection section: Int) -> Int {
+        
+        if section == 0 {
+            return 1
+        }
+        
         return character?.pose.count ?? 0
     }
-
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: posesCellId, for: indexPath) as! CharacterPosesCollectionViewCell
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath)
+    -> UICollectionViewCell {
+        
+        if indexPath.section == 0 {
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: infoCellId,
+                for: indexPath
+            ) as! CharacterInfoCollectionViewCell
+            
+            if let character = character {
+                cell.configureCell(character: character)
+            }
+            return cell
+        }
+        
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: posesCellId,
+            for: indexPath
+        ) as! CharacterPosesCollectionViewCell
+        
         if let pose = character?.pose[indexPath.item] {
             cell.configure(with: pose)
         }
+        
         return cell
     }
-
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // Optional: if you want selecting a character pose to do something
-    }
 }
+
+
+// MARK: - Delegate (optional)
+extension CharacterViewController: UICollectionViewDelegate {}

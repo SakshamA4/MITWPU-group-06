@@ -21,15 +21,16 @@ class MyFilmViewController: UIViewController {
     var sequence: [Sequence] = []
     var character: [Character] = []
     var prop: [Prop] = []
-    var dataStore: DataStore?
+    var dataStore = DataStore.shared
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        sequence = dataStore!.getSequenceByFilmID(filmId: film!.id )
-        character = dataStore!.getCharactersByFilmId(filmId: film!.id)
-        prop = dataStore!.getPropsbyFilmId(filmId: film!.id)
+        
+        sequence = DataStore.shared.getSequenceByFilmID(filmId: film!.id )
+        character = DataStore.shared.getCharactersByFilmId(filmId: film!.id)
+        prop = DataStore.shared.getPropsbyFilmId(filmId: film!.id)
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
@@ -122,11 +123,11 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     func addSequence(sequence: Sequence) {
         
         // Save into datastore
-        dataStore?.createNewSequence(newSequence: sequence)
+        DataStore.shared.createNewSequence(newSequence: sequence)
 
         // Refresh ONLY sequences for the current film
         if let film = film {
-            self.sequence = dataStore!.getSequenceByFilmID(filmId: film.id)
+            self.sequence = DataStore.shared.getSequenceByFilmID(filmId: film.id)
         }
 
         collectionView.reloadData()
@@ -257,24 +258,24 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             let vc = segue.destination as! AddViewController
             vc.sequenceDelegate = self
             vc.propDelegate = self
-            vc.dataStore = dataStore
+            vc.dataStore = DataStore.shared
             vc.film = film
         }
         if segue.identifier == "allSequencesSegue" {
             let vc = segue.destination as! AllSequencesViewController
-            vc.dataStore = dataStore
+            vc.dataStore = DataStore.shared
             vc.sequence = sender as! [Sequence]
         }
 
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
-            vc.dataStore = dataStore
+            vc.dataStore = DataStore.shared
             vc.character = sender as! [Character]
         }
 
         if segue.identifier == "allPropsSegue" {
             let vc = segue.destination as! AllPropsViewController
-            vc.dataStore = dataStore
+            vc.dataStore = DataStore.shared
             vc.prop = sender as! [Prop]
         }
     }

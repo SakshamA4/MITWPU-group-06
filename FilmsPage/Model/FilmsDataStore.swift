@@ -22,7 +22,7 @@ class DataStore {
     private var scenes: [Scene] = []
     
     
-    init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [Prop] = [], Characters: [Character] = [], scenes: [Scene] = []) {
+    private init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [Prop] = [], Characters: [Character] = [], scenes: [Scene] = []) {
         self.films = films
         self.sequence = Sequence
         self.Props = Props
@@ -175,6 +175,30 @@ class DataStore {
     func addCharacter(_ character: Character) {
         Characters.append(character)
         saveData()  // optional, if you want to persist
+    }
+    
+    func updateFilmCounts() {
+
+        for i in 0..<films.count {
+            let filmId = films[i].id
+
+            let seqCount = sequence.filter { $0.filmId == filmId }.count
+            let charCount = Characters.filter { $0.filmId == filmId }.count
+
+            let seqIdsForFilm = sequence
+                .filter { $0.filmId == filmId }
+                .map { $0.id }
+
+            let sceneCount = scenes.filter { seqIdsForFilm.contains($0.SequenceId) }.count
+
+            films[i].sequences = seqCount
+            films[i].characters = charCount
+            films[i].scenes = sceneCount
+        }
+    }
+
+    init () {
+        updateFilmCounts()
     }
 
 

@@ -18,7 +18,9 @@ class FilmsViewController: UIViewController {
 
     var favouriteFilm: Film!
     var allFilms: [Film] = []
-    let dataStore = DataStore(films: [])
+    //let dataStore = DataStore(films: [])
+    let dataStore = DataStore.shared
+
 
     @IBOutlet weak var collectionView: UICollectionView!
 

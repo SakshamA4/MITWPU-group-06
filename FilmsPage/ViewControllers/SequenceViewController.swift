@@ -17,7 +17,7 @@ class SequenceViewController: UIViewController {
 //            }
 //        }
 //    }
-    var dataStore: DataStore?
+    var dataStore = DataStore.shared
     @IBOutlet weak var collectionView: UICollectionView!
     
     var scene: [Scene] = []
@@ -28,8 +28,10 @@ class SequenceViewController: UIViewController {
         super.viewDidLoad()
         
         if let sequence = sequence {
-            scene = dataStore?.getScenes(sequenceId: sequence.id) ?? []
+            scene = DataStore.shared.getScenes(sequenceId: sequence.id)
         }
+        
+
         
         updateTitle()
         //print("[SequenceViewController] sequence name:", sequence.name)
@@ -41,6 +43,17 @@ class SequenceViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
         registerCells()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        if let sequence = sequence {
+            scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+        }
+
+        updateTitle()
+        collectionView.reloadData()
     }
     
     func registerCells() {
@@ -90,6 +103,12 @@ extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDele
         return CGSize(width: width, height: width)
     }
 
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let sequence = sequence else { return }
+        performSegue(withIdentifier: "sequence2Segue", sender: sequence)
+    }
+
+    
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }

@@ -9,7 +9,7 @@ import UIKit
 
 class AddCharacterViewController: UIViewController {
 
-    var dataStore: DataStore?
+    var dataStore = DataStore.shared
     var film: Film?   // The film we are adding characters to
 
     @IBOutlet weak var collectionView: UICollectionView!
@@ -20,9 +20,9 @@ class AddCharacterViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        dataStore?.loadData()
+        DataStore.shared.loadData()
         // Load ALL characters from the datastore
-        characters = dataStore?.getCharacters() ?? []
+        characters = DataStore.shared.getCharacters()
 
 //        navigationItem.title = "All Characters"
 

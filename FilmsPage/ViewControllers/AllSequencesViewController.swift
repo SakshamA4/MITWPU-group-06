@@ -11,6 +11,7 @@ class AllSequencesViewController: UIViewController , UICollectionViewDataSource 
     
     var film: [Film] = []
     var sequence: [Sequence] = []
+    var selectedSequence: Sequence?
   
 
     
@@ -72,9 +73,27 @@ extension AllSequencesViewController: UICollectionViewDelegate, UICollectionView
         let width = (collectionView.bounds.width - totalSpacing) / columns
         return CGSize(width: width, height: width)
     }
+    
+
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let sequence = sequence[indexPath.row]
+        selectedSequence = sequence
+        performSegue(withIdentifier: "sequence2Segue", sender: self)
+    }
+
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "sequence2Segue",
+           let vc = segue.destination as? SequenceViewController {
+            vc.sequence = selectedSequence
+        }
+    }
+
+
 }
 

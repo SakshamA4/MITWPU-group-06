@@ -17,7 +17,7 @@ class AddPropViewController: UIViewController {
     @IBOutlet weak var collectionView: UICollectionView!
     
     var prop: [Prop] = []
-    var dataStore: DataStore?
+    var dataStore = DataStore.shared
     var film: Film?
     let propCellId = "prop_cell"
     var delegate: AddPropDelegate?
@@ -26,8 +26,8 @@ class AddPropViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        dataStore?.loadData()
-        prop = dataStore?.getProps() ?? []
+        DataStore.shared.loadData()
+        prop = DataStore.shared.getProps()
         
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
