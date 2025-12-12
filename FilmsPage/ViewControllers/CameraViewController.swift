@@ -12,6 +12,8 @@ class CameraViewController: UIViewController {
     @IBOutlet weak var cameraCollectionView: UICollectionView!
 
       private let sections = CameraLibraryDataStore.sections
+      private var selectedItem: CameraLibraryItem?
+
 
       override func viewDidLoad() {
           super.viewDidLoad()
@@ -40,6 +42,15 @@ class CameraViewController: UIViewController {
               withReuseIdentifier: "LibraryHeaderView"
           )
       }
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "CameraInfoSegue",
+           let infoVC = segue.destination as? CameraInfoViewController,
+           let item = selectedItem {
+            infoVC.item = item
+        }
+    }
+
+    
   }
 extension CameraViewController: UICollectionViewDataSource {
 
@@ -115,14 +126,8 @@ extension CameraViewController: UICollectionViewDelegate {
         let section = sections[indexPath.section]
         let item = section.items[indexPath.item]
 
-        // Overlay for description
-        let alert = UIAlertController(
-            title: item.name,
-            message: item.description,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Close", style: .cancel))
-        present(alert, animated: true)
+         selectedItem = item                         // remember which one was tapped
+                performSegue(withIdentifier: "CameraInfoSegue", sender: self)
     }
 }
 private func createLayout() -> UICollectionViewCompositionalLayout {

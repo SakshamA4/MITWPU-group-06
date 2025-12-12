@@ -12,6 +12,7 @@ class LightsViewController: UIViewController {
     @IBOutlet weak var lightsCollectionView: UICollectionView!
 
         private var lights = LightsDataStore.items   // [LightItem]
+    private var selectedLight: LightItem?
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -62,6 +63,15 @@ class LightsViewController: UIViewController {
                                            right: sideInset)
         layout.scrollDirection = .vertical
     }
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+            if segue.identifier == "LightsInfoSegue",
+               let infoVC = segue.destination as? LightsInfoViewController,
+               let light = selectedLight {
+                infoVC.titleText = light.name
+                infoVC.detailText = light.description
+                infoVC.imageName = light.imageName
+            }
+        }
     }
 
     extension LightsViewController: UICollectionViewDataSource {
@@ -83,4 +93,10 @@ class LightsViewController: UIViewController {
         }
     }
 
-    extension LightsViewController: UICollectionViewDelegate {}
+extension LightsViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        selectedLight = lights[indexPath.item]
+        performSegue(withIdentifier: "LightsInfoSegue", sender: self)
+    }
+}
+
