@@ -95,7 +95,11 @@
             </constraints>
             <size key="customSize" width="905" height="237"/>
             <connections>
+                <outlet property="characterLabel" destination="o5q-Ph-r1P" id="gLV-95-cvR"/>
                 <outlet property="imageView" destination="eqy-iz-5UI" id="4OO-Bx-sEM"/>
+                <outlet property="sceneLabel" destination="C2S-QZ-3Rw" id="YWX-y3-vlD"/>
+                <outlet property="sequencesLabel" destination="Whi-8k-cuJ" id="etX-3D-sPd"/>
+                <outlet property="timeLabel" destination="iNq-xC-Axn" id="e4H-un-DXN"/>
                 <outlet property="titleLabel" destination="IAz-ET-ZbJ" id="g0y-7p-NVw"/>
             </connections>
             <point key="canvasLocation" x="451.09756097560972" y="201.10169491525426"/>
