@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		19738C7A2EE6D0B4007BA5F7 /* ItemCardCellCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19738C792EE6D0B4007BA5F7 /* ItemCardCellCollectionViewCell.swift */; };
+		19738C7C2EE6D754007BA5F7 /* EditCharacterVCViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19738C7B2EE6D754007BA5F7 /* EditCharacterVCViewController.swift */; };
+		19738C7E2EE6E45E007BA5F7 /* PoseCardCellCollectionViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19738C7D2EE6E45E007BA5F7 /* PoseCardCellCollectionViewCell.swift */; };
+		197F0F422EE7E31C0080D244 /* ColorWheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197F0F412EE7E31C0080D244 /* ColorWheelView.swift */; };
 		198E4F712EE403490030FE85 /* MyFeatueCanvasVCViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */; };
 		198E4F732EE4048E0030FE85 /* ItemPicker.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */; };
 		198E4F752EE404E20030FE85 /* ItemPickerVCViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */; };
@@ -14,7 +18,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		19075A4B2ED4646D00B3A488 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmsPage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		19738C792EE6D0B4007BA5F7 /* ItemCardCellCollectionViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemCardCellCollectionViewCell.swift; sourceTree = "<group>"; };
+		19738C7B2EE6D754007BA5F7 /* EditCharacterVCViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCharacterVCViewController.swift; sourceTree = "<group>"; };
+		19738C7D2EE6E45E007BA5F7 /* PoseCardCellCollectionViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseCardCellCollectionViewCell.swift; sourceTree = "<group>"; };
+		197F0F092EE7DADB0080D244 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = FilmsPage.app; path = "/Users/sdc-user/Desktop/MITWPU-group-06/build/Debug-iphoneos/FilmsPage.app"; sourceTree = "<absolute>"; };
+		197F0F412EE7E31C0080D244 /* ColorWheelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorWheelView.swift; sourceTree = "<group>"; };
 		198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyFeatueCanvasVCViewController.swift; sourceTree = "<group>"; };
 		198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = ItemPicker.storyboard; sourceTree = "<group>"; };
 		198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemPickerVCViewController.swift; sourceTree = "<group>"; };
@@ -59,16 +67,7 @@
 				19075A4D2ED4646D00B3A488 /* FilmsPage */,
 				198E4F6F2EE3FE830030FE85 /* CustomPresentation */,
 				198E4F6E2EE3FE630030FE85 /* CanvasViewControllers */,
-				19075A4C2ED4646D00B3A488 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		19075A4C2ED4646D00B3A488 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				19075A4B2ED4646D00B3A488 /* FilmsPage.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 		198E4F6E2EE3FE630030FE85 /* CanvasViewControllers */ = {
@@ -77,6 +76,10 @@
 				198E4F702EE403490030FE85 /* MyFeatueCanvasVCViewController.swift */,
 				198E4F722EE4048E0030FE85 /* ItemPicker.storyboard */,
 				198E4F742EE404E20030FE85 /* ItemPickerVCViewController.swift */,
+				19738C792EE6D0B4007BA5F7 /* ItemCardCellCollectionViewCell.swift */,
+				19738C7B2EE6D754007BA5F7 /* EditCharacterVCViewController.swift */,
+				19738C7D2EE6E45E007BA5F7 /* PoseCardCellCollectionViewCell.swift */,
+				197F0F412EE7E31C0080D244 /* ColorWheelView.swift */,
 			);
 			path = CanvasViewControllers;
 			sourceTree = "<group>";
@@ -111,7 +114,7 @@
 			packageProductDependencies = (
 			);
 			productName = FilmsPage;
-			productReference = 19075A4B2ED4646D00B3A488 /* FilmsPage.app */;
+			productReference = 197F0F092EE7DADB0080D244 /* FilmsPage.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -139,7 +142,7 @@
 			mainGroup = 19075A422ED4646D00B3A488;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 19075A4C2ED4646D00B3A488 /* Products */;
+			productRefGroup = 19075A422ED4646D00B3A488;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -165,8 +168,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				198E4F772EE406BA0030FE85 /* BottomSheetPresentationController.swift in Sources */,
+				19738C7E2EE6E45E007BA5F7 /* PoseCardCellCollectionViewCell.swift in Sources */,
+				19738C7A2EE6D0B4007BA5F7 /* ItemCardCellCollectionViewCell.swift in Sources */,
+				197F0F422EE7E31C0080D244 /* ColorWheelView.swift in Sources */,
 				198E4F752EE404E20030FE85 /* ItemPickerVCViewController.swift in Sources */,
 				198E4F712EE403490030FE85 /* MyFeatueCanvasVCViewController.swift in Sources */,
+				19738C7C2EE6D754007BA5F7 /* EditCharacterVCViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
