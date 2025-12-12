@@ -85,7 +85,7 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
             let vc = segue.destination as! CharacterViewController
             vc.character = sender as? Character
             vc.film = film
-            vc.dataStore = dataStore ?? DataStore.shared
+            vc.dataStore = dataStore
 
         } }
     

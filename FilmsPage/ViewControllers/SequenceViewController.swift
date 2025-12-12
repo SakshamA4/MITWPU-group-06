@@ -9,20 +9,14 @@ import UIKit
 
 class SequenceViewController: UIViewController {
 
-//    var sequence: Sequence? {
-//        didSet {
-//            // Update title if view is already loaded
-//            if isViewLoaded {
-//                updateTitle()
-//            }
-//        }
-//    }
+
     var dataStore = DataStore.shared
     @IBOutlet weak var collectionView: UICollectionView!
     
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
+    var sceneDelegate: AddSceneDelegate?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -93,7 +87,17 @@ extension SequenceViewController: UICollectionViewDataSource {
     }
 }
 
-extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, AddSceneDelegate {
+    func addScene(scene: Scene) {
+        DataStore.shared.createNewScene(newScene: scene)
+        
+        if let sequence = sequence {
+            self.scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+        }
+        
+        collectionView.reloadData()
+    }
+    
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let inset: CGFloat = 40
         let interItem: CGFloat = 40
@@ -111,6 +115,15 @@ extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDele
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "addSceneSegue" {
+            let vc = segue.destination as! AddSceneViewController
+            vc.datastore = self.dataStore
+            vc.delegate = self
+            vc.sequence = self.sequence
+        }
     }
 }
 

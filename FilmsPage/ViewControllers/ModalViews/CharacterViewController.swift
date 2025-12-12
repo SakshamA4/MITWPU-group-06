@@ -23,6 +23,9 @@ class CharacterViewController: UIViewController {
     // The currently selected character
     var character: Character?
     
+    var newCharacterName: String = ""
+
+    
     private let posesCellId = "poses_cell"
     private let infoCellId = "info_cell"
     
@@ -70,6 +73,29 @@ class CharacterViewController: UIViewController {
     }
     
     
+    @IBAction func addButtonTapped(_ sender: Any) {
+        guard let film = film else { return }
+        guard !newCharacterName.isEmpty else { return }
+        guard let template = character else { return }
+
+        let newCharacter = Character(
+            id: UUID(),
+            name: newCharacterName,
+            image: template.image,
+            filmId:  film.id,
+            pose: template.pose
+        )
+
+        DataStore.shared.addCharacter(newCharacter)
+
+        characters.append(newCharacter)
+        collectionView.reloadData()
+
+        newCharacterName = ""
+        
+    }
+    
+    
     // MARK: - Layout
     func createLayout() -> UICollectionViewCompositionalLayout {
         return UICollectionViewCompositionalLayout { section, _ in
@@ -86,7 +112,7 @@ class CharacterViewController: UIViewController {
                 let group = NSCollectionLayoutGroup.vertical(
                     layoutSize: .init(
                         widthDimension: .fractionalWidth(1),
-                        heightDimension: .fractionalHeight(0.45)
+                        heightDimension: .fractionalHeight(0.6)
                     ),
                     subitems: [item]
                 )
@@ -96,33 +122,45 @@ class CharacterViewController: UIViewController {
                 return section
             }
             
-            // Section 1 → Horizontal pose cells
-            let item = NSCollectionLayoutItem(
-                layoutSize: .init(
-                    widthDimension: .absolute(100),
-                    heightDimension: .absolute(100)
+            else {
+                // Section 1 → Horizontal pose cells
+                let item = NSCollectionLayoutItem(
+                    layoutSize: .init(
+                        widthDimension: .absolute(200),
+                        heightDimension: .absolute(300)
+                    )
                 )
-            )
-            
-            let group = NSCollectionLayoutGroup.horizontal(
-                layoutSize: .init(
-                    widthDimension: .estimated(100),
-                    heightDimension: .absolute(100)
-                ),
-                subitems: [item]
-            )
-            
-            let section = NSCollectionLayoutSection(group: group)
-            section.orthogonalScrollingBehavior = .continuous
-            section.contentInsets = .init(top: 10, leading: 10, bottom: 10, trailing: 10)
-            section.interGroupSpacing = 10
-            
-            return section
+                
+                let group = NSCollectionLayoutGroup.horizontal(
+                    layoutSize: .init(
+                        widthDimension: .estimated(200),
+                        heightDimension: .absolute(300)
+                    ),
+                    subitems: [item]
+                )
+                
+                let section = NSCollectionLayoutSection(group: group)
+                section.orthogonalScrollingBehavior = .continuous
+                section.contentInsets = .init(top: 10, leading: 10, bottom: 10, trailing: 10)
+                section.interGroupSpacing = 10
+                
+                return section
+            }
         }
     }
+    
+    func createCharacterInstance(from template: Character, withName name: String, filmId: String) -> Character {
+        return Character(
+            id: UUID(),        // new instance
+            name: name,                   // user’s new name
+            image: template.image,        // same image
+            filmId: film!.id,        // same poses
+            pose: template.pose               // assign to this film
+        )
+    }
+
+    
 }
-
-
 // MARK: - Data Source
 extension CharacterViewController: UICollectionViewDataSource {
     
@@ -153,21 +191,29 @@ extension CharacterViewController: UICollectionViewDataSource {
             if let character = character {
                 cell.configureCell(character: character)
             }
+            cell.delegate = self
+            return cell
+        } else {
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: posesCellId,
+                for: indexPath
+            ) as! CharacterPosesCollectionViewCell
+            
+            if let pose = character?.pose[indexPath.item] {
+                cell.configure(with: pose)
+            }
+            
             return cell
         }
-        
-        let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: posesCellId,
-            for: indexPath
-        ) as! CharacterPosesCollectionViewCell
-        
-        if let pose = character?.pose[indexPath.item] {
-            cell.configure(with: pose)
-        }
-        
-        return cell
     }
 }
+
+extension CharacterViewController: CharacterNameCellDelegate {
+    func nameDidChange(_ name: String) {
+        newCharacterName = name
+    }
+}
+
 
 
 // MARK: - Delegate (optional)

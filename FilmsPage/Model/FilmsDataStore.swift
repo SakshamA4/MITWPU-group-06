@@ -168,6 +168,11 @@ class DataStore {
         saveData()
     }
     
+    func createNewScene(newScene: Scene) {
+        scenes.append(newScene)
+        saveData()
+    }
+    
     func createNewProp(newProp: Prop) {
         Props.append(newProp)
         saveData()
