@@ -448,7 +448,7 @@
         <!--Library-->
         <scene sceneID="Das-EC-v6j">
             <objects>
-                <navigationController automaticallyAdjustsScrollViewInsets="NO" id="Ujy-6q-Ycq" sceneMemberID="viewController">
+                <navigationController storyboardIdentifier="LibraryNavigationController" automaticallyAdjustsScrollViewInsets="NO" id="Ujy-6q-Ycq" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Library" id="Uqg-s4-yjg"/>
                     <toolbarItems/>
                     <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>

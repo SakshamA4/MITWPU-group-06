@@ -7,7 +7,7 @@
 
 import UIKit
 
-class SceneCollectionViewCell: UICollectionViewCell {
+class LibrarySceneCollectionViewCell: UICollectionViewCell {
     
     static let reuseIdentifier = "SceneCollectionViewCell"
     
@@ -35,7 +35,7 @@ class SceneCollectionViewCell: UICollectionViewCell {
    }
 
    // MARK: - Setup
-   private extension SceneCollectionViewCell {
+   private extension LibrarySceneCollectionViewCell {
        
        func setupUI() {
            contentView.layer.cornerRadius = 12

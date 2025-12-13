@@ -46,9 +46,9 @@ private extension SceneViewController {
     
     func setupCollectionView() {
         //  Register the cell (required if using a XIB)
-        let nib = UINib(nibName: "SceneCollectionViewCell", bundle: nil)
+        let nib = UINib(nibName: "LibrarySceneCollectionViewCell", bundle: nil)
         SceneCollectionView.register(nib,
-                                          forCellWithReuseIdentifier: SceneCollectionViewCell.reuseIdentifier)
+                                          forCellWithReuseIdentifier: LibrarySceneCollectionViewCell.reuseIdentifier)
         
         SceneCollectionView.dataSource = self
         SceneCollectionView.delegate = self
@@ -105,9 +105,9 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: SceneCollectionViewCell.reuseIdentifier,
+            withReuseIdentifier: LibrarySceneCollectionViewCell.reuseIdentifier,
             for: indexPath
-        ) as? SceneCollectionViewCell else {
+        ) as? LibrarySceneCollectionViewCell else {
             return UICollectionViewCell()
         }
         cell.configure(with: items[indexPath.item])
