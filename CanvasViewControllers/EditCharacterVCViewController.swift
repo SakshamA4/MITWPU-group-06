@@ -182,9 +182,17 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
     
     
         // Data source for the poses
-    private let poses: [String] = ["fighting pose", "Talking Woman", "Sitting Woman", "Falling", "Sleeping", "Buffering"]
+//    private let poses: [String] = ["fighting pose", "Talking Woman", "Sitting Woman", "Falling", "Sleeping", "Buffering"]
     
-    
+
+    private let posesForWoman1: [String] = ["fighting pose", "Talking Woman", "Sitting Woman", "Falling", "Sleeping", "Buffering"]
+
+    // Assuming "Man in a suit" uses assets like: Talking Man, Waving Man, Sitting Man, etc.
+    // NOTE: You must verify these exact names exist in your asset catalog!
+    private let posesForManInASuit: [String] = ["Arms stretched", "Talking Man", "Sitting Man", "Waving Man", "Lying down", "Joining hands"]
+
+    // Your dynamic array will be initialized later:
+    private var dynamicPoses: [String] = []
     
     
     
@@ -254,6 +262,16 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                 // Fallback for debugging, will show the default light gray background
                 print("Error: Could not find image asset for selected character: \(selectedCharacterName ?? "nil")")
             }
+        //Load the correct character-specific pose data
+        if selectedCharacterName == "Man in a suit" {
+            dynamicPoses = posesForManInASuit
+        } else if selectedCharacterName == "Woman 1" {
+            dynamicPoses = posesForWoman1
+        } else {
+            // Fallback for other characters or unexpected state
+            dynamicPoses = []
+        }
+        
     }
     
     private func setupViews() {
@@ -390,7 +408,7 @@ extension EditCharacterVC{
     
     // 1. REQUIRED: Number of items
         func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-            return poses.count
+            return dynamicPoses.count
         }
     
     // 2. Cell for item
@@ -399,11 +417,11 @@ extension EditCharacterVC{
                 return UICollectionViewCell()
             }
             
-            // Pass the pose name directly
-            let poseKey = poses[indexPath.row]
-            
-            // Pass the pose name and the base character name
-            cell.poseName = poseKey
+            // 🚨 Use the dynamic array
+                let poseKey = dynamicPoses[indexPath.row]
+                
+                // Pass the unique pose asset name (e.g., "Talking Man" or "Talking Woman")
+                cell.poseName = poseKey
             
             
             return cell
@@ -428,6 +446,6 @@ extension EditCharacterVC{
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         // Handle pose selection here (e.g., store the selected pose)
-        print("Pose selected: \(poses[indexPath.row])")
+        print("Pose selected: \(dynamicPoses[indexPath.row])")
     }
 }

@@ -17,15 +17,12 @@ class PoseCardCell: UICollectionViewCell {
                 
                 // --- NEW: Simplified Image Loading Logic ---
                 if let pose = poseName {
-                    // 1. Clean the Pose Name (e.g., "Fighting pose" -> "Fightingpose")
-                    // We still need to clean spaces for image asset names
                     let assetName = pose
-                    
-                    // 2. Load the image using ONLY the cleaned pose name.
-                    // NOTE: This assumes an asset named "Fightingpose" exists and is the correct one
-                    // for the currently selected character (Woman 1 or Man in a Suit).
                     imageView.image = UIImage(named: assetName)
                     imageView.backgroundColor = .clear
+                } else {
+                    imageView.image = nil
+                    imageView.backgroundColor = .systemGray
                 }
             }
         }
@@ -34,8 +31,7 @@ class PoseCardCell: UICollectionViewCell {
         // if you absolutely do not want to use it for image construction.
         // If you need it for *future* logic, keep it but leave its didSet empty.
         
-        // Since you want to keep them separate:
-        var baseCharacterName: String? // Keep this property if needed for other logic
+       
     
     private let imageView: UIImageView = {
         let iv = UIImageView()

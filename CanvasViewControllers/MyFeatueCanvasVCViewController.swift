@@ -124,32 +124,6 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     }()
     
     
-    //Newest feature(Add to properties)
-    private let backgroundImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill // Ensures the image fills the entire screen
-        iv.clipsToBounds = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.image = UIImage(named: "DefaultBackground") // Optional: a default placeholder
-        return iv
-    }()
-
-    
-    private func setupCanvas() {
-        // Add the background image view *before* the canvasView
-        view.insertSubview(backgroundImageView, at: 0) // IMPORTANT: Layer 0
-        
-        // Pin it to the entire view bounds
-        NSLayoutConstraint.activate([
-            backgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
-            backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        
-        
-    }
-    
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -360,7 +334,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     func addItemToCanvas(itemName: String, itemType: String) {
         let uniqueItemName = itemName + " (" + UUID().uuidString.prefix(4) + ")"
         
-        if itemType == "Character" || itemType == "Props" || itemType == "Walls" || itemType == "Camera" || itemType == "Lights"{
+        if itemType == "Character" || itemType == "Props" || itemType == "Walls" || itemType == "Camera" || itemType == "Lights" || itemType == "Background" {
             
             // --- 1. Create the Icon Container ---
             let itemIcon = UIView()
@@ -403,72 +377,97 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
                 ])
                 
             } else {
-                // Logic for Props, Walls, Camera, and Lights
+                // Logic for Props, Walls, Camera, Lights, and NOW Background
+                
+                let size: CGFloat = 60 // Default size for generic icons
+                
+                // Define specific appearance based on the item type
+                switch itemType {
+                case "Walls":
+                    // --- WALLS: Load Image View directly (Uses 150 size) ---
+                    let wallSize: CGFloat = 150
+                    itemIcon.frame = CGRect(x: view.frame.width/2 - wallSize/2, y: view.frame.height/2 - wallSize/2, width: wallSize, height: wallSize)
+                    itemIcon.layer.cornerRadius = 8
+                    itemIcon.clipsToBounds = true
+                    
+                    // Load and pin the image view (from previous successful step)
+                    let imageView = UIImageView()
+                    imageView.translatesAutoresizingMaskIntoConstraints = false
+                    imageView.contentMode = .scaleToFill // Allows stretching
+                    imageView.image = UIImage(named: itemName)
+                    itemIcon.addSubview(imageView)
+                    
+                    NSLayoutConstraint.activate([
+                        imageView.topAnchor.constraint(equalTo: itemIcon.topAnchor),
+                        imageView.leadingAnchor.constraint(equalTo: itemIcon.leadingAnchor),
+                        imageView.trailingAnchor.constraint(equalTo: itemIcon.trailingAnchor),
+                        imageView.bottomAnchor.constraint(equalTo: itemIcon.bottomAnchor)
+                    ])
+                    
+                    // Skip the rest of the generic setup
+                    break
+                case "Background":
+                    let backgroundSize: CGFloat = 300 // Start large for a background image
+                    itemIcon.frame = CGRect(x: view.frame.width/2 - backgroundSize/2, y: view.frame.height/2 - backgroundSize/2, width: backgroundSize, height: backgroundSize)
+                    itemIcon.layer.cornerRadius = 0 // No corners for a large image
+                    itemIcon.clipsToBounds = true
+                    
+                    // Image setup for Background
+                    let imageView = UIImageView()
+                    imageView.translatesAutoresizingMaskIntoConstraints = false
+                    imageView.contentMode = .scaleAspectFill // Good default for background texture
+                    imageView.image = UIImage(named: itemName)
+                    itemIcon.addSubview(imageView)
+                    
+                    NSLayoutConstraint.activate([
+                        imageView.topAnchor.constraint(equalTo: itemIcon.topAnchor),
+                        imageView.leadingAnchor.constraint(equalTo: itemIcon.leadingAnchor),
+                        imageView.trailingAnchor.constraint(equalTo: itemIcon.trailingAnchor),
+                        imageView.bottomAnchor.constraint(equalTo: itemIcon.bottomAnchor)
+                    ])
+                    break
+                    
+                case "Camera", "Lights", "Props":
+                    // --- CAMERA, LIGHTS, PROPS: Use SF Symbol Icons ---
+                    
+                    itemIcon.frame = CGRect(x: view.frame.width/2 - size/2, y: view.frame.height/2 - size/2, width: size, height: size)
+                    itemIcon.layer.cornerRadius = 8
+                    itemIcon.clipsToBounds = true
+                    
+                    let (color, _, symbolImage) = createSymbolIcon(for: itemType, withName: itemName, size: size)
+                    
+                    itemIcon.backgroundColor = color
+                    
+                    if let image = symbolImage {
+                        let symbolView = UIImageView(image: image)
+                        symbolView.translatesAutoresizingMaskIntoConstraints = false
+                        symbolView.tintColor = .white
+                        itemIcon.addSubview(symbolView)
                         
-                        let size: CGFloat = 60 // Default size for generic icons
-                        
-                        // Define specific appearance based on the item type
-                        switch itemType {
-                        case "Walls":
-                            // --- WALLS: Load Image View directly (Uses 150 size) ---
-                            let wallSize: CGFloat = 150
-                            itemIcon.frame = CGRect(x: view.frame.width/2 - wallSize/2, y: view.frame.height/2 - wallSize/2, width: wallSize, height: wallSize)
-                            itemIcon.layer.cornerRadius = 8
-                            itemIcon.clipsToBounds = true
-                            
-                            // Load and pin the image view (from previous successful step)
-                            let imageView = UIImageView()
-                            imageView.translatesAutoresizingMaskIntoConstraints = false
-                            imageView.contentMode = .scaleAspectFill
-                            imageView.image = UIImage(named: itemName)
-                            itemIcon.addSubview(imageView)
-                            
-                            NSLayoutConstraint.activate([
-                                imageView.topAnchor.constraint(equalTo: itemIcon.topAnchor),
-                                imageView.leadingAnchor.constraint(equalTo: itemIcon.leadingAnchor),
-                                imageView.trailingAnchor.constraint(equalTo: itemIcon.trailingAnchor),
-                                imageView.bottomAnchor.constraint(equalTo: itemIcon.bottomAnchor)
-                            ])
-                            
-                            // Skip the rest of the generic setup
-                            break
-                            
-                        case "Camera", "Lights", "Props":
-                            // --- CAMERA, LIGHTS, PROPS: Use SF Symbol Icons ---
-                            
-                            itemIcon.frame = CGRect(x: view.frame.width/2 - size/2, y: view.frame.height/2 - size/2, width: size, height: size)
-                            itemIcon.layer.cornerRadius = 8
-                            itemIcon.clipsToBounds = true
-
-                            let (color, _, symbolImage) = createSymbolIcon(for: itemType, withName: itemName, size: size)
-                            
-                            itemIcon.backgroundColor = color
-                            
-                            if let image = symbolImage {
-                                let symbolView = UIImageView(image: image)
-                                symbolView.translatesAutoresizingMaskIntoConstraints = false
-                                symbolView.tintColor = .white
-                                itemIcon.addSubview(symbolView)
-                                
-                                // Pin the symbol image centered and slightly smaller than the container
-                                NSLayoutConstraint.activate([
-                                    symbolView.centerXAnchor.constraint(equalTo: itemIcon.centerXAnchor),
-                                    symbolView.centerYAnchor.constraint(equalTo: itemIcon.centerYAnchor),
-                                    symbolView.widthAnchor.constraint(equalTo: itemIcon.widthAnchor, multiplier: 0.7),
-                                    symbolView.heightAnchor.constraint(equalTo: itemIcon.heightAnchor, multiplier: 0.7),
-                                ])
-                            }
-                            
-                        default:
-                            // Fallback for types not handled (shouldn't happen with the outer check)
-                            break
-                        }
+                        // Pin the symbol image centered and slightly smaller than the container
+                        NSLayoutConstraint.activate([
+                            symbolView.centerXAnchor.constraint(equalTo: itemIcon.centerXAnchor),
+                            symbolView.centerYAnchor.constraint(equalTo: itemIcon.centerYAnchor),
+                            symbolView.widthAnchor.constraint(equalTo: itemIcon.widthAnchor, multiplier: 0.7),
+                            symbolView.heightAnchor.constraint(equalTo: itemIcon.heightAnchor, multiplier: 0.7),
+                        ])
+                    }
+                    
+                default:
+                    // Fallback for types not handled (shouldn't happen with the outer check)
+                    break
+                }
             }
             
-            // --- 2. Make it Draggable ---
+            // --- 2. Make it Draggable ---(have pan/pinch)
             itemIcon.isUserInteractionEnabled = true
             let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
             itemIcon.addGestureRecognizer(panGesture)
+            
+            let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+            itemIcon.addGestureRecognizer(pinchGesture)
+            pinchGesture.delegate = self
+            panGesture.delegate = self
             
             canvasView.addSubview(itemIcon)
             
@@ -479,40 +478,29 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             
             canvasView.bringSubviewToFront(itemIcon)
             
+            // 🚨 CRITICAL FIX: Send Background and Wall items to the lowest layer
+                if itemType == "Background" {
+                    // Walls should typically also be behind everything else
+                    canvasView.sendSubviewToBack(itemIcon) // <-- ENSURES LOWEST LAYER
+                } else {
+                    // Characters, Props, Cameras, Lights should be on top
+                    canvasView.bringSubviewToFront(itemIcon)
+                }
+            
             print("Added draggable item: \(uniqueItemName) of type \(itemType) to canvas.")
             
         } else {
+            // 🚨 FINAL ELSE: This block should now be for truly unhandled/non-visual items.
+            // If you remove "Background" from here, the old background logic must also be removed.
+            
             let uniqueItemName = itemName + " (" + UUID().uuidString.prefix(4) + ")"
-                    
-                    // Check specifically for the Background type
-                    if itemType == "Background" {
-                        // 🚨 CRITICAL FIX: Apply the image directly to the background ImageView
-                        
-                        if let backgroundImage = UIImage(named: itemName) {
-                            // Apply the new image to the dedicated background view
-                            self.backgroundImageView.image = backgroundImage
-                            
-                            print("Applied canvas background: \(itemName)")
-                            
-                            // Store a placeholder so the item appears in the sidebar list (e.g., 'Framed sunset')
-                            canvasItems[uniqueItemName] = UIView()
-                            refreshSidebarContent()
-                            
-                        } else {
-                            print("Error: Could not find background image asset: \(itemName)")
-                        }
-                        
-                    } else {
-                        // Logic for truly non-visual/unhandled items
-                        print("Set non-visual property: \(itemName) as \(itemType).")
-                        
-                        // Store a placeholder view for the sidebar
-                        canvasItems[uniqueItemName] = UIView()
-                        refreshSidebarContent()
-                    }
+            print("Set non-visual property: \(itemName) as \(itemType).")
+            
+            canvasItems[uniqueItemName] = UIView()
+            refreshSidebarContent()
         }
     }
-        
+    
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
         guard let draggedView = gesture.view else { return }
         let translation = gesture.translation(in: canvasView)
@@ -524,6 +512,19 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         )
         gesture.setTranslation(.zero, in: canvasView)
     }
+    
+    @objc func handlePinch(_ sender: UIPinchGestureRecognizer) {
+            guard let viewToResize = sender.view else { return }
+            
+            // This is a standard proportional scaling implementation
+            if sender.state == .began || sender.state == .changed {
+                // Apply the change in scale since the last event
+                viewToResize.transform = viewToResize.transform.scaledBy(x: sender.scale, y: sender.scale)
+                
+                // Reset the scale to 1.0 to accumulate changes, not multiply them infinitely
+                sender.scale = 1.0
+            }
+        }
 
     // MARK: - Sidebar Refresh Logic
     
@@ -631,4 +632,14 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             
             return (color, type, symbolImage)
         }
+}
+
+
+//Add the extension required to enable multiple gestures (pan and pinch) to work on the same view simultaneously.
+// MARK: - UIGestureRecognizerDelegate
+extension MyFeatureCanvasVC: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Allows both dragging (pan) and resizing (pinch) to work together
+        return true
+    }
 }
