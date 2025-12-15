@@ -119,7 +119,16 @@ class MyFilmViewController: UIViewController {
 }
 
 
-extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate {
+extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate, AddCharacterDelegate {
+    
+    func addCharacter(character: Character) {
+        DataStore.shared.addCharacter(newCharacter: character)
+        if let film = film {
+            self.character = DataStore.shared.getCharactersByFilmId(filmId: film.id)
+        }
+        collectionView.reloadData()
+    }
+    
     func addSequence(sequence: Sequence) {
         
         // Save into datastore
@@ -134,14 +143,25 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         
     }
     
+//    func attachPropToFilm(prop: Prop) {
+//        guard let filmId = film?.id else { return }
+//
+//        DataStore.shared.attachPropToFilm(prop: prop)
+//    }
+
+    
     func addProp(prop: Prop) {
-        print(self.prop)
-        DataStore.shared.createNewProp(newProp: prop)
+        guard let film = film else { return }
 
-        self.prop = DataStore.shared.getPropsbyFilmId(filmId: film!.id)
+        DataStore.shared.attachPropToFilm(
+            propId: prop.id,
+            filmId: film.id
+        )
 
+        self.prop = DataStore.shared.getPropsbyFilmId(filmId: film.id)
         collectionView.reloadData()
     }
+
 
 
     // Helper — generic dequeue
@@ -227,7 +247,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if indexPath.section == 0 {
             performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
         } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterSegue", sender: character[indexPath.item])
+            performSegue(withIdentifier: "characterInfoSegue", sender: character[indexPath.item])
         } else {
             performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
         }
@@ -242,22 +262,23 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             vc.dataStore = dataStore
         }
 
-//        if segue.identifier == "characterSegue" {
-//            let vc = segue.destination as! AddCharacterViewController
-//            vc.character = sender as? Character
-//            vc.dataStore = dataStore
-//        }
+        if segue.identifier == "characterInfoSegue" {
+            let vc = segue.destination as! CharacterViewController
+            vc.character = sender as? Character
+            vc.dataStore = dataStore
+        }
 
-//        if segue.identifier == "propSegue" {
-//            let vc = segue.destination as! AddPropViewController
-//            vc.prop = sender as? Prop
-//            vc.dataStore = dataStore
-//        }
+        if segue.identifier == "propSegue" {
+            let vc = segue.destination as! PropDetailViewController
+            vc.prop = sender as? Prop
+            vc.dataStore = dataStore
+        }
 
         if segue.identifier == "addButtonSegue" {   // the segue that opens AddViewController
             let vc = segue.destination as! AddViewController
             vc.sequenceDelegate = self
             vc.propDelegate = self
+            vc.characterDelegate = self
             vc.dataStore = DataStore.shared
             vc.film = film
         }

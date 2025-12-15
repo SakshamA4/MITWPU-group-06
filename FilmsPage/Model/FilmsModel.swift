@@ -21,7 +21,7 @@ struct Film: Codable {
 }
 
 
-struct Sequence {
+struct Sequence: Codable {
     var id: UUID
     var name: String
     var image: String
@@ -36,6 +36,15 @@ struct Character {
     var pose: [Pose]
 }
 
+enum CharacterType: String, Codable {
+    case woman1
+    case manSuit
+    case woman2
+    case woman3
+    case asianMan
+    case jerseyMan
+}
+
 struct Pose: Codable {
     var id: UUID
     var name: String
@@ -48,10 +57,10 @@ struct Prop {
     var id: UUID
     var name: String
     var image: String
-    var filmId: UUID = UUID()
+    var filmId: UUID?
 }
 
-struct Scene {
+struct Scene: Codable {
     
     var id: UUID
     var name: String

@@ -9,14 +9,6 @@ import UIKit
 
 class SequenceViewController: UIViewController {
 
-//    var sequence: Sequence? {
-//        didSet {
-//            // Update title if view is already loaded
-//            if isViewLoaded {
-//                updateTitle()
-//            }
-//        }
-//    }
     var dataStore = DataStore.shared
     @IBOutlet weak var collectionView: UICollectionView!
     
@@ -63,18 +55,6 @@ class SequenceViewController: UIViewController {
     private func updateTitle() {
         navigationItem.title = sequence?.name ?? "Sequence"
     }
-    
-
-    
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
-    }
-    */
 
 }
 
@@ -93,7 +73,26 @@ extension SequenceViewController: UICollectionViewDataSource {
     }
 }
 
-extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+extension SequenceViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, AddSceneDelegate {
+    func addScene(scene: Scene) {
+        
+        DataStore.shared.createNewScene(newScene: scene)
+        
+        if let sequence = sequence {
+            self.scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+        }
+        collectionView.reloadData()
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "addSceneSegue" {
+            let vc = segue.destination as! AddSceneViewController
+            vc.delegate = self
+            vc.dataStore = DataStore.shared
+            vc.sequence = sequence
+        }
+    }
+    
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let inset: CGFloat = 40
         let interItem: CGFloat = 40

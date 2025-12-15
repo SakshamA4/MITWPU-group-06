@@ -22,6 +22,11 @@ class PropsCollectionViewCell: UICollectionViewCell {
         // Round the imageView
         imageView.layer.cornerRadius = 20
         imageView.layer.masksToBounds = true
+        imageView.layer.maskedCorners = [
+            .layerMinXMinYCorner,
+            .layerMaxXMinYCorner
+        ]
+
         // Initialization code
     }
    

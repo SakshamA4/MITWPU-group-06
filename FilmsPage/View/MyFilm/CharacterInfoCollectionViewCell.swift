@@ -7,28 +7,33 @@
 
 import UIKit
 
+protocol UpdateCharacterInfoDelegate{
+    func updateName(text: String)
+}
+
 class CharacterInfoCollectionViewCell: UICollectionViewCell {
     
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var imageView: UIImageView!
+    var updateDelegate: UpdateCharacterInfoDelegate?
     
     override func awakeFromNib() {
         super.awakeFromNib()
         // Initialization code
     }
     
-    func configureCell(character: Character) {
+    func configureCell(character: Character, delegate: UpdateCharacterInfoDelegate?) {
         
         if !character.image.isEmpty {
             imageView.image = UIImage(named: character.image)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }
+        updateDelegate = delegate
     }
+
     
-    @IBAction func nameTextChanged(_ sender: UITextField) {
-        nameTextField.text = sender.text
+    @IBAction func onNameChanged(_ sender: UITextField) {
+        updateDelegate?.updateName(text: sender.text ?? "")
     }
-
-
 }

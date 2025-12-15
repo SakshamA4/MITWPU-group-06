@@ -19,7 +19,7 @@
                     <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="KDy-5T-onG">
                         <rect key="frame" x="0.0" y="0.0" width="1005" height="416"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="jNb-c5-Mzh">
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="jNb-c5-Mzh">
                                 <rect key="frame" x="44" y="40" width="240" height="336"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="240" id="YWc-tb-Emq"/>
@@ -47,7 +47,7 @@
                                                         <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                                         <textInputTraits key="textInputTraits"/>
                                                         <connections>
-                                                            <action selector="nameTextChanged:" destination="gTV-IL-0wX" eventType="editingDidEnd" id="ZX1-dm-cnO"/>
+                                                            <action selector="onNameChanged:" destination="gTV-IL-0wX" eventType="editingChanged" id="Wvo-cr-fEf"/>
                                                         </connections>
                                                     </textField>
                                                 </subviews>
@@ -61,7 +61,7 @@
                                                         <color key="textColor" red="0.99999600649999998" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                         <nil key="highlightedColor"/>
                                                     </label>
-                                                    <slider opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="150" minValue="0.0" maxValue="280" translatesAutoresizingMaskIntoConstraints="NO" id="NIf-9D-Puj">
+                                                    <slider opaque="NO" contentMode="scaleToFill" selected="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="122" minValue="0.0" maxValue="280" translatesAutoresizingMaskIntoConstraints="NO" id="NIf-9D-Puj">
                                                         <rect key="frame" x="145.5" y="0.0" width="422.5" height="51.5"/>
                                                         <color key="tintColor" red="0.6411132812" green="0.18554688990000001" blue="0.2338867188" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                                     </slider>

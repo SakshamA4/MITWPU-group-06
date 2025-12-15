@@ -13,42 +13,42 @@ struct CharactersDataStore {
     static var characters: [CharacterItem] = [
         CharacterItem(
             name: "Man in a Suit",
-            imageName: "Image",
+            imageName: "Man in a suit",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 180
         ),
         CharacterItem(
             name: "Asian man",
-            imageName: "Image",
+            imageName: "Asian man",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 178
         ),
         CharacterItem(
             name: "Man in a jersey",
-            imageName: "Image",
+            imageName: "Man in a jersey",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 175
         ),
         CharacterItem(
             name: "Woman 1",
-            imageName: "Image",
+            imageName: "Woman 1",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 165
         ),
         CharacterItem(
             name: "Woman 2",
-            imageName: "Image",
+            imageName: "Woman 2",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 167
         ),
         CharacterItem(
             name: "Woman 3",
-            imageName: "Image",
+            imageName: "Woman 3",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
             heightInCms: 168

@@ -14,10 +14,6 @@ protocol LibraryDisplayItem: Identifiable, Hashable {
     var imageName: String { get }
 }
 
-// MARK: - Sections on the Library screen
-
-/// The big horizontal row (Scenes + Cameras) and
-/// the smaller grid row (Characters, Props, Lights, Background)
 enum LibrarySection: Int, CaseIterable {
     case featured          // top row: big cards
     case assets            // bottom row: smaller cards
@@ -48,34 +44,34 @@ enum LibraryModel {
         .featured: [
             LibraryItem(
                 title: "Scenes",
-                imageName: "Image",        // put this image in Assets
+                imageName: "Scenes",        // put this image in Assets
                 destinationKey: "scenes"
             ),
             LibraryItem(
                 title: "Cameras and Movements",
-                imageName: "Image",
+                imageName: "Cameras and Movements",
                 destinationKey: "camerasAndMovements"
             )
         ],
         .assets: [
             LibraryItem(
                 title: "Characters",
-                imageName: "Image",
+                imageName: "Characters",
                 destinationKey: "characters"
             ),
             LibraryItem(
                 title: "Props",
-                imageName: "Image",
+                imageName: "Props",
                 destinationKey: "props"
             ),
             LibraryItem(
                 title: "Lights",
-                imageName: "Image",
+                imageName: "Lights",
                 destinationKey: "lights"
             ),
             LibraryItem(
                 title: "Background",
-                imageName: "Image",
+                imageName: "Background",
                 destinationKey: "background"
             )
         ]

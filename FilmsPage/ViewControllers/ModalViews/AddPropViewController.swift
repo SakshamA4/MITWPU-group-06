@@ -26,7 +26,7 @@ class AddPropViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        DataStore.shared.loadData()
+      //  DataStore.shared.loadData()
         prop = DataStore.shared.getProps()
         
         let layout = UICollectionViewFlowLayout()
@@ -103,12 +103,9 @@ extension AddPropViewController: UICollectionViewDelegate {
 
         guard let film = film else { return }
 
-        var selectedProp = prop[indexPath.item]
-        selectedProp.filmId = film.id      // attach the film ID
-
-
-        // Notify MyFilmViewController
+        let selectedProp = prop[indexPath.item]
         delegate?.addProp(prop: selectedProp)
+
 
         // Close the view
         self.dismiss(animated: true)
