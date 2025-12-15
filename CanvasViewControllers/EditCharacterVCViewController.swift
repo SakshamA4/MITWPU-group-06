@@ -26,6 +26,9 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
     }()
     
     
+    
+    
+    
     // MARK: - Left Side Components
         
         private let selectedCharacterCard: UIView = {
@@ -239,7 +242,18 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
         setupConstraints()
         
         // Update the title and name label
-                selectedNameLabel.text = selectedCharacterName ?? "Unknown Character"
+        selectedNameLabel.text = selectedCharacterName ?? "Unknown Character"
+        
+        if let characterName = selectedCharacterName,
+               let image = UIImage(named: characterName) {
+                
+                // This will load "Woman 1" or "Man in a suit" into the large preview card
+                characterPreview.image = image
+                
+            } else {
+                // Fallback for debugging, will show the default light gray background
+                print("Error: Could not find image asset for selected character: \(selectedCharacterName ?? "nil")")
+            }
     }
     
     private func setupViews() {

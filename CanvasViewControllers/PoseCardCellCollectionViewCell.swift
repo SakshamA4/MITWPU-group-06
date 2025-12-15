@@ -19,7 +19,7 @@ class PoseCardCell: UICollectionViewCell {
                 if let pose = poseName {
                     // 1. Clean the Pose Name (e.g., "Fighting pose" -> "Fightingpose")
                     // We still need to clean spaces for image asset names
-                    let assetName = pose.replacingOccurrences(of: " ", with: "")
+                    let assetName = pose
                     
                     // 2. Load the image using ONLY the cleaned pose name.
                     // NOTE: This assumes an asset named "Fightingpose" exists and is the correct one

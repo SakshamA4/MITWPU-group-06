@@ -56,6 +56,8 @@ class ItemPickerVC: UIViewController {
         private var titleCenterYConstraint: NSLayoutConstraint!
         private var titleBottomConstraint: NSLayoutConstraint!
         private var tabBottomConstraint: NSLayoutConstraint!
+        private var detailStackHalfWidthConstraint: NSLayoutConstraint!
+        private var collectionViewHeightConstraint: NSLayoutConstraint!
     
     // MARK: - Views (Private UI Components)
     
@@ -315,6 +317,7 @@ class ItemPickerVC: UIViewController {
         private func setupBodyLayout() {
             // Reset visibility for all changeable views
             detailStackView.isHidden = true // Hide all detail fields by default
+            detailStackHalfWidthConstraint.isActive = false
             
             // Change scroll direction based on type
             if let layout = itemCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -324,6 +327,13 @@ class ItemPickerVC: UIViewController {
             
             let detailFields: [UIView] = []
             
+            // Clear any previous detail views
+                detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                
+                // Reset collection view height constraint to a huge value for vertical scrolling types
+                // This allows the scroll view to expand based on the number of cells.
+                collectionViewHeightConstraint.constant = 9999
+            
             switch itemType {
             case "Camera":
                 // Horizontal Scroll, Details visible (Name, Notes, Color)
@@ -331,12 +341,13 @@ class ItemPickerVC: UIViewController {
                     layout.scrollDirection = .horizontal
                 }
                 detailStackView.isHidden = false
-                
+                detailStackHalfWidthConstraint.isActive = true
                 // Rebuild detail stack for Camera
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
                 detailStackView.addArrangedSubview(createInputField(label: "Name", placeholder: "e.g., Wide Shot Camera"))
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Primary A-Cam"))
                 detailStackView.addArrangedSubview(createDetailColorPicker()) // Color picker row
+                collectionViewHeightConstraint.constant = 360 // Fixed height for horizontal scrolling
                 
             case "Lights":
                 // Horizontal Scroll, Details visible (Intensity, Temperature, Shadows, Color)
@@ -344,21 +355,34 @@ class ItemPickerVC: UIViewController {
                     layout.scrollDirection = .horizontal
                 }
                 detailStackView.isHidden = false
-                
+                detailStackHalfWidthConstraint.isActive = true
                 // Rebuild detail stack for Lights
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
                 detailStackView.addArrangedSubview(createSliderRow(title: "Intensity:", min: 0, max: 100))
                 detailStackView.addArrangedSubview(createSliderRow(title: "Temperature:", min: 2000, max: 8000))
                 detailStackView.addArrangedSubview(createSliderRow(title: "Shadows:", min: 0, max: 1))
                 detailStackView.addArrangedSubview(createDetailColorPicker())
+                collectionViewHeightConstraint.constant = 360 // Fixed height for horizontal scrolling
             
-                
+            case "Wall":
+                    // Vertical Scroll, Details visible (Height, Color)
+                    // Note: Scroll direction defaults to vertical above
+                    
+                    detailStackView.isHidden = false
+                    detailStackHalfWidthConstraint.isActive = true // Activate half-width for detail stack
+                    
+                    // Rebuild detail stack for Wall (Height slider, Color picker)
+                    detailStackView.addArrangedSubview(createSliderRow(title: "Wall Height:", min: 10, max: 50)) // Example Wall height slider
+                    detailStackView.addArrangedSubview(createDetailColorPicker())
+                    
+                    // For Vertical types, height is set to 9999 above (DYNAMIC)
                 
                 
             case "Character", "Props", "Background":
                 // Vertical Scroll, NO Details visible
                 detailStackView.isHidden = true
                 // Scroll direction defaults to vertical above
+                
                 
             default:
                 detailStackView.isHidden = true
@@ -514,6 +538,7 @@ class ItemPickerVC: UIViewController {
                 // 3. Tabs pushed down (For Character)
                 tabBottomConstraint = tabSegmentedControl.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor, constant: 10)
 
+        detailStackHalfWidthConstraint = detailStackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.5)
         
         // --- START CONSTRAINTS FOR CONTENT BODY ---
             
@@ -557,13 +582,19 @@ class ItemPickerVC: UIViewController {
                 ])
 
                 // --- 4. Enforce Collection View Height inside the Stack ---
-                let horizontalGridHeight: CGFloat = 360
-                NSLayoutConstraint.activate([
-                    // Ensure the item collection view has a fixed height within the stack
-                    itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight),
-                ])
+//                let horizontalGridHeight: CGFloat = 360
+//                NSLayoutConstraint.activate([
+//                    // Ensure the item collection view has a fixed height within the stack
+//                    itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight),
+//                ])
 
+        
+        // --- 4. Enforce Collection View Height inside the Stack ---
+        let horizontalGridHeight: CGFloat = 360
+        collectionViewHeightConstraint = itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight) // 🚨 Use the new property
+        collectionViewHeightConstraint.isActive = true // Activate it by default (for horizontal types)
             // --- END CONSTRAINTS FOR CONTENT BODY ---
+        
         }
        
         
