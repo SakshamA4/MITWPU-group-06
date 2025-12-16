@@ -1030,7 +1030,7 @@
                 </viewControllerPlaceholder>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="SsW-8h-Gjd" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1929" y="-534"/>
+            <point key="canvasLocation" x="-959" y="-695"/>
         </scene>
         <!--Tab Bar Controller-->
         <scene sceneID="7d2-bc-gwU">
@@ -1044,9 +1044,9 @@
                         <color key="selectedImageTintColor" red="1" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
                     </tabBar>
                     <connections>
-                        <segue destination="Eh0-DA-4hq" kind="relationship" relationship="viewControllers" id="RT9-nM-dwe"/>
-                        <segue destination="DoI-hN-6lg" kind="relationship" relationship="viewControllers" id="Wh4-iS-O4i"/>
                         <segue destination="tpa-HP-pss" kind="relationship" relationship="viewControllers" id="dj4-19-Ld5"/>
+                        <segue destination="Eh0-DA-4hq" kind="relationship" relationship="viewControllers" id="gEj-ae-bln"/>
+                        <segue destination="DoI-hN-6lg" kind="relationship" relationship="viewControllers" id="Ens-lw-SWQ"/>
                     </connections>
                 </tabBarController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="ObR-8P-DQf" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
@@ -1058,14 +1058,15 @@
             <objects>
                 <viewControllerPlaceholder storyboardName="Library" referencedIdentifier="LibraryNavigationController" id="DoI-hN-6lg" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Item" id="Ppc-ug-iaj"/>
+                    <navigationItem key="navigationItem" id="eBT-fR-m5E"/>
                 </viewControllerPlaceholder>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="zqE-2g-b9B" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1613" y="964"/>
+            <point key="canvasLocation" x="-1686" y="828"/>
         </scene>
     </scenes>
     <inferredMetricsTieBreakers>
-        <segue reference="YOU-Ky-EOW"/>
+        <segue reference="T5b-fB-vzQ"/>
         <segue reference="qL6-BQ-uyN"/>
     </inferredMetricsTieBreakers>
     <resources>

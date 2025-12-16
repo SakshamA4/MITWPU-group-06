@@ -22,10 +22,10 @@ class CharacterInfoCollectionViewCell: UICollectionViewCell {
         // Initialization code
     }
     
-    func configureCell(character: Character, delegate: UpdateCharacterInfoDelegate?) {
+    func configureCell(character: CharacterItem, delegate: UpdateCharacterInfoDelegate?) {
         
-        if !character.image.isEmpty {
-            imageView.image = UIImage(named: character.image)
+        if !character.imageName.isEmpty {
+            imageView.image = UIImage(named: character.imageName)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }

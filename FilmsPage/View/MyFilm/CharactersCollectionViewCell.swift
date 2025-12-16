@@ -36,9 +36,9 @@ class CharactersCollectionViewCell: UICollectionViewCell {
     }
    
     
-    func configureCell(character: Character) {
-        if !character.image.isEmpty {
-            imageView.image = UIImage(named: character.image)
+    func configureCell(character: CharacterItem) {
+        if !character.imageName.isEmpty {
+            imageView.image = UIImage(named: character.imageName)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }

@@ -11,8 +11,9 @@ class LibraryCharactersViewController: UIViewController {
 
     @IBOutlet weak var charactersCollectionView: UICollectionView!
 
-        private var characters = CharactersDataStore.characters   //[CharacterItem]
-
+    private var dataStore = DataStore.shared   //[CharacterItem]
+    private var characters: [CharacterItem] = []
+    
         override func viewDidLoad() {
             super.viewDidLoad()
             charactersCollectionView.dataSource = self
@@ -22,6 +23,8 @@ class LibraryCharactersViewController: UIViewController {
             charactersCollectionView.register(
                 UINib(nibName: "LibraryCharactersCollectionViewCell", bundle: nil),
                 forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell" )
+            
+            characters = DataStore.shared.getCharacters()
                 
 
         }
@@ -38,7 +41,7 @@ class LibraryCharactersViewController: UIViewController {
             return
         }
 
-        // 🔴 IMPORTANT: disable self-sizing
+        // IMPORTANT: disable self-sizing
         layout.estimatedItemSize = .zero
 
         let columns: CGFloat = 3

@@ -17,13 +17,13 @@ class DataStore {
     
     private var sequence: [Sequence] = []
     private var Props: [Prop] = []
-    private var Characters: [Character] = []
+    private var Characters: [CharacterItem] = []
     
     private var scenes: [Scene] = []
-    private var poses: [Pose] = []
+    private var poses: [CharacterPoseItem] = []
     
     
-    private init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [Prop] = [], Characters: [Character] = [], scenes: [Scene] = []) {
+    private init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [Prop] = [], Characters: [CharacterItem] = [], scenes: [Scene] = []) {
         self.films = films
         self.sequence = Sequence
         self.Props = Props
@@ -50,12 +50,12 @@ class DataStore {
         if favFilms == nil {
             favFilms = Film(
                 id: UUID(),
-                name: "Interstellar",
+                name: "Favourite Film",
                 sequences: 0,
                 scenes: 0,
                 time: "0",
                 characters: 0,
-                image: "Image"
+                image: "FilmImage"
             )
         }
 
@@ -75,7 +75,7 @@ class DataStore {
             
         ]
         
-        self.favFilms = Film(id: UUID(), name: "Intestellar", sequences: 0, scenes: 0, time: "0", characters: 0, image: "Image")
+        self.favFilms = Film(id: UUID(), name: "Favourite Film", sequences: 0, scenes: 0, time: "0", characters: 0, image: "FilmImage")
         
         self.sequence = [
             Sequence(id: UUID(), name: "Sequence 1", image: "Image", filmId: self.films[0].id),
@@ -96,94 +96,99 @@ class DataStore {
 
         
         self.Characters = [
-            Character(id: UUID() ,
-                      name: "Character 1",
-                      image: "Woman 1",
-                      filmId: self.films[0].id,
-                      pose:
-                        [
-                            Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
-                            Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
-                            Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
-                            Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
-                            Pose(id: UUID(), name: "Falling", image: "Falling"),
-                            Pose(id: UUID(), name: "Buffering", image: "Buffering")
-                        ]
-                      ),
-            
-            Character(id: UUID() ,
-                      name: "Character 2",
-                      image: "Man in a suit",
-                      filmId: self.films[0].id,
-                      pose:
-                        [
-                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
 
-                        ]
-                     ),
-            
-            Character(id: UUID(),
-                      name: "Character 3",
-                      image: "Woman 2",
-                      pose:
-                        [
-                           Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                           Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                           Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                           Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                           Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                           Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-                       ]
-                     ),
-            
-            Character(id: UUID(),
-                      name: "Character 4",
-                      image: "Woman 3",
-                      pose:
-                        [
-                           Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
-                           Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
-                           Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
-                           Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
-                           Pose(id: UUID(), name: "Falling", image: "Falling"),
-                           Pose(id: UUID(), name: "Buffering", image: "Buffering")
-                       ]
-                     ),
-            
-            Character(id: UUID(),
-                      name: "Character 5",
-                      image: "Asian man",
-                      pose:
-                        [
-                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-                        ]
-                     ),
-            
-            Character(id: UUID(),
-                      name: "Character 6",
-                      image: "Man in a jersey",
-                      pose:
-                        [
-                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-                        ]
-                    )
-        
+            CharacterItem(
+                id: UUID(),
+                name: "Character 1",
+                imageName: "Woman 1",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Sleeping", imageName: "Sleeping"),
+                    CharacterPoseItem(id: UUID(), name: "Falling", imageName: "Falling"),
+                    CharacterPoseItem(id: UUID(), name: "Buffering", imageName: "Buffering")
+                ]
+            ),
+
+            CharacterItem(
+                id: UUID(),
+                name: "Character 2",
+                imageName: "Man in a suit",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
+                    CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
+                    CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
+                    CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
+                ]
+            ),
+
+            CharacterItem(
+                id: UUID(),
+                name: "Character 3",
+                imageName: "Woman 2",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
+                    CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
+                ]
+            ),
+
+            CharacterItem(
+                id: UUID(),
+                name: "Character 4",
+                imageName: "Woman 3",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
+                    CharacterPoseItem(id: UUID(), name: "Sleeping", imageName: "Sleeping"),
+                    CharacterPoseItem(id: UUID(), name: "Falling", imageName: "Falling"),
+                    CharacterPoseItem(id: UUID(), name: "Buffering", imageName: "Buffering")
+                ]
+            ),
+
+            CharacterItem(
+                id: UUID(),
+                name: "Character 5",
+                imageName: "Asian man",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
+                    CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
+                    CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
+                    CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
+                ]
+            ),
+
+            CharacterItem(
+                id: UUID(),
+                name: "Character 6",
+                imageName: "Man in a jersey",
+                filmId: self.films[0].id,
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
+                    CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
+                    CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
+                    CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
+                    CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
+                ]
+            )
+
         ]
+
         
 
         if let savedScenes = UserDefaults.standard.data(forKey: "scenes") {
@@ -248,15 +253,15 @@ class DataStore {
     }
     
     
-    func getCharactersByFilmId(filmId: UUID) -> [Character] {
+    func getCharactersByFilmId(filmId: UUID) -> [CharacterItem] {
         return Characters.filter { $0.filmId == filmId }
     }
     
-    func getCharacters() -> [Character] {
+    func getCharacters() -> [CharacterItem] {
         return self.Characters
     }
     
-    func getPoses(forCharacter characterId: UUID) -> [Pose]? {
+    func getPoses(forCharacter characterId: UUID) -> [CharacterPoseItem]? {
         return Characters.first(where: { $0.id == characterId })?.pose
     }
 
@@ -303,7 +308,7 @@ class DataStore {
 
 
 
-    func addCharacter(newCharacter: Character) {
+    func addCharacter(newCharacter: CharacterItem) {
         Characters.append(newCharacter)
         updateFilmCounts()
         saveData()

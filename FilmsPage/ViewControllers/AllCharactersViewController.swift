@@ -9,8 +9,8 @@ import UIKit
 
 class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
 
-    var character: [Character] = []
-    var dataStore: DataStore?
+    var character: [CharacterItem] = []
+    var dataStore = DataStore.shared
     
     
     @IBOutlet weak var collectionView: UICollectionView!

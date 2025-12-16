@@ -21,10 +21,10 @@ class CharacterViewController: UIViewController {
     var dataStore: DataStore = DataStore.shared
     
     // Characters for this film
-    var characters: [Character] = []
+    var characters: [CharacterItem] = []
     
     // The currently selected character
-    var character: Character?
+    var character: CharacterItem?
     
     var delegate: AddCharacterDelegate?
     

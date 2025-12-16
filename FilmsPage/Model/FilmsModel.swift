@@ -28,19 +28,19 @@ struct Sequence: Codable {
     var filmId: UUID
 }
 
-struct Character {
-    var id: UUID
-    var name: String
-    var image: String
-    var filmId: UUID = UUID()
-    var pose: [Pose]
-}
-
-struct Pose: Codable {
-    var id: UUID
-    var name: String
-    var image: String
-}
+//struct Character {
+//    var id: UUID
+//    var name: String
+//    var image: String
+//    var filmId: UUID = UUID()
+//    var pose: [Pose]
+//}
+//
+//struct Pose: Codable {
+//    var id: UUID
+//    var name: String
+//    var image: String
+//}
 
 
 struct Prop {
