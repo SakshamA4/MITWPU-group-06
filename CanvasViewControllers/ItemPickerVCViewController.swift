@@ -2,7 +2,7 @@
 // ItemPickerVC.swift
 // FilmsPage
 //
-// Created by [Ritik]
+// Created by Ritik
 //
 
 import UIKit

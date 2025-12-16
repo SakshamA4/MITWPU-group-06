@@ -2,7 +2,7 @@
 // MyFeatureCanvasVC.swift
 // FilmsPage
 //
-// Created by [Your Name]
+// Created by Ritik
 //
 
 import UIKit
@@ -148,7 +148,8 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         let undo = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"), style: .plain, target: self, action: nil)
         let redo = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.forward"), style: .plain, target: self, action: nil)
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), style: .plain, target: self, action: nil)
-        navigationItem.rightBarButtonItems = [more, redo, undo]
+        let exportButton = UIBarButtonItem(image: UIImage(systemName: "square.and.arrow.up"), style: .plain, target: self, action: #selector(didTapExportButton))
+        navigationItem.rightBarButtonItems = [more, redo, undo,exportButton]
     }
     func setupViewsAndConstraints() {
         //1. Canvas Setup
@@ -460,7 +461,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             refreshSidebarContent()
             
             canvasView.bringSubviewToFront(itemIcon)
-                if itemType == "Background" {
+                if itemType == "Background" || itemType == "Walls" {
                     canvasView.sendSubviewToBack(itemIcon)
                 } else {
                     canvasView.bringSubviewToFront(itemIcon)
@@ -475,6 +476,81 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             canvasItems[uniqueItemName] = UIView()
             refreshSidebarContent()
         }
+    }
+    
+    private func captureCanvasAndShare(isPNG: Bool) {
+        // 1. Define the area to capture (the entire canvasView)
+        let renderer = UIGraphicsImageRenderer(bounds: canvasView.bounds)
+        
+        // 2. Render the view hierarchy into an image
+        let image = renderer.image { context in
+            // Ensures all subviews are drawn, including draggable elements
+            canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
+        }
+        
+        let data: Data?
+        
+        if isPNG {
+            data = image.pngData()
+        } else {
+            // JPEG compression (0.9 = high quality)
+            data = image.jpegData(compressionQuality: 0.9)
+        }
+        
+        guard let exportData = data, let imageToShare = UIImage(data: exportData) else {
+            print("Error: Could not generate image data for export.")
+            return
+        }
+        
+        // 3. Present the native iOS Share Sheet (UIActivityViewController)
+        let activityViewController = UIActivityViewController(activityItems: [imageToShare], applicationActivities: nil)
+        
+        // Required for iPad presentation
+        if let popoverController = activityViewController.popoverPresentationController {
+            if let barButton = navigationItem.rightBarButtonItems?.last { // Assuming export button is the last one
+                 popoverController.barButtonItem = barButton
+            } else {
+                 popoverController.sourceView = self.view
+            }
+        }
+        
+        self.present(activityViewController, animated: true, completion: nil)
+    }
+    
+    @objc func didTapExportButton() {
+        print("Export button tapped. Presenting Export Options modal.")
+        
+        // 1. Instantiate the new ExportVC
+        let exportVC = ExportVC()
+        
+        // 2. Set the completion closure
+        exportVC.onFormatSelected = { [weak self] format in
+            guard let self = self else { return }
+            
+            // Dismiss the modal first, then perform the action
+            exportVC.dismiss(animated: true) {
+                print("Selected format: \(format)")
+                
+                switch format {
+                case "JPEG":
+                    self.captureCanvasAndShare(isPNG: false)
+                case "PNG":
+                    self.captureCanvasAndShare(isPNG: true)
+                case "PDF":
+                    print("PDF Export not implemented yet.")
+                case "MP4":
+                    print("MP4 Export not implemented yet.")
+                default:
+                    break
+                }
+            }
+        }
+        
+        // 3. Apply custom presentation settings (assuming you use the BottomSheetPresentationController)
+        exportVC.modalPresentationStyle = .custom
+        exportVC.transitioningDelegate = self
+        
+        self.present(exportVC, animated: true)
     }
     
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
