@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		19075A4B2ED4646D00B3A488 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmsPage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		19D87C592EED6FE9002FC9F8 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmsPage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,16 +46,8 @@
 			isa = PBXGroup;
 			children = (
 				19075A4D2ED4646D00B3A488 /* FilmsPage */,
-				19075A4C2ED4646D00B3A488 /* Products */,
+				19D87C592EED6FE9002FC9F8 /* FilmsPage.app */,
 			);
-			sourceTree = "<group>";
-		};
-		19075A4C2ED4646D00B3A488 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				19075A4B2ED4646D00B3A488 /* FilmsPage.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -80,7 +72,7 @@
 			packageProductDependencies = (
 			);
 			productName = FilmsPage;
-			productReference = 19075A4B2ED4646D00B3A488 /* FilmsPage.app */;
+			productReference = 19D87C592EED6FE9002FC9F8 /* FilmsPage.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -108,7 +100,7 @@
 			mainGroup = 19075A422ED4646D00B3A488;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 19075A4C2ED4646D00B3A488 /* Products */;
+			productRefGroup = 19075A422ED4646D00B3A488;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
