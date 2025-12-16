@@ -17,6 +17,8 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
     @IBOutlet weak var titleLabel: UILabel!
     @IBOutlet weak var FavButton: UIButton!
     
+    @IBOutlet weak var view: UIView!
+    
     var delegate: OtherFilmDelegate?
     var film: Film?
     
@@ -25,7 +27,8 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
         
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
-
+        contentView.layer.borderWidth = 0.7
+        contentView.layer.borderColor = UIColor.gray.cgColor
         // Round the imageView
 
         // Initialization code

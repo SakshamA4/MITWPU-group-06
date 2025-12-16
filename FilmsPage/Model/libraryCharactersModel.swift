@@ -10,6 +10,7 @@ struct CharacterItem {
     var shirtColorHex: String   // e.g. "#FFFFFF"
     var pantColorHex: String    // e.g. "#000000"
     var heightInCms: Float      // e.g. 170.0
+    var pose: [CharacterPoseItem]
 }
 
 // MARK: - Character Pose (for the horizontal poses row)

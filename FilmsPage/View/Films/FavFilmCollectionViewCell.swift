@@ -21,7 +21,9 @@ class FavFilmCollectionViewCell: UICollectionViewCell {
         
             contentView.layer.cornerRadius = 20
             contentView.layer.masksToBounds = true
-
+        
+        contentView.layer.borderWidth = 0.7
+        contentView.layer.borderColor = UIColor.gray.cgColor
             // Round the imageView
             imageView.layer.cornerRadius = 20
             imageView.layer.masksToBounds = true

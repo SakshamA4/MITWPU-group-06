@@ -495,7 +495,7 @@
                                     </collectionViewCell>
                                 </cells>
                             </collectionView>
-                            <button opaque="NO" contentMode="scaleToFill" misplaced="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="EGx-0L-8eD">
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="EGx-0L-8eD">
                                 <rect key="frame" x="1076" y="32" width="67" height="68"/>
                                 <color key="tintColor" red="0.6411132812" green="0.18554688990000001" blue="0.2338867188" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                 <state key="normal" title="Button"/>
@@ -514,6 +514,7 @@
                             <constraint firstItem="h9W-Iu-ddf" firstAttribute="bottom" secondItem="ldf-7n-pZp" secondAttribute="bottom" id="Pgd-sc-v5w"/>
                             <constraint firstItem="h9W-Iu-ddf" firstAttribute="trailing" secondItem="ldf-7n-pZp" secondAttribute="trailing" id="Qu8-4v-4cQ"/>
                             <constraint firstItem="eC8-aV-kdQ" firstAttribute="top" secondItem="h9W-Iu-ddf" secondAttribute="top" constant="40" id="R7x-YM-wiY"/>
+                            <constraint firstItem="ldf-7n-pZp" firstAttribute="top" secondItem="EGx-0L-8eD" secondAttribute="bottom" constant="1" id="XWZ-I8-aW8"/>
                             <constraint firstItem="EGx-0L-8eD" firstAttribute="leading" secondItem="eC8-aV-kdQ" secondAttribute="trailing" constant="791.5" id="Yyz-su-2dD"/>
                             <constraint firstItem="h9W-Iu-ddf" firstAttribute="trailing" secondItem="EGx-0L-8eD" secondAttribute="trailing" constant="37" id="ZCl-Vr-ADv"/>
                             <constraint firstItem="EGx-0L-8eD" firstAttribute="top" secondItem="h9W-Iu-ddf" secondAttribute="top" constant="32" id="elj-hY-B9r"/>

@@ -18,10 +18,20 @@ class CharactersCollectionViewCell: UICollectionViewCell {
         
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
+        
+        imageView.layer.borderWidth = 0.7
+        imageView.layer.borderColor = UIColor.gray.cgColor
+        
+        contentView.layer.borderWidth = 0.7
+        contentView.layer.borderColor = UIColor.gray.cgColor
 
         // Round the imageView
         imageView.layer.cornerRadius = 16
         imageView.layer.masksToBounds = true
+        imageView.layer.maskedCorners = [
+            .layerMinXMinYCorner,
+            .layerMaxXMinYCorner
+        ]
         // Initialization code
     }
    

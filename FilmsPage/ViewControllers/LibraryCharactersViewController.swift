@@ -11,7 +11,7 @@ class LibraryCharactersViewController: UIViewController {
 
     @IBOutlet weak var charactersCollectionView: UICollectionView!
 
-        private var characters = CharactersDataStore.characters   // [CharacterItem]
+        private var characters = CharactersDataStore.characters   //[CharacterItem]
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -21,8 +21,9 @@ class LibraryCharactersViewController: UIViewController {
 
             charactersCollectionView.register(
                 UINib(nibName: "LibraryCharactersCollectionViewCell", bundle: nil),
-                forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell"
-            )
+                forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell" )
+                
+
         }
 
         override func viewDidLayoutSubviews() {
@@ -43,7 +44,7 @@ class LibraryCharactersViewController: UIViewController {
         let columns: CGFloat = 3
         let spacing: CGFloat = 35
         let sideInset: CGFloat = 46
-        let verticalInset: CGFloat = 40
+//        let verticalInset: CGFloat = 40
 
         let width = charactersCollectionView.bounds.width
         guard width > 0 else { return }
@@ -112,5 +113,7 @@ class LibraryCharactersViewController: UIViewController {
             return cell
         }
     }
+
+
 
     extension LibraryCharactersViewController: UICollectionViewDelegate {}
