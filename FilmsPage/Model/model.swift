@@ -47,3 +47,10 @@ struct props {
     var name: String
     var image: [String]
 }
+// home
+
+struct Home{
+    var id: Int
+    var title: String
+    var imageName: String
+}

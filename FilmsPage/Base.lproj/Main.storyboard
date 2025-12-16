@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="Qms-NW-zMo">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="landscape" layout="fullscreen" appearance="light"/>
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="collection view cell content view" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -11,18 +12,56 @@
         <!--Home-->
         <scene sceneID="VgV-ha-sGe">
             <objects>
-                <viewController title="Home" id="jZm-ht-jkD" sceneMemberID="viewController">
+                <viewController title="Home" id="jZm-ht-jkD" customClass="HomeViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Ksy-uT-PFt">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" misplaced="YES" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="KOk-dy-p8q">
+                                <rect key="frame" x="20" y="158" width="1140" height="179"/>
+                                <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="180" id="2PN-QU-oPD"/>
+                                </constraints>
+                                <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="1RK-d3-hUF">
+                                    <size key="itemSize" width="586" height="358"/>
+                                    <size key="headerReferenceSize" width="0.0" height="0.0"/>
+                                    <size key="footerReferenceSize" width="0.0" height="0.0"/>
+                                    <inset key="sectionInset" minX="0.0" minY="0.0" maxX="0.0" maxY="0.0"/>
+                                </collectionViewFlowLayout>
+                                <cells>
+                                    <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" id="3f5-WI-fAV">
+                                        <rect key="frame" x="277" y="0.0" width="586" height="358"/>
+                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                        <collectionViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" insetsLayoutMarginsFromSafeArea="NO" id="v2p-6g-Cc8">
+                                            <rect key="frame" x="0.0" y="0.0" width="586" height="358"/>
+                                            <autoresizingMask key="autoresizingMask"/>
+                                        </collectionViewCellContentView>
+                                        <size key="customSize" width="586" height="358"/>
+                                    </collectionViewCell>
+                                </cells>
+                                <connections>
+                                    <outlet property="dataSource" destination="jZm-ht-jkD" id="YrS-0V-aJk"/>
+                                    <outlet property="delegate" destination="jZm-ht-jkD" id="CST-EM-TOB"/>
+                                </connections>
+                            </collectionView>
+                        </subviews>
                         <viewLayoutGuide key="safeArea" id="C4m-hj-o7E"/>
                         <color key="backgroundColor" red="0.042358394709999997" green="0.042358394709999997" blue="0.08166503906" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+                        <constraints>
+                            <constraint firstItem="KOk-dy-p8q" firstAttribute="trailing" secondItem="C4m-hj-o7E" secondAttribute="trailing" constant="20" id="DST-mn-IxA"/>
+                            <constraint firstItem="KOk-dy-p8q" firstAttribute="leading" secondItem="C4m-hj-o7E" secondAttribute="leading" constant="20" id="E8Y-uw-gh4"/>
+                            <constraint firstItem="KOk-dy-p8q" firstAttribute="top" secondItem="C4m-hj-o7E" secondAttribute="top" constant="80" id="zSZ-Qb-4kS"/>
+                        </constraints>
                     </view>
                     <navigationItem key="navigationItem" id="46Y-hr-szM"/>
+                    <connections>
+                        <outlet property="templateCollectionView" destination="KOk-dy-p8q" id="bqx-NL-KyL"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="Gqy-ro-xV8" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="793.72881355932202" y="-896.34146341463418"/>
+            <point key="canvasLocation" x="794" y="-896"/>
         </scene>
         <!--Library -->
         <scene sceneID="SbB-qD-yui">
@@ -219,4 +258,9 @@
             <point key="canvasLocation" x="84.915254237288138" y="1266.5853658536585"/>
         </scene>
     </scenes>
+    <resources>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
 </document>
