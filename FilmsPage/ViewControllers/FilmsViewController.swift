@@ -112,7 +112,7 @@ class FilmsViewController: UIViewController {
             } else {
                 //set item size
                 let itemSize = NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(0.2),
+                    widthDimension: .fractionalWidth(0.25),
                     heightDimension: .absolute(280)
                 )
                 //create item

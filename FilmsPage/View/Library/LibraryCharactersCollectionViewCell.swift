@@ -22,6 +22,16 @@ class LibraryCharactersCollectionViewCell: UICollectionViewCell {
     func configure(with item: CharacterItem) {
         libraryCharacterLabel.text = item.name
         libraryCharacterImage.image = UIImage(named: item.imageName)
+        
+        libraryCharacterImage.layer.borderWidth = 0.7
+        libraryCharacterImage.layer.borderColor = UIColor.gray.cgColor
+        
+        libraryCharacterImage.layer.cornerRadius = 12.0
+        libraryCharacterImage.layer.masksToBounds = true
+        libraryCharacterImage.layer.maskedCorners = [
+            .layerMinXMinYCorner,
+            .layerMaxXMinYCorner
+        ]
 //        featuredImageView.layer.cornerRadius = 12.0
 //        featuredImageView.clipsToBounds = true
         }

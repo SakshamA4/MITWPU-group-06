@@ -74,7 +74,7 @@ class MyFilmViewController: UIViewController {
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 
                 item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 32, trailing: 12)
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section
@@ -91,7 +91,7 @@ class MyFilmViewController: UIViewController {
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 group.interItemSpacing = .fixed(10)
                 section.interGroupSpacing = 50
-                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 32, trailing: 12)
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section
@@ -108,7 +108,7 @@ class MyFilmViewController: UIViewController {
                 section.orthogonalScrollingBehavior = .groupPagingCentered
                 group.interItemSpacing = .fixed(10)
                 section.interGroupSpacing = 50
-                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 12, bottom: 32, trailing: 12)
                 section.boundarySupplementaryItems = [headerItem]
                 
                 return section

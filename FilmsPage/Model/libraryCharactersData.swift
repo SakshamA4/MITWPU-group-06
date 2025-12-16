@@ -16,42 +16,60 @@ struct CharactersDataStore {
             imageName: "Man in a suit",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 180
+            heightInCms: 180,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         ),
         CharacterItem(
             name: "Asian man",
             imageName: "Asian man",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 178
+            heightInCms: 178,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         ),
         CharacterItem(
             name: "Man in a jersey",
             imageName: "Man in a jersey",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 175
+            heightInCms: 175,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         ),
         CharacterItem(
             name: "Woman 1",
             imageName: "Woman 1",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 165
+            heightInCms: 165,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         ),
         CharacterItem(
             name: "Woman 2",
             imageName: "Woman 2",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 167
+            heightInCms: 167,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         ),
         CharacterItem(
             name: "Woman 3",
             imageName: "Woman 3",
             shirtColorHex: "#FFFFFF",
             pantColorHex: "#000000",
-            heightInCms: 168
+            heightInCms: 168,
+            pose: [
+            CharacterPoseItem(name: "Sleeping", imageName: "Sleeping")
+            ]
         )
     ]
     

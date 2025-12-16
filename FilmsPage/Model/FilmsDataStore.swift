@@ -36,19 +36,17 @@ class DataStore {
 
         let decoder = JSONDecoder()
 
-        // 1️⃣ Load saved films
+
         if let savedFilms = UserDefaults.standard.data(forKey: "films"),
            let decodedFilms = try? decoder.decode([Film].self, from: savedFilms) {
             self.films = decodedFilms
         }
 
-        // 2️⃣ Load saved favourite
         if let savedFav = UserDefaults.standard.data(forKey: "favFilm"),
            let decodedFav = try? decoder.decode(Film.self, from: savedFav) {
             self.favFilms = decodedFav
         }
 
-        // 3️⃣ ONLY set default data if NOTHING exists
         if favFilms == nil {
             favFilms = Film(
                 id: UUID(),
@@ -98,12 +96,93 @@ class DataStore {
 
         
         self.Characters = [
-            Character(id: UUID() ,name: "Character 1", image: "Woman 1",filmId: self.films[0].id, pose: poses(for: .woman1)),
-            Character(id: UUID() ,name: "Character 2", image: "Man in a suit",filmId: self.films[0].id, pose: poses(for: .manSuit)),
-            Character(id: UUID(), name: "Character 3", image: "Woman 2", pose: poses(for: .woman2)),
-            Character(id: UUID(), name: "Character 4", image: "Woman 3", pose: poses(for: .woman3)),
-            Character(id: UUID(), name: "Character 5", image: "Asian man", pose: poses(for: .asianMan)),
-            Character(id: UUID(), name: "Character 6", image: "Man in a jersey", pose: poses(for: .jerseyMan))
+            Character(id: UUID() ,
+                      name: "Character 1",
+                      image: "Woman 1",
+                      filmId: self.films[0].id,
+                      pose:
+                        [
+                            Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
+                            Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
+                            Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
+                            Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
+                            Pose(id: UUID(), name: "Falling", image: "Falling"),
+                            Pose(id: UUID(), name: "Buffering", image: "Buffering")
+                        ]
+                      ),
+            
+            Character(id: UUID() ,
+                      name: "Character 2",
+                      image: "Man in a suit",
+                      filmId: self.films[0].id,
+                      pose:
+                        [
+                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
+                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
+                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
+                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
+                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
+                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
+
+                        ]
+                     ),
+            
+            Character(id: UUID(),
+                      name: "Character 3",
+                      image: "Woman 2",
+                      pose:
+                        [
+                           Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
+                           Pose(id: UUID(), name: "Talking", image: "Talking Man"),
+                           Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
+                           Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
+                           Pose(id: UUID(), name: "Waving", image: "Waving Man"),
+                           Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
+                       ]
+                     ),
+            
+            Character(id: UUID(),
+                      name: "Character 4",
+                      image: "Woman 3",
+                      pose:
+                        [
+                           Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
+                           Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
+                           Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
+                           Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
+                           Pose(id: UUID(), name: "Falling", image: "Falling"),
+                           Pose(id: UUID(), name: "Buffering", image: "Buffering")
+                       ]
+                     ),
+            
+            Character(id: UUID(),
+                      name: "Character 5",
+                      image: "Asian man",
+                      pose:
+                        [
+                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
+                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
+                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
+                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
+                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
+                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
+                        ]
+                     ),
+            
+            Character(id: UUID(),
+                      name: "Character 6",
+                      image: "Man in a jersey",
+                      pose:
+                        [
+                            Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
+                            Pose(id: UUID(), name: "Talking", image: "Talking Man"),
+                            Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
+                            Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
+                            Pose(id: UUID(), name: "Waving", image: "Waving Man"),
+                            Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
+                        ]
+                    )
+        
         ]
         
 
@@ -230,71 +309,7 @@ class DataStore {
         saveData()
     }
     
-    private func poses(for type: CharacterType) -> [Pose] {
-        switch type {
 
-        case .woman1:
-            return [
-                Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
-                Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
-                Pose(id: UUID(), name: "Falling", image: "Falling"),
-                Pose(id: UUID(), name: "Buffering", image: "Buffering")
-            ]
-
-        case .manSuit:
-            return [
-                Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-
-            ]
-
-        case .woman2:
-            return [
-                Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
-                Pose(id: UUID(), name: "Sleeping", image: "Sleeping "),
-                Pose(id: UUID(), name: "Falling", image: "Falling"),
-                Pose(id: UUID(), name: "Buffering", image: "Buffering")
-            ]
-
-        case .woman3:
-            return [
-                Pose(id: UUID(), name: "Fighting Pose", image: "fighting pose"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Woman"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Woman"),
-                Pose(id: UUID(), name: "Sleeping", image: "Sleeping"),
-                Pose(id: UUID(), name: "Falling", image: "Falling"),
-                Pose(id: UUID(), name: "Buffering", image: "Buffering")
-            ]
-
-        case .asianMan:
-            return [
-                Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-            ]
-
-        case .jerseyMan:
-            return [
-                Pose(id: UUID(), name: "Arms stretched", image: "Arms stretched"),
-                Pose(id: UUID(), name: "Talking", image: "Talking Man"),
-                Pose(id: UUID(), name: "Sitting", image: "Sitting Man"),
-                Pose(id: UUID(), name: "Laying Down", image: "Lying down"),
-                Pose(id: UUID(), name: "Waving", image: "Waving Man"),
-                Pose(id: UUID(), name: "Joining Hands", image: "Joining hands")
-            ]
-        }
-    }
     
     func updateFilmCounts() {
 

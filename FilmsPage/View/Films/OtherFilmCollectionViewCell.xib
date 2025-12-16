@@ -33,16 +33,18 @@
                                 <nil key="highlightedColor"/>
                             </label>
                             <button opaque="NO" contentMode="scaleAspectFit" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="KNy-hB-Zg5">
-                                <rect key="frame" x="169" y="5" width="38" height="34"/>
+                                <rect key="frame" x="168" y="201" width="34" height="34"/>
                                 <color key="backgroundColor" red="0.99999600649999998" green="1" blue="1" alpha="0.27863666373239437" colorSpace="custom" customColorSpace="sRGB"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="38" id="lKs-pL-mEO"/>
+                                    <constraint firstAttribute="width" constant="34" id="4dl-Bu-cvq"/>
+                                    <constraint firstAttribute="height" constant="34" id="i5C-pX-0pt"/>
                                 </constraints>
                                 <color key="tintColor" red="0.99999600649999998" green="1" blue="1" alpha="0.2752530809859155" colorSpace="custom" customColorSpace="sRGB"/>
                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
                                 <state key="normal" title="Button" image="heart" catalog="system"/>
-                                <buttonConfiguration key="configuration" style="filled">
+                                <buttonConfiguration key="configuration" style="gray">
                                     <imageReference key="image" image="heart" catalog="system" symbolScale="medium"/>
+                                    <color key="baseForegroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 </buttonConfiguration>
                                 <connections>
                                     <action selector="onFavClick:" destination="gTV-IL-0wX" eventType="touchUpInside" id="His-BU-5rq"/>
@@ -53,12 +55,12 @@
                         <constraints>
                             <constraint firstItem="yGx-oQ-Dtn" firstAttribute="top" secondItem="OCU-Mb-fFe" secondAttribute="bottom" constant="25" id="5XU-sd-U6x"/>
                             <constraint firstItem="OCU-Mb-fFe" firstAttribute="leading" secondItem="Zds-jD-1Kr" secondAttribute="leading" constant="14" id="8gM-zE-fhs"/>
-                            <constraint firstItem="KNy-hB-Zg5" firstAttribute="top" secondItem="Zds-jD-1Kr" secondAttribute="top" constant="5" id="L39-KZ-Xjm"/>
                             <constraint firstItem="yGx-oQ-Dtn" firstAttribute="leading" secondItem="Zds-jD-1Kr" secondAttribute="leading" constant="14" id="PlK-D0-EPs"/>
                             <constraint firstAttribute="trailing" secondItem="OCU-Mb-fFe" secondAttribute="trailing" constant="14" id="Q4q-FL-l28"/>
                             <constraint firstItem="OCU-Mb-fFe" firstAttribute="top" secondItem="Zds-jD-1Kr" secondAttribute="top" constant="24" id="ZQO-ep-JXi"/>
+                            <constraint firstAttribute="trailing" secondItem="KNy-hB-Zg5" secondAttribute="trailing" constant="10" id="bGs-JD-PLg"/>
+                            <constraint firstAttribute="bottom" secondItem="KNy-hB-Zg5" secondAttribute="bottom" constant="11" id="cPD-lN-Z5d"/>
                             <constraint firstAttribute="trailing" secondItem="yGx-oQ-Dtn" secondAttribute="trailing" constant="14" id="qWW-Nn-dOs"/>
-                            <constraint firstAttribute="trailing" secondItem="KNy-hB-Zg5" secondAttribute="trailing" constant="5" id="qku-qw-yyb"/>
                         </constraints>
                     </view>
                 </subviews>
@@ -75,6 +77,7 @@
                 <outlet property="FavButton" destination="KNy-hB-Zg5" id="mAQ-2k-vsz"/>
                 <outlet property="imageView" destination="OCU-Mb-fFe" id="B4O-Gx-J0N"/>
                 <outlet property="titleLabel" destination="yGx-oQ-Dtn" id="gHh-ew-R24"/>
+                <outlet property="view" destination="Zds-jD-1Kr" id="2KE-Ji-At8"/>
             </connections>
             <point key="canvasLocation" x="197.5609756097561" y="203.38983050847457"/>
         </collectionViewCell>
