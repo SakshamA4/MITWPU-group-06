@@ -28,8 +28,8 @@ class CharacterPosesCollectionViewCell: UICollectionViewCell {
         contentView.layer.borderColor = UIColor.lightGray.cgColor
     }
     
-    func configure(with pose: Pose) {
+    func configure(with pose: CharacterPoseItem) {
         titleLabel.text = pose.name
-        imageView.image = UIImage(named: pose.image) // use the image from datastore
+        imageView.image = UIImage(named: pose.imageName) // use the image from datastore
     }
 }

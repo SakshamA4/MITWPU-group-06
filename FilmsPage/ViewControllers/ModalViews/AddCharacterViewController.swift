@@ -8,7 +8,7 @@
 import UIKit
 
 protocol AddCharacterDelegate {
-    func addCharacter(character: Character)
+    func addCharacter(character: CharacterItem)
 }
 
 class AddCharacterViewController: UIViewController {
@@ -21,7 +21,7 @@ class AddCharacterViewController: UIViewController {
     var addCharacterDelegate: AddCharacterDelegate?
     
 
-    var characters: [Character] = []
+    var characters: [CharacterItem] = []
     let characterCellId = "character_cell"
 
     override func viewDidLoad() {
@@ -66,8 +66,8 @@ extension AddCharacterViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
 
-        let character = characters[indexPath.item]
-        cell.configureCell(character: character)
+        let characterItem = characters[indexPath.item]
+        cell.configureCell(character: characterItem)
         return cell
     }
 
@@ -82,15 +82,15 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
 
-        let character = characters[indexPath.item]
-        performSegue(withIdentifier: "characterDetailSegue", sender: character)
+        let characterItem = characters[indexPath.item]
+        performSegue(withIdentifier: "characterDetailSegue", sender: characterItem)
     }
     
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "characterDetailSegue" {
             let vc = segue.destination as! CharacterViewController
-            vc.character = sender as? Character
+            vc.character = sender as? CharacterItem
             vc.film = film
             vc.dataStore = DataStore.shared
             vc.delegate = addCharacterDelegate

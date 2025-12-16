@@ -736,11 +736,11 @@
             </objects>
             <point key="canvasLocation" x="-78" y="-1559"/>
         </scene>
-        <!--Item-->
+        <!--Home-->
         <scene sceneID="Oss-XJ-6jK">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="7dz-OZ-1vc" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="Item" id="j2B-8O-Bk7"/>
+                    <tabBarItem key="tabBarItem" title="Home" id="j2B-8O-Bk7"/>
                     <toolbarItems/>
                     <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="fYV-VA-rd8">

@@ -19,7 +19,7 @@ class MyFilmViewController: UIViewController {
     private let propCellId = "prop_cell"
     
     var sequence: [Sequence] = []
-    var character: [Character] = []
+    var character: [CharacterItem] = []
     var prop: [Prop] = []
     var dataStore = DataStore.shared
     
@@ -121,7 +121,7 @@ class MyFilmViewController: UIViewController {
 
 extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate, AddCharacterDelegate {
     
-    func addCharacter(character: Character) {
+    func addCharacter(character: CharacterItem) {
         DataStore.shared.addCharacter(newCharacter: character)
         if let film = film {
             self.character = DataStore.shared.getCharactersByFilmId(filmId: film.id)
@@ -264,7 +264,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
         if segue.identifier == "characterInfoSegue" {
             let vc = segue.destination as! CharacterViewController
-            vc.character = sender as? Character
+            vc.character = sender as? CharacterItem
             vc.dataStore = dataStore
         }
 
@@ -291,7 +291,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
             vc.dataStore = DataStore.shared
-            vc.character = sender as! [Character]
+            vc.character = sender as! [CharacterItem]
         }
 
         if segue.identifier == "allPropsSegue" {
