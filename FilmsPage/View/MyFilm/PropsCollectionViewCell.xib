@@ -17,7 +17,7 @@
                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 <subviews>
                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="CCV-mq-nEY">
-                        <rect key="frame" x="0.0" y="0.0" width="270" height="253"/>
+                        <rect key="frame" x="0.0" y="0.0" width="270" height="209"/>
                     </imageView>
                     <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="CY9-dw-8Jw">
                         <rect key="frame" x="0.0" y="209" width="270" height="44"/>
@@ -29,7 +29,7 @@
                                 <nil key="highlightedColor"/>
                             </label>
                         </subviews>
-                        <color key="backgroundColor" red="0.042358394709999997" green="0.042358394709999997" blue="0.08166503906" alpha="0.45320752640845069" colorSpace="custom" customColorSpace="displayP3"/>
+                        <color key="backgroundColor" red="0.079162590209999995" green="0.082214348019999994" blue="0.11486815659999999" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                         <constraints>
                             <constraint firstAttribute="trailing" secondItem="XL9-dy-BDG" secondAttribute="trailing" id="HXe-qt-qbP"/>
                             <constraint firstItem="XL9-dy-BDG" firstAttribute="leading" secondItem="CY9-dw-8Jw" secondAttribute="leading" id="XF5-ke-ehy"/>
@@ -45,7 +45,7 @@
                 <constraint firstItem="CY9-dw-8Jw" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="KzM-6E-W0o"/>
                 <constraint firstItem="CCV-mq-nEY" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="bNu-EV-Qhr"/>
                 <constraint firstAttribute="trailing" secondItem="CCV-mq-nEY" secondAttribute="trailing" id="f11-mf-ETO"/>
-                <constraint firstAttribute="bottom" secondItem="CCV-mq-nEY" secondAttribute="bottom" id="fob-VT-nOC"/>
+                <constraint firstAttribute="bottom" secondItem="CCV-mq-nEY" secondAttribute="bottom" constant="44" id="fob-VT-nOC"/>
                 <constraint firstAttribute="bottom" secondItem="CY9-dw-8Jw" secondAttribute="bottom" id="hnk-dn-CNc"/>
                 <constraint firstItem="CCV-mq-nEY" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="s9X-lV-BR5"/>
             </constraints>

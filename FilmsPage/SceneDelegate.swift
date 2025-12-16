@@ -18,31 +18,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
        
         guard let windowScene = (scene as? UIWindowScene) else { return }
                 
-                // =========================================================================
-                // START: TEMPORARY OVERRIDE FOR [YOUR NAME]'s FEATURE (Character Canvas)
-                // This block ensures the application launches the custom feature view
-                // for development purposes. It must be REMOVED before merging to main.
-                // =========================================================================
                 
-                window = UIWindow(windowScene: windowScene)
-                
-                // 1. Instantiate YOUR custom View Controller
-                let rootVC = MyFeatureCanvasVC()
-                
-                // 2. Embed YOUR View Controller in a Navigation Controller (Needed for the Layers Icon)
-                let navigationController = UINavigationController(rootViewController: rootVC)
-                
-                // 3. Set the Navigation Controller as the root view controller
-                window?.rootViewController = navigationController
-                
-                window?.makeKeyAndVisible()
-                
-                // =========================================================================
-                // END: TEMPORARY OVERRIDE
-                // =========================================================================
                 
                 // NOTE: If the original code used Storyboard launch, it was usually below here
                 // and is commented out by this override block.
+        self.window = UIWindow(windowScene: windowScene)
+                // Assume original project uses a Storyboard named "Main"
+                let storyboard = UIStoryboard(name: "Main", bundle: nil)
+                let rootVC = storyboard.instantiateInitialViewController()
+                
+                self.window?.rootViewController = rootVC
+                self.window?.makeKeyAndVisible()
 
 
     }

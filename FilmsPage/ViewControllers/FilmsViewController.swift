@@ -27,7 +27,7 @@ class FilmsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        dataStore.loadData()
+        DataStore.shared.loadData()
 
         favouriteFilm = dataStore.getFavFilms()!
         allFilms = dataStore.getOtherFilms()
@@ -113,7 +113,7 @@ class FilmsViewController: UIViewController {
                 //set item size
                 let itemSize = NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(0.2),
-                    heightDimension: .absolute(261)
+                    heightDimension: .absolute(280)
                 )
                 //create item
                 let item = NSCollectionLayoutItem(layoutSize: itemSize)
@@ -128,7 +128,7 @@ class FilmsViewController: UIViewController {
                 //create the group
                 let groupSize = NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(0.9),
-                    heightDimension: .estimated(261)
+                    heightDimension: .estimated(280)
                 )
 
                 //                let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
@@ -224,18 +224,6 @@ extension FilmsViewController: UICollectionViewDataSource,
         }
     }
 
-    //    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-    //        //create headerView
-    //        let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: "header", withReuseIdentifier: "header_cell", for: indexPath) as! HeaderView
-    //        //headerView.backgroundColor = .blue
-    //
-    //        if indexPath.section == 0 {
-    //            headerView.configureHeader(text: "Films")
-    //        }
-    //
-    //        return headerView
-    //    }
-    //
     func collectionView(
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
@@ -278,6 +266,16 @@ extension FilmsViewController: UICollectionViewDataSource,
         // 4. Reload UI
         collectionView.reloadData()
     }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        dataStore.updateFilmCounts()
+        favouriteFilm = dataStore.getFavFilms()
+        allFilms = dataStore.getOtherFilms()
+        collectionView.reloadData()
+    }
+
 
 }
 

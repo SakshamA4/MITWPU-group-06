@@ -14,7 +14,7 @@ protocol AddSequenceDelegate {
 class AddSequenceViewController: UIViewController {
     
     var delegate: AddSequenceDelegate?
-    var dataStore: DataStore?
+    var dataStore = DataStore.shared
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
 

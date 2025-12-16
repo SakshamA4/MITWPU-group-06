@@ -7,8 +7,22 @@
 
 import UIKit
 
-class AddSceneViewController: UIViewController {
+protocol AddSceneDelegate {
+    
+    func addScene(scene: Scene)
+    
+}
 
+class AddSceneViewController: UIViewController {
+    
+    var delegate: AddSceneDelegate?
+    var dataStore = DataStore.shared
+    //var film: Film?
+    var sequence: Sequence?
+
+    @IBOutlet weak var sceneName: UITextField!
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -16,6 +30,18 @@ class AddSceneViewController: UIViewController {
     }
     
 
+    @IBAction func addButtonTapped(_ sender: Any) {
+        
+       // guard let film = film else { return }
+        guard let sequence = sequence else { return }
+        guard let name  = sceneName.text, !name.isEmpty else { return }
+        
+        let scene = Scene(id: UUID(), name: sceneName.text! , image: "Image", SequenceId: sequence.id)
+        
+        delegate?.addScene(scene: scene)
+        dismiss(animated: true)
+        
+    }
     /*
     // MARK: - Navigation
 

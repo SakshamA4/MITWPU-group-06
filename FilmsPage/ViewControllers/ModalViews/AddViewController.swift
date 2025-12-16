@@ -13,6 +13,7 @@ class AddViewController: UIViewController {
     var film: Film?
     var sequenceDelegate: AddSequenceDelegate?
     var propDelegate: AddPropDelegate?
+    var characterDelegate: AddCharacterDelegate?
     
 
     override func viewDidLoad() {
@@ -27,7 +28,9 @@ class AddViewController: UIViewController {
         if segue.identifier == "addCharacterSegue" {
             let vc = segue.destination as! AddCharacterViewController
             vc.dataStore = self.dataStore    // ← pass datastore forward
-            vc.film = self.film              // ← pass film forward
+            vc.film = self.film// ← pass film forward
+            vc.addCharacterDelegate = self.characterDelegate
+//            vc.delegate = self.characterDelegate
         }
         else if segue.identifier == "addPropSegue" {
             let vc = segue.destination as! AddPropViewController

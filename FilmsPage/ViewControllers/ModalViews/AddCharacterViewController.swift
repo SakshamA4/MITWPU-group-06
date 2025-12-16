@@ -7,6 +7,10 @@
 
 import UIKit
 
+protocol AddCharacterDelegate {
+    func addCharacter(character: Character)
+}
+
 class AddCharacterViewController: UIViewController {
 
     var dataStore = DataStore.shared
@@ -14,13 +18,15 @@ class AddCharacterViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
+    var addCharacterDelegate: AddCharacterDelegate?
+    
 
     var characters: [Character] = []
     let characterCellId = "character_cell"
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        DataStore.shared.loadData()
+        //DataStore.shared.loadData()
         // Load ALL characters from the datastore
         characters = DataStore.shared.getCharacters()
 
@@ -79,14 +85,15 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
         let character = characters[indexPath.item]
         performSegue(withIdentifier: "characterDetailSegue", sender: character)
     }
+    
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "characterDetailSegue" {
             let vc = segue.destination as! CharacterViewController
             vc.character = sender as? Character
             vc.film = film
-            vc.dataStore = dataStore ?? DataStore.shared
-
+            vc.dataStore = DataStore.shared
+            vc.delegate = addCharacterDelegate
         } }
     
 
@@ -109,4 +116,5 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
                         insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }
+    
 }
