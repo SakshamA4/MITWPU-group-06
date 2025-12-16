@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="lwf-bY-03b">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="7dz-OZ-1vc">
     <device id="ipad10_9rounded" orientation="landscape" layout="fullscreen" appearance="light"/>
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
@@ -91,10 +91,10 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" distribution="fillEqually" spacing="15" translatesAutoresizingMaskIntoConstraints="NO" id="yyd-WO-tdx">
-                                <rect key="frame" x="15" y="43" width="345" height="140"/>
+                                <rect key="frame" x="15" y="43" width="345" height="115"/>
                                 <subviews>
                                     <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="jhJ-cp-xVS">
-                                        <rect key="frame" x="0.0" y="0.0" width="345" height="62.5"/>
+                                        <rect key="frame" x="0.0" y="0.0" width="345" height="50"/>
                                         <color key="backgroundColor" red="0.63529413940000001" green="0.1843137443" blue="0.22745099660000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                         <constraints>
                                             <constraint firstAttribute="height" relation="greaterThanOrEqual" constant="50" id="3hp-mI-mk5"/>
@@ -105,7 +105,7 @@
                                         <buttonConfiguration key="configuration" style="plain" title="New Scene" cornerStyle="capsule"/>
                                     </button>
                                     <button opaque="NO" contentMode="scaleToFill" verticalHuggingPriority="249" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="sDN-GX-h40">
-                                        <rect key="frame" x="0.0" y="77.5" width="345" height="62.5"/>
+                                        <rect key="frame" x="0.0" y="65" width="345" height="50"/>
                                         <color key="backgroundColor" red="0.63529413940000001" green="0.1843137443" blue="0.22745099660000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                         <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                         <state key="normal" title="Button"/>
@@ -734,7 +734,7 @@
                 </navigationController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="cGz-bQ-FYI" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-81.355932203389841" y="-1558.5365853658536"/>
+            <point key="canvasLocation" x="-78" y="-1559"/>
         </scene>
         <!--Item-->
         <scene sceneID="Oss-XJ-6jK">
@@ -742,6 +742,7 @@
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="7dz-OZ-1vc" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Item" id="j2B-8O-Bk7"/>
                     <toolbarItems/>
+                    <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="fYV-VA-rd8">
                         <rect key="frame" x="0.0" y="24" width="1180" height="54"/>
                         <autoresizingMask key="autoresizingMask"/>

@@ -7,20 +7,24 @@
 
 import UIKit
 
+struct Home {
+    var id: Int,
+        title: String,
+        imageName: String
+}
+
 class HomeViewController: UIViewController {
-    
+
     var template: [Home] = [
         Home(id: 1, title: "Outdoor scene", imageName: "outdoor"),
-        Home(id: 2, title: "Home", imageName: "home")
+        Home(id: 2, title: "Home", imageName: "home"),
     ]
 
     var recentScenes: [Home] = [
         Home(id: 3, title: "Scene 1", imageName: "scene1")
     ]
 
-    
     @IBOutlet weak var collectionView: UICollectionView!
-    
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -32,22 +36,31 @@ class HomeViewController: UIViewController {
 
         // Do any additional setup after loading the view.
     }
-    
+
     func registerCells() {
-        
-        collectionView.register(UINib(nibName: "RecentScenesCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "recentscenes_cell")
-        
-        collectionView.register(UINib(nibName: "TemplatesCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "templates_cell")
-        
+
         collectionView.register(
-                UINib(nibName: "HomeHeaderView", bundle: nil),
-                forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
-                withReuseIdentifier: "home_header_view"
-            )
+            UINib(nibName: "RecentScenesCollectionViewCell", bundle: nil),
+            forCellWithReuseIdentifier: "recentscenes_cell"
+        )
+
+        collectionView.register(
+            UINib(nibName: "TemplatesCollectionViewCell", bundle: nil),
+            forCellWithReuseIdentifier: "templates_cell"
+        )
+
+        collectionView.register(
+            UINib(nibName: "HomeHeaderView", bundle: nil),
+            forSupplementaryViewOfKind: UICollectionView
+                .elementKindSectionHeader,
+            withReuseIdentifier: "home_header_view"
+        )
     }
     func createLayout() -> UICollectionViewLayout {
 
-        return UICollectionViewCompositionalLayout { sectionIndex, environment in
+        return UICollectionViewCompositionalLayout {
+            sectionIndex,
+            environment in
 
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .absolute(320),
@@ -89,35 +102,39 @@ class HomeViewController: UIViewController {
         }
     }
 
-
-
 }
 
 extension HomeViewController: UICollectionViewDelegate,
-                              UICollectionViewDataSource,
-                              UICollectionViewDelegateFlowLayout {
+    UICollectionViewDataSource,
+    UICollectionViewDelegateFlowLayout
+{
 
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 2
     }
 
-    func collectionView(_ collectionView: UICollectionView,
-                        numberOfItemsInSection section: Int) -> Int {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        numberOfItemsInSection section: Int
+    ) -> Int {
         if section == 0 {
             return template.count
         }
         return recentScenes.count
     }
 
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath
+    ) -> UICollectionViewCell {
 
         if indexPath.section == 0 {
             // Templates section
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "templates_cell",
-                for: indexPath
-            ) as! TemplatesCollectionViewCell
+            let cell =
+                collectionView.dequeueReusableCell(
+                    withReuseIdentifier: "templates_cell",
+                    for: indexPath
+                ) as! TemplatesCollectionViewCell
 
             let item = template[indexPath.row]
             cell.templateLabel.text = item.title
@@ -126,10 +143,11 @@ extension HomeViewController: UICollectionViewDelegate,
 
         } else {
             // Recent scenes section
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "recentscenes_cell",
-                for: indexPath
-            ) as! RecentScenesCollectionViewCell
+            let cell =
+                collectionView.dequeueReusableCell(
+                    withReuseIdentifier: "recentscenes_cell",
+                    for: indexPath
+                ) as! RecentScenesCollectionViewCell
 
             let item = recentScenes[indexPath.row]
             cell.recentLabel.text = item.title
@@ -137,20 +155,23 @@ extension HomeViewController: UICollectionViewDelegate,
             return cell
         }
     }
-    
-    func collectionView(_ collectionView: UICollectionView,
-                        viewForSupplementaryElementOfKind kind: String,
-                        at indexPath: IndexPath) -> UICollectionReusableView {
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        viewForSupplementaryElementOfKind kind: String,
+        at indexPath: IndexPath
+    ) -> UICollectionReusableView {
 
         guard kind == UICollectionView.elementKindSectionHeader else {
             return UICollectionReusableView()
         }
 
-        let header = collectionView.dequeueReusableSupplementaryView(
-            ofKind: kind,
-            withReuseIdentifier: "home_header_view",
-            for: indexPath
-        ) as! HomeHeaderView
+        let header =
+            collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind,
+                withReuseIdentifier: "home_header_view",
+                for: indexPath
+            ) as! HomeHeaderView
 
         if indexPath.section == 0 {
             header.titleLabel.text = "Templates"
@@ -160,6 +181,5 @@ extension HomeViewController: UICollectionViewDelegate,
 
         return header
     }
-
 
 }
