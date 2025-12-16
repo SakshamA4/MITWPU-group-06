@@ -15,7 +15,7 @@ class BottomSheetPresentationController: UIPresentationController {
     override init(presentedViewController: UIViewController, presenting presentingViewController: UIViewController?) {
         super.init(presentedViewController: presentedViewController, presenting: presentingViewController)
 
-        // Set the dimming view color and alpha (0.45 as requested)
+        // Set the dimming view color and alpha 
         dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.45)
         dimmingView.alpha = 0
         

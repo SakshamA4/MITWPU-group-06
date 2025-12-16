@@ -2,7 +2,7 @@
 // EditCharacterVC.swift
 // FilmsPage
 //
-// Created by [Your Name]
+// Created by Ritik
 //
 
 import UIKit
@@ -24,10 +24,6 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
         h.translatesAutoresizingMaskIntoConstraints = false
         return h
     }()
-    
-    
-    
-    
     
     // MARK: - Left Side Components
         
@@ -68,25 +64,25 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             return stack
         }()
         
-    private func createColorPicker(title: String) -> UIView {
+        private func createColorPicker(title: String) -> UIView {
             let row = UIStackView()
             row.axis = .horizontal
             row.alignment = .center
             row.spacing = 16 // Spacing between the title and the color group
             
-            // --- FIX: Limit the width of the color picker row (already present, keep it) ---
+            //Limited the width of the color picker row  ---
             row.widthAnchor.constraint(equalToConstant: 250).isActive = true
             
             let titleLabel = UILabel()
             titleLabel.text = title
             titleLabel.textColor = .white
-            titleLabel.widthAnchor.constraint(equalToConstant: 80).isActive = true
+            titleLabel.widthAnchor.constraint(equalToConstant: 120).isActive = true
             
-            // --- NEW: Group the Swatch and Rainbow Icon TIGHTLY ---
+            //Grouping the Swatch and Rainbow Icon
             let colorControlGroup = UIStackView()
             colorControlGroup.axis = .horizontal
             colorControlGroup.alignment = .center
-            colorControlGroup.spacing = 8 // Tiny space between Swatch and Icon
+            colorControlGroup.spacing = 8
             
             let colorSwatch = UIView()
             colorSwatch.backgroundColor = .white
@@ -96,21 +92,17 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             colorSwatch.layer.borderWidth = 1
             colorSwatch.layer.borderColor = UIColor.systemGray.cgColor // Added slight border for definition
             
-        
-        
-            // Stylized Rainbow Icon (representing the palette button)
-        let colorWheel = ColorWheelView() // Use the custom radial gradient view
+            let colorWheel = ColorWheelView() // Use the custom radial gradient view
             colorWheel.widthAnchor.constraint(equalToConstant: 20).isActive = true
             colorWheel.heightAnchor.constraint(equalToConstant: 20).isActive = true
 
             colorControlGroup.addArrangedSubview(colorSwatch)
             colorControlGroup.addArrangedSubview(colorWheel)
             
-            // --- Final Assembly ---
             row.addArrangedSubview(titleLabel)
-            row.addArrangedSubview(colorControlGroup) // Add the tight grouping
+            row.addArrangedSubview(colorControlGroup)
             
-            // Add a flexible spacer to push the controls to the left (Optional, but ensures control group stays together)
+            // Added a flexible spacer to push the controls to the left (Optional, but ensures control group stays together)
             let spacer = UIView()
             row.addArrangedSubview(spacer)
 
@@ -123,7 +115,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             row.alignment = .center
             row.spacing = 8
             
-            // --- FIX: Limit the width of the height slider row ---
+            //Limited the width of the height slider row ---
             row.widthAnchor.constraint(equalToConstant: 250).isActive = true
             
             let titleLabel = UILabel()
@@ -135,7 +127,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             slider.minimumValue = 150
             slider.maximumValue = 200
             slider.value = 175
-            // FIX: Explicitly constrain the slider width to prevent it from stretching fully
+            //Explicitly constrain the slider width to prevent it from stretching fully
             slider.widthAnchor.constraint(equalToConstant: 120).isActive = true
             
             let cmsLabel = UILabel()
@@ -146,7 +138,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             row.addArrangedSubview(slider)
             row.addArrangedSubview(cmsLabel)
             
-            // Add a flexible spacer to push the controls to the left
+            // Added a flexible spacer to push the controls to the left
             let spacer = UIView()
             row.addArrangedSubview(spacer)
 
@@ -179,25 +171,10 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
         }()
         
     
-    
-    
-        // Data source for the poses
-//    private let poses: [String] = ["fighting pose", "Talking Woman", "Sitting Woman", "Falling", "Sleeping", "Buffering"]
-    
-
+    // Data source for the poses
     private let posesForWoman1: [String] = ["fighting pose", "Talking Woman", "Sitting Woman", "Falling", "Sleeping", "Buffering"]
-
-    // Assuming "Man in a suit" uses assets like: Talking Man, Waving Man, Sitting Man, etc.
-    // NOTE: You must verify these exact names exist in your asset catalog!
     private let posesForManInASuit: [String] = ["Arms stretched", "Talking Man", "Sitting Man", "Waving Man", "Lying down", "Joining hands"]
-
-    // Your dynamic array will be initialized later:
     private var dynamicPoses: [String] = []
-    
-    
-    
-    
-    
     
     private let titleLabel: UILabel = {
         let l = UILabel()
@@ -254,21 +231,20 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
         
         if let characterName = selectedCharacterName,
                let image = UIImage(named: characterName) {
-                
-                // This will load "Woman 1" or "Man in a suit" into the large preview card
                 characterPreview.image = image
                 
             } else {
-                // Fallback for debugging, will show the default light gray background
                 print("Error: Could not find image asset for selected character: \(selectedCharacterName ?? "nil")")
             }
-        //Load the correct character-specific pose data
-        if selectedCharacterName == "Man in a suit" {
+        if selectedCharacterName == "Man in a suit" ||
+           selectedCharacterName == "Asian man" ||
+           selectedCharacterName == "Man in a jersey"{
             dynamicPoses = posesForManInASuit
-        } else if selectedCharacterName == "Woman 1" {
+        } else if selectedCharacterName == "Woman 1" ||
+                  selectedCharacterName == "Woman 2" ||
+                  selectedCharacterName == "Woman 3" {
             dynamicPoses = posesForWoman1
         } else {
-            // Fallback for other characters or unexpected state
             dynamicPoses = []
         }
         
@@ -281,11 +257,11 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
         closeButtonContainer.contentView.addSubview(closeButton)
         headerBar.addSubview(confirmButton)
         
-        // --- Add Pose Grid Components ---
+                // --- Add Pose Grid Components ---
                 view.addSubview(poseTitleLabel)
                 view.addSubview(poseCollectionView)
         
-        // --- Add Pose Grid Components (Right Side) ---
+                // --- Add Pose Grid Components (Right Side) ---
                 view.addSubview(poseTitleLabel)
                 view.addSubview(poseCollectionView)
                 
@@ -301,9 +277,8 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                 controlsStackView.addArrangedSubview(createHeightSlider())
         
         
-        
-        closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
-        confirmButton.addTarget(self, action: #selector(didTapConfirm), for: .touchUpInside)
+                closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
+                confirmButton.addTarget(self, action: #selector(didTapConfirm), for: .touchUpInside)
     }
 
     private func setupConstraints() {
@@ -315,7 +290,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             headerBar.heightAnchor.constraint(equalToConstant: 64)
         ])
         
-        // MARK: - Right Side (Pose Grid)
+                // MARK: - Right Side (Pose Grid)
                 let padding: CGFloat = 32
                 
                 NSLayoutConstraint.activate([
@@ -330,7 +305,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                     poseCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -padding)
                 ])
         
-        // MARK: - Left Side (Selected Character & Controls)
+                // MARK: - Left Side (Selected Character & Controls)
                 let cardWidth: CGFloat = 200
                 let leftRightMargin: CGFloat = 32
                 
@@ -359,16 +334,13 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                     controlsStackView.trailingAnchor.constraint(equalTo: view.centerXAnchor, constant: -16)
                 ])
         
-        
-        
-        
         // Title Label (centered)
         NSLayoutConstraint.activate([
             titleLabel.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor)
         ])
         
-        // Close Button (Blur Effect container on the left)
+        // Close Button
         NSLayoutConstraint.activate([
             closeButtonContainer.leadingAnchor.constraint(equalTo: headerBar.leadingAnchor, constant: 16),
             closeButtonContainer.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
@@ -378,7 +350,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             closeButton.centerYAnchor.constraint(equalTo: closeButtonContainer.centerYAnchor)
         ])
         
-        // Confirm Button (Deep Carmine on the right)
+        // Confirm Button
         NSLayoutConstraint.activate([
             confirmButton.trailingAnchor.constraint(equalTo: headerBar.trailingAnchor, constant: -16),
             confirmButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
@@ -400,38 +372,29 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             // Dismiss the Edit modal
             dismiss(animated: true)
         }
-    
-}
+    }
 
 // MARK: - UICollectionViewDataSource & Delegate (Poses)
 extension EditCharacterVC{
     
-    // 1. REQUIRED: Number of items
         func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
             return dynamicPoses.count
         }
     
-    // 2. Cell for item
         func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PoseCardCell.reuseID, for: indexPath) as? PoseCardCell else {
                 return UICollectionViewCell()
             }
-            
-            // 🚨 Use the dynamic array
+                //  Use the dynamic array
                 let poseKey = dynamicPoses[indexPath.row]
-                
-                // Pass the unique pose asset name (e.g., "Talking Man" or "Talking Woman")
                 cell.poseName = poseKey
-            
-            
-            return cell
+                return cell
         }
-   
-    
-    // Define the size for a 3-column grid layout (for poses)
+
+    // Defining the size for a 3-column grid layout (for poses)
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         
-        // Calculate the available width for the grid area
+        // Calculated the available width for the grid area
         let availableWidth = collectionView.bounds.width
         
         // 3 items with 2 spaces (16 each)
@@ -440,12 +403,10 @@ extension EditCharacterVC{
         
         // Height to maintain aspect ratio for the card appearance
         let height: CGFloat = 1.3 * width
-        
         return CGSize(width: width, height: height)
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // Handle pose selection here (e.g., store the selected pose)
         print("Pose selected: \(dynamicPoses[indexPath.row])")
     }
 }

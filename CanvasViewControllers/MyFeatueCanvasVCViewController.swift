@@ -12,7 +12,16 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     // MARK: - Data Model
     private var canvasItems: [String: UIView] = [:]
     private let hierarchyCategories = ["Characters", "Cameras", "Props", "Lighting", "Wall", "Background"]
+    // In MyFeatureCanvasVC.swift (Add this near the top with your other properties)
 
+    private let categoryToToolMap: [String: String] = [
+        "Characters": "Character",
+        "Cameras": "Camera",
+        "Props": "Props",
+        "Lighting": "Lights",
+        "Wall": "Walls",
+        "Background": "Background"
+    ]
     
     // MARK: - Item Data Source
         
@@ -123,8 +132,6 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         return sv
     }()
     
-    
-    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -143,10 +150,8 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), style: .plain, target: self, action: nil)
         navigationItem.rightBarButtonItems = [more, redo, undo]
     }
-    
-    // CONSOLIDATED VIEW AND CONSTRAINT SETUP
     func setupViewsAndConstraints() {
-        // --- 1. Canvas Setup (Highest Layer) ---
+        //1. Canvas Setup
         view.addSubview(canvasView)
         NSLayoutConstraint.activate([
             canvasView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -155,26 +160,20 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             canvasView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
    
-        // --- 2. Sidebar Setup (Below Toolbar) ---
+        //2. Sidebar Setup
         canvasView.addSubview(sidebarView)
-
         NSLayoutConstraint.activate([
-            // 1. Sidebar View Constraints (Pins the ENTIRE sidebar to the top/bottom of the safe area)
             sidebarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             sidebarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             sidebarView.widthAnchor.constraint(equalToConstant: sidebarWidth)
         ])
-        
-        
-        
-        // --- Sidebar Header Setup ---
+
         sidebarView.addSubview(sidebarHeaderView)
         sidebarHeaderView.addSubview(sidebarTitleLabel)
         sidebarHeaderView.addSubview(sidebarCloseButton)
 
         NSLayoutConstraint.activate([
-            // CRITICAL CORRECTION: Header starts at the TOP of its parent (sidebarView), NOT the view's safe area.
-            sidebarHeaderView.topAnchor.constraint(equalTo: sidebarView.topAnchor), // <-- CORRECTED LINE
+            sidebarHeaderView.topAnchor.constraint(equalTo: sidebarView.topAnchor),
             sidebarHeaderView.leadingAnchor.constraint(equalTo: sidebarView.leadingAnchor),
             sidebarHeaderView.trailingAnchor.constraint(equalTo: sidebarView.trailingAnchor),
             sidebarHeaderView.heightAnchor.constraint(equalToConstant: 44),
@@ -188,7 +187,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         ])
 
 
-        // Initial position: off-screen. This is the constraint we animate.
+        // Initial position: off-screen.
         sidebarLeadingConstraint = sidebarView.leadingAnchor.constraint(equalTo: canvasView.leadingAnchor, constant: -sidebarWidth)
         sidebarLeadingConstraint.isActive = true
 
@@ -212,7 +211,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             hierarchyStackView.widthAnchor.constraint(equalTo: hierarchyScrollView.frameLayoutGuide.widthAnchor)
         ])
         
-        // --- 3. Toolbar Setup (Highest Layer on Canvas) ---
+        //3. Toolbar Setup
         canvasView.addSubview(toolbarContainer)
         toolbarContainer.addSubview(toolStackView)
         
@@ -280,8 +279,6 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     @objc func didTapTool(_ sender: UIButton) {
             guard let toolName = sender.accessibilityIdentifier else { return }
             print("\(toolName) tool tapped.")
-            
-            // Now, all buttons launch the picker, using their own name as the type
             presentItemPicker(for: toolName)
         }
     
@@ -293,37 +290,31 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
                  print("Error: ItemPickerVC not found in ItemPicker.storyboard.")
                  return
             }
-            
-            // --- Setup for ALL Tools ---
             pickerVC.modalTitle = "Add \(toolName)"
-            pickerVC.itemType = toolName // Pass the type (e.g., "Character", "Props")
-            pickerVC.itemsToDisplay = getItems(for: toolName) // Pass the specific list
+            pickerVC.itemType = toolName
+            pickerVC.itemsToDisplay = getItems(for: toolName)
             
             pickerVC.modalPresentationStyle = .custom
             pickerVC.transitioningDelegate = self
             
             pickerVC.onItemSelected = { [weak self] selectedItem in
-                self?.launchEditModal(selectedItemName: selectedItem, itemType: toolName) // Pass the itemType back
+                self?.launchEditModal(selectedItemName: selectedItem, itemType: toolName)
             }
 
             present(pickerVC, animated: true)
         }
     
-    // NEW FUNCTION: Launches the second modal (EditCharacterVC) after selection in the first modal.
+        //Launches the second modal (EditCharacterVC) after selection in the first modal.
         func launchEditModal(selectedItemName: String, itemType: String) {
-            
-            // We only launch the edit modal if it's a Character
             if itemType != "Character" {
-                // For Props, Lights, etc., just add them immediately (use the old logic here)
                 addItemToCanvas(itemName: selectedItemName, itemType: itemType)
                 return
             }
 
-            let editVC = EditCharacterVC() // Assume EditCharacterVC handles its own complex UI layout
+            let editVC = EditCharacterVC()
             editVC.selectedCharacterName = selectedItemName
             editVC.delegate = self
 
-            // Use the same custom bottom sheet presentation for the Edit modal
             editVC.modalPresentationStyle = .custom
             editVC.transitioningDelegate = self
 
@@ -336,11 +327,9 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         
         if itemType == "Character" || itemType == "Props" || itemType == "Walls" || itemType == "Camera" || itemType == "Lights" || itemType == "Background" {
             
-            // --- 1. Create the Icon Container ---
+            //1. Create the Icon Container
             let itemIcon = UIView()
             itemIcon.translatesAutoresizingMaskIntoConstraints = true
-            
-            // Set appearance based on type
             if itemType == "Character" {
                 // Create the gray silhouette view inside the container
                 let silhouetteView = UIView()
@@ -378,10 +367,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
                 
             } else {
                 // Logic for Props, Walls, Camera, Lights, and NOW Background
-                
                 let size: CGFloat = 60 // Default size for generic icons
-                
-                // Define specific appearance based on the item type
                 switch itemType {
                 case "Walls":
                     // --- WALLS: Load Image View directly (Uses 150 size) ---
@@ -403,19 +389,16 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
                         imageView.trailingAnchor.constraint(equalTo: itemIcon.trailingAnchor),
                         imageView.bottomAnchor.constraint(equalTo: itemIcon.bottomAnchor)
                     ])
-                    
-                    // Skip the rest of the generic setup
                     break
                 case "Background":
-                    let backgroundSize: CGFloat = 300 // Start large for a background image
+                    let backgroundSize: CGFloat = 300
                     itemIcon.frame = CGRect(x: view.frame.width/2 - backgroundSize/2, y: view.frame.height/2 - backgroundSize/2, width: backgroundSize, height: backgroundSize)
-                    itemIcon.layer.cornerRadius = 0 // No corners for a large image
+                    itemIcon.layer.cornerRadius = 0
                     itemIcon.clipsToBounds = true
                     
-                    // Image setup for Background
                     let imageView = UIImageView()
                     imageView.translatesAutoresizingMaskIntoConstraints = false
-                    imageView.contentMode = .scaleAspectFill // Good default for background texture
+                    imageView.contentMode = .scaleAspectFill
                     imageView.image = UIImage(named: itemName)
                     itemIcon.addSubview(imageView)
                     
@@ -454,12 +437,12 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
                     }
                     
                 default:
-                    // Fallback for types not handled (shouldn't happen with the outer check)
+                    // Fallback for types not handled
                     break
                 }
             }
             
-            // --- 2. Make it Draggable ---(have pan/pinch)
+            // 2. Make it Draggable (have pan/pinch)
             itemIcon.isUserInteractionEnabled = true
             let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
             itemIcon.addGestureRecognizer(panGesture)
@@ -471,28 +454,21 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             
             canvasView.addSubview(itemIcon)
             
-            // --- 3. Store the item and refresh the sidebar ---
+            //3. Store the item and refresh the sidebar
             itemIcon.accessibilityLabel = uniqueItemName
             canvasItems[uniqueItemName] = itemIcon
             refreshSidebarContent()
             
             canvasView.bringSubviewToFront(itemIcon)
-            
-            // 🚨 CRITICAL FIX: Send Background and Wall items to the lowest layer
                 if itemType == "Background" {
-                    // Walls should typically also be behind everything else
-                    canvasView.sendSubviewToBack(itemIcon) // <-- ENSURES LOWEST LAYER
+                    canvasView.sendSubviewToBack(itemIcon)
                 } else {
-                    // Characters, Props, Cameras, Lights should be on top
                     canvasView.bringSubviewToFront(itemIcon)
                 }
             
             print("Added draggable item: \(uniqueItemName) of type \(itemType) to canvas.")
             
         } else {
-            // 🚨 FINAL ELSE: This block should now be for truly unhandled/non-visual items.
-            // If you remove "Background" from here, the old background logic must also be removed.
-            
             let uniqueItemName = itemName + " (" + UUID().uuidString.prefix(4) + ")"
             print("Set non-visual property: \(itemName) as \(itemType).")
             
@@ -528,31 +504,72 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
 
     // MARK: - Sidebar Refresh Logic
     
+  
+
     func refreshSidebarContent() {
         hierarchyStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
+        // --- 1. Map Canvas Items to their Original Type ---
+        var itemsByType: [String: [(name: String, view: UIView)]] = [:]
+        
+        // Initialize empty arrays for all categories
         for category in hierarchyCategories {
-            let itemsInCategory = canvasItems.filter { $0.key.contains("Character") && category == "Characters" }
+            itemsByType[category] = []
+        }
+        
+        // Iterate through every item currently on the canvas
+        for (uniqueName, view) in canvasItems {
             
-            if category == "Characters" {
-                let header = createHierarchyHeader(title: category, count: itemsInCategory.count)
-                hierarchyStackView.addArrangedSubview(header)
-                
-                for (name, _) in itemsInCategory {
-                    let itemRow = createHierarchyItemRow(title: name)
-                    hierarchyStackView.addArrangedSubview(itemRow)
-                }
+            var itemType: String? = nil
+            
+            // Find the base name (e.g., "Man in a suit" from "Man in a suit (ABCD)")
+            let baseName: String
+            if let range = uniqueName.range(of: " (") {
+                baseName = String(uniqueName[..<range.lowerBound])
             } else {
-                let placeholderHeader = createHierarchyHeader(title: category, count: 1, isPlaceholder: true)
-                hierarchyStackView.addArrangedSubview(placeholderHeader)
+                baseName = uniqueName // Use the whole name if no ID is found
+            }
+            
+            // Determine the item's category
+            for category in hierarchyCategories {
                 
-                if category == "Wall" {
-                    let placeholderItem = createHierarchyItemRow(title: "Brick Wall", isPlaceholder: true)
-                    hierarchyStackView.addArrangedSubview(placeholderItem)
+                // 🚨 CRITICAL FIX: Use the direct mapping dictionary to get the correct key
+                guard let toolName = categoryToToolMap[category] else { continue }
+                
+                let baseItemNames = getItems(for: toolName) // e.g., ["Brick", "Wooden", "Glass"]
+                
+                // Check if our isolated base name matches any name in the category's source list
+                if baseItemNames.contains(baseName) {
+                    itemType = category // Found the category (e.g., "Wall")
+                    break
                 }
+            }
+            
+            // Group the item by its determined type
+            if let type = itemType {
+                itemsByType[type]?.append((name: uniqueName, view: view))
+            } else {
+                print("Warning: Item \(uniqueName) (Base: \(baseName)) did not match any hierarchy category.")
+            }
+        }
+        // --- 2. Build the Stack View ---
+        for category in hierarchyCategories {
+            let items = itemsByType[category] ?? []
+            let count = items.count
+            
+            let header = createHierarchyHeader(title: category, count: count)
+            hierarchyStackView.addArrangedSubview(header)
+            
+            // Add item rows for all items found in this category
+            for (name, _) in items {
+                // Clean up the unique ID for display in the sidebar (e.g., "Brick (ABCD)" -> "Brick")
+                let displayTitle = name.components(separatedBy: " (").first ?? name
+                let itemRow = createHierarchyItemRow(title: displayTitle)
+                hierarchyStackView.addArrangedSubview(itemRow)
             }
         }
         
+        // --- 3. Final Footer ---
         let totalObjects = UILabel()
         totalObjects.text = "\nTotal Objects: \(canvasItems.count)"
         totalObjects.textColor = .systemGray
@@ -560,9 +577,8 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         hierarchyStackView.addArrangedSubview(totalObjects)
     }
     
-    // ... (createHierarchyHeader and createHierarchyItemRow functions omitted for brevity, ensure they are present)
+ 
     private func createHierarchyHeader(title: String, count: Int, isPlaceholder: Bool = false) -> UIView {
-        // ... (implementation needed here)
         let label = UILabel()
         label.text = "\(title) (\(count))"
         label.textColor = isPlaceholder ? .systemGray : .label
@@ -574,7 +590,6 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         return container
     }
     private func createHierarchyItemRow(title: String, isPlaceholder: Bool = false) -> UIView {
-        // ... (implementation needed here)
         let label = UILabel()
         label.text = title
         label.textColor = isPlaceholder ? .systemGray : .systemRed
@@ -601,7 +616,6 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     
     // MARK: - EditCharacterDelegate
         func didConfirmCharacter(name: String) {
-            // This is the FINAL step: add the confirmed character to the canvas!
             addItemToCanvas(itemName: name, itemType: "Character")
         }
     
@@ -639,7 +653,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
 // MARK: - UIGestureRecognizerDelegate
 extension MyFeatureCanvasVC: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        // Allows both dragging (pan) and resizing (pinch) to work together
+        
         return true
     }
 }

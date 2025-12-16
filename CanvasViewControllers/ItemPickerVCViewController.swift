@@ -16,41 +16,27 @@ class ItemPickerVC: UIViewController {
     var onItemSelected: ItemSelectionCallback? // Closure to send data back to ViewController
     
     // MARK: - Public Properties for Generic Content
-        var itemType: String = "Character" // e.g., "Props", "Camera"
-        var itemsToDisplay: [String] = []  // The list of items to show
-    
-    // Property to set the modal's title from the presenting VC
-    var modalTitle: String = "Select Item" {
-        didSet {
-            titleLabel.text = modalTitle
+        var itemType: String = "Character"
+        var itemsToDisplay: [String] = []
+        var modalTitle: String = "Select Item" {
+            didSet {
+                titleLabel.text = modalTitle
+            }
         }
-    }
-    
     
     // MARK: - Character Data Sources
     private let filmCharacters: [String] = ["Man in a suit", "Woman 1", "Asian man"]
-
-    // Placeholder for the full library list (add more names here as needed)
     private let libraryCharacters: [String] = ["Man in a suit","Woman 1", "Asian man",  "Woman 2", "Man in a jersey", "Woman 3"]
     
-    
     // MARK: - Prop Data Sources
-        // The list of props available when 'Film' is selected.
-        private let filmProps: [String] = ["Plant", "Bookshelf", "Fridge", "Wardrobe"]
-
-        // Placeholder for the full library list (add more names here as needed)
-        private let libraryProps: [String] = ["Plant", "Bookshelf", "Fridge", "Wardrobe","Handbag", "Flower Vase","Bag Pack","Shoe Rack"] // Added more items for demonstration
+    private let filmProps: [String] = ["Plant", "Bookshelf", "Fridge", "Wardrobe"]
+    private let libraryProps: [String] = ["Plant", "Bookshelf", "Fridge", "Wardrobe","Handbag", "Flower Vase","Bag Pack","Shoe Rack"]
     
     // MARK: - Wall Texture Data Sources
-        private let wallTextures: [String] = ["Brick", "Wooden", "Glass"]
+    private let wallTextures: [String] = ["Brick", "Wooden", "Glass"]
     
     // Single list for backgrounds since there are no tabs.
-        private let backgroundItems: [String] = ["Framed sunset", "Stairwell", "Forest Landscape", "Temple", "Dining Area", "Open terrace","Industrial Hall","Backyard"]
-    
-    
-    
-    
-    
+    private let backgroundItems: [String] = ["Framed sunset", "Stairwell", "Forest Landscape", "Temple", "Dining Area", "Open terrace","Industrial Hall","Backyard"]
     
     // MARK: - Constraint Properties (To be managed dynamically)
         private var titleCenterYConstraint: NSLayoutConstraint!
@@ -60,7 +46,6 @@ class ItemPickerVC: UIViewController {
         private var collectionViewHeightConstraint: NSLayoutConstraint!
     
     // MARK: - Views (Private UI Components)
-    
     private let dragHandle: UIView = {
         let h = UIView()
         h.backgroundColor = UIColor.systemGray4
@@ -96,7 +81,7 @@ class ItemPickerVC: UIViewController {
     }()
 
     // MARK: - Custom Button Factory
-        private func createDeepCarmineConfirmButton() -> UIButton {
+    private func createDeepCarmineConfirmButton() -> UIButton {
             let b = UIButton(type: .system)
             b.setImage(UIImage(systemName: "checkmark"), for: .normal)
             b.setTitle(nil, for: .normal)
@@ -112,27 +97,22 @@ class ItemPickerVC: UIViewController {
             b.translatesAutoresizingMaskIntoConstraints = false
             return b
         }
-        
-        // REDEFINE the confirm button property using the factory
+    
         private lazy var confirmButton: UIButton = {
             let button = createDeepCarmineConfirmButton()
             return button
         }()
 
-    // MARK: - Views (Private UI Components)
-        // ... (dragHandle, headerBar, titleLabel, closeButton, confirmButton are unchanged) ...
-
-    // MARK: - Horizontal Item Selection Grid (Camera, Props)
-        private lazy var itemCollectionView: UICollectionView = { // Renamed for clarity
+        // MARK: - Horizontal Item Selection Grid (Camera, Props)
+        private lazy var itemCollectionView: UICollectionView = {
             let layout = UICollectionViewFlowLayout()
-            // *** KEY CHANGE: Scroll direction is horizontal ***
             layout.scrollDirection = .horizontal
             layout.minimumLineSpacing = 16
             layout.minimumInteritemSpacing = 16
             
             let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
             cv.backgroundColor = .clear
-            cv.showsHorizontalScrollIndicator = true // Show scroll indicator
+            cv.showsHorizontalScrollIndicator = true
             cv.translatesAutoresizingMaskIntoConstraints = false
             cv.register(ItemCardCell.self, forCellWithReuseIdentifier: ItemCardCell.reuseID)
             cv.dataSource = self
@@ -149,10 +129,7 @@ class ItemPickerVC: UIViewController {
             return stack
         }()
 
-    
-    
-    
-    // MARK: - Core Content Stack (Holds everything below the header)
+        // MARK: - Core Content Stack (Holds everything below the header)
         private let coreContentStack: UIStackView = {
             let stack = UIStackView()
             stack.axis = .vertical
@@ -160,11 +137,8 @@ class ItemPickerVC: UIViewController {
             stack.translatesAutoresizingMaskIntoConstraints = false
             return stack
         }()
-        
-       
     
-    
-    // MARK: - Body Content Scroll Views
+        // MARK: - Body Content Scroll Views
         private let scrollView: UIScrollView = {
             let sv = UIScrollView()
             sv.translatesAutoresizingMaskIntoConstraints = false
@@ -178,13 +152,7 @@ class ItemPickerVC: UIViewController {
             return v
         }()
         
-        // NOTE: The 'itemCollectionView' property defined previously will remain and be placed inside the contentView.
-        // The 'detailStackView' will also remain.
-    
-    
-    
-    
-        private func createInputField(label: String, placeholder: String) -> UIView {
+       private func createInputField(label: String, placeholder: String) -> UIView {
             let container = UIStackView()
             container.axis = .vertical
             container.spacing = 4
@@ -198,7 +166,7 @@ class ItemPickerVC: UIViewController {
             textField.placeholder = placeholder
             textField.textColor = .white
             textField.borderStyle = .none
-            // Add a line underneath
+            // Added a line underneath
             let separator = UIView()
             separator.backgroundColor = .systemGray5
             separator.heightAnchor.constraint(equalToConstant: 2).isActive = true
@@ -209,7 +177,6 @@ class ItemPickerVC: UIViewController {
             return container
         }
 
-        // Reuse the custom color picker from EditCharacterVC (if you copied it to the canvas VC)
         private func createDetailColorPicker() -> UIView {
             let row = UIStackView()
             row.axis = .horizontal
@@ -230,8 +197,8 @@ class ItemPickerVC: UIViewController {
             colorSwatch.layer.borderWidth = 1
             colorSwatch.layer.borderColor = UIColor.systemGray.cgColor
 
-            // Color Wheel (reusing the logic from the EditCharacterVC)
-            let colorWheel = ColorWheelView() // Assumes ColorWheelView class is available
+            // Color Wheel
+            let colorWheel = ColorWheelView()
             colorWheel.widthAnchor.constraint(equalToConstant: 40).isActive = true
             colorWheel.heightAnchor.constraint(equalToConstant: 40).isActive = true
 
@@ -242,7 +209,7 @@ class ItemPickerVC: UIViewController {
             return row
         }
     
-    // Helper function for the Light intensity/temperature/shadow sliders
+        // Helper function for the Light intensity/temperature/shadow sliders
         private func createSliderRow(title: String, min: Float, max: Float) -> UIView {
             let row = UIStackView()
             row.axis = .horizontal
@@ -269,22 +236,19 @@ class ItemPickerVC: UIViewController {
             row.addArrangedSubview(slider)
             row.addArrangedSubview(valueLabel)
             
-            // You will need to add a target action to update the valueLabel in the future
-            
             return row
         }
-    // MARK: - Conditional Layout
+    
+        // MARK: - Conditional Layout
         private func setupHeaderLayout() {
-            // Deactivate the dynamic constraints related to the two-line layout
+            
             titleBottomConstraint.isActive = false
             tabBottomConstraint.isActive = false
             
             // Check if we need the two-line header (Character OR Props)
                     if itemType == "Character" || itemType == "Props" {
-                        // --- CHARACTER/PROPS LAYOUT (Requires Tabs) ---
-                        tabSegmentedControl.isHidden = false // <<< SHOW TABS FOR PROPS
-                        confirmButton.isHidden = (itemType == "Character") // Hide CONFIRM for Character, show for Props
-                        
+                        tabSegmentedControl.isHidden = false
+                        confirmButton.isHidden = (itemType == "Character")
                         titleLabel.text = (itemType == "Character") ? "Add Character" : "Add Props"
                         
                         // Activate the two-line header constraints
@@ -292,30 +256,19 @@ class ItemPickerVC: UIViewController {
                         tabBottomConstraint.isActive = true
                         
                     } else {
-                // --- GENERIC LAYOUT (Title centered vertically using Top/Bottom alignment) ---
                 tabSegmentedControl.isHidden = true
-                confirmButton.isHidden = false // <<< SHOW CONFIRM
+                confirmButton.isHidden = false
                 titleLabel.text = "Add \(itemType)"
-                
-                // For single-line titles, we deactivate the bottom constraint to let the STATIC top constraint work alone.
-                // This centers the single line visually as it fights no other constraint.
-                        
-                        // Activate the single-line header constraint
-                                    titleCenterYConstraint.isActive = true
+                // Activate the single-line header constraint
+                titleCenterYConstraint.isActive = true
                         
             }
-            
-        
             itemCollectionView.reloadData()
-            // Force layout update
             headerBar.layoutIfNeeded()
         }
-    
-    
-    
-    // MARK: - Conditional Layout Setup (Body)
+        // MARK: - Conditional Layout Setup (Body)
         private func setupBodyLayout() {
-            // Reset visibility for all changeable views
+            
             detailStackView.isHidden = true // Hide all detail fields by default
             detailStackHalfWidthConstraint.isActive = false
             
@@ -327,30 +280,25 @@ class ItemPickerVC: UIViewController {
             
             let detailFields: [UIView] = []
             
-            // Clear any previous detail views
+                // Clear any previous detail views
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-                
-                // Reset collection view height constraint to a huge value for vertical scrolling types
-                // This allows the scroll view to expand based on the number of cells.
                 collectionViewHeightConstraint.constant = 9999
             
             switch itemType {
             case "Camera":
-                // Horizontal Scroll, Details visible (Name, Notes, Color)
                 if let layout = itemCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
                     layout.scrollDirection = .horizontal
                 }
                 detailStackView.isHidden = false
                 detailStackHalfWidthConstraint.isActive = true
-                // Rebuild detail stack for Camera
+               
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
                 detailStackView.addArrangedSubview(createInputField(label: "Name", placeholder: "e.g., Wide Shot Camera"))
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Primary A-Cam"))
                 detailStackView.addArrangedSubview(createDetailColorPicker()) // Color picker row
-                collectionViewHeightConstraint.constant = 360 // Fixed height for horizontal scrolling
+                collectionViewHeightConstraint.constant = 360
                 
             case "Lights":
-                // Horizontal Scroll, Details visible (Intensity, Temperature, Shadows, Color)
                 if let layout = itemCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
                     layout.scrollDirection = .horizontal
                 }
@@ -362,28 +310,16 @@ class ItemPickerVC: UIViewController {
                 detailStackView.addArrangedSubview(createSliderRow(title: "Temperature:", min: 2000, max: 8000))
                 detailStackView.addArrangedSubview(createSliderRow(title: "Shadows:", min: 0, max: 1))
                 detailStackView.addArrangedSubview(createDetailColorPicker())
-                collectionViewHeightConstraint.constant = 360 // Fixed height for horizontal scrolling
+                collectionViewHeightConstraint.constant = 360
             
             case "Wall":
-                    // Vertical Scroll, Details visible (Height, Color)
-                    // Note: Scroll direction defaults to vertical above
-                    
                     detailStackView.isHidden = false
-                    detailStackHalfWidthConstraint.isActive = true // Activate half-width for detail stack
-                    
-                    // Rebuild detail stack for Wall (Height slider, Color picker)
-                    detailStackView.addArrangedSubview(createSliderRow(title: "Wall Height:", min: 10, max: 50)) // Example Wall height slider
+                    detailStackHalfWidthConstraint.isActive = true
+                    detailStackView.addArrangedSubview(createSliderRow(title: "Wall Height:", min: 10, max: 50))
                     detailStackView.addArrangedSubview(createDetailColorPicker())
-                    
-                    // For Vertical types, height is set to 9999 above (DYNAMIC)
-                
                 
             case "Character", "Props", "Background":
-                // Vertical Scroll, NO Details visible
                 detailStackView.isHidden = true
-                // Scroll direction defaults to vertical above
-                
-                
             default:
                 detailStackView.isHidden = true
             }
@@ -392,17 +328,14 @@ class ItemPickerVC: UIViewController {
             itemCollectionView.reloadData()
             view.layoutIfNeeded()
         }
-    
-    
-    //add the segmented control view and constraints to integrate it into the headerBar immediately after the titleLabel.
+    //added the segmented control view and constraints to integrate it into the headerBar immediately after the titleLabel.
     private let tabSegmentedControl: UISegmentedControl = {
             let sc = UISegmentedControl(items: ["Film", "Library"])
             sc.selectedSegmentIndex = 0 // Default to Library
             sc.selectedSegmentTintColor = .white
-            sc.backgroundColor = UIColor.black.withAlphaComponent(0.2) // Dark background for contrast
+            sc.backgroundColor = UIColor.black.withAlphaComponent(0.2)
             sc.tintColor = .white
-            
-            // Customize text attributes for contrast against purple header
+
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: UIColor.white,
                 .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
@@ -413,21 +346,15 @@ class ItemPickerVC: UIViewController {
                 .foregroundColor: UIColor.black, // Selected text color
             ]
             sc.setTitleTextAttributes(selectedAttributes, for: .selected)
-            
             sc.translatesAutoresizingMaskIntoConstraints = false
             sc.addTarget(self, action: #selector(handleTabChange), for: .valueChanged)
             return sc
         }()
     
-    
-    
-    
-    // MARK: - Lifecycle
+        // MARK: - Lifecycle
         override func viewDidLoad() {
             super.viewDidLoad()
-            
-            // CRITICAL FIX: Tell the view controller to extend its layout edges underneath the safe area.
-                    // This ensures the UIScrollView can use the full height of the modal, down to the bottom edge.
+            // This ensures the UIScrollView can use the full height of the modal, down to the bottom edge.
                     if #available(iOS 11.0, *) {
                         // Deprecated in iOS 13+, but this is the robust way to handle the modal extending fully
                         self.edgesForExtendedLayout = .bottom
@@ -435,31 +362,25 @@ class ItemPickerVC: UIViewController {
             
             // --- Set Initial Data Source (Default to Film Tab) ---
                     if itemType == "Character" {
-                        // Segmented control defaults to index 0 ("Film")
                         itemsToDisplay = filmCharacters
                     }else if itemType == "Props" {
-                        // Segmented control defaults to index 0 ("Film")
                         itemsToDisplay = filmProps
                     }else if itemType == "Background" {
-                        itemsToDisplay = backgroundItems // Use the single list
-                    }else if itemType == "Wall" { // <<< ADDED WALL INITIALIZATION
+                        itemsToDisplay = backgroundItems
+                    }else if itemType == "Wall" {
                         itemsToDisplay = wallTextures
                     }
-            
             
             view.backgroundColor = UIColor(red: 14/255, green: 14/255, blue: 24/255, alpha: 1.0)
             setupViews()
             setupConstraints()
             setupHeaderLayout()
-            setupBodyLayout()// <<< CALL THE NEW CONDITIONAL SETUP
+            setupBodyLayout()
         }
-    
-    
-    
     
     // MARK: - Setup
     private func setupViews() {
-        // Add all subviews to the main view
+        
         view.addSubview(dragHandle)
         view.addSubview(headerBar)
         headerBar.addSubview(titleLabel)
@@ -467,28 +388,28 @@ class ItemPickerVC: UIViewController {
         headerBar.addSubview(tabSegmentedControl)
         headerBar.addSubview(confirmButton)
 
-        // --- NEW: Add ScrollView Hierarchy ---
+                //Added ScrollView Hierarchy
                 view.addSubview(scrollView)
                 scrollView.addSubview(contentView)
                 
-        // --- ADD CORE CONTENT STACK TO CONTENT VIEW ---
+                //Added CORE CONTENT STACK TO CONTENT VIEW
                 contentView.addSubview(coreContentStack)
                 
-                // --- ADD COLLECTION VIEW AND DETAIL STACK TO CORE CONTENT STACK ---
+                //Added COLLECTION VIEW AND DETAIL STACK TO CORE CONTENT STACK
                 coreContentStack.addArrangedSubview(itemCollectionView)
                 coreContentStack.addArrangedSubview(detailStackView)
         
-        // Add input fields to the detail stack
+                //Added input fields to the detail stack
                 detailStackView.addArrangedSubview(createInputField(label: "Name", placeholder: "e.g., Default"))
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Default Camera"))
                 detailStackView.addArrangedSubview(createDetailColorPicker())
         
-        // Add button actions
-        closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
+                // Add button actions
+                closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
     }
 
     private func setupConstraints() {
-        // Drag handle constraints (STATIC)
+  
         NSLayoutConstraint.activate([
             dragHandle.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
             dragHandle.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -496,7 +417,6 @@ class ItemPickerVC: UIViewController {
             dragHandle.heightAnchor.constraint(equalToConstant: 5)
         ])
 
-        // HeaderBar constraints (STATIC)
         NSLayoutConstraint.activate([
             headerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -504,32 +424,30 @@ class ItemPickerVC: UIViewController {
             headerBar.heightAnchor.constraint(equalToConstant: 56)
         ])
 
-        // Title and buttons (STATIC)
+                // Title and buttons (STATIC)
                 NSLayoutConstraint.activate([
-                    // Close Button
+            
                     closeButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
                     closeButton.leadingAnchor.constraint(equalTo: headerBar.leadingAnchor, constant: 12),
                     closeButton.widthAnchor.constraint(equalToConstant: 44),
 
-                    // Confirm Button Constraints
-                            confirmButton.trailingAnchor.constraint(equalTo: headerBar.trailingAnchor, constant: -16),
-                            confirmButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
-                            confirmButton.widthAnchor.constraint(equalToConstant: 40),
-                            confirmButton.heightAnchor.constraint(equalToConstant: 40),
+                  
+                    confirmButton.trailingAnchor.constraint(equalTo: headerBar.trailingAnchor, constant: -16),
+                    confirmButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
+                    confirmButton.widthAnchor.constraint(equalToConstant: 40),
+                    confirmButton.heightAnchor.constraint(equalToConstant: 40),
                     
-                    // Tab Segmented Control (Center it vertically in the header bar for maximum space)
                     tabSegmentedControl.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor),
                     tabSegmentedControl.widthAnchor.constraint(equalToConstant: 180),
-                    tabSegmentedControl.heightAnchor.constraint(equalToConstant: 28), // Reduce height slightly to save space
+                    tabSegmentedControl.heightAnchor.constraint(equalToConstant: 28),
                     
-                    // --- ADD THIS NEW STATIC CONSTRAINT FOR TITLE VERTICAL POSITION ---
-                                titleLabel.topAnchor.constraint(equalTo: headerBar.topAnchor, constant: 4),
-                                titleLabel.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor), // Ensure it is centered horizontally
+                    titleLabel.topAnchor.constraint(equalTo: headerBar.topAnchor, constant: 4),
+                    titleLabel.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor),
                ])
                     
         
-        // --- DYNAMIC CONSTRAINTS SETUP (Define but DO NOT activate here) ---
-                // 1. Centered Title Constraint (For Props, Lights, etc.)
+                //DYNAMIC CONSTRAINTS SETUP
+                // 1. Centered Title Constraint
                 titleCenterYConstraint = titleLabel.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor)
 
                 // 2. Title pinned above Tabs (For Character)
@@ -538,23 +456,21 @@ class ItemPickerVC: UIViewController {
                 // 3. Tabs pushed down (For Character)
                 tabBottomConstraint = tabSegmentedControl.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor, constant: 10)
 
-        detailStackHalfWidthConstraint = detailStackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.5)
+                detailStackHalfWidthConstraint = detailStackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.5)
         
-        // --- START CONSTRAINTS FOR CONTENT BODY ---
+            //START CONSTRAINTS FOR CONTENT BODY
             
-        // --- 1. ScrollView Constraints (Below HeaderBar, Anchored to View Bottom) ---
+            //1. ScrollView Constraints (Below HeaderBar, Anchored to View Bottom)
             NSLayoutConstraint.activate([
                 scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
                 scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
                 scrollView.topAnchor.constraint(equalTo: headerBar.bottomAnchor),
-
-                // CRITICAL FIX: Anchor scroll view to the absolute bottom of the view's frame.
                 scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
             ])
 
-            // --- 2. ContentView Constraints (Ensuring Vertical Scrolling) ---
+            //2. ContentView Constraints (Ensuring Vertical Scrolling)
 
-            // CRITICAL FIX 2: Ensure content view width matches the scroll view's frame width
+            //Ensuring content view width matches the scroll view's frame width
             let contentViewWidthConstraint = contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
             contentViewWidthConstraint.isActive = true
 
@@ -562,139 +478,83 @@ class ItemPickerVC: UIViewController {
                 contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
                 contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
                 contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-
-                // This bottom anchor drives the overall scrollable content size:
                 contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             ])
         
-        // --- 3. CORE CONTENT STACK Constraints ---
+                //3. CORE CONTENT STACK Constraints
                 let padding: CGFloat = 24
-                let bottomPadding: CGFloat = 80 // Ensures scrolling is active
+                let bottomPadding: CGFloat = 80
                 
                 NSLayoutConstraint.activate([
-                    // Pin stack view horizontally and vertically inside the contentView
                     coreContentStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
                     coreContentStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
                     coreContentStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
-                    
-                    // CRITICAL FIX: Pin stack view bottom to contentView bottom. This forces scrolling.
                     coreContentStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -bottomPadding)
                 ])
-
-                // --- 4. Enforce Collection View Height inside the Stack ---
-//                let horizontalGridHeight: CGFloat = 360
-//                NSLayoutConstraint.activate([
-//                    // Ensure the item collection view has a fixed height within the stack
-//                    itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight),
-//                ])
-
-        
-        // --- 4. Enforce Collection View Height inside the Stack ---
+        //4. Enforce Collection View Height inside the Stack
         let horizontalGridHeight: CGFloat = 360
-        collectionViewHeightConstraint = itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight) // 🚨 Use the new property
-        collectionViewHeightConstraint.isActive = true // Activate it by default (for horizontal types)
-            // --- END CONSTRAINTS FOR CONTENT BODY ---
-        
+        collectionViewHeightConstraint = itemCollectionView.heightAnchor.constraint(equalToConstant: horizontalGridHeight)
+        collectionViewHeightConstraint.isActive = true
         }
        
         
-        
-        
-    
-        
-    
-
-    
-
     // MARK: - Actions
     @objc private func didTapClose() {
         dismiss(animated: true)
     }
 
-// Restore the missing confirm action (required by constraints/targets)
     @objc private func didTapConfirm() {
-        // Find the selected item in the collection view if needed, or simply pass a default value.
-        // For simplicity now, we just dismiss, as the Confirm button is for non-Character modals.
         dismiss(animated: true)
     }
     
-
- 
-    // MARK: - Tab Handling
+        // MARK: - Tab Handling
         @objc private func handleTabChange(_ sender: UISegmentedControl) {
             if itemType == "Character" {
-                // Only handle data change if the modal is for "Character"
                 if sender.selectedSegmentIndex == 0 {
-                    // --- Film Tab Selected ---
-                    itemsToDisplay = filmCharacters // Set to the limited list
-                    
-                } else {
-                    // --- Library Tab Selected ---
-                    itemsToDisplay = libraryCharacters // Set to the full list
-                    
-                }
+                    itemsToDisplay = filmCharacters
+                    } else {
+                    itemsToDisplay = libraryCharacters
+                    }
                 
-                
-            }else if itemType == "Props" {
+                }else if itemType == "Props" {
                 if sender.selectedSegmentIndex == 0 {
-                    // --- Props Film Tab Selected ---
-                    itemsToDisplay = filmProps // Use the limited list for Film
+                   itemsToDisplay = filmProps
                 } else {
-                    // --- Props Library Tab Selected ---
-                    itemsToDisplay = libraryProps // Use the full list for Library
+                   itemsToDisplay = libraryProps
                 }
             }
-            
-            
-            // Reload the Collection View to show the new set of items
             itemCollectionView.reloadData()
-            // Re-run header layout just in case of any title/tab dependency
             setupHeaderLayout()
         }
 
 }
 
-
-
-
-
-
 // MARK: - UICollectionViewDataSource & Delegate
 extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
-    // 1. Number of items
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return itemsToDisplay.count
     }
     
-    // 2. Cell for item
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ItemCardCell.reuseID, for: indexPath) as? ItemCardCell else {
             return UICollectionViewCell()
         }
         let itemName = itemsToDisplay[indexPath.row]
         cell.itemName = itemName
-        
-        // This is where you would load the actual image asset:
-        // cell.imageView.image = UIImage(named: itemName)
-        
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
             
             if itemType == "Camera" || itemType == "Lights" {
-                // Horizontal scroll cards (Tall and narrow)
                 let width: CGFloat = 232
                 let height: CGFloat = 232
                 return CGSize(width: width, height: height)
                 
             } else {
-                // Vertical scroll grid (Character/Props/Wall/Background: 4-column square cards)
-                            
-                            let numColumns: CGFloat = 4 // Changed from 3 to 4
+                            let numColumns: CGFloat = 4
                             let spacing: CGFloat = 16
-                            
                             // 5 paddings: 2 edges (16*2) + 3 spaces between cards (16*3)
                             let totalPadding = (spacing * (numColumns + 1))
                             

@@ -2,7 +2,7 @@
 // ColorWheelView.swift
 // FilmsPage
 //
-// Created by [Your Name]
+// Created by Ritik
 //
 
 import UIKit

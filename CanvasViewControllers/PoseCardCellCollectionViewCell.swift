@@ -2,7 +2,7 @@
 // PoseCardCell.swift
 // FilmsPage
 //
-// Created by [Your Name]
+// Created by Ritik
 //
 
 import UIKit
@@ -26,10 +26,6 @@ class PoseCardCell: UICollectionViewCell {
                 }
             }
         }
-        
-        // DELETE the didSet for baseCharacterName and the baseCharacterName property itself
-        // if you absolutely do not want to use it for image construction.
-        // If you need it for *future* logic, keep it but leave its didSet empty.
         
        
     

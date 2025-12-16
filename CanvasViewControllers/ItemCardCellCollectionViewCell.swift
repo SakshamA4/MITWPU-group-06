@@ -11,22 +11,17 @@ class ItemCardCell: UICollectionViewCell {
     
     static let reuseID = "ItemCardCell"
     
-    // Public property to configure the cell
     var itemName: String? {
         didSet {
                     titleLabel.text = itemName
                     
-                    // --- NEW: Load the actual image asset ---
                     if let name = itemName {
-                        // Assuming your asset names match the item names (e.g., "Man in a Suit")
                         imageView.image = UIImage(named: name)
-                        
-                        // Remove the placeholder background color
+                        // Removing the placeholder background color
                         imageView.backgroundColor = .clear
                     }
                 }
     }
-    
     private let imageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
@@ -55,8 +50,8 @@ class ItemCardCell: UICollectionViewCell {
     }
     
     private func setupViews() {
-        // Set the card container appearance
-        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.1) // Lightly visible card
+        // Setting the card container appearance
+        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
         contentView.layer.cornerRadius = 12
         contentView.clipsToBounds = true
         
@@ -64,12 +59,11 @@ class ItemCardCell: UICollectionViewCell {
         contentView.addSubview(titleLabel)
         
         NSLayoutConstraint.activate([
-            // Image View (Takes up most of the space)
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             
-            // Title Label (Pinned to the bottom)
+            // Title Label 
             titleLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
