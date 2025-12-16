@@ -43,13 +43,13 @@ struct Sequence: Codable {
 //}
 
 
-struct Prop {
-    
-    var id: UUID
-    var name: String
-    var image: String
-    var filmId: UUID?
-}
+//struct Prop {
+//    
+//    var id: UUID
+//    var name: String
+//    var image: String
+//    var filmId: UUID?
+//}
 
 struct Scene: Codable {
     

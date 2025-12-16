@@ -21,7 +21,7 @@ class PropDetailViewController: UIViewController {
     
     @IBOutlet weak var propName: UILabel!
     
-    var prop: Prop?
+    var prop: PropItem?
     var dataStore = DataStore.shared
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -38,10 +38,10 @@ class PropDetailViewController: UIViewController {
         propName.text = prop?.name ?? "Prop"
     }
 
-    func configure(with prop: Prop) {
+    func configure(with prop: PropItem) {
         self.prop = prop
         updateTitle()
-        imageView.image = UIImage(named: prop.image)
+        imageView.image = UIImage(named: prop.imageName)
         texture1.image = UIImage(named: "Glass")
         texture2.image = UIImage(named: "Wooden")
         texture3.image = UIImage(named: "Brick")

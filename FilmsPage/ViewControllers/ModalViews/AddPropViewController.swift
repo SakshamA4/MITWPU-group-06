@@ -8,7 +8,7 @@
 import UIKit
 
 protocol AddPropDelegate {
-    func addProp(prop: Prop)
+    func addProp(prop: PropItem)
 }
 
 
@@ -16,7 +16,7 @@ class AddPropViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
-    var prop: [Prop] = []
+    var prop: [PropItem] = []
     var dataStore = DataStore.shared
     var film: Film?
     let propCellId = "prop_cell"
@@ -101,7 +101,7 @@ extension AddPropViewController: UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
 
-        guard let film = film else { return }
+        guard film != nil else { return }
 
         let selectedProp = prop[indexPath.item]
         delegate?.addProp(prop: selectedProp)

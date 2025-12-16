@@ -20,7 +20,7 @@ class MyFilmViewController: UIViewController {
     
     var sequence: [Sequence] = []
     var character: [CharacterItem] = []
-    var prop: [Prop] = []
+    var prop: [PropItem] = []
     var dataStore = DataStore.shared
     
     
@@ -150,11 +150,11 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 //    }
 
     
-    func addProp(prop: Prop) {
+    func addProp(prop: PropItem) {
         guard let film = film else { return }
 
         DataStore.shared.attachPropToFilm(
-            propId: prop.id,
+            propId: prop.id ?? UUID(),
             filmId: film.id
         )
 
@@ -270,7 +270,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
         if segue.identifier == "propSegue" {
             let vc = segue.destination as! PropDetailViewController
-            vc.prop = sender as? Prop
+            vc.prop = sender as? PropItem
             vc.dataStore = dataStore
         }
 
@@ -297,7 +297,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "allPropsSegue" {
             let vc = segue.destination as! AllPropsViewController
             vc.dataStore = DataStore.shared
-            vc.prop = sender as! [Prop]
+            vc.prop = sender as! [PropItem]
         }
     }
 }

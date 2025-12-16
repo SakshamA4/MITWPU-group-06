@@ -34,9 +34,9 @@ class PropsCollectionViewCell: UICollectionViewCell {
     }
    
     
-    func configureCell(prop: Prop) {
-        if !prop.image.isEmpty {
-            imageView.image = UIImage(named: prop.image)
+    func configureCell(prop: PropItem) {
+        if !prop.imageName.isEmpty {
+            imageView.image = UIImage(named: prop.imageName)
         } else {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }

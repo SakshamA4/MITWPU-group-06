@@ -16,17 +16,17 @@ class DataStore {
     private var films: [Film] = []
     
     private var sequence: [Sequence] = []
-    private var Props: [Prop] = []
+    private var props: [PropItem] = []
     private var Characters: [CharacterItem] = []
     
     private var scenes: [Scene] = []
     private var poses: [CharacterPoseItem] = []
     
     
-    private init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [Prop] = [], Characters: [CharacterItem] = [], scenes: [Scene] = []) {
+    private init(films: [Film] = [], favFilms: [Film] = [], Sequence: [Sequence] = [], Props: [PropItem] = [], Characters: [CharacterItem] = [], scenes: [Scene] = []) {
         self.films = films
         self.sequence = Sequence
-        self.Props = Props
+        self.props = Props
         self.Characters = Characters
         self.scenes = scenes
     }
@@ -83,16 +83,72 @@ class DataStore {
             Sequence(id: UUID(), name: "Fight", image: "Image", filmId: self.favFilms!.id)
             
         ]
-        let sampleData4: [Prop] = [
-            Prop(id: UUID() ,name: "Plant", image: "Plant",filmId: self.films[0].id ),
-            Prop(id: UUID() ,name: "Bookshelf", image: "Bookshelf",filmId: self.films[0].id),
-            Prop(id: UUID() ,name: "Fridge", image: "Fridge",filmId: self.films[0].id),
-            Prop(id: UUID(), name: "Wardrobe", image: "Wardrobe", filmId: nil),
-            Prop(id: UUID() ,name: "Handbag", image: "Handbag", filmId: nil),
-            Prop(id: UUID() ,name: "Flower Vase", image: "Flower Vase", filmId: nil),
-            Prop(id: UUID() ,name: "Bag Pack", image: "Bag Pack", filmId: nil),
-            Prop(id: UUID() ,name: "Shoe Rack", image: "Shoe Rack", filmId: nil)
+        self.props = [
+            PropItem(
+                id: UUID(),
+                name: "Plant",
+                imageName: "Plant",
+                filmId: self.films[0].id,
+                description: "A decorative indoor plant used to add freshness and life to a scene."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Bookshelf",
+                imageName: "Bookshelf",
+                filmId: self.films[0].id,
+                description: "A wooden bookshelf filled with books, ideal for study rooms or living spaces."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Fridge",
+                imageName: "Fridge",
+                filmId: self.films[0].id,
+                description: "A modern refrigerator commonly placed in kitchens for storing food and drinks."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Wardrobe",
+                imageName: "Wardrobe",
+                filmId: nil,
+                description: "A tall wardrobe used for storing clothes, suitable for bedrooms."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Handbag",
+                imageName: "Handbag",
+                filmId: nil,
+                description: "A stylish handbag that characters can carry or place in indoor scenes."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Flower Vase",
+                imageName: "Flower Vase",
+                filmId: nil,
+                description: "A decorative flower vase used to enhance tables, shelves, or room corners."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Bag Pack",
+                imageName: "Bag Pack",
+                filmId: nil,
+                description: "A casual backpack suitable for travel, school, or outdoor scenes."
+            ),
+
+            PropItem(
+                id: UUID(),
+                name: "Shoe Rack",
+                imageName: "Shoe Rack",
+                filmId: nil,
+                description: "A compact rack designed to neatly store shoes near entrances or rooms."
+            )
         ]
+
 
         
         self.Characters = [
@@ -198,7 +254,7 @@ class DataStore {
             }
         }
 
-        self.Props = sampleData4
+//        self.Props = sampleData4
         updateFilmCounts()
 
     }
@@ -244,12 +300,12 @@ class DataStore {
         return sequence.filter { $0.filmId == filmId }
     }
     
-    func getPropsbyFilmId(filmId: UUID) -> [Prop] {
-        return Props.filter { $0.filmId == filmId }
+    func getPropsbyFilmId(filmId: UUID) -> [PropItem] {
+        return props.filter { $0.filmId == filmId }
     }
     
-    func getProps() -> [Prop] {
-        return Props
+    func getProps() -> [PropItem] {
+        return props
     }
     
     
@@ -288,14 +344,14 @@ class DataStore {
     }
     func attachPropToFilm(propId: UUID, filmId: UUID) {
 
-        guard let index = Props.firstIndex(where: { $0.id == propId }) else {
+        guard let index = props.firstIndex(where: { $0.id == propId }) else {
             return
         }
-        if Props[index].filmId == filmId {
+        if props[index].filmId == filmId {
             return
         }
 
-        Props[index].filmId = filmId
+        props[index].filmId = filmId
         saveData()
     }
     
