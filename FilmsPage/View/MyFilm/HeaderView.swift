@@ -21,6 +21,7 @@ class HeaderView: UICollectionReusableView {
         super.awakeFromNib()
         // Initialization code
     }
+
     weak var delegate: HeaderViewDelegate?
     private var sectionIndex: Int = 0
     
@@ -34,10 +35,3 @@ class HeaderView: UICollectionReusableView {
         delegate?.didTapHeader(section: sectionIndex)
     }
 }
-
-
-
-
-
-
-
