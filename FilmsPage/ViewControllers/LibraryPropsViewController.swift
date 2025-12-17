@@ -20,7 +20,6 @@ class LibraryPropsViewController: UIViewController {
         propsCollectionView.dataSource = self
         propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
-        DataStore.shared.loadData()
         props = DataStore.shared.getProps()
         print(props)
 

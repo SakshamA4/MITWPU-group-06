@@ -19,12 +19,16 @@ class LibraryPropsCollectionViewCell: UICollectionViewCell {
         // Initialization code
     }
     func configure(with item: PropItem) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.libraryPropLabel?.text = item.name
-            self.libraryPropImage?.image = UIImage(named: item.imageName)
+        libraryPropLabel.text = item.name
+        libraryPropImage.image = UIImage(named: item.imageName)
+//        featuredImageView.layer.cornerRadius = 12.0
+//        featuredImageView.clipsToBounds = true
+// DispatchQueue.main.async { [weak self] in
+//             guard let self = self else { return }
+//             self.libraryPropLabel?.text = item.name
+//             self.libraryPropImage?.image = UIImage(named: item.imageName)
+//         }
         }
-    }
 
 }
 
@@ -47,9 +51,8 @@ private extension LibraryPropsCollectionViewCell {
             layer.masksToBounds = false
             
             // Image setup
-            libraryPropImage.contentMode = .scaleAspectFill
-            libraryPropImage.clipsToBounds = true
-            libraryPropImage.layer.cornerRadius = 12.0
+            //featuredImageView.contentMode = .scaleAspectFill
+        libraryPropImage.clipsToBounds = true
             
             // Label style
             //featuredLabel.textColor = .white
