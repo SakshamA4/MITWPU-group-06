@@ -14,7 +14,7 @@ class AllPropsViewController: UIViewController, UICollectionViewDataSource {
     @IBOutlet weak var collectionView: UICollectionView!
     
     private let propCellId = "prop_cell"
-    var prop: [Prop] = []
+    var prop: [PropItem] = []
     var dataStore: DataStore?
     
     override func viewDidLoad() {

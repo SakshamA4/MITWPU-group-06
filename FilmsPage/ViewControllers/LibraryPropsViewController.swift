@@ -12,13 +12,16 @@ class LibraryPropsViewController: UIViewController {
 
     @IBOutlet weak var propsCollectionView: UICollectionView!
 
-    private var props = PropsDataStore.items   // [PropItem]
-
+    private var dataStore = DataStore.shared// [PropItem]
+    private var props: [PropItem] = []
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         propsCollectionView.dataSource = self
         propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
+        props = DataStore.shared.getProps()
+        print(props)
 
         propsCollectionView.register(
             UINib(nibName: "LibraryPropsCollectionViewCell", bundle: nil),
@@ -45,7 +48,7 @@ class LibraryPropsViewController: UIViewController {
         let columns: CGFloat = 4
         let spacing: CGFloat = 35
         let sideInset: CGFloat = 75
-        let verticalInset: CGFloat = 40
+//        let verticalInset: CGFloat = 40
 
         let width = propsCollectionView.bounds.width
         guard width > 0 else { return }
@@ -84,4 +87,21 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
     }
 }
 
-extension LibraryPropsViewController: UICollectionViewDelegate {}
+extension LibraryPropsViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView,
+                        didSelectItemAt indexPath: IndexPath) {
+
+        let selectedProp = props[indexPath.item]
+
+        let storyboard = UIStoryboard(name: "Library", bundle: nil)
+        guard let vc = storyboard.instantiateViewController(
+            withIdentifier: "PropDetailViewController"
+        ) as? PropDetailViewController else {
+            return
+        }
+
+        vc.prop = selectedProp
+        navigationController?.pushViewController(vc, animated: true)
+    }
+}
