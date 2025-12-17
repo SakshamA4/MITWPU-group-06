@@ -10,9 +10,11 @@ import Foundation
 class SceneService {
     static let shared = SceneService()
     private let storageKey = StorageKeys.scenes
+    private var isInitialized = false
 
     private var scenes: [Scene] = [] {
         didSet {
+            guard isInitialized else { return }
             save()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.scenesUpdated), object: nil)
         }
@@ -20,6 +22,7 @@ class SceneService {
 
     private init() {
         load()
+        isInitialized = true
     }
 
     // MARK: - CRUD Operations

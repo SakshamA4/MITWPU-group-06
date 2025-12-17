@@ -12,6 +12,10 @@ class FilmsViewController: UIViewController {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     private let favCellId = "film_cell"
     private let otherCellId = "otherFilm_cell"
@@ -33,14 +37,28 @@ class FilmsViewController: UIViewController {
         allFilms = filmService.getFilms()
 
         registerCells()
+        setupObservers()
 
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.collectionViewLayout = generateLayout()
 
         collectionView.reloadData()
-
-        // Do any additional setup after loading the view.
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.filmsUpdated),
+            object: nil
+        )
+    }
+    
+    @objc private func refreshData() {
+        favouriteFilm = filmService.getFavFilm()
+        allFilms = filmService.getFilms()
+        collectionView.reloadData()
     }
 
     func registerCells() {
@@ -163,7 +181,7 @@ class FilmsViewController: UIViewController {
 }
 
 extension FilmsViewController: UICollectionViewDataSource,
-    UICollectionViewDelegate, OtherFilmDelegate, AddFilmDelegate
+    UICollectionViewDelegate, OtherFilmDelegate
 {
     func setFavFilm(film: Film) {
         self.allFilms.append(self.favouriteFilm)
@@ -239,35 +257,12 @@ extension FilmsViewController: UICollectionViewDataSource,
             let film = sender as! Film
             let vc = segue.destination as! MyFilmViewController
             vc.film = film
-        } else if(segue.identifier == "addFilmSegue") {
-            let vc = segue.destination as! AddFilmViewController
-            vc.delegate = self
         }
-        
-    }
-    
-    func addFilm(film: Film) {
-
-        // 1. Move current favourite to allFilms
-        if let fav = favouriteFilm {
-            allFilms.append(fav)
-        }
-
-        // 2. Set new favourite
-        favouriteFilm = film
-
-        // 3. Save to service
-        filmService.addFilm(film)
-
-        // 4. Reload UI
-        collectionView.reloadData()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        favouriteFilm = filmService.getFavFilm()
-        allFilms = filmService.getFilms()
-        collectionView.reloadData()
+        refreshData()
     }
 
 

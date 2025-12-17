@@ -26,8 +26,6 @@ class CharacterDetailsViewController: UIViewController {
     // The currently selected character
     var character: CharacterItem?
     
-    var delegate: AddCharacterDelegate?
-    
     private let posesCellId = "poses_cell"
     private let infoCellId = "info_cell"
     
@@ -136,14 +134,13 @@ class CharacterDetailsViewController: UIViewController {
             return
         }
 
-        selectedCharacter.id = UUID()          // important: avoid overwriting template
-        selectedCharacter.filmId = film.id     // attach character to this film
-        if(characterNameInput != "" ){
-            selectedCharacter.name = characterNameInput        }
+        selectedCharacter.id = UUID()
+        selectedCharacter.filmId = film.id
+        if characterNameInput != "" {
+            selectedCharacter.name = characterNameInput
+        }
 
-        delegate?.addCharacter(character: selectedCharacter)
-
-
+        characterService.addCharacter(selectedCharacter)
         dismiss(animated: true)
     }
     

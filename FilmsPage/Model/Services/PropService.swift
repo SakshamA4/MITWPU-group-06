@@ -10,9 +10,11 @@ import Foundation
 class PropService {
     static let shared = PropService()
     private let storageKey = StorageKeys.props
+    private var isInitialized = false
 
     private var props: [PropItem] = [] {
         didSet {
+            guard isInitialized else { return }
             save()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
         }
@@ -20,6 +22,7 @@ class PropService {
 
     private init() {
         load()
+        isInitialized = true
     }
 
     // MARK: - CRUD Operations
@@ -103,31 +106,28 @@ class PropService {
             }
         }
         
-        // Initialize with default data if empty
+        // Initialize with default template props (no filmId - templates)
         if props.isEmpty {
-            let films = FilmService.shared.getFilms()
-            let filmId: [UUID]? = films.isEmpty ? nil : [films[0].id]
-            
             props = [
                 PropItem(
                     id: UUID(),
                     name: "Plant",
                     imageName: "Plant",
-                    filmId: filmId,
+                    filmId: nil,
                     description: "A decorative indoor plant used to add freshness and life to a scene."
                 ),
                 PropItem(
                     id: UUID(),
                     name: "Bookshelf",
                     imageName: "Bookshelf",
-                    filmId: filmId,
+                    filmId: nil,
                     description: "A wooden bookshelf filled with books, ideal for study rooms or living spaces."
                 ),
                 PropItem(
                     id: UUID(),
                     name: "Fridge",
                     imageName: "Fridge",
-                    filmId: filmId,
+                    filmId: nil,
                     description: "A modern refrigerator commonly placed in kitchens for storing food and drinks."
                 ),
                 PropItem(

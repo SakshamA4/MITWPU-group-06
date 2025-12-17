@@ -17,16 +17,17 @@ class SequenceViewController: UIViewController {
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        if let sequence = sequence {
-            scene = sceneService.getScenes(forSequenceId: sequence.id)
-        }
+        refreshData()
 
         updateTitle()
-        //print("[SequenceViewController] sequence name:", sequence.name)
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 8
@@ -35,17 +36,29 @@ class SequenceViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
         registerCells()
+        setupObservers()
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.scenesUpdated),
+            object: nil
+        )
+    }
+    
+    @objc private func refreshData() {
+        if let sequence = sequence {
+            scene = sceneService.getScenes(forSequenceId: sequence.id)
+        }
+        collectionView?.reloadData()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-
-        if let sequence = sequence {
-            scene = sceneService.getScenes(forSequenceId: sequence.id)
-        }
-
+        refreshData()
         updateTitle()
-        collectionView.reloadData()
     }
 
     func registerCells() {
@@ -88,25 +101,13 @@ extension SequenceViewController: UICollectionViewDataSource {
 }
 
 extension SequenceViewController: UICollectionViewDelegate,
-    UICollectionViewDelegateFlowLayout, AddSceneDelegate
+    UICollectionViewDelegateFlowLayout
 {
-    func addScene(scene: Scene) {
-
-        sceneService.addScene(scene)
-
-        if let sequence = sequence {
-            self.scene = sceneService.getScenes(forSequenceId: sequence.id)
-        }
-        collectionView.reloadData()
-    }
-
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "addSceneSegue" {
             let vc = segue.destination as! AddSceneViewController
-            vc.delegate = self
             vc.sequence = sequence
         }
-
     }
 
     func collectionView(

@@ -10,9 +10,11 @@ import Foundation
 class CharacterService {
     static let shared = CharacterService()
     private let storageKey = StorageKeys.characters
+    private var isInitialized = false
 
     private var characters: [CharacterItem] = [] {
         didSet {
+            guard isInitialized else { return }
             save()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.charactersUpdated), object: nil)
         }
@@ -20,6 +22,7 @@ class CharacterService {
 
     private init() {
         load()
+        isInitialized = true
     }
 
     // MARK: - CRUD Operations
@@ -90,18 +93,14 @@ class CharacterService {
             }
         }
         
-        // Initialize with default data if empty
+        // Initialize with default template characters (no filmId - templates)
         if characters.isEmpty {
-            let films = FilmService.shared.getFilms()
-            guard !films.isEmpty else { return }
-            let filmId = films[0].id
-            
             characters = [
                 CharacterItem(
                     id: UUID(),
                     name: "Character 1",
                     imageName: "Woman 1",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
@@ -115,7 +114,7 @@ class CharacterService {
                     id: UUID(),
                     name: "Character 2",
                     imageName: "Man in a suit",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
@@ -129,7 +128,7 @@ class CharacterService {
                     id: UUID(),
                     name: "Character 3",
                     imageName: "Woman 2",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
@@ -143,7 +142,7 @@ class CharacterService {
                     id: UUID(),
                     name: "Character 4",
                     imageName: "Woman 3",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
@@ -157,7 +156,7 @@ class CharacterService {
                     id: UUID(),
                     name: "Character 5",
                     imageName: "Asian man",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
@@ -171,7 +170,7 @@ class CharacterService {
                     id: UUID(),
                     name: "Character 6",
                     imageName: "Man in a jersey",
-                    filmId: filmId,
+                    filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
                         CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),

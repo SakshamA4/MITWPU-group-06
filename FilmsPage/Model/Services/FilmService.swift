@@ -11,9 +11,11 @@ class FilmService {
     static let shared = FilmService()
     private let storageKey = StorageKeys.films
     private let favStorageKey = StorageKeys.favFilm
+    private var isInitialized = false
 
     private var films: [Film] = [] {
         didSet {
+            guard isInitialized else { return }
             save()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.filmsUpdated), object: nil)
         }
@@ -21,6 +23,7 @@ class FilmService {
     
     private var favFilm: Film? = nil {
         didSet {
+            guard isInitialized else { return }
             saveFavFilm()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.favFilmUpdated), object: nil)
         }
@@ -28,6 +31,9 @@ class FilmService {
 
     private init() {
         load()
+        isInitialized = true
+        save()
+        saveFavFilm()
         setupObservers()
     }
     
@@ -94,6 +100,8 @@ class FilmService {
     // MARK: - Update Film Counts
     
     @objc private func updateFilmCounts() {
+        guard isInitialized else { return }
+        
         let sequenceService = SequenceService.shared
         let sceneService = SceneService.shared
         let characterService = CharacterService.shared

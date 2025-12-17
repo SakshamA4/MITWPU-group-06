@@ -29,19 +29,20 @@ class MyFilmViewController: UIViewController {
     private let characterService = CharacterService.shared
     private let propService = PropService.shared
     
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        
-        sequence = sequenceService.getSequences(forFilmId: film!.id)
-        character = characterService.getCharacters(forFilmId: film!.id)
-        prop = propService.getProps(forFilmId: film!.id)
+        refreshData()
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
         
         registerCells()
+        setupObservers()
         
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -50,6 +51,35 @@ class MyFilmViewController: UIViewController {
         collectionView.reloadData()
         
         filmName.text = film?.name ?? "My Film"
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.sequencesUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.charactersUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.propsUpdated),
+            object: nil
+        )
+    }
+    
+    @objc private func refreshData() {
+        guard let film = film else { return }
+        sequence = sequenceService.getSequences(forFilmId: film.id)
+        character = characterService.getCharacters(forFilmId: film.id)
+        prop = propService.getProps(forFilmId: film.id)
+        collectionView?.reloadData()
     }
     
     func registerCells() {
@@ -125,48 +155,7 @@ class MyFilmViewController: UIViewController {
 }
 
 
-extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate, AddCharacterDelegate {
-    
-    func addCharacter(character: CharacterItem) {
-        characterService.addCharacter(character)
-        if let film = film {
-            self.character = characterService.getCharacters(forFilmId: film.id)
-        }
-        collectionView.reloadData()
-    }
-    
-    func addSequence(sequence: Sequence) {
-        
-        // Save into service
-        sequenceService.addSequence(sequence)
-
-        // Refresh ONLY sequences for the current film
-        if let film = film {
-            self.sequence = sequenceService.getSequences(forFilmId: film.id)
-        }
-
-        collectionView.reloadData()
-        
-    }
-    
-//    func attachPropToFilm(prop: Prop) {
-//        guard let filmId = film?.id else { return }
-//
-//        DataStore.shared.attachPropToFilm(prop: prop)
-//    }
-
-    
-    func addProp(prop: PropItem) {
-        guard let film = film else { return }
-
-        propService.attachPropToFilm(
-            propId: prop.id ?? UUID(),
-            filmId: film.id
-        )
-
-        self.prop = propService.getProps(forFilmId: film.id)
-        collectionView.reloadData()
-    }
+extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
 
 
@@ -277,11 +266,8 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             vc.prop = sender as? PropItem
         }
 
-        if segue.identifier == "addButtonSegue" {   // the segue that opens AddViewController
+        if segue.identifier == "addButtonSegue" {
             let vc = segue.destination as! AddViewController
-            vc.sequenceDelegate = self
-            vc.propDelegate = self
-            vc.characterDelegate = self
             vc.film = film
         }
         if segue.identifier == "allSequencesSegue" {

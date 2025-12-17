@@ -7,22 +7,15 @@
 
 import UIKit
 
-protocol AddSequenceDelegate {
-    func addSequence(sequence: Sequence)
-}
-
 class AddSequenceViewController: UIViewController {
     
-    var delegate: AddSequenceDelegate?
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
-
     
     var film: Film?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
     }
     
     @IBAction func AddNewSequence(_ sender: Any) {
@@ -31,14 +24,12 @@ class AddSequenceViewController: UIViewController {
 
         let sequence = Sequence(
             id: UUID(),
-            name: nameTextField.text!,
+            name: name,
             image: "Image",
-            filmId: film.id   // attach to the correct film!// ← use existing film id
+            filmId: film.id
         )
         
-        delegate?.addSequence(sequence: sequence)
+        SequenceService.shared.addSequence(sequence)
         dismiss(animated: true)
     }
-    
-
 }

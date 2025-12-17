@@ -10,9 +10,11 @@ import Foundation
 class SequenceService {
     static let shared = SequenceService()
     private let storageKey = StorageKeys.sequences
+    private var isInitialized = false
 
     private var sequences: [Sequence] = [] {
         didSet {
+            guard isInitialized else { return }
             save()
             NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.sequencesUpdated), object: nil)
         }
@@ -20,6 +22,7 @@ class SequenceService {
 
     private init() {
         load()
+        isInitialized = true
     }
 
     // MARK: - CRUD Operations
@@ -86,39 +89,6 @@ class SequenceService {
                 sequences = try decoder.decode([Sequence].self, from: data)
             } catch {
                 print("Failed to load sequences: \(error)")
-            }
-        }
-        
-        // Initialize with default data if empty
-        if sequences.isEmpty {
-            let films = FilmService.shared.getFilms()
-            let favFilm = FilmService.shared.getFavFilm()
-            
-            if !films.isEmpty {
-                sequences.append(Sequence(
-                    id: UUID(),
-                    name: "Sequence 1",
-                    image: "Image",
-                    filmId: films[0].id
-                ))
-            }
-            
-            if films.count > 1 {
-                sequences.append(Sequence(
-                    id: UUID(),
-                    name: "Introduction",
-                    image: "Image",
-                    filmId: films[1].id
-                ))
-            }
-            
-            if let fav = favFilm {
-                sequences.append(Sequence(
-                    id: UUID(),
-                    name: "Fight",
-                    image: "Image",
-                    filmId: fav.id
-                ))
             }
         }
     }
