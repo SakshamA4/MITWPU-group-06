@@ -56,7 +56,7 @@ private extension LibraryPropsCollectionViewCell {
             
             // Label style
             //featuredLabel.textColor = .white
-        libraryPropLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+//        libraryPropLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
             
         }
 

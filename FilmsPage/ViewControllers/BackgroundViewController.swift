@@ -74,9 +74,9 @@ private extension BackgroundViewController {
         let lineSpacing: CGFloat = 35
         
         layout.sectionInset = UIEdgeInsets(
-            top: 32,
+            top: 0,
             left: sectionInset,
-            bottom: 32,
+            bottom: 0,
             right: sectionInset
         )
         layout.minimumInteritemSpacing = interItemSpacing

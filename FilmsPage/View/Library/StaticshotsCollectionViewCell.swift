@@ -30,8 +30,8 @@ class StaticshotsCollectionViewCell: UICollectionViewCell {
     func configure(with item: CameraLibraryItem) {
         staticShotLabel.text = item.name
         staticShotImage.image = UIImage(named: item.imageName)
-//        featuredImageView.layer.cornerRadius = 12.0
-//        featuredImageView.clipsToBounds = true
+        staticShotImage.layer.cornerRadius = 12.0
+        staticShotImage.clipsToBounds = true
         }
     
     //Makes it feel more interactive when tapped.
@@ -71,7 +71,7 @@ private extension StaticshotsCollectionViewCell {
             
             // Label style
             //featuredLabel.textColor = .white
-        staticShotLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+//        staticShotLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
             
         }
 

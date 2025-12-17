@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -19,8 +19,8 @@
                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="FvA-rQ-Tgr">
                         <rect key="frame" x="0.0" y="0.0" width="228" height="233"/>
                     </imageView>
-                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="IX8-8d-zKt">
-                        <rect key="frame" x="0.0" y="212" width="228" height="21"/>
+                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="IX8-8d-zKt">
+                        <rect key="frame" x="8" y="204.5" width="220" height="20.5"/>
                         <fontDescription key="fontDescription" type="system" pointSize="17"/>
                         <color key="textColor" red="0.99999600649999998" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <nil key="highlightedColor"/>
@@ -31,8 +31,8 @@
             <constraints>
                 <constraint firstAttribute="trailing" secondItem="IX8-8d-zKt" secondAttribute="trailing" id="2CO-kJ-9y9"/>
                 <constraint firstAttribute="bottom" secondItem="FvA-rQ-Tgr" secondAttribute="bottom" id="CVt-wM-KMF"/>
-                <constraint firstItem="IX8-8d-zKt" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="JZj-RU-xFb"/>
-                <constraint firstAttribute="bottom" secondItem="IX8-8d-zKt" secondAttribute="bottom" id="ROv-TT-QYB"/>
+                <constraint firstItem="IX8-8d-zKt" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" constant="8" id="JZj-RU-xFb"/>
+                <constraint firstAttribute="bottom" secondItem="IX8-8d-zKt" secondAttribute="bottom" constant="8" id="ROv-TT-QYB"/>
                 <constraint firstItem="FvA-rQ-Tgr" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="UgV-95-1B6"/>
                 <constraint firstItem="FvA-rQ-Tgr" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="p2C-BY-Pt4"/>
                 <constraint firstAttribute="trailing" secondItem="FvA-rQ-Tgr" secondAttribute="trailing" id="yZO-Jb-Gga"/>

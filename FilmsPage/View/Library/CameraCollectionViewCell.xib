@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -17,10 +17,10 @@
                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 <subviews>
                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="8rM-4e-Dje">
-                        <rect key="frame" x="0.0" y="0.0" width="244" height="154"/>
+                        <rect key="frame" x="12" y="12" width="220" height="198"/>
                     </imageView>
                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="cVE-TA-6ok">
-                        <rect key="frame" x="0.0" y="156" width="244" height="38"/>
+                        <rect key="frame" x="0.0" y="218" width="244" height="24"/>
                         <fontDescription key="fontDescription" type="system" pointSize="20"/>
                         <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <nil key="highlightedColor"/>
@@ -28,15 +28,15 @@
                 </subviews>
             </view>
             <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <color key="backgroundColor" red="0.078431375319999996" green="0.082352943720000002" blue="0.11372549830000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
             <constraints>
-                <constraint firstAttribute="bottom" secondItem="8rM-4e-Dje" secondAttribute="bottom" constant="100" id="CKC-jG-voH"/>
-                <constraint firstItem="cVE-TA-6ok" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" constant="156" id="HdB-Zp-NZo"/>
-                <constraint firstItem="8rM-4e-Dje" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="LfG-e6-D9j"/>
-                <constraint firstAttribute="trailing" secondItem="8rM-4e-Dje" secondAttribute="trailing" id="M3S-Ir-qQc"/>
-                <constraint firstItem="cVE-TA-6ok" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="Yu9-Jp-s1v"/>
-                <constraint firstItem="8rM-4e-Dje" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="Z9A-d2-jSs"/>
-                <constraint firstAttribute="bottom" secondItem="cVE-TA-6ok" secondAttribute="bottom" constant="60" id="bk8-H6-T2T"/>
-                <constraint firstAttribute="trailing" secondItem="cVE-TA-6ok" secondAttribute="trailing" id="rKf-Jf-12o"/>
+                <constraint firstItem="cVE-TA-6ok" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="4Vz-Aj-eHr"/>
+                <constraint firstAttribute="trailing" secondItem="cVE-TA-6ok" secondAttribute="trailing" id="DQl-Pg-HT5"/>
+                <constraint firstAttribute="trailing" secondItem="8rM-4e-Dje" secondAttribute="trailing" constant="12" id="TiE-ww-j7m"/>
+                <constraint firstItem="8rM-4e-Dje" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" constant="12" id="V3f-UE-Lxk"/>
+                <constraint firstItem="8rM-4e-Dje" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" constant="12" id="fQm-pd-0bt"/>
+                <constraint firstItem="cVE-TA-6ok" firstAttribute="top" secondItem="8rM-4e-Dje" secondAttribute="bottom" constant="8" id="nC3-Qp-Jqb"/>
+                <constraint firstAttribute="bottom" secondItem="cVE-TA-6ok" secondAttribute="bottom" constant="12" id="ufP-3J-ghH"/>
             </constraints>
             <size key="customSize" width="244" height="254"/>
             <connections>

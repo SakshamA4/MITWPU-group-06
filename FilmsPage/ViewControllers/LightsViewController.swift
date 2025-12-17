@@ -45,7 +45,7 @@ class LightsViewController: UIViewController {
         let columns: CGFloat = 4
         let spacing: CGFloat = 35
         let sideInset: CGFloat = 75
-        let verticalInset: CGFloat = 0
+//        let verticalInset: CGFloat = 0
 
         let width = lightsCollectionView.bounds.width
         guard width > 0 else { return }
@@ -57,9 +57,9 @@ class LightsViewController: UIViewController {
         layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
         layout.minimumInteritemSpacing = spacing
         layout.minimumLineSpacing = spacing
-        layout.sectionInset = UIEdgeInsets(top: verticalInset,
+        layout.sectionInset = UIEdgeInsets(top: 0,
                                            left: sideInset,
-                                           bottom: verticalInset,
+                                           bottom: 0,
                                            right: sideInset)
         layout.scrollDirection = .vertical
     }

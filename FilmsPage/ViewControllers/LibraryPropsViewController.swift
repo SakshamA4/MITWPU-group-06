@@ -87,4 +87,21 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
     }
 }
 
-extension LibraryPropsViewController: UICollectionViewDelegate {}
+extension LibraryPropsViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView,
+                        didSelectItemAt indexPath: IndexPath) {
+
+        let selectedProp = props[indexPath.item]
+
+        let storyboard = UIStoryboard(name: "Library", bundle: nil)
+        guard let vc = storyboard.instantiateViewController(
+            withIdentifier: "PropDetailViewController"
+        ) as? PropDetailViewController else {
+            return
+        }
+
+        vc.prop = selectedProp
+        navigationController?.pushViewController(vc, animated: true)
+    }
+}
