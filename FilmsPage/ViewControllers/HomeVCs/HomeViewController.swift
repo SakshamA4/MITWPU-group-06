@@ -14,9 +14,14 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
     private var templates: [ScenesModel] = []
     private var recentScenes: [ScenesModel] = []
     
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCollectionView()
+        setupObservers()
         refreshData() // Initial load
     }
     
@@ -32,6 +37,19 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         collectionView.dataSource = self
     }
     
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScenesUpdated),
+            name: ScenesDataStore.scenesUpdatedNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleScenesUpdated() {
+        refreshData()
+    }
+    
     private func refreshData() {
         // 1. Fetch latest data from the Single Source of Truth
         templates = ScenesDataStore.shared.currentTemplates
@@ -40,33 +58,10 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         // 2. Reload UI
         collectionView.reloadData()
     }
-    
-    func reloadSceneData(){
-        print("Reloading Scena")
-        refreshData()
-    }
 
     // MARK: - Navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "goToAddSceneToLibrary" {
-            // Handle case where destination is the VC itself OR a Nav Controller wrapping it
-            let destination = segue.destination
-            
-            if let addVC = destination as? AddSceneToLibrarayViewController {
-                addVC.delegate = self
-            } else if let nav = destination as? UINavigationController,
-                      let addVC = nav.viewControllers.first as? AddSceneToLibrarayViewController {
-                addVC.delegate = self
-            }
-        }
-    }
-}
-
-// MARK: - Delegate Implementation
-extension HomeViewController: SceneLibraryDelegate {
-    func didAddScene() {
-        // The modal has updated the Store. Now we refresh our view.
-        refreshData()
+        // No delegate setup needed - using NotificationCenter
     }
 }
 

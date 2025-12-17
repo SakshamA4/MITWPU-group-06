@@ -40,6 +40,8 @@ class SceneService {
     }
     
     func addScene(_ scene: Scene) {
+        var sc = scene
+        sc.image = "Image"
         scenes.append(scene)
     }
     
