@@ -265,7 +265,6 @@ extension FilmsViewController: UICollectionViewDataSource,
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        DataServiceCoordinator.shared.updateFilmCounts()
         favouriteFilm = filmService.getFavFilm()
         allFilms = filmService.getFilms()
         collectionView.reloadData()

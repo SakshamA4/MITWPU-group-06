@@ -28,6 +28,30 @@ class FilmService {
 
     private init() {
         load()
+        setupObservers()
+    }
+    
+    // MARK: - Observers for Count Updates
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateFilmCounts),
+            name: NSNotification.Name(NotificationNames.sequencesUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateFilmCounts),
+            name: NSNotification.Name(NotificationNames.scenesUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateFilmCounts),
+            name: NSNotification.Name(NotificationNames.charactersUpdated),
+            object: nil
+        )
     }
 
     // MARK: - Films CRUD Operations
@@ -69,22 +93,24 @@ class FilmService {
     
     // MARK: - Update Film Counts
     
-    func updateFilmCounts(
-        sequenceCountForFilm: (UUID) -> Int,
-        characterCountForFilm: (UUID) -> Int,
-        sceneCountForFilm: (UUID) -> Int
-    ) {
+    @objc private func updateFilmCounts() {
+        let sequenceService = SequenceService.shared
+        let sceneService = SceneService.shared
+        let characterService = CharacterService.shared
+        
         for i in 0..<films.count {
             let filmId = films[i].id
-            films[i].sequences = sequenceCountForFilm(filmId)
-            films[i].characters = characterCountForFilm(filmId)
-            films[i].scenes = sceneCountForFilm(filmId)
+            films[i].sequences = sequenceService.getSequenceCount(forFilmId: filmId)
+            films[i].characters = characterService.getCharacterCount(forFilmId: filmId)
+            let sequenceIds = sequenceService.getSequenceIds(forFilmId: filmId)
+            films[i].scenes = sceneService.getSceneCount(forSequenceIds: sequenceIds)
         }
         
         if var fav = favFilm {
-            fav.sequences = sequenceCountForFilm(fav.id)
-            fav.characters = characterCountForFilm(fav.id)
-            fav.scenes = sceneCountForFilm(fav.id)
+            fav.sequences = sequenceService.getSequenceCount(forFilmId: fav.id)
+            fav.characters = characterService.getCharacterCount(forFilmId: fav.id)
+            let sequenceIds = sequenceService.getSequenceIds(forFilmId: fav.id)
+            fav.scenes = sceneService.getSceneCount(forSequenceIds: sequenceIds)
             favFilm = fav
         }
     }
