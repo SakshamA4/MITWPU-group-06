@@ -13,7 +13,7 @@ protocol AddCharacterDelegate {
 
 class AddCharacterViewController: UIViewController {
 
-    var dataStore = DataStore.shared
+    private let characterService = CharacterService.shared
     var film: Film?   // The film we are adding characters to
 
     @IBOutlet weak var collectionView: UICollectionView!
@@ -27,7 +27,7 @@ class AddCharacterViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        characters = DataStore.shared.getCharacters()
+        characters = characterService.getCharacters()
 
 
 
@@ -91,7 +91,6 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
             let vc = segue.destination as! CharacterDetailsViewController
             vc.character = sender as? CharacterItem
             vc.film = film
-            vc.dataStore = DataStore.shared
             vc.delegate = addCharacterDelegate
         } }
     

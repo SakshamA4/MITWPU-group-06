@@ -17,8 +17,8 @@ class CharacterDetailsViewController: UIViewController {
     // Film passed from previous screen
     var film: Film?
     
-    // Shared DataStore
-    var dataStore: DataStore = DataStore.shared
+    // Character Service
+    private let characterService = CharacterService.shared
     
     // Characters for this film
     var characters: [CharacterItem] = []
@@ -41,9 +41,9 @@ class CharacterDetailsViewController: UIViewController {
         
         // Load characters belonging to the film
         if let film = film {
-            characters = dataStore.getCharactersByFilmId(filmId: film.id)
+            characters = characterService.getCharacters(forFilmId: film.id)
         } else {
-            characters = dataStore.getCharacters()
+            characters = characterService.getCharacters()
         }
         
         updateTitle()

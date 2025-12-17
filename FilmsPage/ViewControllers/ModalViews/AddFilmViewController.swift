@@ -35,7 +35,7 @@ class AddFilmViewController: UIViewController {
             image: "Image"
         )
         
-        DataStore.shared.createNewFilm(newFilm: film)
+        FilmService.shared.addFilm(film)
 
         delegate?.addFilm(film: film)
         dismiss(animated: true)

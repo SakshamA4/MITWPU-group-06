@@ -9,7 +9,7 @@ import UIKit
 
 class SequenceViewController: UIViewController {
 
-    var dataStore = DataStore.shared
+    private let sceneService = SceneService.shared
     @IBOutlet weak var collectionView: UICollectionView!
 
     @IBOutlet weak var sequenceTitle: UILabel!
@@ -22,7 +22,7 @@ class SequenceViewController: UIViewController {
         super.viewDidLoad()
 
         if let sequence = sequence {
-            scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+            scene = sceneService.getScenes(forSequenceId: sequence.id)
         }
 
         updateTitle()
@@ -41,7 +41,7 @@ class SequenceViewController: UIViewController {
         super.viewWillAppear(animated)
 
         if let sequence = sequence {
-            scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+            scene = sceneService.getScenes(forSequenceId: sequence.id)
         }
 
         updateTitle()
@@ -92,10 +92,10 @@ extension SequenceViewController: UICollectionViewDelegate,
 {
     func addScene(scene: Scene) {
 
-        DataStore.shared.createNewScene(newScene: scene)
+        sceneService.addScene(scene)
 
         if let sequence = sequence {
-            self.scene = DataStore.shared.getScenes(sequenceId: sequence.id)
+            self.scene = sceneService.getScenes(forSequenceId: sequence.id)
         }
         collectionView.reloadData()
     }
@@ -104,7 +104,6 @@ extension SequenceViewController: UICollectionViewDelegate,
         if segue.identifier == "addSceneSegue" {
             let vc = segue.destination as! AddSceneViewController
             vc.delegate = self
-            vc.dataStore = DataStore.shared
             vc.sequence = sequence
         }
 

@@ -19,8 +19,9 @@ class FilmsViewController: UIViewController {
     @IBOutlet weak var FilmsPageTitleLabel: UILabel!
     var favouriteFilm: Film!
     var allFilms: [Film] = []
-    //let dataStore = DataStore(films: [])
-    let dataStore = DataStore.shared
+    
+    // Services
+    private let filmService = FilmService.shared
 
 
     @IBOutlet weak var collectionView: UICollectionView!
@@ -28,10 +29,8 @@ class FilmsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        DataStore.shared.loadData()
-
-        favouriteFilm = dataStore.getFavFilms()!
-        allFilms = dataStore.getOtherFilms()
+        favouriteFilm = filmService.getFavFilm()!
+        allFilms = filmService.getFilms()
 
         registerCells()
 
@@ -240,7 +239,6 @@ extension FilmsViewController: UICollectionViewDataSource,
             let film = sender as! Film
             let vc = segue.destination as! MyFilmViewController
             vc.film = film
-            vc.dataStore = dataStore
         } else if(segue.identifier == "addFilmSegue") {
             let vc = segue.destination as! AddFilmViewController
             vc.delegate = self
@@ -258,8 +256,8 @@ extension FilmsViewController: UICollectionViewDataSource,
         // 2. Set new favourite
         favouriteFilm = film
 
-        // 3. Save to datastore
-        dataStore.createNewFilm(newFilm: film)
+        // 3. Save to service
+        filmService.addFilm(film)
 
         // 4. Reload UI
         collectionView.reloadData()
@@ -267,10 +265,9 @@ extension FilmsViewController: UICollectionViewDataSource,
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        DataStore.shared.loadData()
-        dataStore.updateFilmCounts()
-        favouriteFilm = dataStore.getFavFilms()
-        allFilms = dataStore.getOtherFilms()
+        DataServiceCoordinator.shared.updateFilmCounts()
+        favouriteFilm = filmService.getFavFilm()
+        allFilms = filmService.getFilms()
         collectionView.reloadData()
     }
 

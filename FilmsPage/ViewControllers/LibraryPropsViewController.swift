@@ -12,7 +12,7 @@ class LibraryPropsViewController: UIViewController {
 
     @IBOutlet weak var propsCollectionView: UICollectionView!
 
-    private var dataStore = DataStore.shared// [PropItem]
+    private let propService = PropService.shared
     private var props: [PropItem] = []
     
     override func viewDidLoad() {
@@ -20,7 +20,7 @@ class LibraryPropsViewController: UIViewController {
         propsCollectionView.dataSource = self
         propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
-        props = DataStore.shared.getProps()
+        props = propService.getProps()
         print(props)
 
         propsCollectionView.register(

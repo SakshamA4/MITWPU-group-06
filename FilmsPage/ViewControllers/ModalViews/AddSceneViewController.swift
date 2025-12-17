@@ -16,8 +16,6 @@ protocol AddSceneDelegate {
 class AddSceneViewController: UIViewController {
     
     var delegate: AddSceneDelegate?
-    var dataStore = DataStore.shared
-    //var film: Film?
     var sequence: Sequence?
 
     @IBOutlet weak var sceneName: UITextField!

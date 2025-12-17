@@ -23,7 +23,7 @@ class PropDetailViewController: UIViewController {
     
     
     var prop: PropItem?
-    var dataStore = DataStore.shared
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         

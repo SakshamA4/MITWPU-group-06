@@ -11,7 +11,7 @@ class LibraryCharactersViewController: UIViewController {
 
     @IBOutlet weak var charactersCollectionView: UICollectionView!
 
-    private var dataStore = DataStore.shared   //[CharacterItem]
+    private let characterService = CharacterService.shared
     private var characters: [CharacterItem] = []
     
         override func viewDidLoad() {
@@ -24,7 +24,7 @@ class LibraryCharactersViewController: UIViewController {
                 UINib(nibName: "LibraryCharactersCollectionViewCell", bundle: nil),
                 forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell" )
             
-            characters = DataStore.shared.getCharacters()
+            characters = characterService.getCharacters()
                 
 
         }
