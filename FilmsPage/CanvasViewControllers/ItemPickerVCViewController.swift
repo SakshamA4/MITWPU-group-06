@@ -23,9 +23,10 @@ class ItemPickerVC: UIViewController {
                 titleLabel.text = modalTitle
             }
         }
-    
+    private var pendingSelectedItem: String?
     // MARK: - Character Data Sources
     private let filmCharacters: [String] = ["Man in a suit", "Woman 1", "Asian man"]
+
     private let libraryCharacters: [String] = ["Man in a suit","Woman 1", "Asian man",  "Woman 2", "Man in a jersey", "Woman 3"]
     
     // MARK: - Prop Data Sources
@@ -56,7 +57,6 @@ class ItemPickerVC: UIViewController {
 
     private let headerBar: UIView = {
         let h = UIView()
-        // Custom Purple color: #3E3962
         h.backgroundColor = UIColor(red: 14/255, green: 14/255, blue: 24/255, alpha: 1.0)
         h.translatesAutoresizingMaskIntoConstraints = false
         return h
@@ -65,7 +65,7 @@ class ItemPickerVC: UIViewController {
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.textAlignment = .center
-        l.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        l.font = UIFont.systemFont(ofSize: 30, weight: .bold)
         l.textColor = .white
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -124,7 +124,7 @@ class ItemPickerVC: UIViewController {
         private let detailStackView: UIStackView = {
             let stack = UIStackView()
             stack.axis = .vertical
-            stack.spacing = 24
+            stack.spacing = 15
             stack.translatesAutoresizingMaskIntoConstraints = false
             return stack
         }()
@@ -133,7 +133,7 @@ class ItemPickerVC: UIViewController {
         private let coreContentStack: UIStackView = {
             let stack = UIStackView()
             stack.axis = .vertical
-            stack.spacing = 24 // Spacing between the collection view and the detail stack
+            stack.spacing = 5 // Spacing between the collection view and the detail stack
             stack.translatesAutoresizingMaskIntoConstraints = false
             return stack
         }()
@@ -159,7 +159,7 @@ class ItemPickerVC: UIViewController {
             
             let labelView = UILabel()
             labelView.text = label
-            labelView.textColor = .systemGray
+            labelView.textColor = .white
             labelView.font = UIFont.systemFont(ofSize: 14)
             
             let textField = UITextField()
@@ -168,7 +168,7 @@ class ItemPickerVC: UIViewController {
             textField.borderStyle = .none
             // Added a line underneath
             let separator = UIView()
-            separator.backgroundColor = .systemGray5
+            separator.backgroundColor = .systemGray
             separator.heightAnchor.constraint(equalToConstant: 2).isActive = true
             
             container.addArrangedSubview(labelView)
@@ -177,37 +177,42 @@ class ItemPickerVC: UIViewController {
             return container
         }
 
-        private func createDetailColorPicker() -> UIView {
-            let row = UIStackView()
-            row.axis = .horizontal
-            row.alignment = .center
-            row.spacing = 16
 
-            let titleLabel = UILabel()
-            titleLabel.text = "Color:"
-            titleLabel.textColor = .systemGray
-            titleLabel.widthAnchor.constraint(equalToConstant: 80).isActive = true
-            
-            // Swatch
-            let colorSwatch = UIView()
-            colorSwatch.backgroundColor = .white
-            colorSwatch.layer.cornerRadius = 4
-            colorSwatch.widthAnchor.constraint(equalToConstant: 32).isActive = true
-            colorSwatch.heightAnchor.constraint(equalToConstant: 32).isActive = true
-            colorSwatch.layer.borderWidth = 1
-            colorSwatch.layer.borderColor = UIColor.systemGray.cgColor
+    private func createSystemColorPicker(title: String) -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 16
 
-            // Color Wheel
-            let colorWheel = ColorWheelView()
-            colorWheel.widthAnchor.constraint(equalToConstant: 40).isActive = true
-            colorWheel.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.textColor = .white
+        titleLabel.font = UIFont.systemFont(ofSize: 16)
+        titleLabel.widthAnchor.constraint(equalToConstant: 80).isActive = true
 
-            row.addArrangedSubview(titleLabel)
-            row.addArrangedSubview(colorSwatch)
-            row.addArrangedSubview(colorWheel)
-            
-            return row
-        }
+        // The Native iOS Color Well
+        let colorWell = UIColorWell()
+        colorWell.selectedColor = .white
+        colorWell.title = title
+        colorWell.supportsAlpha = true
+        colorWell.addTarget(self, action: #selector(colorChanged(_:)), for: .valueChanged)
+        colorWell.translatesAutoresizingMaskIntoConstraints = false
+
+        row.addArrangedSubview(titleLabel)
+        row.addArrangedSubview(colorWell)
+        
+        // Flexible spacer to keep items left-aligned
+        let spacer = UIView()
+        row.addArrangedSubview(spacer)
+
+        return row
+    }
+
+    @objc private func colorChanged(_ sender: UIColorWell) {
+        guard let color = sender.selectedColor else { return }
+        print("New color selected from well: \(color)")
+    }
+    
     
         // Helper function for the Light intensity/temperature/shadow sliders
         private func createSliderRow(title: String, min: Float, max: Float) -> UIView {
@@ -241,7 +246,7 @@ class ItemPickerVC: UIViewController {
     
         // MARK: - Conditional Layout
         private func setupHeaderLayout() {
-            
+            titleCenterYConstraint.isActive = false
             titleBottomConstraint.isActive = false
             tabBottomConstraint.isActive = false
             
@@ -251,7 +256,7 @@ class ItemPickerVC: UIViewController {
                         confirmButton.isHidden = (itemType == "Character")
                         titleLabel.text = (itemType == "Character") ? "Add Character" : "Add Props"
                         
-                        // Activate the two-line header constraints
+                      
                         titleBottomConstraint.isActive = true
                         tabBottomConstraint.isActive = true
                         
@@ -295,8 +300,8 @@ class ItemPickerVC: UIViewController {
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
                 detailStackView.addArrangedSubview(createInputField(label: "Name", placeholder: "e.g., Wide Shot Camera"))
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Primary A-Cam"))
-                detailStackView.addArrangedSubview(createDetailColorPicker()) // Color picker row
-                collectionViewHeightConstraint.constant = 360
+                detailStackView.addArrangedSubview(createSystemColorPicker(title: "Color:"))
+                collectionViewHeightConstraint.constant = 250
                 
             case "Lights":
                 if let layout = itemCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -309,14 +314,14 @@ class ItemPickerVC: UIViewController {
                 detailStackView.addArrangedSubview(createSliderRow(title: "Intensity:", min: 0, max: 100))
                 detailStackView.addArrangedSubview(createSliderRow(title: "Temperature:", min: 2000, max: 8000))
                 detailStackView.addArrangedSubview(createSliderRow(title: "Shadows:", min: 0, max: 1))
-                detailStackView.addArrangedSubview(createDetailColorPicker())
-                collectionViewHeightConstraint.constant = 360
+                detailStackView.addArrangedSubview(createSystemColorPicker(title: "Color:"))
+                collectionViewHeightConstraint.constant = 250
             
             case "Wall":
                     detailStackView.isHidden = false
                     detailStackHalfWidthConstraint.isActive = true
                     detailStackView.addArrangedSubview(createSliderRow(title: "Wall Height:", min: 10, max: 50))
-                    detailStackView.addArrangedSubview(createDetailColorPicker())
+                    detailStackView.addArrangedSubview(createSystemColorPicker(title: "Wall Color:"))
                 
             case "Character", "Props", "Background":
                 detailStackView.isHidden = true
@@ -338,7 +343,7 @@ class ItemPickerVC: UIViewController {
 
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: UIColor.white,
-                .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
+                .font: UIFont.systemFont(ofSize: 16, weight: .semibold)
             ]
             sc.setTitleTextAttributes(attributes, for: .normal)
             
@@ -372,6 +377,7 @@ class ItemPickerVC: UIViewController {
                     }
             
             view.backgroundColor = UIColor(red: 14/255, green: 14/255, blue: 24/255, alpha: 1.0)
+            
             setupViews()
             setupConstraints()
             setupHeaderLayout()
@@ -402,10 +408,13 @@ class ItemPickerVC: UIViewController {
                 //Added input fields to the detail stack
                 detailStackView.addArrangedSubview(createInputField(label: "Name", placeholder: "e.g., Default"))
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Default Camera"))
-                detailStackView.addArrangedSubview(createDetailColorPicker())
+                detailStackView.addArrangedSubview(createSystemColorPicker(title: "Color:"))
         
                 // Add button actions
                 closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
+                confirmButton.addTarget(self, action: #selector(didTapConfirm), for: .touchUpInside)
+                scrollView.delaysContentTouches = false // Add this
+                itemCollectionView.delaysContentTouches = false // Add this
     }
 
     private func setupConstraints() {
@@ -421,25 +430,26 @@ class ItemPickerVC: UIViewController {
             headerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             headerBar.topAnchor.constraint(equalTo: dragHandle.bottomAnchor, constant: 8),
-            headerBar.heightAnchor.constraint(equalToConstant: 56)
+            headerBar.heightAnchor.constraint(equalToConstant: 80)
         ])
 
                 // Title and buttons (STATIC)
                 NSLayoutConstraint.activate([
             
-                    closeButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
+                    closeButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
                     closeButton.leadingAnchor.constraint(equalTo: headerBar.leadingAnchor, constant: 12),
                     closeButton.widthAnchor.constraint(equalToConstant: 44),
 
                   
                     confirmButton.trailingAnchor.constraint(equalTo: headerBar.trailingAnchor, constant: -16),
-                    confirmButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
+                    confirmButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
                     confirmButton.widthAnchor.constraint(equalToConstant: 40),
                     confirmButton.heightAnchor.constraint(equalToConstant: 40),
                     
                     tabSegmentedControl.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor),
                     tabSegmentedControl.widthAnchor.constraint(equalToConstant: 180),
                     tabSegmentedControl.heightAnchor.constraint(equalToConstant: 28),
+                    
                     
                     titleLabel.topAnchor.constraint(equalTo: headerBar.topAnchor, constant: 4),
                     titleLabel.centerXAnchor.constraint(equalTo: headerBar.centerXAnchor),
@@ -451,10 +461,10 @@ class ItemPickerVC: UIViewController {
                 titleCenterYConstraint = titleLabel.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor)
 
                 // 2. Title pinned above Tabs (For Character)
-                titleBottomConstraint = titleLabel.bottomAnchor.constraint(equalTo: tabSegmentedControl.topAnchor, constant: -2)
+                titleBottomConstraint = titleLabel.bottomAnchor.constraint(equalTo: tabSegmentedControl.topAnchor, constant: -10)
                 
                 // 3. Tabs pushed down (For Character)
-                tabBottomConstraint = tabSegmentedControl.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor, constant: 10)
+                tabBottomConstraint = tabSegmentedControl.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor, constant: 15)
 
                 detailStackHalfWidthConstraint = detailStackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.5)
         
@@ -504,9 +514,22 @@ class ItemPickerVC: UIViewController {
     }
 
     @objc private func didTapConfirm() {
-        dismiss(animated: true)
+        guard let selectedItem = pendingSelectedItem else {
+            print("No item selected. Please tap an item before confirming.")
+            return
+        }
+        
+        // Capture the callback locally
+        let callback = self.onItemSelected
+        
+        dismiss(animated: true) {
+            // Run on main thread to ensure MyFeatureCanvasVC is ready
+            DispatchQueue.main.async {
+                print("Confirming item: \(selectedItem)")
+                callback?(selectedItem)
+            }
+        }
     }
-    
         // MARK: - Tab Handling
         @objc private func handleTabChange(_ sender: UISegmentedControl) {
             if itemType == "Character" {
@@ -542,6 +565,8 @@ extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlow
         }
         let itemName = itemsToDisplay[indexPath.row]
         cell.itemName = itemName
+        // Manually set the selection state based on your 'pending' variable
+        cell.isCurrentlySelected = (itemName == pendingSelectedItem)
         return cell
     }
     
@@ -552,7 +577,20 @@ extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlow
                 let height: CGFloat = 232
                 return CGSize(width: width, height: height)
                 
-            } else {
+            } else if itemType == "Character"{
+                let numColumns: CGFloat = 3
+                let spacing: CGFloat = 16
+                // 5 paddings: 2 edges (16*2) + 3 spaces between cards (16*3)
+                let totalPadding = (spacing * (numColumns + 1))
+                
+                // Calculate width for 4 columns
+                let availableWidth = collectionView.bounds.width - totalPadding
+                let width = availableWidth / numColumns
+                
+                // Maintain a square size, approximating the 232 height/width requested
+                let height: CGFloat = 250
+                return CGSize(width: width, height: height)
+}else {
                             let numColumns: CGFloat = 4
                             let spacing: CGFloat = 16
                             // 5 paddings: 2 edges (16*2) + 3 spaces between cards (16*3)
@@ -564,10 +602,6 @@ extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlow
                             
                             // Maintain a square size, approximating the 232 height/width requested
                             let height: CGFloat = width
-                            
-                            // Check if calculated size is large enough (Optional: for safety)
-                            // If width is too small, we cap it, but usually, automatic sizing is best.
-                            
                             return CGSize(width: width, height: height)
             }
         }
@@ -576,13 +610,25 @@ extension ItemPickerVC: UICollectionViewDataSource, UICollectionViewDelegateFlow
     
     // 4. Handle item tap/selection
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        //        let selectedItemName = itemsToDisplay[indexPath.row]
+        //
+        //        // NEW: Dismiss the current modal and launch the Edit modal
+        //        dismiss(animated: true) { [weak self] in
+        //            // The presenting VC (MyFeatureCanvasVC) needs to launch the second modal
+        //            self?.onItemSelected?(selectedItemName)
+        //        }
+        //    }
         let selectedItemName = itemsToDisplay[indexPath.row]
         
-        // NEW: Dismiss the current modal and launch the Edit modal
-        dismiss(animated: true) { [weak self] in
-            // The presenting VC (MyFeatureCanvasVC) needs to launch the second modal
-            self?.onItemSelected?(selectedItemName)
+        if itemType == "Character" {
+            dismiss(animated: true) { [weak self] in
+                self?.onItemSelected?(selectedItemName)
+            }
+        } else {
+            // For Camera, Props, Lights, etc., just SAVE the name and wait for confirmButton
+            self.pendingSelectedItem = selectedItemName
+            collectionView.reloadData()
+            
         }
     }
-    
 }
