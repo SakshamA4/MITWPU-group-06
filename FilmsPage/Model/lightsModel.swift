@@ -47,17 +47,17 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Flood Light",
-            imageName: "Image",
+            imageName: "Flood Light",
             description: "Wide, powerful light used to wash large areas."
         ),
         LightItem(
             name: "Fluorescent Tube 2",
-            imageName: "Image",
+            imageName: "Fluorescent Tube 2",
             description: "Second variation of fluorescent tube for a different look/colour."
         ),
         LightItem(
             name: "Fluorescent Tube 3",
-            imageName: "Image",
+            imageName: "Fluorescent Tube 3",
             description: "Third variation of fluorescent tube for extra flexibility."
         )
     ]
