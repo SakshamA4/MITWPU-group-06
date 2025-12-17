@@ -127,14 +127,16 @@ extension LibraryCharactersViewController: UICollectionViewDelegate {
         let selectedCharacter = characters[indexPath.item]
 
         let storyboard = UIStoryboard(name: "Library", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "EditCharacterViewController"
+//        )  else {
+//            return
+//        }
+        let vc = storyboard.instantiateViewController(
             withIdentifier: "EditCharacterViewController"
-        ) as? CharacterViewController else {
-            return
-        }
-
+        )
         // Pass character
-        vc.character = selectedCharacter
+//        vc.character = selectedCharacter
 
         navigationController?.pushViewController(vc, animated: true)
     }

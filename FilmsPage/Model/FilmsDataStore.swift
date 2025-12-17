@@ -4,11 +4,20 @@
 //
 //  Created by SDC-USER on 24/11/25.
 //
+//  DEPRECATED: This file is deprecated. Use the new services in Model/Services/ instead:
+//  - FilmService.shared
+//  - SequenceService.shared
+//  - SceneService.shared
+//  - CharacterService.shared
+//  - PropService.shared
+//  Or use DataServiceCoordinator.shared for backward compatibility
+//
 
 import Foundation
 
-class DataStore {
-    static let shared = DataStore()
+@available(*, deprecated, message: "Use DataServiceCoordinator.shared or individual services instead")
+class LegacyDataStore {
+    static let shared = LegacyDataStore()
 
     private var favFilms: Film? = nil
 
@@ -120,7 +129,7 @@ class DataStore {
                 id: UUID(),
                 name: "Plant",
                 imageName: "Plant",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A decorative indoor plant used to add freshness and life to a scene."
             )
