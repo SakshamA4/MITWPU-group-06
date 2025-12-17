@@ -7,7 +7,11 @@
 import Foundation
 
 struct PropItem {
+    var id: UUID?
     let name: String
     let imageName: String
+    var filmId: UUID?
     let description: String
+    var surfaceTexture: String?
+    var colour: String?
 }

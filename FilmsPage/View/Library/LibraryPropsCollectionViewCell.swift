@@ -23,6 +23,11 @@ class LibraryPropsCollectionViewCell: UICollectionViewCell {
         libraryPropImage.image = UIImage(named: item.imageName)
 //        featuredImageView.layer.cornerRadius = 12.0
 //        featuredImageView.clipsToBounds = true
+// DispatchQueue.main.async { [weak self] in
+//             guard let self = self else { return }
+//             self.libraryPropLabel?.text = item.name
+//             self.libraryPropImage?.image = UIImage(named: item.imageName)
+//         }
         }
 
 }
