@@ -19,11 +19,11 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
         recentImageView.contentMode = .scaleAspectFill
                 recentImageView.layer.cornerRadius = 16
                 recentImageView.clipsToBounds = true
+        contentView.layer.cornerRadius = 16
+        contentView.layer.borderColor = UIColor.gray.cgColor
+        
                 
                 recentLabel.textColor = .white
-                recentLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
-                recentLabel.backgroundColor = UIColor.black.withAlphaComponent(0.45)
-                recentLabel.layer.cornerRadius = 4
                 recentLabel.clipsToBounds = true
 
     }

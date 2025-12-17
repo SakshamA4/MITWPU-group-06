@@ -61,7 +61,7 @@
                                                         <color key="textColor" red="0.99999600649999998" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                         <nil key="highlightedColor"/>
                                                     </label>
-                                                    <slider opaque="NO" contentMode="scaleToFill" selected="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="122" minValue="0.0" maxValue="280" translatesAutoresizingMaskIntoConstraints="NO" id="NIf-9D-Puj">
+                                                    <slider opaque="NO" contentMode="scaleToFill" selected="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="122" minValue="0.0" maxValue="280" continuous="NO" translatesAutoresizingMaskIntoConstraints="NO" id="NIf-9D-Puj">
                                                         <rect key="frame" x="145.5" y="0.0" width="422.5" height="51.5"/>
                                                         <color key="tintColor" red="0.6411132812" green="0.18554688990000001" blue="0.2338867188" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                                     </slider>
@@ -111,6 +111,7 @@
                         <color key="backgroundColor" red="0.042358394709999997" green="0.042358394709999997" blue="0.08166503906" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                         <constraints>
                             <constraint firstAttribute="trailing" secondItem="Wlf-M3-ZAi" secondAttribute="trailing" constant="35" id="M3U-zC-UWG"/>
+                            <constraint firstItem="Wlf-M3-ZAi" firstAttribute="leading" secondItem="jNb-c5-Mzh" secondAttribute="trailing" constant="78" id="cWb-V0-lld"/>
                             <constraint firstAttribute="bottom" secondItem="Wlf-M3-ZAi" secondAttribute="bottom" constant="40" id="fNB-sH-Pk0"/>
                             <constraint firstItem="Wlf-M3-ZAi" firstAttribute="top" secondItem="KDy-5T-onG" secondAttribute="top" constant="40" id="h6Z-yg-dL3"/>
                             <constraint firstAttribute="bottom" secondItem="jNb-c5-Mzh" secondAttribute="bottom" constant="40" id="heH-bD-c8t"/>
@@ -129,8 +130,10 @@
             </constraints>
             <size key="customSize" width="1005" height="416"/>
             <connections>
+                <outlet property="heightSlider" destination="NIf-9D-Puj" id="wGP-Rc-hvV"/>
                 <outlet property="imageView" destination="jNb-c5-Mzh" id="0zJ-Kp-8PG"/>
                 <outlet property="nameTextField" destination="2nf-MN-yUb" id="lsG-RC-GCA"/>
+                <outlet property="view" destination="Wlf-M3-ZAi" id="BUd-KZ-VcF"/>
             </connections>
             <point key="canvasLocation" x="491.34146341463412" y="175.93220338983051"/>
         </collectionViewCell>

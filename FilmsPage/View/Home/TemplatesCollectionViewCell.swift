@@ -20,12 +20,15 @@ class TemplatesCollectionViewCell: UICollectionViewCell {
         templatesImageView.contentMode = .scaleAspectFill
                 templatesImageView.layer.cornerRadius = 16
                 templatesImageView.clipsToBounds = true
-                
+        contentView.layer.cornerRadius = 16
+        contentView.layer.borderWidth = 0.7
+        contentView.layer.borderColor = UIColor.gray.cgColor
+        
                 templateLabel.textColor = .white
-                templateLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+
                 // dark translucent background so text is readable
-                templateLabel.backgroundColor = UIColor.black.withAlphaComponent(0.45)
-                templateLabel.layer.cornerRadius = 4
+
+
                 templateLabel.clipsToBounds = true
     }
 
