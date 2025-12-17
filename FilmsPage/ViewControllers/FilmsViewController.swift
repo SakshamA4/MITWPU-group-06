@@ -16,6 +16,7 @@ class FilmsViewController: UIViewController {
     private let favCellId = "film_cell"
     private let otherCellId = "otherFilm_cell"
 
+    @IBOutlet weak var FilmsPageTitleLabel: UILabel!
     var favouriteFilm: Film!
     var allFilms: [Film] = []
     //let dataStore = DataStore(films: [])
@@ -55,7 +56,7 @@ class FilmsViewController: UIViewController {
             forCellWithReuseIdentifier: "otherFilm_cell"
         )
 
-        // collectionView.register(UINib(nibName: "HeaderView",bundle: nil),forSupplementaryViewOfKind: "header",withReuseIdentifier: "header_cell")
+    
 
     }
 
@@ -63,9 +64,6 @@ class FilmsViewController: UIViewController {
         let layout = UICollectionViewCompositionalLayout {
             section,
             env in
-
-            //            let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(50))
-            //            let headerItem = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize, elementKind: "header", alignment: .top)
 
             if section == 0 {
                 //set item size
@@ -269,7 +267,7 @@ extension FilmsViewController: UICollectionViewDataSource,
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-
+        DataStore.shared.loadData()
         dataStore.updateFilmCounts()
         favouriteFilm = dataStore.getFavFilms()
         allFilms = dataStore.getOtherFilms()

@@ -15,7 +15,7 @@ class HomeHeaderView: UICollectionReusableView {
         super.awakeFromNib()
         // Initialization code
         titleLabel.textColor = .white
-                titleLabel.font = UIFont.systemFont(ofSize: 34, weight: .bold)
+                titleLabel.font = UIFont.systemFont(ofSize: 44, weight: .bold)
     }
     
 }

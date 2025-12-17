@@ -48,7 +48,7 @@ class DataStore {
                 id: UUID(),
                 name: "Plant",
                 imageName: "Plant",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A decorative indoor plant used to add freshness and life to a scene."
             ),
@@ -57,7 +57,7 @@ class DataStore {
                 id: UUID(),
                 name: "Bookshelf",
                 imageName: "Bookshelf",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A wooden bookshelf filled with books, ideal for study rooms or living spaces."
             ),
@@ -66,7 +66,7 @@ class DataStore {
                 id: UUID(),
                 name: "Fridge",
                 imageName: "Fridge",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A modern refrigerator commonly placed in kitchens for storing food and drinks."
             ),
@@ -188,7 +188,7 @@ class DataStore {
                 id: UUID(),
                 name: "Plant",
                 imageName: "Plant",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A decorative indoor plant used to add freshness and life to a scene."
             ),
@@ -197,7 +197,7 @@ class DataStore {
                 id: UUID(),
                 name: "Bookshelf",
                 imageName: "Bookshelf",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A wooden bookshelf filled with books, ideal for study rooms or living spaces."
             ),
@@ -206,7 +206,7 @@ class DataStore {
                 id: UUID(),
                 name: "Fridge",
                 imageName: "Fridge",
-                filmId: self.films[0].id,
+                filmId: [self.films[0].id],
                 description:
                     "A modern refrigerator commonly placed in kitchens for storing food and drinks."
             ),
@@ -546,7 +546,7 @@ class DataStore {
     }
 
     func getPropsbyFilmId(filmId: UUID) -> [PropItem] {
-        return props.filter { $0.filmId == filmId }
+        return props.filter { $0.filmId == [filmId] }
     }
 
     func getProps() -> [PropItem] {
@@ -590,11 +590,11 @@ class DataStore {
         guard let index = props.firstIndex(where: { $0.id == propId }) else {
             return
         }
-        if props[index].filmId == filmId {
+        if props[index].filmId == [filmId] {
             return
         }
 
-        props[index].filmId = filmId
+        props[index].filmId = [filmId]
         saveData()
     }
 

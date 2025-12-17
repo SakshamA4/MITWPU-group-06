@@ -14,6 +14,8 @@ class MyFilmViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
+    @IBOutlet weak var filmName: UILabel!
+    
     private let sequenceCellId = "sequence_cell"
     private let characterCellId = "character_cell"
     private let propCellId = "prop_cell"
@@ -43,7 +45,7 @@ class MyFilmViewController: UIViewController {
 
         collectionView.reloadData()
         
-        navigationItem.title = film?.name ?? "My Film"
+        filmName.text = film?.name ?? "My Film"
     }
     
     func registerCells() {
@@ -263,7 +265,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         }
 
         if segue.identifier == "characterInfoSegue" {
-            let vc = segue.destination as! CharacterViewController
+            let vc = segue.destination as! CharacterDetailsViewController
             vc.character = sender as? CharacterItem
             vc.dataStore = dataStore
         }
@@ -302,10 +304,6 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     }
 }
 
-
-// ---------------------------------------------------------
-// MARK: - HEADER TAP HANDLER
-// ---------------------------------------------------------
 
 extension MyFilmViewController: HeaderViewDelegate {
     func didTapHeader(section: Int) {

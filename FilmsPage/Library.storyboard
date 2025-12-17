@@ -70,7 +70,7 @@
         <scene sceneID="bP1-Th-yME">
             <objects>
                 <viewController storyboardIdentifier="LightsViewController" id="y2u-0j-22m" customClass="LightsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="vD7-RY-c4b">
+                    <view key="view" contentMode="scaleToFill" ambiguous="YES" id="vD7-RY-c4b">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
@@ -317,7 +317,7 @@
             <objects>
                 <viewController id="DRP-x6-efI" customClass="CameraInfoViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="QpP-oF-Cxz">
-                        <rect key="frame" x="0.0" y="0.0" width="580" height="660"/>
+                        <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="617-fS-Irt">
@@ -405,7 +405,7 @@
             <objects>
                 <viewController id="oy3-hf-2AG" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="DFe-M0-UuC">
-                        <rect key="frame" x="0.0" y="0.0" width="473" height="227"/>
+                        <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" distribution="fillEqually" spacing="24" translatesAutoresizingMaskIntoConstraints="NO" id="cNt-hz-Q4W">
@@ -477,7 +477,7 @@
         <scene sceneID="IZL-5w-OnQ">
             <objects>
                 <viewController storyboardIdentifier="LibraryCharactersViewController" id="eXL-V1-ioa" customClass="LibraryCharactersViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" ambiguous="YES" id="vN3-s7-J5b">
+                    <view key="view" contentMode="scaleToFill" id="vN3-s7-J5b">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
@@ -539,7 +539,7 @@
         <scene sceneID="CrA-Sx-wIr">
             <objects>
                 <viewController storyboardIdentifier="LibraryPropsViewController" id="mOH-ZY-vYF" customClass="LibraryPropsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" ambiguous="YES" id="Tfp-j0-5ue">
+                    <view key="view" contentMode="scaleToFill" id="Tfp-j0-5ue">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
@@ -602,7 +602,7 @@
             <objects>
                 <viewController id="cX2-gV-8Yr" customClass="LightsInfoViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Bfv-P9-nfC">
-                        <rect key="frame" x="0.0" y="0.0" width="580" height="660"/>
+                        <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="tAB-Kk-jD9">
@@ -685,10 +685,10 @@
             </objects>
             <point key="canvasLocation" x="2502" y="536"/>
         </scene>
-        <!--Character View Controller-->
+        <!--Character Details View Controller-->
         <scene sceneID="2RI-xn-MP2">
             <objects>
-                <viewController id="deg-Jo-0pe" customClass="CharacterViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="deg-Jo-0pe" customClass="CharacterDetailsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="GEc-hs-esS">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

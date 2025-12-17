@@ -33,16 +33,6 @@ class SceneViewController: UIViewController {
 // MARK: - Setup
 private extension SceneViewController {
     
-//    func setupNavigationBar() {
-//
-//        navigationController?.navigationBar.prefersLargeTitles = false
-//        navigationController?.navigationBar.tintColor = .white
-//
-//        let addButton = UIBarButtonItem(barButtonSystemItem: .add,
-//                                        target: self,
-//                                        action: #selector(addBackgroundTapped))
-//        navigationItem.rightBarButtonItem = addButton
-//    }
     
     func setupCollectionView() {
         //  Register the cell (required if using a XIB)

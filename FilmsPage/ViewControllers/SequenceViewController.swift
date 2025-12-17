@@ -12,6 +12,8 @@ class SequenceViewController: UIViewController {
     var dataStore = DataStore.shared
     @IBOutlet weak var collectionView: UICollectionView!
 
+    @IBOutlet weak var sequenceTitle: UILabel!
+    
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
@@ -54,7 +56,7 @@ class SequenceViewController: UIViewController {
     }
 
     private func updateTitle() {
-        navigationItem.title = sequence?.name ?? "Sequence"
+        sequenceTitle.text = sequence?.name ?? "Sequence"
     }
 
 }
