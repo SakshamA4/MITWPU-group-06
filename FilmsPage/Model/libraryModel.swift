@@ -49,7 +49,7 @@ enum LibraryModel {
             ),
             LibraryItem(
                 title: "Cameras and Movements",
-                imageName: "Cameras and Movements",
+                imageName: "t1",
                 destinationKey: "camerasAndMovements"
             )
         ],

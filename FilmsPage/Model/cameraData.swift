@@ -11,14 +11,14 @@ enum CameraLibraryDataStore {
         .init(
             type: .cameras,
             items: [
-                .init(name: "Default",   imageName: "Image", description: "Standard camera setup for general shooting."),
-                .init(name: "DSLR",      imageName: "Image",    description: "Digital single-lens reflex camera with interchangeable lenses."),
-                .init(name: "Sony",      imageName: "Image",    description: "Sony camera, great for video with strong autofocus."),
-                .init(name: "Canon",     imageName: "Image",   description: "Canon camera, popular for both photo and video."),
-                .init(name: "iPhone",    imageName: "Image",  description: "Mobile shooting with an iPhone or similar smartphone."),
-                .init(name: "GoPro",     imageName: "Image",   description: "Action camera for POV and extreme situations."),
-                .init(name: "Drone",     imageName: "Image",   description: "Aerial camera for high and moving shots."),
-                .init(name: "Arri",      imageName: "Image",    description: "Professional cinema camera used on film sets.")
+                .init(name: "Default",   imageName: "Default", description: "Standard camera setup for general shooting."),
+                .init(name: "DSLR",      imageName: "DSLR",    description: "Digital single-lens reflex camera with interchangeable lenses."),
+                .init(name: "Sony",      imageName: "Sony",    description: "Sony camera, great for video with strong autofocus."),
+                .init(name: "Canon",     imageName: "Canon",   description: "Canon camera, popular for both photo and video."),
+                .init(name: "iPhone",    imageName: "iPhone",  description: "Mobile shooting with an iPhone or similar smartphone."),
+                .init(name: "GoPro",     imageName: "GoPro",   description: "Action camera for POV and extreme situations."),
+                .init(name: "Drone",     imageName: "Drone",   description: "Aerial camera for high and moving shots."),
+                .init(name: "Arri",      imageName: "Arri",    description: "Professional cinema camera used on film sets.")
             ]
         ),
 

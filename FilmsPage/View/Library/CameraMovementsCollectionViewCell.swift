@@ -28,8 +28,8 @@ class CameraMovementsCollectionViewCell: UICollectionViewCell {
     func configure(with item: CameraLibraryItem) {
         cameraMovementLabel.text = item.name
         cameraMovementImage.image = UIImage(named: item.imageName)
-//        featuredImageView.layer.cornerRadius = 12.0
-//        featuredImageView.clipsToBounds = true
+        cameraMovementImage.layer.cornerRadius = 12.0
+        cameraMovementImage.clipsToBounds = true
         }
     
     //Makes it feel more interactive when tapped.

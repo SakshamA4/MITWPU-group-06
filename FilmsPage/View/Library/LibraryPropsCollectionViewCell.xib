@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -17,10 +17,11 @@
                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 <subviews>
                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="ynn-PW-GUM">
-                        <rect key="frame" x="0.0" y="0.0" width="277" height="251"/>
+                        <rect key="frame" x="12" y="12" width="253" height="239"/>
                     </imageView>
                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Yog-TR-qKL">
-                        <rect key="frame" x="0.0" y="251" width="277" height="25"/>
+                        <rect key="frame" x="0.0" y="259" width="277" height="20"/>
+                        <color key="backgroundColor" red="0.078431375319999996" green="0.082352943720000002" blue="0.11372549830000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                         <fontDescription key="fontDescription" type="system" pointSize="20"/>
                         <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <nil key="highlightedColor"/>
@@ -28,15 +29,16 @@
                 </subviews>
             </view>
             <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <color key="backgroundColor" red="0.078431375319999996" green="0.082352943720000002" blue="0.11372549830000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
             <constraints>
-                <constraint firstAttribute="trailing" secondItem="ynn-PW-GUM" secondAttribute="trailing" id="EVB-jE-wMe"/>
-                <constraint firstItem="ynn-PW-GUM" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="HBM-gw-Gyy"/>
+                <constraint firstAttribute="trailing" secondItem="ynn-PW-GUM" secondAttribute="trailing" constant="12" id="EVB-jE-wMe"/>
+                <constraint firstItem="ynn-PW-GUM" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" constant="12" id="HBM-gw-Gyy"/>
                 <constraint firstAttribute="bottom" secondItem="ynn-PW-GUM" secondAttribute="bottom" constant="40" id="WbT-aJ-Nrx"/>
                 <constraint firstAttribute="trailing" secondItem="Yog-TR-qKL" secondAttribute="trailing" id="avl-U0-4si"/>
                 <constraint firstItem="Yog-TR-qKL" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="pMy-Da-MBw"/>
-                <constraint firstItem="Yog-TR-qKL" firstAttribute="top" secondItem="ynn-PW-GUM" secondAttribute="bottom" id="sWz-Pb-fWV"/>
-                <constraint firstAttribute="bottom" secondItem="Yog-TR-qKL" secondAttribute="bottom" constant="15" id="tvb-Wn-m8i"/>
-                <constraint firstItem="ynn-PW-GUM" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="xS9-py-44v"/>
+                <constraint firstItem="Yog-TR-qKL" firstAttribute="top" secondItem="ynn-PW-GUM" secondAttribute="bottom" constant="8" id="sWz-Pb-fWV"/>
+                <constraint firstAttribute="bottom" secondItem="Yog-TR-qKL" secondAttribute="bottom" constant="12" id="tvb-Wn-m8i"/>
+                <constraint firstItem="ynn-PW-GUM" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" constant="12" id="xS9-py-44v"/>
             </constraints>
             <size key="customSize" width="277" height="291"/>
             <connections>
