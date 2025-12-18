@@ -188,7 +188,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             sidebarHeaderView.topAnchor.constraint(equalTo: sidebarView.topAnchor),
             sidebarHeaderView.leadingAnchor.constraint(equalTo: sidebarView.leadingAnchor),
             sidebarHeaderView.trailingAnchor.constraint(equalTo: sidebarView.trailingAnchor),
-            sidebarHeaderView.heightAnchor.constraint(equalToConstant: 44),
+            sidebarHeaderView.heightAnchor.constraint(equalToConstant: 64),
             
             // Title and Close Button constraints are fine:
             sidebarTitleLabel.centerXAnchor.constraint(equalTo: sidebarHeaderView.centerXAnchor),

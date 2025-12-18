@@ -223,8 +223,8 @@ class ItemPickerVC: UIViewController {
             
             let titleLabel = UILabel()
             titleLabel.text = title
-            titleLabel.textColor = .systemGray
-            titleLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            titleLabel.textColor = .white
+            titleLabel.widthAnchor.constraint(equalToConstant: 110).isActive = true
             
             let slider = UISlider()
             slider.minimumValue = min
@@ -235,7 +235,7 @@ class ItemPickerVC: UIViewController {
             let valueLabel = UILabel()
             valueLabel.text = String(format: "%.0f", slider.value)
             valueLabel.textColor = .white
-            valueLabel.widthAnchor.constraint(equalToConstant: 80).isActive = true
+            valueLabel.widthAnchor.constraint(equalToConstant: 60).isActive = true
             
             row.addArrangedSubview(titleLabel)
             row.addArrangedSubview(slider)
@@ -302,21 +302,47 @@ class ItemPickerVC: UIViewController {
                 detailStackView.addArrangedSubview(createInputField(label: "Notes", placeholder: "e.g., Primary A-Cam"))
                 detailStackView.addArrangedSubview(createSystemColorPicker(title: "Color:"))
                 collectionViewHeightConstraint.constant = 250
-                
+ 
             case "Lights":
                 if let layout = itemCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
                     layout.scrollDirection = .horizontal
                 }
                 detailStackView.isHidden = false
-                detailStackHalfWidthConstraint.isActive = true
-                // Rebuild detail stack for Lights
+                
+                // 1. DEACTIVATE the half-width constraint to let the two columns use more space
+                detailStackHalfWidthConstraint.isActive = false
+                
+                // 2. Clear any previous detail views
                 detailStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-                detailStackView.addArrangedSubview(createSliderRow(title: "Intensity:", min: 0, max: 100))
-                detailStackView.addArrangedSubview(createSliderRow(title: "Temperature:", min: 2000, max: 8000))
-                detailStackView.addArrangedSubview(createSliderRow(title: "Shadows:", min: 0, max: 1))
-                detailStackView.addArrangedSubview(createSystemColorPicker(title: "Color:"))
+                
+                // 3. Create a Horizontal Parent Stack to hold the two columns
+                let columnsStack = UIStackView()
+                columnsStack.axis = .horizontal
+                columnsStack.distribution = .fillEqually
+                columnsStack.spacing = 40 // Gap between the left and right side
+                
+                // 4. Create the Left Column (Intensity & Temperature)
+                let leftColumn = UIStackView()
+                leftColumn.axis = .vertical
+                leftColumn.spacing = 15
+                leftColumn.addArrangedSubview(createSliderRow(title: "Intensity:", min: 0, max: 100))
+                leftColumn.addArrangedSubview(createSliderRow(title: "Temperature:", min: 2000, max: 8000))
+                
+                // 5. Create the Right Column (Shadows & Color)
+                let rightColumn = UIStackView()
+                rightColumn.axis = .vertical
+                rightColumn.spacing = 15
+                rightColumn.addArrangedSubview(createSliderRow(title: "Shadows:", min: 0, max: 1))
+                rightColumn.addArrangedSubview(createSystemColorPicker(title: "Color:"))
+                
+                // 6. Assemble the columns into the Parent Stack
+                columnsStack.addArrangedSubview(leftColumn)
+                columnsStack.addArrangedSubview(rightColumn)
+                
+                // 7. Add the assembled columns to your main detailStackView
+                detailStackView.addArrangedSubview(columnsStack)
+                
                 collectionViewHeightConstraint.constant = 250
-            
             case "Wall":
                     detailStackView.isHidden = false
                     detailStackHalfWidthConstraint.isActive = true

@@ -88,7 +88,7 @@ class ItemCardCell: UICollectionViewCell {
         didSet {
                 if isCurrentlySelected {
                     contentView.layer.borderWidth = 3
-                    contentView.layer.borderColor = UIColor.systemRed.cgColor
+                    contentView.layer.borderColor = UIColor.systemGray.cgColor
                 } else {
                     // Restore the standard look when not selected
                     contentView.layer.borderWidth = 0.7
