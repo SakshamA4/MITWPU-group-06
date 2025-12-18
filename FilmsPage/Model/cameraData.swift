@@ -26,11 +26,11 @@ enum CameraLibraryDataStore {
         .init(
             type: .movements,
             items: [
-                .init(name: "Pan",        imageName: "Image",        description: "Camera rotates left or right from a fixed position."),
-                .init(name: "Tilt",       imageName: "Image",       description: "Camera tilts up or down from a fixed position."),
-                .init(name: "Dolly-in",   imageName: "Image",   description: "Camera physically moves closer to the subject."),
-                .init(name: "Dolly-out",  imageName: "Image",  description: "Camera physically moves away from the subject."),
-                .init(name: "Crane/Boom", imageName: "Image", description: "Camera moves up, down or across on a crane/boom.")
+                .init(name: "Pan",        imageName: "Pan",        description: "Camera rotates left or right from a fixed position."),
+                .init(name: "Tilt",       imageName: "Tilt",       description: "Camera tilts up or down from a fixed position."),
+                .init(name: "Dolly-in",   imageName: "Dolly-in",   description: "Camera physically moves closer to the subject."),
+                .init(name: "Dolly-out",  imageName: "Dolly-out",  description: "Camera physically moves away from the subject."),
+                .init(name: "Crane/Boom", imageName: "Crane/Boom", description: "Camera moves up, down or across on a crane/boom.")
             ]
         ),
 
@@ -38,11 +38,11 @@ enum CameraLibraryDataStore {
         .init(
             type: .staticShots,
             items: [
-                .init(name: "Establishing Shot", imageName: "Image", description: "Wide shot that sets up location and context."),
-                .init(name: "Wide Shot",         imageName: "Image",         description: "Shows the subject in their full environment."),
-                .init(name: "Medium Shot",       imageName: "Image",       description: "Frames the subject from waist up."),
-                .init(name: "Close-up",          imageName: "Image",      description: "Tight framing on the subject’s face or detail."),
-                .init(name: "Insert/Cutaway",    imageName: "Image",       description: "Cut to a detail that supports the main action.")
+                .init(name: "Establishing Shot", imageName: "Establishing Shot", description: "Wide shot that sets up location and context."),
+                .init(name: "Wide Shot",         imageName: "Wide Shot",         description: "Shows the subject in their full environment."),
+                .init(name: "Medium Shot",       imageName: "Medium Shot",       description: "Frames the subject from waist up."),
+                .init(name: "Close-up",          imageName: "Close-up",      description: "Tight framing on the subject’s face or detail."),
+                .init(name: "Insert/Cutaway",    imageName: "insert",       description: "Cut to a detail that supports the main action.")
             ]
         ),
     ]

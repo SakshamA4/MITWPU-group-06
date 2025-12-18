@@ -11,7 +11,7 @@ class LibraryCharactersViewController: UIViewController {
 
     @IBOutlet weak var charactersCollectionView: UICollectionView!
 
-    private var dataStore = DataStore.shared   //[CharacterItem]
+    private let characterService = CharacterService.shared
     private var characters: [CharacterItem] = []
     
         override func viewDidLoad() {
@@ -24,7 +24,7 @@ class LibraryCharactersViewController: UIViewController {
                 UINib(nibName: "LibraryCharactersCollectionViewCell", bundle: nil),
                 forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell" )
             
-            characters = DataStore.shared.getCharacters()
+            characters = characterService.getCharacters()
                 
 
         }
@@ -127,14 +127,16 @@ extension LibraryCharactersViewController: UICollectionViewDelegate {
         let selectedCharacter = characters[indexPath.item]
 
         let storyboard = UIStoryboard(name: "Library", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "EditCharacterViewController"
+//        )  else {
+//            return
+//        }
+        let vc = storyboard.instantiateViewController(
             withIdentifier: "EditCharacterViewController"
-        ) as? CharacterViewController else {
-            return
-        }
-
+        )
         // Pass character
-        vc.character = selectedCharacter
+//        vc.character = selectedCharacter
 
         navigationController?.pushViewController(vc, animated: true)
     }

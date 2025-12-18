@@ -7,22 +7,25 @@
 
 import UIKit
 
-protocol AddFilmDelegate {
-    func addFilm(film: Film)
-}
-
 class AddFilmViewController: UIViewController {
-    
     
     @IBOutlet weak var notesTextField: UITextView!
     @IBOutlet weak var nameTextField: UITextField!
-    var delegate: AddFilmDelegate?
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-
-    }
     
+    @IBOutlet weak var mainView: UIView!
+    
+    
+    override func viewDidLoad() {
+        
+        
+        super.viewDidLoad()
+        
+        notesTextField.layer.cornerRadius = 16
+      
+        mainView.layer.cornerRadius = 16
+        mainView.clipsToBounds = true
+        
+    }
     
     @IBAction func addFilm(_ sender: Any) {
         let film = Film(
@@ -35,11 +38,7 @@ class AddFilmViewController: UIViewController {
             image: "Image"
         )
         
-        DataStore.shared.createNewFilm(newFilm: film)
-
-        delegate?.addFilm(film: film)
+        FilmService.shared.addFilm(film)
         dismiss(animated: true)
     }
-
-
 }

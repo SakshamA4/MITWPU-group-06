@@ -12,6 +12,10 @@ class FilmsViewController: UIViewController {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     private let favCellId = "film_cell"
     private let otherCellId = "otherFilm_cell"
@@ -19,8 +23,9 @@ class FilmsViewController: UIViewController {
     @IBOutlet weak var FilmsPageTitleLabel: UILabel!
     var favouriteFilm: Film!
     var allFilms: [Film] = []
-    //let dataStore = DataStore(films: [])
-    let dataStore = DataStore.shared
+    
+    // Services
+    private let filmService = FilmService.shared
 
 
     @IBOutlet weak var collectionView: UICollectionView!
@@ -28,20 +33,32 @@ class FilmsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        DataStore.shared.loadData()
-
-        favouriteFilm = dataStore.getFavFilms()!
-        allFilms = dataStore.getOtherFilms()
+        favouriteFilm = filmService.getFavFilm()!
+        allFilms = filmService.getFilms()
 
         registerCells()
+        setupObservers()
 
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.collectionViewLayout = generateLayout()
 
         collectionView.reloadData()
-
-        // Do any additional setup after loading the view.
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.filmsUpdated),
+            object: nil
+        )
+    }
+    
+    @objc private func refreshData() {
+        favouriteFilm = filmService.getFavFilm()
+        allFilms = filmService.getFilms()
+        collectionView.reloadData()
     }
 
     func registerCells() {
@@ -76,7 +93,7 @@ class FilmsViewController: UIViewController {
 
                 //create the group
                 let groupSize = NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(0.90),
+                    widthDimension: .fractionalWidth(0.88),
                     heightDimension: .estimated(235)
                 )
                 let group = NSCollectionLayoutGroup.horizontal(
@@ -92,9 +109,9 @@ class FilmsViewController: UIViewController {
 
                 item.contentInsets = NSDirectionalEdgeInsets(
                     top: 0,
-                    leading: 8,
+                    leading: 10,
                     bottom: 0,
-                    trailing: 8
+                    trailing: 10
                 )
                 //spacing between next block
                 //section.interGroupSpacing = 10
@@ -164,7 +181,7 @@ class FilmsViewController: UIViewController {
 }
 
 extension FilmsViewController: UICollectionViewDataSource,
-    UICollectionViewDelegate, OtherFilmDelegate, AddFilmDelegate
+    UICollectionViewDelegate, OtherFilmDelegate
 {
     func setFavFilm(film: Film) {
         self.allFilms.append(self.favouriteFilm)
@@ -240,38 +257,12 @@ extension FilmsViewController: UICollectionViewDataSource,
             let film = sender as! Film
             let vc = segue.destination as! MyFilmViewController
             vc.film = film
-            vc.dataStore = dataStore
-        } else if(segue.identifier == "addFilmSegue") {
-            let vc = segue.destination as! AddFilmViewController
-            vc.delegate = self
         }
-        
-    }
-    
-    func addFilm(film: Film) {
-
-        // 1. Move current favourite to allFilms
-        if let fav = favouriteFilm {
-            allFilms.append(fav)
-        }
-
-        // 2. Set new favourite
-        favouriteFilm = film
-
-        // 3. Save to datastore
-        dataStore.createNewFilm(newFilm: film)
-
-        // 4. Reload UI
-        collectionView.reloadData()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        DataStore.shared.loadData()
-        dataStore.updateFilmCounts()
-        favouriteFilm = dataStore.getFavFilms()
-        allFilms = dataStore.getOtherFilms()
-        collectionView.reloadData()
+        refreshData()
     }
 
 

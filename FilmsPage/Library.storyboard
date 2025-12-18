@@ -473,7 +473,7 @@
         <scene sceneID="IZL-5w-OnQ">
             <objects>
                 <viewController storyboardIdentifier="LibraryCharactersViewController" id="eXL-V1-ioa" customClass="LibraryCharactersViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="vN3-s7-J5b">
+<!--                    <view key="view" contentMode="scaleToFill" id="vN3-s7-J5b">-->
                     <view key="view" contentMode="scaleToFill" id="vN3-s7-J5b">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -533,7 +533,7 @@
         <scene sceneID="CrA-Sx-wIr">
             <objects>
                 <viewController storyboardIdentifier="LibraryPropsViewController" id="mOH-ZY-vYF" customClass="LibraryPropsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="Tfp-j0-5ue">
+<!--                    <view key="view" contentMode="scaleToFill" id="Tfp-j0-5ue">-->
                     <view key="view" contentMode="scaleToFill" id="Tfp-j0-5ue">
                         <rect key="frame" x="0.0" y="0.0" width="1210" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

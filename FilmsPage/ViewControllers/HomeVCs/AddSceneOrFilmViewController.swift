@@ -8,37 +8,10 @@
 import UIKit
 
 class AddSceneOrFilmViewController: UIViewController {
-    
-    var addSceneDelegate: SceneLibraryDelegate?
-    var addFilmDelegate: AddFilmDelegate?
 
     override func viewDidLoad() {
         super.viewDidLoad()
     }
-     
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-
-        if segue.identifier == "goToAddSceneToLibrary" {
-            let addSceneVC = segue.destination as! AddSceneToLibrarayViewController
-            addSceneVC.delegate = self.addSceneDelegate
-
-
-            if let nav = presentingViewController as? UINavigationController,
-               let homeVC = nav.viewControllers.first as? HomeViewController {
-                addSceneVC.delegate = homeVC
-            }
-
-        }
-        else if segue.identifier == "goToAddFilm" {
-            let addFilmVC = segue.destination as! AddFilmViewController
-
-            if let nav = presentingViewController as? UINavigationController,
-               let filmsVC = nav.viewControllers.first(where: { $0 is FilmsViewController }) as? FilmsViewController {
-
-                addFilmVC.delegate = filmsVC
-            }
-        }
-    }
-
     
+    // No delegate setup needed - using NotificationCenter
 }

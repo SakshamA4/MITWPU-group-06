@@ -7,19 +7,12 @@
 
 import UIKit
 
-protocol AddCharacterDelegate {
-    func addCharacter(character: CharacterItem)
-}
-
 class AddCharacterViewController: UIViewController {
 
-    var dataStore = DataStore.shared
-    var film: Film?   // The film we are adding characters to
+    private let characterService = CharacterService.shared
+    var film: Film?
 
     @IBOutlet weak var collectionView: UICollectionView!
-    
-    var addCharacterDelegate: AddCharacterDelegate?
-    
 
     var characters: [CharacterItem] = []
     let characterCellId = "character_cell"
@@ -27,7 +20,7 @@ class AddCharacterViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        characters = DataStore.shared.getCharacters()
+        characters = characterService.getCharacters()
 
 
 
@@ -91,9 +84,8 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
             let vc = segue.destination as! CharacterDetailsViewController
             vc.character = sender as? CharacterItem
             vc.film = film
-            vc.dataStore = DataStore.shared
-            vc.delegate = addCharacterDelegate
-        } }
+        }
+    }
     
 
     func collectionView(_ collectionView: UICollectionView,

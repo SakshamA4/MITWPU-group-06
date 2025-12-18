@@ -7,40 +7,33 @@
 
 import UIKit
 
-protocol AddSceneDelegate {
-    
-    func addScene(scene: Scene)
-    
-}
-
 class AddSceneViewController: UIViewController {
     
-    var delegate: AddSceneDelegate?
-    var dataStore = DataStore.shared
-    //var film: Film?
     var sequence: Sequence?
 
     @IBOutlet weak var sceneName: UITextField!
-    
+    @IBOutlet weak var newSceneView: UIView!
+    @IBOutlet weak var sceneNotes: UITextView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
+        
+        newSceneView.layer.cornerRadius = 16
+        newSceneView.clipsToBounds = true
+        
+        sceneNotes.layer.cornerRadius = 16
+        sceneName.layer.cornerRadius = 16
+        
     }
-    
 
     @IBAction func addButtonTapped(_ sender: Any) {
-        
-       // guard let film = film else { return }
         guard let sequence = sequence else { return }
-        guard let name  = sceneName.text, !name.isEmpty else { return }
+        guard let name = sceneName.text, !name.isEmpty else { return }
         
-        let scene = Scene(id: UUID(), name: sceneName.text! , image: "Image", SequenceId: sequence.id)
+        let scene = Scene(id: UUID(), name: name, image: "Image", SequenceId: sequence.id)
         
-        delegate?.addScene(scene: scene)
+        SceneService.shared.addScene(scene)
         dismiss(animated: true)
-        
     }
     /*
     // MARK: - Navigation
