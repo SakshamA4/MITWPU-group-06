@@ -32,8 +32,8 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             view.backgroundColor = UIColor.white.withAlphaComponent(0.1)
             view.layer.cornerRadius = 12
             view.clipsToBounds = true
-            view.layer.borderWidth = 2 // Red border for selected state as per design
-            view.layer.borderColor = UIColor.systemRed.cgColor
+            view.layer.borderWidth = 0.7
+            view.layer.borderColor = UIColor.systemGray2.cgColor
             view.translatesAutoresizingMaskIntoConstraints = false
             return view
         }()
@@ -64,50 +64,48 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             return stack
         }()
         
-        private func createColorPicker(title: String) -> UIView {
-            let row = UIStackView()
-            row.axis = .horizontal
-            row.alignment = .center
-            row.spacing = 16 // Spacing between the title and the color group
-            
-            //Limited the width of the color picker row  ---
-            row.widthAnchor.constraint(equalToConstant: 250).isActive = true
-            
-            let titleLabel = UILabel()
-            titleLabel.text = title
-            titleLabel.textColor = .white
-            titleLabel.widthAnchor.constraint(equalToConstant: 120).isActive = true
-            
-            //Grouping the Swatch and Rainbow Icon
-            let colorControlGroup = UIStackView()
-            colorControlGroup.axis = .horizontal
-            colorControlGroup.alignment = .center
-            colorControlGroup.spacing = 8
-            
-            let colorSwatch = UIView()
-            colorSwatch.backgroundColor = .white
-            colorSwatch.layer.cornerRadius = 4
-            colorSwatch.widthAnchor.constraint(equalToConstant: 16).isActive = true
-            colorSwatch.heightAnchor.constraint(equalToConstant: 16).isActive = true
-            colorSwatch.layer.borderWidth = 1
-            colorSwatch.layer.borderColor = UIColor.systemGray.cgColor // Added slight border for definition
-            
-            let colorWheel = ColorWheelView() // Use the custom radial gradient view
-            colorWheel.widthAnchor.constraint(equalToConstant: 20).isActive = true
-            colorWheel.heightAnchor.constraint(equalToConstant: 20).isActive = true
+    private func createSystemColorPicker(title: String) -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 16
+        
+        // Limits row width to keep controls compact
+        row.widthAnchor.constraint(equalToConstant: 250).isActive = true
 
-            colorControlGroup.addArrangedSubview(colorSwatch)
-            colorControlGroup.addArrangedSubview(colorWheel)
-            
-            row.addArrangedSubview(titleLabel)
-            row.addArrangedSubview(colorControlGroup)
-            
-            // Added a flexible spacer to push the controls to the left (Optional, but ensures control group stays together)
-            let spacer = UIView()
-            row.addArrangedSubview(spacer)
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.textColor = .white
+        titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        titleLabel.widthAnchor.constraint(equalToConstant: 120).isActive = true
 
-            return row
-        }
+        // The Native iOS Color Well
+        let colorWell = UIColorWell()
+        colorWell.selectedColor = .white
+        colorWell.title = title
+        colorWell.supportsAlpha = true // Allows opacity selection
+        colorWell.addTarget(self, action: #selector(colorChanged(_:)), for: .valueChanged)
+        colorWell.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Set size for the well to match your UI scale
+        NSLayoutConstraint.activate([
+            colorWell.widthAnchor.constraint(equalToConstant: 28),
+            colorWell.heightAnchor.constraint(equalToConstant: 28)
+        ])
+
+        row.addArrangedSubview(titleLabel)
+        row.addArrangedSubview(colorWell)
+        
+        // Flexible spacer to keep items left-aligned
+        row.addArrangedSubview(UIView())
+
+        return row
+    }
+
+    @objc private func colorChanged(_ sender: UIColorWell) {
+        guard let color = sender.selectedColor else { return }
+        print("Character \(sender.title ?? "Item") color changed to: \(color)")
+    }
         
     private func createHeightSlider() -> UIView {
             let row = UIStackView()
@@ -150,7 +148,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             let label = UILabel()
             label.text = "Character Poses"
             label.textColor = .white
-            label.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+            label.font = UIFont.systemFont(ofSize: 25, weight: .semibold)
             label.translatesAutoresizingMaskIntoConstraints = false
             return label
         }()
@@ -165,6 +163,8 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
             cv.backgroundColor = .clear
             cv.translatesAutoresizingMaskIntoConstraints = false
             cv.register(PoseCardCell.self, forCellWithReuseIdentifier: PoseCardCell.reuseID) // Register custom cell
+           
+            
             cv.dataSource = self
             cv.delegate = self
             return cv
@@ -179,7 +179,7 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.textAlignment = .center
-        l.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        l.font = UIFont.systemFont(ofSize: 30, weight: .bold)
         l.textColor = .white
         l.translatesAutoresizingMaskIntoConstraints = false
         l.text = "Edit Character"
@@ -272,8 +272,8 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                 
                 // --- Add Controls ---
                 view.addSubview(controlsStackView)
-                controlsStackView.addArrangedSubview(createColorPicker(title: "Shirt Color:"))
-                controlsStackView.addArrangedSubview(createColorPicker(title: "Pant Color:"))
+                controlsStackView.addArrangedSubview(createSystemColorPicker(title: "Shirt Color:"))
+                controlsStackView.addArrangedSubview(createSystemColorPicker(title: "Pant Color:"))
                 controlsStackView.addArrangedSubview(createHeightSlider())
         
         
@@ -296,11 +296,11 @@ class EditCharacterVC: UIViewController,  UICollectionViewDelegate, UICollection
                 NSLayoutConstraint.activate([
                     // Pose Title
                     poseTitleLabel.topAnchor.constraint(equalTo: headerBar.bottomAnchor, constant: padding),
-                    poseTitleLabel.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: 16), // Starts right of the center
+                    poseTitleLabel.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: -60), // Starts right of the center
                     
                     // Pose Collection View (Fills the right half)
                     poseCollectionView.topAnchor.constraint(equalTo: poseTitleLabel.bottomAnchor, constant: 16),
-                    poseCollectionView.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: 16),
+                    poseCollectionView.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: -60),
                     poseCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
                     poseCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -padding)
                 ])
@@ -391,20 +391,21 @@ extension EditCharacterVC{
                 return cell
         }
 
-    // Defining the size for a 3-column grid layout (for poses)
+     //Defining the size for a 3-column grid layout (for poses)
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         
         // Calculated the available width for the grid area
         let availableWidth = collectionView.bounds.width
         
         // 3 items with 2 spaces (16 each)
-        let interItemSpacing: CGFloat = 16 * 2
+        let interItemSpacing: CGFloat = 32
         let width = (availableWidth - interItemSpacing) / 3
         
         // Height to maintain aspect ratio for the card appearance
-        let height: CGFloat = 1.3 * width
+        let height: CGFloat = 1.5 * width
         return CGSize(width: width, height: height)
     }
+    
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         print("Pose selected: \(dynamicPoses[indexPath.row])")

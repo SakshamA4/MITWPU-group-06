@@ -14,6 +14,8 @@ class MyFilmViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
+    @IBOutlet weak var filmName: UILabel!
+    
     private let sequenceCellId = "sequence_cell"
     private let characterCellId = "character_cell"
     private let propCellId = "prop_cell"
@@ -21,21 +23,26 @@ class MyFilmViewController: UIViewController {
     var sequence: [Sequence] = []
     var character: [CharacterItem] = []
     var prop: [PropItem] = []
-    var dataStore = DataStore.shared
     
+    // Services
+    private let sequenceService = SequenceService.shared
+    private let characterService = CharacterService.shared
+    private let propService = PropService.shared
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        
-        sequence = DataStore.shared.getSequenceByFilmID(filmId: film!.id )
-        character = DataStore.shared.getCharactersByFilmId(filmId: film!.id)
-        prop = DataStore.shared.getPropsbyFilmId(filmId: film!.id)
+        refreshData()
         
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
         
         registerCells()
+        setupObservers()
         
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -43,7 +50,36 @@ class MyFilmViewController: UIViewController {
 
         collectionView.reloadData()
         
-        navigationItem.title = film?.name ?? "My Film"
+        filmName.text = film?.name ?? "My Film"
+    }
+    
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.sequencesUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.charactersUpdated),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshData),
+            name: NSNotification.Name(NotificationNames.propsUpdated),
+            object: nil
+        )
+    }
+    
+    @objc private func refreshData() {
+        guard let film = film else { return }
+        sequence = sequenceService.getSequences(forFilmId: film.id)
+        character = characterService.getCharacters(forFilmId: film.id)
+        prop = propService.getProps(forFilmId: film.id)
+        collectionView?.reloadData()
     }
     
     func registerCells() {
@@ -119,48 +155,7 @@ class MyFilmViewController: UIViewController {
 }
 
 
-extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate, AddSequenceDelegate, AddPropDelegate, AddCharacterDelegate {
-    
-    func addCharacter(character: CharacterItem) {
-        DataStore.shared.addCharacter(newCharacter: character)
-        if let film = film {
-            self.character = DataStore.shared.getCharactersByFilmId(filmId: film.id)
-        }
-        collectionView.reloadData()
-    }
-    
-    func addSequence(sequence: Sequence) {
-        
-        // Save into datastore
-        DataStore.shared.createNewSequence(newSequence: sequence)
-
-        // Refresh ONLY sequences for the current film
-        if let film = film {
-            self.sequence = DataStore.shared.getSequenceByFilmID(filmId: film.id)
-        }
-
-        collectionView.reloadData()
-        
-    }
-    
-//    func attachPropToFilm(prop: Prop) {
-//        guard let filmId = film?.id else { return }
-//
-//        DataStore.shared.attachPropToFilm(prop: prop)
-//    }
-
-    
-    func addProp(prop: PropItem) {
-        guard let film = film else { return }
-
-        DataStore.shared.attachPropToFilm(
-            propId: prop.id ?? UUID(),
-            filmId: film.id
-        )
-
-        self.prop = DataStore.shared.getPropsbyFilmId(filmId: film.id)
-        collectionView.reloadData()
-    }
+extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
 
 
@@ -259,53 +254,39 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "sequenceSegue" {
             let vc = segue.destination as! SequenceViewController
             vc.sequence = sender as? Sequence
-            vc.dataStore = dataStore
         }
 
         if segue.identifier == "characterInfoSegue" {
-            let vc = segue.destination as! CharacterViewController
+            let vc = segue.destination as! CharacterDetailsViewController
             vc.character = sender as? CharacterItem
-            vc.dataStore = dataStore
         }
 
         if segue.identifier == "propSegue" {
             let vc = segue.destination as! PropDetailViewController
             vc.prop = sender as? PropItem
-            vc.dataStore = dataStore
         }
 
-        if segue.identifier == "addButtonSegue" {   // the segue that opens AddViewController
+        if segue.identifier == "addButtonSegue" {
             let vc = segue.destination as! AddViewController
-            vc.sequenceDelegate = self
-            vc.propDelegate = self
-            vc.characterDelegate = self
-            vc.dataStore = DataStore.shared
             vc.film = film
         }
         if segue.identifier == "allSequencesSegue" {
             let vc = segue.destination as! AllSequencesViewController
-            vc.dataStore = DataStore.shared
             vc.sequence = sender as! [Sequence]
         }
 
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
-            vc.dataStore = DataStore.shared
             vc.character = sender as! [CharacterItem]
         }
 
         if segue.identifier == "allPropsSegue" {
             let vc = segue.destination as! AllPropsViewController
-            vc.dataStore = DataStore.shared
             vc.prop = sender as! [PropItem]
         }
     }
 }
 
-
-// ---------------------------------------------------------
-// MARK: - HEADER TAP HANDLER
-// ---------------------------------------------------------
 
 extension MyFilmViewController: HeaderViewDelegate {
     func didTapHeader(section: Int) {

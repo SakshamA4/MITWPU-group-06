@@ -12,7 +12,18 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     // MARK: - Data Model
     private var canvasItems: [String: UIView] = [:]
     private let hierarchyCategories = ["Characters", "Cameras", "Props", "Lighting", "Wall", "Background"]
-    // In MyFeatureCanvasVC.swift (Add this near the top with your other properties)
+
+    private let layersButton: UIButton = {
+        let b = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        b.setImage(UIImage(systemName: "square.stack.3d.down.right"), for: .normal)
+        b.tintColor = .label
+        b.backgroundColor = .systemGray6
+        b.layer.cornerRadius = 20 // Makes it a circle
+        b.clipsToBounds = true
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
+    }()
 
     private let categoryToToolMap: [String: String] = [
         "Characters": "Character",
@@ -101,15 +112,15 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             return label
         }()
         
-        private let sidebarCloseButton: UIButton = {
-            let button = UIButton(type: .system)
-            let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-            button.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: config), for: .normal)
-            button.tintColor = .label
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.addTarget(self, action: #selector(didTapLayersButton), for: .touchUpInside) // Use the same toggle function
-            return button
-        }()
+//        private let sidebarCloseButton: UIButton = {
+//            let button = UIButton(type: .system)
+//            let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+//            button.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: config), for: .normal)
+//            button.tintColor = .label
+//            button.translatesAutoresizingMaskIntoConstraints = false
+//            button.addTarget(self, action: #selector(didTapLayersButton), for: .touchUpInside) // Use the same toggle function
+//            return button
+//        }()
     
     private var sidebarLeadingConstraint: NSLayoutConstraint!
     private let sidebarWidth: CGFloat = 260
@@ -144,10 +155,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     func setupNavigationBar() {
         navigationItem.title = "Scene 1"
         let closeButton = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(didTapCloseButton))
-        
-        let layersButton = UIBarButtonItem(image: UIImage(systemName: "square.stack.3d.down.right"), style: .plain, target: self, action: #selector(didTapLayersButton))
-        navigationItem.leftBarButtonItems = [closeButton, layersButton]
-        navigationItem.leftBarButtonItem = layersButton
+        navigationItem.leftBarButtonItem = closeButton
         let undo = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"), style: .plain, target: self, action: nil)
         let redo = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.forward"), style: .plain, target: self, action: nil)
         let more = UIBarButtonItem(image: UIImage(systemName: "ellipsis"), style: .plain, target: self, action: nil)
@@ -174,20 +182,20 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
 
         sidebarView.addSubview(sidebarHeaderView)
         sidebarHeaderView.addSubview(sidebarTitleLabel)
-        sidebarHeaderView.addSubview(sidebarCloseButton)
+        //sidebarHeaderView.addSubview(sidebarCloseButton)
 
         NSLayoutConstraint.activate([
             sidebarHeaderView.topAnchor.constraint(equalTo: sidebarView.topAnchor),
             sidebarHeaderView.leadingAnchor.constraint(equalTo: sidebarView.leadingAnchor),
             sidebarHeaderView.trailingAnchor.constraint(equalTo: sidebarView.trailingAnchor),
-            sidebarHeaderView.heightAnchor.constraint(equalToConstant: 44),
+            sidebarHeaderView.heightAnchor.constraint(equalToConstant: 64),
             
             // Title and Close Button constraints are fine:
             sidebarTitleLabel.centerXAnchor.constraint(equalTo: sidebarHeaderView.centerXAnchor),
             sidebarTitleLabel.centerYAnchor.constraint(equalTo: sidebarHeaderView.centerYAnchor),
             
-            sidebarCloseButton.trailingAnchor.constraint(equalTo: sidebarHeaderView.trailingAnchor, constant: -12),
-            sidebarCloseButton.centerYAnchor.constraint(equalTo: sidebarHeaderView.centerYAnchor)
+//            sidebarCloseButton.trailingAnchor.constraint(equalTo: sidebarHeaderView.trailingAnchor, constant: -12),
+//            sidebarCloseButton.centerYAnchor.constraint(equalTo: sidebarHeaderView.centerYAnchor)
         ])
 
 
@@ -218,12 +226,24 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         //3. Toolbar Setup
         canvasView.addSubview(toolbarContainer)
         toolbarContainer.addSubview(toolStackView)
+        view.addSubview(layersButton)
+        layersButton.addTarget(self, action: #selector(didTapLayersButton), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
             toolbarContainer.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
             toolbarContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            toolbarContainer.heightAnchor.constraint(equalToConstant: 40)
+            toolbarContainer.heightAnchor.constraint(equalToConstant: 40),
+            
+            // 3. Layers Button: Level with Toolbar on the left
+                    layersButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+                    layersButton.centerYAnchor.constraint(equalTo: toolbarContainer.centerYAnchor), // Keeps them perfectly level
+                    layersButton.widthAnchor.constraint(equalToConstant: 40),
+                    layersButton.heightAnchor.constraint(equalToConstant: 40)
         ])
+        
+        // Ensure they are visible above the white canvas
+            view.bringSubviewToFront(toolbarContainer)
+            view.bringSubviewToFront(layersButton)
         
         NSLayoutConstraint.activate([
             toolStackView.topAnchor.constraint(equalTo: toolbarContainer.topAnchor, constant: 4),
@@ -246,6 +266,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             button.addTarget(self, action: action, for: .touchUpInside)
             toolStackView.addArrangedSubview(button)
         }
+       
     }
     
     func createToolbarButton(imageName: String, title: String) -> UIButton {
@@ -278,9 +299,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         }
         
         let layersIcon = isSidebarVisible ? "xmark" : "square.stack.3d.down.right"
-        navigationItem.leftBarButtonItem?.image = UIImage(systemName: layersIcon)
-        
-        print("Sidebar toggled. Visible: \(isSidebarVisible)")
+        layersButton.setImage(UIImage(systemName: layersIcon), for: .normal)
     }
 
     
@@ -292,12 +311,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
     
     
     func presentItemPicker(for toolName: String) {
-//            let storyboard = UIStoryboard(name: "ItemPicker", bundle: nil)
-//            
-//            guard let pickerVC = storyboard.instantiateInitialViewController() as? ItemPickerVC else {
-//                 print("Error: ItemPickerVC not found in ItemPicker.storyboard.")
-//                 return
-//            }
+
             let pickerVC = ItemPickerVC()
             pickerVC.modalTitle = "Add \(toolName)"
             pickerVC.itemType = toolName
@@ -308,6 +322,7 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
             
             pickerVC.onItemSelected = { [weak self] selectedItem in
                 self?.launchEditModal(selectedItemName: selectedItem, itemType: toolName)
+                print("Closure fired for: \(selectedItem)")
             }
 
             present(pickerVC, animated: true)
@@ -486,75 +501,159 @@ class MyFeatureCanvasVC: UIViewController, UIViewControllerTransitioningDelegate
         }
     }
     
-    private func captureCanvasAndShare(isPNG: Bool) {
-        // 1. Define the area to capture (the entire canvasView)
-        let renderer = UIGraphicsImageRenderer(bounds: canvasView.bounds)
+    // Function to handle the final share sheet presentation
+    func shareExportedFile(data: Data, fileName: String, fileType: String) {
         
-        // 2. Render the view hierarchy into an image
-        let image = renderer.image { context in
-            // Ensures all subviews are drawn, including draggable elements
-            canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
-        }
+        // 1. Save the data to a temporary file URL
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+        let fileURL = temporaryDirectory.appendingPathComponent(fileName)
         
-        let data: Data?
-        
-        if isPNG {
-            data = image.pngData()
-        } else {
-            // JPEG compression (0.9 = high quality)
-            data = image.jpegData(compressionQuality: 0.9)
-        }
-        
-        guard let exportData = data, let imageToShare = UIImage(data: exportData) else {
-            print("Error: Could not generate image data for export.")
+        do {
+            try data.write(to: fileURL)
+        } catch {
+            print("Error writing file to temp directory: \(error)")
             return
         }
         
-        // 3. Present the native iOS Share Sheet (UIActivityViewController)
-        let activityViewController = UIActivityViewController(activityItems: [imageToShare], applicationActivities: nil)
+        // 2. Present the standard iOS Share Sheet (UIActivityViewController)
+        let activityViewController = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
         
         // Required for iPad presentation
         if let popoverController = activityViewController.popoverPresentationController {
-            if let barButton = navigationItem.rightBarButtonItems?.last { // Assuming export button is the last one
+            // Find the export button for popover source
+            if let barButton = navigationItem.rightBarButtonItems?.first(where: { $0.action == #selector(didTapExportButton) }) {
                  popoverController.barButtonItem = barButton
             } else {
-                 popoverController.sourceView = self.view
+                popoverController.sourceView = self.view
+                popoverController.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
             }
         }
         
         self.present(activityViewController, animated: true, completion: nil)
     }
+    // Helper function to capture image (used by both PDF and high-res image export)
+    private func captureCanvasImage(scale: CGFloat) -> UIImage? {
+        let bounds = canvasView.bounds
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        // Initialize with only bounds
+        let renderer = UIGraphicsImageRenderer(bounds: bounds, format: format)
+
+        
+        let image = renderer.image { context in
+            canvasView.drawHierarchy(in: bounds, afterScreenUpdates: true)
+        }
+        return image
+    }
+    
+    
+   
+
+    func captureCanvasAndShare(format: String, quality: String? = nil) {
+        
+        // 1. Determine compression quality and scale factor (resolution)
+        let compressionQuality: CGFloat = {
+            if format == "JPEG" {
+                return (quality == "High") ? 0.9 : 0.6
+            }
+            return 1.0
+        }()
+        
+        let scale: CGFloat = (quality == "High") ? 3.0 : 2.0
+        
+        // 2. Define the area and renderer
+        let renderer = UIGraphicsImageRenderer(bounds: canvasView.bounds)
+    
+
+        // 3. Render the view hierarchy into an image
+        let image = renderer.image { context in
+            canvasView.drawHierarchy(in: canvasView.bounds, afterScreenUpdates: true)
+        }
+        
+        let data: Data?
+        let fileExtension: String
+        let fileType: String
+        
+        if format == "PNG" {
+            data = image.pngData()
+            fileExtension = "png"
+            fileType = "image/png"
+        } else { // JPEG or default
+            data = image.jpegData(compressionQuality: compressionQuality)
+            fileExtension = "jpeg"
+            fileType = "image/jpeg"
+        }
+        
+        guard let exportData = data else {
+            print("Error: Could not generate image data for export.")
+            return
+        }
+        
+        // 4. Share the image file data
+        shareExportedFile(data: exportData, fileName: "Scene_Canvas_Export.\(fileExtension)", fileType: fileType)
+    }
+    
+    func exportCanvasAsPDF(quality: String) {
+        let scale: CGFloat = (quality == "High") ? 3.0 : 2.0
+        
+        guard let canvasImage = captureCanvasImage(scale: scale) else {
+            print("Error: Failed to capture canvas image for PDF export.")
+            return
+        }
+        
+        guard let pdfData = createPDFData(from: canvasImage) else {
+            print("Error: Failed to create PDF data.")
+            return
+        }
+        
+        shareExportedFile(data: pdfData, fileName: "Scene_Canvas_Export.pdf", fileType: "application/pdf")
+    }
+    
+    func createPDFData(from image: UIImage) -> Data? {
+        // We choose a standard PDF page size, like A4, defined in points (1 point = 1/72 inch).
+        let pageSize = CGRect(x: 0, y: 0, width: 595, height: 842) // Standard A4 points (approx)
+        let pdfData = NSMutableData()
+        
+        // 1. Begin the PDF graphics context, writing to the pdfData buffer.
+        UIGraphicsBeginPDFContextToData(pdfData, pageSize, nil)
+        
+        // 2. Start the first (and in this case, only) page.
+        UIGraphicsBeginPDFPage()
+        
+        // 3. Determine the drawing rectangle to maintain aspect ratio on the PDF page.
+        let imageAspectRatio = image.size.width / image.size.height
+        let pdfWidth = pageSize.width
+        let pdfHeight = pdfWidth / imageAspectRatio
+        
+        // 4. Draw the captured image onto the page.
+        image.draw(in: CGRect(x: 0, y: 0, width: pdfWidth, height: pdfHeight))
+        
+        // 5. Finalize and close the PDF context.
+        UIGraphicsEndPDFContext()
+        
+        return pdfData as Data
+    }
     
     @objc func didTapExportButton() {
-        print("Export button tapped. Presenting Export Options modal.")
-        
-        // 1. Instantiate the new ExportVC
         let exportVC = ExportVC()
         
-        // 2. Set the completion closure
-        exportVC.onFormatSelected = { [weak self] format in
-            guard let self = self else { return }
+        // FIX IS HERE: Using onExportSelected
+        exportVC.onExportSelected = { [weak self] format, quality in
             
-            // Dismiss the modal first, then perform the action
-            exportVC.dismiss(animated: true) {
-                print("Selected format: \(format)")
-                
+            self?.dismiss(animated: true) {
+                // Dismissal happens first, then execution
                 switch format {
-                case "JPEG":
-                    self.captureCanvasAndShare(isPNG: false)
-                case "PNG":
-                    self.captureCanvasAndShare(isPNG: true)
+                case "JPEG", "PNG":
+                    self?.captureCanvasAndShare(format: format, quality: quality)
                 case "PDF":
-                    print("PDF Export not implemented yet.")
-                case "MP4":
-                    print("MP4 Export not implemented yet.")
+                    self?.exportCanvasAsPDF(quality: quality)
                 default:
-                    break
+                    print("Unsupported export format selected.")
                 }
             }
         }
         
-        // 3. Apply custom presentation settings (assuming you use the BottomSheetPresentationController)
+        // Set the custom presentation delegates
         exportVC.modalPresentationStyle = .custom
         exportVC.transitioningDelegate = self
         

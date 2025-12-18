@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Main Character in Library
 
-struct CharacterItem {
+struct CharacterItem: Codable {
     var id: UUID?
     var name: String
     var imageName: String

@@ -22,8 +22,12 @@ class CharacterPosesCollectionViewCell: UICollectionViewCell {
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
 
-        imageView.layer.cornerRadius = 20
+        imageView.layer.cornerRadius = 16
         imageView.layer.masksToBounds = true
+        imageView.layer.maskedCorners = [
+            .layerMinXMinYCorner,
+            .layerMaxXMinYCorner
+        ]
         contentView.layer.borderWidth = 1
         contentView.layer.borderColor = UIColor.lightGray.cgColor
     }

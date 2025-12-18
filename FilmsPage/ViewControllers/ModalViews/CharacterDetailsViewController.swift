@@ -6,7 +6,7 @@
 //
 import UIKit
 
-class CharacterViewController: UIViewController {
+class CharacterDetailsViewController: UIViewController {
     
     @IBOutlet weak var characterTitle: UILabel!
     @IBOutlet weak var collectionView: UICollectionView!
@@ -17,16 +17,14 @@ class CharacterViewController: UIViewController {
     // Film passed from previous screen
     var film: Film?
     
-    // Shared DataStore
-    var dataStore: DataStore = DataStore.shared
+    // Character Service
+    private let characterService = CharacterService.shared
     
     // Characters for this film
     var characters: [CharacterItem] = []
     
     // The currently selected character
     var character: CharacterItem?
-    
-    var delegate: AddCharacterDelegate?
     
     private let posesCellId = "poses_cell"
     private let infoCellId = "info_cell"
@@ -41,9 +39,9 @@ class CharacterViewController: UIViewController {
         
         // Load characters belonging to the film
         if let film = film {
-            characters = dataStore.getCharactersByFilmId(filmId: film.id)
+            characters = characterService.getCharacters(forFilmId: film.id)
         } else {
-            characters = dataStore.getCharacters()
+            characters = characterService.getCharacters()
         }
         
         updateTitle()
@@ -67,12 +65,16 @@ class CharacterViewController: UIViewController {
         
         collectionView.register(UINib(nibName: "CharacterPosesCollectionViewCell", bundle: nil),
                                 forCellWithReuseIdentifier: posesCellId)
+        collectionView.register(UINib(nibName: "PoseTitleCollectionReusableView",bundle: nil),forSupplementaryViewOfKind: "header",withReuseIdentifier: "header_cell")
     }
     
     
     // MARK: - Layout
     func createLayout() -> UICollectionViewCompositionalLayout {
         return UICollectionViewCompositionalLayout { section, _ in
+            
+            let headerSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(50))
+            let headerItem = NSCollectionLayoutBoundarySupplementaryItem(layoutSize: headerSize, elementKind: "header", alignment: .top)
             
             if section == 0 {
                 // Large info cell section
@@ -100,7 +102,7 @@ class CharacterViewController: UIViewController {
                 // Section 1 → Horizontal pose cells
                 let item = NSCollectionLayoutItem(
                     layoutSize: .init(
-                        widthDimension: .fractionalWidth(1),
+                        widthDimension: .fractionalWidth(1.0),
                         heightDimension: .fractionalHeight(1)
                     )
                 )
@@ -115,8 +117,9 @@ class CharacterViewController: UIViewController {
                 
                 let section = NSCollectionLayoutSection(group: group)
                 section.orthogonalScrollingBehavior = .continuous
-                section.contentInsets = .init(top: 10, leading: 10, bottom: 10, trailing: 10)
-                section.interGroupSpacing = 10
+                section.contentInsets = .init(top: 10, leading: 30, bottom: 10, trailing: 10)
+                section.interGroupSpacing = 20
+                section.boundarySupplementaryItems = [headerItem]
                 
                 return section
             }
@@ -131,17 +134,13 @@ class CharacterViewController: UIViewController {
             return
         }
 
-        // 2. Create a NEW character instance for this film
-        selectedCharacter.id = UUID()          // important: avoid overwriting template
-        selectedCharacter.filmId = film.id     // attach character to this film
-        if(characterNameInput != "" ){
-            selectedCharacter.name = characterNameInput        }
+        selectedCharacter.id = UUID()
+        selectedCharacter.filmId = film.id
+        if characterNameInput != "" {
+            selectedCharacter.name = characterNameInput
+        }
 
-        // 3. Notify parent (MyFilmViewController)
-        delegate?.addCharacter(character: selectedCharacter)
-
-        // 4. Navigate back (PUSH navigation, not modal)
-//        navigationController?.popToRootViewController(animated: true)
+        characterService.addCharacter(selectedCharacter)
         dismiss(animated: true)
     }
     
@@ -150,7 +149,10 @@ class CharacterViewController: UIViewController {
 
 
 // MARK: - Data Source
-extension CharacterViewController: UICollectionViewDataSource, UpdateCharacterInfoDelegate {
+extension CharacterDetailsViewController: UICollectionViewDataSource, UpdateCharacterInfoDelegate {
+    func updateHeight(value: Float) {
+    }
+    
     
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         2
@@ -194,22 +196,38 @@ extension CharacterViewController: UICollectionViewDataSource, UpdateCharacterIn
         return cell
     }
     
-    func updateName(text: String) {
-//        print("ext", text)
-        characterNameInput = text
-    }
-}
-
-
-// MARK: - Delegate (optional)
-extension CharacterViewController: UICollectionViewDelegate {
- 
-    
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    func collectionView(_ collectionView: UICollectionView,
+                        viewForSupplementaryElementOfKind kind: String,
+                        at indexPath: IndexPath) -> UICollectionReusableView {
         
-        guard indexPath.section == 1 else { return }
-
+                let headerView = collectionView.dequeueReusableSupplementaryView(
+                    ofKind: "header",
+                    withReuseIdentifier: "header_cell",
+                    for: indexPath) as! PoseTitleCollectionReusableView
+        
+                if indexPath.section == 1 {
+                    headerView.configureCell()
+                }
+                return headerView
+            }
+        
+        func updateName(text: String) {
+            //        print("ext", text)
+            characterNameInput = text
+        }
     }
     
     
-}
+    // MARK: - Delegate (optional)
+    extension CharacterDetailsViewController: UICollectionViewDelegate {
+        
+        
+        func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+            
+            guard indexPath.section == 1 else { return }
+            
+        }
+        
+        
+    }
+    

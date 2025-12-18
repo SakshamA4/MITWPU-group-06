@@ -7,30 +7,22 @@
 
 import UIKit
 
-protocol AddCharacterDelegate {
-    func addCharacter(character: CharacterItem)
-}
-
 class AddCharacterViewController: UIViewController {
 
-    var dataStore = DataStore.shared
-    var film: Film?   // The film we are adding characters to
+    private let characterService = CharacterService.shared
+    var film: Film?
 
     @IBOutlet weak var collectionView: UICollectionView!
-    
-    var addCharacterDelegate: AddCharacterDelegate?
-    
 
     var characters: [CharacterItem] = []
     let characterCellId = "character_cell"
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        //DataStore.shared.loadData()
-        // Load ALL characters from the datastore
-        characters = DataStore.shared.getCharacters()
 
-//        navigationItem.title = "All Characters"
+        characters = characterService.getCharacters()
+
+
 
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
@@ -89,12 +81,11 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "characterDetailSegue" {
-            let vc = segue.destination as! CharacterViewController
+            let vc = segue.destination as! CharacterDetailsViewController
             vc.character = sender as? CharacterItem
             vc.film = film
-            vc.dataStore = DataStore.shared
-            vc.delegate = addCharacterDelegate
-        } }
+        }
+    }
     
 
     func collectionView(_ collectionView: UICollectionView,
@@ -108,7 +99,7 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
 
         let width = (collectionView.bounds.width - spacing) / columns
 
-        return CGSize(width: width, height: width - 20)
+        return CGSize(width: width, height: width - 40)
     }
 
     func collectionView(_ collectionView: UICollectionView,
