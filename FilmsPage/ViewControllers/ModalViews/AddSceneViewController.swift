@@ -12,9 +12,18 @@ class AddSceneViewController: UIViewController {
     var sequence: Sequence?
 
     @IBOutlet weak var sceneName: UITextField!
+    @IBOutlet weak var newSceneView: UIView!
+    @IBOutlet weak var sceneNotes: UITextView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        newSceneView.layer.cornerRadius = 16
+        newSceneView.clipsToBounds = true
+        
+        sceneNotes.layer.cornerRadius = 16
+        sceneName.layer.cornerRadius = 16
+        
     }
 
     @IBAction func addButtonTapped(_ sender: Any) {

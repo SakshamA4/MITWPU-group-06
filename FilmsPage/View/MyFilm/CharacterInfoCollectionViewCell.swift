@@ -19,9 +19,10 @@ class CharacterInfoCollectionViewCell: UICollectionViewCell {
     var updateDelegate: UpdateCharacterInfoDelegate?
     @IBOutlet weak var view: UIView!
     
-    @IBOutlet weak var heightSlider: UISlider!
+    @IBOutlet weak var heightTextField: UITextField!
     
-    override func awakeFromNib() {
+    
+        override func awakeFromNib() {
         super.awakeFromNib()
         // Initialization code
         imageView.layer.cornerRadius = 16
@@ -30,8 +31,7 @@ class CharacterInfoCollectionViewCell: UICollectionViewCell {
         view.clipsToBounds = true
         view.layer.borderWidth = 0.7
         view.layer.borderColor = UIColor.gray.cgColor
-        
-
+            
 
     }
     
@@ -43,7 +43,13 @@ class CharacterInfoCollectionViewCell: UICollectionViewCell {
             imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
         }
         updateDelegate = delegate
-        heightSlider.value = 150
+       
+    }
+    
+
+    @IBAction func heightChanged(_ sender: Any) {
+        
+        updateDelegate?.updateHeight(value: (sender as AnyObject).value ?? 0)
     }
     
     @IBAction func onNameChanged(_ sender: UITextField) {

@@ -93,7 +93,7 @@ class FilmsViewController: UIViewController {
 
                 //create the group
                 let groupSize = NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(0.90),
+                    widthDimension: .fractionalWidth(0.88),
                     heightDimension: .estimated(235)
                 )
                 let group = NSCollectionLayoutGroup.horizontal(
@@ -109,9 +109,9 @@ class FilmsViewController: UIViewController {
 
                 item.contentInsets = NSDirectionalEdgeInsets(
                     top: 0,
-                    leading: 8,
+                    leading: 10,
                     bottom: 0,
-                    trailing: 8
+                    trailing: 10
                 )
                 //spacing between next block
                 //section.interGroupSpacing = 10

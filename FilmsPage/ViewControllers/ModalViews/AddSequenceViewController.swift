@@ -12,10 +12,16 @@ class AddSequenceViewController: UIViewController {
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
     
+    @IBOutlet weak var newSequenceView: UIView!
+    
     var film: Film?
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        notesTextField.layer.cornerRadius = 16
+        nameTextField.layer.cornerRadius = 16
+        newSequenceView.layer.cornerRadius = 16
     }
     
     @IBAction func AddNewSequence(_ sender: Any) {

@@ -12,8 +12,19 @@ class AddFilmViewController: UIViewController {
     @IBOutlet weak var notesTextField: UITextView!
     @IBOutlet weak var nameTextField: UITextField!
     
+    @IBOutlet weak var mainView: UIView!
+    
+    
     override func viewDidLoad() {
+        
+        
         super.viewDidLoad()
+        
+        notesTextField.layer.cornerRadius = 16
+      
+        mainView.layer.cornerRadius = 16
+        mainView.clipsToBounds = true
+        
     }
     
     @IBAction func addFilm(_ sender: Any) {
