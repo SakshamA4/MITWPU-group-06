@@ -6,8 +6,12 @@
 //
 import Foundation
 
-struct PropItem {
-    let name: String
-    let imageName: String
-    let description: String
+struct PropItem: Codable {
+    var id: UUID?
+    var name: String
+    var imageName: String
+    var filmId: [UUID?]?
+    var description: String
+    var surfaceTexture: String?
+    var colour: String?
 }

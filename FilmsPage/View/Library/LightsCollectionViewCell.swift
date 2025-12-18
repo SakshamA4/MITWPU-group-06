@@ -50,7 +50,7 @@ private extension LightsCollectionViewCell {
             
             // Label style
             //featuredLabel.textColor = .white
-        lightsLabel.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+//        lightsLabel.font = UIFont.systemFont(ofSize: 20, weight: .regular)
             
         }
 

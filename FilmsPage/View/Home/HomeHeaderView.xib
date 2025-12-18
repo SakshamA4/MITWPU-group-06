@@ -14,7 +14,7 @@
             <autoresizingMask key="autoresizingMask"/>
             <subviews>
                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="vtJ-9Y-NIh">
-                    <rect key="frame" x="20" y="0.0" width="76" height="50"/>
+                    <rect key="frame" x="40" y="0.0" width="76" height="50"/>
                     <fontDescription key="fontDescription" type="system" pointSize="32"/>
                     <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                     <nil key="highlightedColor"/>
@@ -24,7 +24,7 @@
             <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
             <constraints>
                 <constraint firstItem="vtJ-9Y-NIh" firstAttribute="top" secondItem="U6b-Vx-4bR" secondAttribute="top" id="7lC-Ty-0oi"/>
-                <constraint firstItem="vtJ-9Y-NIh" firstAttribute="leading" secondItem="U6b-Vx-4bR" secondAttribute="leading" constant="20" id="WY2-Bc-xXf"/>
+                <constraint firstItem="vtJ-9Y-NIh" firstAttribute="leading" secondItem="U6b-Vx-4bR" secondAttribute="leading" constant="40" id="WY2-Bc-xXf"/>
                 <constraint firstAttribute="bottom" secondItem="vtJ-9Y-NIh" secondAttribute="bottom" id="vhN-3I-9U5"/>
             </constraints>
             <connections>

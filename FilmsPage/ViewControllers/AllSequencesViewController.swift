@@ -18,8 +18,6 @@ class AllSequencesViewController: UIViewController , UICollectionViewDataSource 
     @IBOutlet weak var collectionView: UICollectionView!
     
     private let sequenceCellId = "sequence_cell"
-
-    var dataStore: DataStore?
     
     override func viewDidLoad() {
         super.viewDidLoad()

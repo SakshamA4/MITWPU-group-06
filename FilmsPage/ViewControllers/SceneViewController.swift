@@ -33,16 +33,6 @@ class SceneViewController: UIViewController {
 // MARK: - Setup
 private extension SceneViewController {
     
-//    func setupNavigationBar() {
-//
-//        navigationController?.navigationBar.prefersLargeTitles = false
-//        navigationController?.navigationBar.tintColor = .white
-//
-//        let addButton = UIBarButtonItem(barButtonSystemItem: .add,
-//                                        target: self,
-//                                        action: #selector(addBackgroundTapped))
-//        navigationItem.rightBarButtonItem = addButton
-//    }
     
     func setupCollectionView() {
         //  Register the cell (required if using a XIB)
@@ -74,9 +64,9 @@ private extension SceneViewController {
         let lineSpacing: CGFloat = 35
         
         layout.sectionInset = UIEdgeInsets(
-            top: 32,
+            top: 0,
             left: sectionInset,
-            bottom: 32,
+            bottom: 0,
             right: sectionInset
         )
         layout.minimumInteritemSpacing = interItemSpacing

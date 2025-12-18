@@ -20,7 +20,7 @@ class BackgroundCollectionViewCell: UICollectionViewCell {
            super.awakeFromNib()
            
            setupUI()
-           setupGradient()
+//           setupGradient()
        }
        
        override func layoutSubviews() {
@@ -45,19 +45,19 @@ class BackgroundCollectionViewCell: UICollectionViewCell {
            backgroundImageView.contentMode = .scaleAspectFill
            backgroundImageView.clipsToBounds = true
            
-           titleLabel.textColor = .white
-           titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-           titleLabel.numberOfLines = 2
+//           titleLabel.textColor = .white
+//           titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+//           titleLabel.numberOfLines = 2
        }
        
-       func setupGradient() {
-           gradientLayer.colors = [
-               UIColor(hex: "#00000000").cgColor, // transparent top
-               UIColor(hex: "#00000099").cgColor  // black 60% bottom
-           ]
-           gradientLayer.locations = [0.0, 1.0]
-           gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
-           gradientLayer.endPoint = CGPoint(x: 0.0, y: 1.0)
-           backgroundImageView.layer.addSublayer(gradientLayer)
-       }
+//       func setupGradient() {
+//           gradientLayer.colors = [
+//               UIColor(hex: "#00000000").cgColor, // transparent top
+//               UIColor(hex: "#00000099").cgColor  // black 60% bottom
+//           ]
+//           gradientLayer.locations = [0.0, 1.0]
+//           gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
+//           gradientLayer.endPoint = CGPoint(x: 0.0, y: 1.0)
+//           backgroundImageView.layer.addSublayer(gradientLayer)
+//       }
    }

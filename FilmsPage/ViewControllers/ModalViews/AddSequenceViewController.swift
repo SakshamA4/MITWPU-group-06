@@ -7,22 +7,21 @@
 
 import UIKit
 
-protocol AddSequenceDelegate {
-    func addSequence(sequence: Sequence)
-}
-
 class AddSequenceViewController: UIViewController {
     
-    var delegate: AddSequenceDelegate?
-    var dataStore = DataStore.shared
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var notesTextField: UITextView!
-
+    
+    @IBOutlet weak var newSequenceView: UIView!
+    
     var film: Film?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
+        
+        notesTextField.layer.cornerRadius = 16
+        nameTextField.layer.cornerRadius = 16
+        newSequenceView.layer.cornerRadius = 16
     }
     
     @IBAction func AddNewSequence(_ sender: Any) {
@@ -31,23 +30,12 @@ class AddSequenceViewController: UIViewController {
 
         let sequence = Sequence(
             id: UUID(),
-            name: nameTextField.text!,
+            name: name,
             image: "Image",
-            filmId: film.id   // attach to the correct film!// ← use existing film id
+            filmId: film.id
         )
         
-        delegate?.addSequence(sequence: sequence)
+        SequenceService.shared.addSequence(sequence)
         dismiss(animated: true)
     }
-    
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
-    }
-    */
-
 }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -17,25 +17,26 @@
                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                 <subviews>
                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="sVz-ks-fd5">
-                        <rect key="frame" x="0.0" y="223" width="249" height="24"/>
+                        <rect key="frame" x="0.0" y="227" width="249" height="24"/>
                         <fontDescription key="fontDescription" type="system" pointSize="20"/>
                         <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <nil key="highlightedColor"/>
                     </label>
                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="pu3-Xb-Fnz">
-                        <rect key="frame" x="0.0" y="0.0" width="249" height="207"/>
+                        <rect key="frame" x="12" y="12" width="225" height="207"/>
                     </imageView>
                 </subviews>
             </view>
             <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <color key="backgroundColor" red="0.078431375319999996" green="0.082352943720000002" blue="0.11372549830000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
             <constraints>
-                <constraint firstAttribute="bottom" secondItem="sVz-ks-fd5" secondAttribute="bottom" constant="16" id="CMs-VP-xsp"/>
+                <constraint firstAttribute="bottom" secondItem="sVz-ks-fd5" secondAttribute="bottom" constant="12" id="CMs-VP-xsp"/>
                 <constraint firstAttribute="trailing" secondItem="sVz-ks-fd5" secondAttribute="trailing" id="EfO-Ue-Vrz"/>
-                <constraint firstItem="pu3-Xb-Fnz" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="GuQ-Gf-HBj"/>
+                <constraint firstItem="pu3-Xb-Fnz" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" constant="12" id="GuQ-Gf-HBj"/>
                 <constraint firstItem="sVz-ks-fd5" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="dCR-26-DOv"/>
-                <constraint firstAttribute="trailing" secondItem="pu3-Xb-Fnz" secondAttribute="trailing" id="fDl-Nv-smA"/>
-                <constraint firstItem="sVz-ks-fd5" firstAttribute="top" secondItem="pu3-Xb-Fnz" secondAttribute="bottom" constant="16" id="iNF-mI-BkE"/>
-                <constraint firstItem="pu3-Xb-Fnz" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="zch-Lt-teB"/>
+                <constraint firstAttribute="trailing" secondItem="pu3-Xb-Fnz" secondAttribute="trailing" constant="12" id="fDl-Nv-smA"/>
+                <constraint firstItem="sVz-ks-fd5" firstAttribute="top" secondItem="pu3-Xb-Fnz" secondAttribute="bottom" constant="8" id="iNF-mI-BkE"/>
+                <constraint firstItem="pu3-Xb-Fnz" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" constant="12" id="zch-Lt-teB"/>
             </constraints>
             <size key="customSize" width="249" height="263"/>
             <connections>
