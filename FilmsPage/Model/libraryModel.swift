@@ -66,7 +66,7 @@ enum LibraryModel {
             ),
             LibraryItem(
                 title: "Lights",
-                imageName: "Lights",
+                imageName: "lights",
                 destinationKey: "lights"
             ),
             LibraryItem(

@@ -66,35 +66,6 @@ class LibraryCharactersViewController: UIViewController {
         layout.scrollDirection = .vertical
     }
 
-//        private func configureLayout() {
-//            guard let layout = charactersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
-//                let newLayout = UICollectionViewFlowLayout()
-//                charactersCollectionView.setCollectionViewLayout(newLayout, animated: false)
-//                configureLayout()
-//                return
-//            }
-//
-//            let columns: CGFloat = 3        // visually your characters have 3 per row on iPad
-//            let spacing: CGFloat = 32
-//            let sideInset: CGFloat = 64
-//            let verticalInset: CGFloat = 40
-//
-//            let width = charactersCollectionView.bounds.width
-//            guard width > 0 else { return }
-//
-//            let totalSpacing = spacing * (columns - 1) + sideInset * 2
-//            let itemWidth = floor((width - totalSpacing) / columns)
-//            let itemHeight = itemWidth * 0.75   // wider rectangle (thumbnail + label)
-//
-//            layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
-//            layout.minimumInteritemSpacing = spacing
-//            layout.minimumLineSpacing = spacing
-//            layout.sectionInset = UIEdgeInsets(top: verticalInset,
-//                                               left: sideInset,
-//                                               bottom: verticalInset,
-//                                               right: sideInset)
-//            layout.scrollDirection = .vertical
-//        }
     
     }
 
@@ -126,17 +97,15 @@ extension LibraryCharactersViewController: UICollectionViewDelegate {
 
         let selectedCharacter = characters[indexPath.item]
 
-        let storyboard = UIStoryboard(name: "Library", bundle: nil)
-//        guard let vc = storyboard.instantiateViewController(
-//            withIdentifier: "EditCharacterViewController"
-//        )  else {
-//            return
-//        }
-        let vc = storyboard.instantiateViewController(
-            withIdentifier: "EditCharacterViewController"
-        )
-        // Pass character
-//        vc.character = selectedCharacter
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        guard let vc = storyboard.instantiateViewController(
+            withIdentifier: "CharacterDetailsViewController"
+        ) as? CharacterDetailsViewController else {
+            return
+        }
+        
+        vc.character = selectedCharacter
+
 
         navigationController?.pushViewController(vc, animated: true)
     }

@@ -28,9 +28,9 @@ class LibrarySceneCollectionViewCell: UICollectionViewCell {
            gradientLayer.frame = sceneImageView.bounds
        }
        
-       func configure(with item: SceneItem) {
-           sceneImageView.image = UIImage(named: item.imageName)
-           titleLabel.text = item.title
+       func configure(with item: ScenesModel) {
+           sceneImageView.image = UIImage(named: item.image)
+           titleLabel.text = item.name
        }
    }
 
