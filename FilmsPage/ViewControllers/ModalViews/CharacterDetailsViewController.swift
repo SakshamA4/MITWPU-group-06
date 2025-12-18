@@ -17,16 +17,14 @@ class CharacterDetailsViewController: UIViewController {
     // Film passed from previous screen
     var film: Film?
     
-    // Shared DataStore
-    var dataStore: DataStore = DataStore.shared
+    // Character Service
+    private let characterService = CharacterService.shared
     
     // Characters for this film
     var characters: [CharacterItem] = []
     
     // The currently selected character
     var character: CharacterItem?
-    
-    var delegate: AddCharacterDelegate?
     
     private let posesCellId = "poses_cell"
     private let infoCellId = "info_cell"
@@ -41,9 +39,9 @@ class CharacterDetailsViewController: UIViewController {
         
         // Load characters belonging to the film
         if let film = film {
-            characters = dataStore.getCharactersByFilmId(filmId: film.id)
+            characters = characterService.getCharacters(forFilmId: film.id)
         } else {
-            characters = dataStore.getCharacters()
+            characters = characterService.getCharacters()
         }
         
         updateTitle()
@@ -136,14 +134,13 @@ class CharacterDetailsViewController: UIViewController {
             return
         }
 
-        selectedCharacter.id = UUID()          // important: avoid overwriting template
-        selectedCharacter.filmId = film.id     // attach character to this film
-        if(characterNameInput != "" ){
-            selectedCharacter.name = characterNameInput        }
+        selectedCharacter.id = UUID()
+        selectedCharacter.filmId = film.id
+        if characterNameInput != "" {
+            selectedCharacter.name = characterNameInput
+        }
 
-        delegate?.addCharacter(character: selectedCharacter)
-
-
+        characterService.addCharacter(selectedCharacter)
         dismiss(animated: true)
     }
     

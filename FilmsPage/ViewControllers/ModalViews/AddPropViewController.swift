@@ -7,27 +7,20 @@
 
 import UIKit
 
-protocol AddPropDelegate {
-    func addProp(prop: PropItem)
-}
-
-
 class AddPropViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
     var prop: [PropItem] = []
-    var dataStore = DataStore.shared
+    private let propService = PropService.shared
     var film: Film?
     let propCellId = "prop_cell"
-    var delegate: AddPropDelegate?
 
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
-      //  DataStore.shared.loadData()
-        prop = DataStore.shared.getProps()
+        prop = propService.getProps()
         
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
@@ -101,13 +94,11 @@ extension AddPropViewController: UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
 
-        guard film != nil else { return }
+        guard let film = film else { return }
 
         let selectedProp = prop[indexPath.item]
-        delegate?.addProp(prop: selectedProp)
+        propService.attachPropToFilm(propId: selectedProp.id ?? UUID(), filmId: film.id)
 
-
-        // Close the view
         self.dismiss(animated: true)
     }
 }

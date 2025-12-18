@@ -21,27 +21,31 @@ class PropDetailViewController: UIViewController {
     
     @IBOutlet weak var propName: UILabel!
     
+    @IBOutlet weak var mainPropView: UIView!
     
     var prop: PropItem?
-    var dataStore = DataStore.shared
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         updateTitle()
         if let prop = prop {
             configure(with: prop)
+        
         }
+        mainPropView.layer.cornerRadius = 16
+        mainPropView.clipsToBounds = true
         
         imageView.layer.cornerRadius = 16
         imageView.clipsToBounds = true
         
-        texture1.layer.cornerRadius = 16
+        texture1.layer.cornerRadius = 10
         texture1.clipsToBounds = true
         
-        texture2.layer.cornerRadius = 16
+        texture2.layer.cornerRadius = 10
         texture2.clipsToBounds = true
         
-        texture3.layer.cornerRadius = 16
+        texture3.layer.cornerRadius = 10
         texture3.clipsToBounds = true
 
         

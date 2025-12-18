@@ -10,8 +10,8 @@ import Foundation
 class ScenesDataStore {
     
     static let shared = ScenesDataStore()
+    static let scenesUpdatedNotification = Notification.Name("scenesDataStoreUpdated")
     
-
     private let isPersistenceEnabled = false
     
     private let kRecentScenesKey = "recentScenes"
@@ -56,6 +56,9 @@ class ScenesDataStore {
         if isPersistenceEnabled {
             saveData()
         }
+        
+        // Post notification for UI updates
+        NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
     
     // MARK: - Persistence (Private)
