@@ -26,7 +26,7 @@ class ItemCardCell: UICollectionViewCell {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.layer.cornerRadius = 10  //changed from 8->10
+        iv.layer.cornerRadius = 12  //changed from 8->10
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -35,7 +35,7 @@ class ItemCardCell: UICollectionViewCell {
         let label = UILabel()
         label.textAlignment = .center
         label.textColor = .white
-        label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        label.font = UIFont.systemFont(ofSize: 20, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -51,10 +51,17 @@ class ItemCardCell: UICollectionViewCell {
     
     private func setupViews() {
         // Setting the card container appearance
-        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        //contentView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        contentView.backgroundColor = UIColor(
+            red: CGFloat(0x14) / 255.0,
+            green: CGFloat(0x14) / 255.0,
+            blue: CGFloat(0x1E) / 255.0,
+            alpha: 1.0
+        )
         contentView.layer.cornerRadius = 12
         contentView.clipsToBounds = true
-        
+        contentView.layer.borderColor = UIColor.systemGray.cgColor
+        contentView.layer.borderWidth = 0.7
         contentView.addSubview(imageView)
         contentView.addSubview(titleLabel)
         
@@ -72,11 +79,22 @@ class ItemCardCell: UICollectionViewCell {
         ])
     }
     
-    // Override the default selection visual
-    override var isSelected: Bool {
+    
+    var isCurrentlySelected: Bool = false {
+//        didSet {
+//            contentView.layer.borderWidth = isSelected ? 3 : 0
+//            contentView.layer.borderColor = isSelected ? UIColor.systemRed.cgColor : nil
+//        }
         didSet {
-            contentView.layer.borderWidth = isSelected ? 3 : 0
-            contentView.layer.borderColor = isSelected ? UIColor.systemRed.cgColor : nil
-        }
+                if isCurrentlySelected {
+                    contentView.layer.borderWidth = 3
+                    contentView.layer.borderColor = UIColor.systemGray.cgColor
+                } else {
+                    // Restore the standard look when not selected
+                    contentView.layer.borderWidth = 0.7
+                    contentView.layer.borderColor = UIColor.systemGray.cgColor
+                }
+                contentView.layoutIfNeeded() 
+            }
     }
 }

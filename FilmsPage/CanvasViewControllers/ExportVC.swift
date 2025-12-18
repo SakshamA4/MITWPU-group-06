@@ -4,8 +4,9 @@ import UIKit
 
 class ExportVC: UIViewController {
     
-    // Closure to pass back the selected format (e.g., "JPEG", "PNG")
-    var onFormatSelected: ((String) -> Void)?
+    // Closure to pass back the selected format and quality
+    // We update the closure to pass both format and quality.
+    var onExportSelected: ((String, String) -> Void)? // Changed name for clarity
     
     private var selectedFormat: String = "JPEG" // Default selection
     private var selectedQuality: String = "High" // Default selection
@@ -21,12 +22,19 @@ class ExportVC: UIViewController {
         return stack
     }()
 
-    private lazy var qualityStackView: UIStackView = {
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        return stack
+    // UISegmentedControl for Quality
+    private lazy var qualitySegmentedControl: UISegmentedControl = {
+        let items = ["High", "Good"]
+        let control = UISegmentedControl(items: items)
+        control.selectedSegmentIndex = 0 // Default to High
+        control.backgroundColor = UIColor(white: 0.3, alpha: 1.0)
+        // Use tintColor for selected background color on older iOS, or appearance proxy
+        control.selectedSegmentTintColor = .systemGray
+        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        control.setTitleTextAttributes([.foregroundColor: UIColor.black], for: .selected)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.addTarget(self, action: #selector(didChangeQualitySegment), for: .valueChanged)
+        return control
     }()
 
     private lazy var headerLabel: UILabel = {
@@ -54,15 +62,16 @@ class ExportVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Use a semi-transparent dark background for the modal effect
         view.backgroundColor = UIColor(red: 14/255, green: 14/255, blue: 24/255, alpha: 1.0)
         setupHeader()
         setupFormatSelection()
         setupQualitySelection()
         
-        // Initial button state setup
+        // Initial setup for visual selection state
         updateFormatButtonAppearance(selectedFormat)
-        updateQualityButtonAppearance(selectedQuality)
+        
+        // Quality Segment is set via its selectedSegmentIndex = 0 in the lazy var
+        // No need for updateQualityButtonAppearance anymore
     }
 
     private func setupHeader() {
@@ -98,6 +107,7 @@ class ExportVC: UIViewController {
         
         formatContainer.addSubview(formatStackView)
         
+        // Ensure "PDF" is available for the next step
         let formats = ["JPEG", "PNG", "PDF", "MP4"]
         
         for format in formats {
@@ -110,7 +120,7 @@ class ExportVC: UIViewController {
 
         NSLayoutConstraint.activate([
             formatLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            formatLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 80), // Position below header
+            formatLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 80),
             
             formatContainer.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 20),
             formatContainer.centerYAnchor.constraint(equalTo: formatLabel.centerYAnchor),
@@ -123,39 +133,24 @@ class ExportVC: UIViewController {
         ])
     }
     
+    // CLEANED UP: Only uses the qualitySegmentedControl
     private func setupQualitySelection() {
         let qualityLabel = createSubtitleLabel(text: "Quality:")
-        let qualityContainer = UIView()
-        qualityContainer.translatesAutoresizingMaskIntoConstraints = false
-        
-        qualityContainer.addSubview(qualityStackView)
-        
-        // This is a toggle-like selection, not fillEqually
-        let qualities = ["High", "Good"]
-        
-        for quality in qualities {
-            let button = createSelectionButton(title: quality, action: #selector(didTapQualityButton(_:)))
-            qualityStackView.addArrangedSubview(button)
-        }
         
         view.addSubview(qualityLabel)
-        view.addSubview(qualityContainer)
+        view.addSubview(qualitySegmentedControl) // Use the new segmented control
 
         NSLayoutConstraint.activate([
             qualityLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             qualityLabel.topAnchor.constraint(equalTo: formatStackView.bottomAnchor, constant: 40),
             
-            qualityContainer.leadingAnchor.constraint(equalTo: qualityLabel.trailingAnchor, constant: 20),
-            qualityContainer.centerYAnchor.constraint(equalTo: qualityLabel.centerYAnchor),
-            
-            qualityStackView.topAnchor.constraint(equalTo: qualityContainer.topAnchor),
-            qualityStackView.bottomAnchor.constraint(equalTo: qualityContainer.bottomAnchor),
-            qualityStackView.leadingAnchor.constraint(equalTo: qualityContainer.leadingAnchor),
-            qualityStackView.trailingAnchor.constraint(equalTo: qualityContainer.trailingAnchor)
+            qualitySegmentedControl.leadingAnchor.constraint(equalTo: qualityLabel.trailingAnchor, constant: 20),
+            qualitySegmentedControl.centerYAnchor.constraint(equalTo: qualityLabel.centerYAnchor),
+            qualitySegmentedControl.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.45)
         ])
     }
 
-    // MARK: - UI Helper Functions
+    // MARK: - UI Helper Functions (Unchanged)
     
     private func createSubtitleLabel(text: String) -> UILabel {
         let label = UILabel()
@@ -171,11 +166,11 @@ class ExportVC: UIViewController {
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
         button.setTitleColor(.lightGray, for: .normal)
-        button.backgroundColor = UIColor(white: 0.3, alpha: 1.0) // Unselected gray
+        button.backgroundColor = UIColor(white: 0.3, alpha: 1.0)
         button.layer.cornerRadius = 6
         button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.accessibilityIdentifier = title // Use identifier to know which button was tapped
+        button.accessibilityIdentifier = title
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
@@ -191,23 +186,21 @@ class ExportVC: UIViewController {
         selectedFormat = title
         updateFormatButtonAppearance(title)
         
-        // Hide/Show Quality options if not PNG/JPEG (not fully implemented yet, but good practice)
+        // Show/Hide Quality segmented control based on format type
         let isImageFormat = (title == "JPEG" || title == "PNG")
-        qualityStackView.isHidden = !isImageFormat
-        
-        // NOTE: Layout and Select buttons are omitted for simplicity in this first pass.
+        qualitySegmentedControl.isHidden = !isImageFormat // Check against the new segmented control
     }
     
-    @objc private func didTapQualityButton(_ sender: UIButton) {
-        guard let title = sender.accessibilityIdentifier else { return }
-        selectedQuality = title
-        updateQualityButtonAppearance(title)
+    @objc private func didChangeQualitySegment(_ sender: UISegmentedControl) {
+        // Get the title of the selected segment
+        let selectedTitle = sender.titleForSegment(at: sender.selectedSegmentIndex) ?? "High"
+        selectedQuality = selectedTitle
     }
-
+    
     @objc private func didTapFinalExport() {
-        // 🚨 Final step: Call the closure with the selected format
-        onFormatSelected?(selectedFormat)
-        // Dismissal happens in MyFeatureCanvasVC's completion handler
+        // Pass both the selected format and quality back via the closure
+        onExportSelected?(selectedFormat, selectedQuality)
+        // We will let MyFeatureCanvasVC handle the dismissal after processing the export
     }
 
     private func updateFormatButtonAppearance(_ selectedTitle: String) {
@@ -220,13 +213,5 @@ class ExportVC: UIViewController {
         }
     }
     
-    private func updateQualityButtonAppearance(_ selectedTitle: String) {
-        for view in qualityStackView.arrangedSubviews {
-            if let button = view as? UIButton {
-                let isSelected = (button.accessibilityIdentifier == selectedTitle)
-                button.backgroundColor = isSelected ? .systemGray : UIColor(white: 0.3, alpha: 1.0)
-                button.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
-            }
-        }
-    }
+    // REMOVED: updateQualityButtonAppearance is no longer needed since UISegmentedControl handles its own appearance
 }
