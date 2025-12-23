@@ -150,7 +150,7 @@ class FilmsViewController: UIViewController {
                 let group = NSCollectionLayoutGroup.horizontal(
                     layoutSize: groupSize,
                     repeatingSubitem: item,
-                    count: 5
+                    count: 4
                     
                     
                 )

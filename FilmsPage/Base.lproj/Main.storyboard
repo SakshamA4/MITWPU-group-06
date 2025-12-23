@@ -464,7 +464,7 @@
         <!--Character Details View Controller-->
         <scene sceneID="YT1-4f-0Tg">
             <objects>
-                <viewController id="ReW-HX-teu" customClass="CharacterDetailsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="CharacterDetailsViewController" id="ReW-HX-teu" customClass="CharacterDetailsViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Ila-h8-7WW">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="810"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -668,6 +668,7 @@
                     </navigationItem>
                     <connections>
                         <outlet property="collectionView" destination="vZf-pt-j1L" id="zaH-ib-ctf"/>
+                        <outlet property="sequenceTitle" destination="piM-Nc-nEc" id="bDb-bB-kqP"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="AUf-qy-gO0" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
@@ -778,7 +779,7 @@
         <!--Prop Detail View Controller-->
         <scene sceneID="eIc-4W-dAD">
             <objects>
-                <viewController id="iUg-Ga-d9P" customClass="PropDetailViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="PropDetailViewController" id="iUg-Ga-d9P" customClass="PropDetailViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="QsO-Kl-BC2">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="810"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -1127,7 +1128,7 @@
         </scene>
     </scenes>
     <inferredMetricsTieBreakers>
-        <segue reference="YOU-Ky-EOW"/>
+        <segue reference="T5b-fB-vzQ"/>
         <segue reference="qL6-BQ-uyN"/>
     </inferredMetricsTieBreakers>
     <resources>

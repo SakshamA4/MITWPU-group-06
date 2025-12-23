@@ -1,9 +1,9 @@
-//
+
 //  ScenesDataStore.swift
 //  FilmsPage
 //
 //  Created by SDC-USER on 17/12/25.
-//
+
 
 import Foundation
 
@@ -25,8 +25,8 @@ class ScenesDataStore {
     private var recentScenes: [ScenesModel] = []
     
     private let templates: [ScenesModel] = [
-        ScenesModel(name: "Scene 1", image: "Image"),
-        ScenesModel(name: "Scene 2", image: "Image"),
+        ScenesModel(name: "Outdoor Scene", image: "outdoor"),
+        ScenesModel(name: "House Scene", image: "scene1"),
         ScenesModel(name: "Scene 3", image: "Image"),
         ScenesModel(name: "Scene 4", image: "Image")
     ]

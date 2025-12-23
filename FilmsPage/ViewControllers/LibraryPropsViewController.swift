@@ -94,7 +94,7 @@ extension LibraryPropsViewController: UICollectionViewDelegate {
 
         let selectedProp = props[indexPath.item]
 
-        let storyboard = UIStoryboard(name: "Library", bundle: nil)
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
         guard let vc = storyboard.instantiateViewController(
             withIdentifier: "PropDetailViewController"
         ) as? PropDetailViewController else {

@@ -12,17 +12,46 @@ class SceneViewController: UIViewController {
     // MARK: - Outlets
     @IBOutlet weak var SceneCollectionView: UICollectionView!
     
-    // MARK: - Data
-    private var items: [SceneItem] = SceneData.allScenes
+
+    private let sceneStore = ScenesDataStore.shared
+    private var allScenes: [ScenesModel] = []
+
+
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         
         view.backgroundColor = UIColor(hex: "#060714")
-//        setupNavigationBar()
         setupCollectionView()
+        loadData()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScenesUpdate),
+            name: ScenesDataStore.scenesUpdatedNotification,
+            object: nil
+        )
     }
+    
+    private func loadData() {
+        let recent = sceneStore.currentRecentScenes
+        let templates = sceneStore.currentTemplates
+
+        // Remove templates that already exist in recent
+        let recentIds = Set(recent.map { $0.id })
+        let filteredTemplates = templates.filter { !recentIds.contains($0.id) }
+
+        // Merge: recent first, templates next
+        allScenes = recent + filteredTemplates
+
+        SceneCollectionView.reloadData()
+    }
+
+    @objc private func handleScenesUpdate() {
+        loadData()
+    }
+
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -89,7 +118,7 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
     
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
-        items.count
+        allScenes.count
     }
     
     func collectionView(_ collectionView: UICollectionView,
@@ -100,13 +129,13 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
         ) as? LibrarySceneCollectionViewCell else {
             return UICollectionViewCell()
         }
-        cell.configure(with: items[indexPath.item])
+        cell.configure(with: allScenes[indexPath.item])
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
-        print("Selected Scene:", items[indexPath.item].title)
+//        print("Selected Scene:", allScenes[indexPath.item].title)
     }
 }
 
@@ -115,29 +144,29 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
 
 private extension SceneViewController {
     
-    @objc func addSceneTapped() {
-        let alert = UIAlertController(title: "New Scene",
-                                      message: "Enter a name for the new Scene",
-                                      preferredStyle: .alert)
-        alert.addTextField { $0.placeholder = "Scene name" }
-        
-        let addAction = UIAlertAction(title: "Add", style: .default) { [weak self] _ in
-            guard let self = self else { return }
-            _ = alert.textFields?.first?.text?.isEmpty == false
-                ? alert.textFields?.first?.text!
-                : "New Scene"
-            
-            let newItem = SceneItem(title: "name", imageName: "Scene_placeholder")
-            SceneData.addScene(newItem)
-            self.items = SceneData.allScenes
-            
-            let newIndexPath = IndexPath(item: self.items.count - 1, section: 0)
-            self.SceneCollectionView.insertItems(at: [newIndexPath])
-        }
-        
-        alert.addAction(addAction)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        present(alert, animated: true)
-    }
+//    @objc func addSceneTapped() {
+//        let alert = UIAlertController(title: "New Scene",
+//                                      message: "Enter a name for the new Scene",
+//                                      preferredStyle: .alert)
+//        alert.addTextField { $0.placeholder = "Scene name" }
+//        
+//        let addAction = UIAlertAction(title: "Add", style: .default) { [weak self] _ in
+//            guard let self = self else { return }
+//            _ = alert.textFields?.first?.text?.isEmpty == false
+//                ? alert.textFields?.first?.text!
+//                : "New Scene"
+//            
+//            let newItem = SceneItem(title: "name", imageName: "Scene_placeholder")
+//            SceneData.addScene(newItem)
+//            self.items = SceneData.allScenes
+//            
+//            let newIndexPath = IndexPath(item: self.items.count - 1, section: 0)
+//            self.SceneCollectionView.insertItems(at: [newIndexPath])
+//        }
+//        
+//        alert.addAction(addAction)
+//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//        present(alert, animated: true)
+//    }
 }
 

@@ -99,6 +99,17 @@ extension HomeViewController: UICollectionViewDataSource {
         header.titleLabel.text = indexPath.section == 0 ? "Templates" : "Recent Scenes"
         return header
     }
+    
+    func collectionView(
+        _ collectionView: UICollectionView,
+        didSelectItemAt indexPath: IndexPath
+    ) {
+        let vc = MyFeatureCanvasVC()
+       // navigationController?.pushViewController(vc, animated: true)
+        let navController = UINavigationController(rootViewController: vc)
+        navController.modalPresentationStyle = .fullScreen
+        self.present(navController, animated: true)
+    }
 }
 
 
