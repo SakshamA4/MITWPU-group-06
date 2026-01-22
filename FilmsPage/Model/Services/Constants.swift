@@ -7,7 +7,7 @@
 
 import Foundation
 
-// MARK: - Storage Keys for UserDefaults
+//Storage Keys for UserDefaults
 enum StorageKeys {
     static let films = "films_storage"
     static let favFilm = "fav_film_storage"
@@ -18,7 +18,7 @@ enum StorageKeys {
     static let poses = "poses_storage"
 }
 
-// MARK: - Notification Names
+// Notification Names
 enum NotificationNames {
     static let filmsUpdated = "filmsUpdated"
     static let favFilmUpdated = "favFilmUpdated"

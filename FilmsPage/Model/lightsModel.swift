@@ -8,7 +8,7 @@ struct LightItem {
 
 struct LightsDataStore {
 
-    // 🔹 This is what your view controller is trying to read: LightsDataStore.items
+
     private(set) static var items: [LightItem] = [
         LightItem(
             name: "LED Panel",

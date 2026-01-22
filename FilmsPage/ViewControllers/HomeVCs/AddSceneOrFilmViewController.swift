@@ -13,5 +13,4 @@ class AddSceneOrFilmViewController: UIViewController {
         super.viewDidLoad()
     }
     
-    // No delegate setup needed - using NotificationCenter
 }

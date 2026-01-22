@@ -25,7 +25,6 @@ class CharacterService {
         isInitialized = true
     }
 
-    // MARK: - CRUD Operations
     
     func getCharacters() -> [CharacterItem] {
         return characters
@@ -71,7 +70,6 @@ class CharacterService {
         return characters.first { $0.id == characterId }?.pose ?? []
     }
 
-    // MARK: - Persistence
     
     private func save() {
         do {
@@ -93,13 +91,13 @@ class CharacterService {
             }
         }
         
-        // Initialize with default template characters (no filmId - templates)
+
         if characters.isEmpty {
             characters = [
                 CharacterItem(
                     id: UUID(),
                     name: "Character 1",
-                    imageName: "Woman 1",
+                    imageName: "woman2",
                     filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
@@ -113,7 +111,7 @@ class CharacterService {
                 CharacterItem(
                     id: UUID(),
                     name: "Character 2",
-                    imageName: "Man in a suit",
+                    imageName: "man1",
                     filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
@@ -127,7 +125,7 @@ class CharacterService {
                 CharacterItem(
                     id: UUID(),
                     name: "Character 3",
-                    imageName: "Woman 2",
+                    imageName: "woman1",
                     filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
@@ -141,7 +139,7 @@ class CharacterService {
                 CharacterItem(
                     id: UUID(),
                     name: "Character 4",
-                    imageName: "Woman 3",
+                    imageName: "woman3",
                     filmId: nil,
                     pose: [
                         CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),

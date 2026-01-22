@@ -59,7 +59,6 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         collectionView.reloadData()
     }
 
-    // MARK: - Navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         // No delegate setup needed - using NotificationCenter
     }
@@ -146,14 +145,13 @@ extension HomeViewController {
             
 
             section.contentInsets = NSDirectionalEdgeInsets(
-                top: 10,
+                top: 30,
                 leading: 50,
                 bottom: 40,
                 trailing: 20
             )
             section.supplementaryContentInsetsReference = .none
-            // 4. Header Setup
-            // Estimated height allows the header to grow if the font is large (like in your design)
+
             let headerSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
                 heightDimension: .estimated(60)

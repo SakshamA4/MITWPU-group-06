@@ -11,7 +11,7 @@ class LoginViewController: UIViewController {
     
     
     
-    override func viewDidLoad() { // <-- ADD THIS METHOD
+    override func viewDidLoad() {
             super.viewDidLoad()
             
             // --- 1. Define the desired light color (e.g., light gray) ---

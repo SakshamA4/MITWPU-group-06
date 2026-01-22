@@ -31,7 +31,7 @@ class ScenesDataStore {
         ScenesModel(name: "Scene 4", image: "Image")
     ]
     
-    // MARK: - Getters
+    //Getters
     var currentRecentScenes: [ScenesModel] {
         return recentScenes
     }
@@ -40,7 +40,6 @@ class ScenesDataStore {
         return templates
     }
 
-    // MARK: - Mutations
     func addToRecent(scene: ScenesModel) {
         // Remove duplicate if exists (move to top)
         recentScenes.removeAll { $0.id == scene.id }
@@ -57,11 +56,9 @@ class ScenesDataStore {
             saveData()
         }
         
-        // Post notification for UI updates
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
     
-    // MARK: - Persistence (Private)
     private func loadData() {
         guard let data = UserDefaults.standard.data(forKey: kRecentScenesKey),
               let decoded = try? JSONDecoder().decode([ScenesModel].self, from: data) else { return }

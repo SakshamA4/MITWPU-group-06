@@ -11,7 +11,7 @@ import Foundation
 struct ScenesModel: Codable, Equatable, Hashable {
     let id: UUID
     let name: String
-    let image: String // Assumed image asset name
+    let image: String 
 
     init(id: UUID = UUID(), name: String, image: String) {
         self.id = id

@@ -16,7 +16,6 @@ struct CharacterItem: Codable {
 
 }
 
-// MARK: - Character Pose (for the horizontal poses row)
 
 struct CharacterPoseItem: Codable {
     var id: UUID?
