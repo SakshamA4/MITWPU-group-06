@@ -12,7 +12,7 @@ class CanvasNavigation: UINavigationController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let canvasVC = MyFeatureCanvasVC()
+        let canvasVC = CanvasViewController()
         self.setViewControllers([canvasVC], animated: false)
         // Do any additional setup after loading the view.
     }

@@ -103,7 +103,7 @@ extension HomeViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {
-        let vc = MyFeatureCanvasVC()
+        let vc = CanvasViewController()
        // navigationController?.pushViewController(vc, animated: true)
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen

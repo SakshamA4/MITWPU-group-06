@@ -42,7 +42,7 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Spotlight",
-            imageName: "Spotlight",
+            imageName: "Spotlight1",
             description: "Narrow beam for highlighting specific areas or subjects."
         ),
         LightItem(
