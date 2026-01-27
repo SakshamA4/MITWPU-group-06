@@ -47,66 +47,11 @@ enum ToolType: CaseIterable {
     var items: [SpawnItem] {
         switch self {
 
-        case .character:
-            return [
-                SpawnItem(
-                    title: "Woman 1",
-                    imageName: "woman1_img",
-                    modelFileName: "woman1",
-                    poses: ["woman1", "Woman1MegLay", "Woman1Sit", "Woman1MegOnCall"]
-                ),
-                SpawnItem(
-                    title: "Man",
-                    imageName: "man1_img",
-                    modelFileName: "man1",
-                    poses: ["man1","Man1LyingIdle", "Man1SittingIdle", "Man1OnCall"]
-                )
-            ]
+       case .character:
+           return CharacterService.shared.getCharacters().map { SpawnItem(character: $0) }
 
-        case .prop:
-            return [
-                SpawnItem(
-                    title: "Chair",
-                    imageName: "chair_img",
-                    modelFileName: "chair"
-                ),
-                SpawnItem(
-                    title: "Table",
-                    imageName: "Table_img",
-                    modelFileName: "Table"
-                ),
-                SpawnItem(
-                    title: "Wardrobe",
-                    imageName: "wardrobe_img",
-                    modelFileName: "wardrobe"
-                ),
-                SpawnItem(
-                    title: "Lamp",
-                    imageName: "lamp_img",
-                    modelFileName: "lamp"
-                ),
-                SpawnItem(
-                    title: "Robot",
-                    imageName: "robot_img",
-                    modelFileName: "Robot"
-                ),
-                SpawnItem(
-                    title: "Flower Vase",
-                    imageName: "flowerVase_img",
-                    modelFileName: "flowerVase"
-                ),
-                SpawnItem(
-                    title: "Plant",
-                    imageName: "Plant_img",
-                    modelFileName: "Plant"
-                ),
-                
-                SpawnItem(
-                    title: "Ball",
-                    imageName: "ball_img",
-                    modelFileName: "ball"
-                )
-            ]
+       case .prop:
+            return PropService.shared.getProps().map { SpawnItem(prop: $0) }
 
         case .camera:
             return [

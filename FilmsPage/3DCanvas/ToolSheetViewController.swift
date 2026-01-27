@@ -181,6 +181,7 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
 
         // 2. Handle Character Logic
         if tool == .character {
+            print("🔥 didSelectItemAt fired for tool:", tool)
             let item = tool.items[indexPath.item]
             let detailVC = CharacterDetailViewController(item: item)
             if let canvasVC = self.presentingViewController as? CanvasViewController {

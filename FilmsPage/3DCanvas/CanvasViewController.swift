@@ -932,28 +932,38 @@ class CanvasViewController: UIViewController {
         
         Task {
             do {
+                // 1. Handle special non-model types first
                 if item.modelFileName == "cam1" {
                     spawnSceneCamera()
                     return
                 }
-                
                 if item.modelFileName == "cube" {
                     spawnWall()
                     return
                 }
-                
                 if item.modelFileName == "ground" {
                     spawnGround()
                     return
                 }
-                
                 if item.isBackground {
-
                     return
                 }
-
+                
+                // 2. LOAD THE ENTITY FIRST
+                // You cannot modify 'entity' before this line exists.
                 let entity = try await Entity(named: item.modelFileName)
-                entity.scale = SIMD3<Float>(repeating: scale)
+                
+                // 3. APPLY SCALING LOGIC
+                if item.modelFileName == "Spotlight" {
+                    // FORCE SMALL SCALE for Spotlight
+                    // This ignores the slider 'scale' because the asset is naturally huge.
+                    entity.scale = SIMD3(repeating: 0.01)
+                } else {
+                    // Use the slider value for Characters/Props
+                    entity.scale = SIMD3<Float>(repeating: scale)
+                }
+                
+                // 4. Common Setup
                 entity.name = customName ?? item.modelFileName
                 entity.position = [
                     Float.random(in: -1...1),
@@ -965,15 +975,18 @@ class CanvasViewController: UIViewController {
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
                 
-                if item.title.lowercased() == "light" || item.modelFileName.contains("Spotlight"){
+                // 5. Add Light Effects
+                // Now that the entity exists and is scaled, we attach the light guts
+                if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
                     addRealLightToModel(entity)
                 }
 
+                // 6. Add to Scene
                 if let anchor = arView.scene.findEntity(named: "MainAnchor") {
                     anchor.addChild(entity)
                     self.refreshSidebarContent()
-                    
                 }
+                
             } catch {
                 print("Failed to load \(item.modelFileName): \(error)")
             }
@@ -1342,7 +1355,7 @@ class CanvasViewController: UIViewController {
         )
         arView.addGestureRecognizer(pinch)
         
-        let rotation = UIRotationGestureRecognizer(
+        _ = UIRotationGestureRecognizer(
             target: self,
             action: #selector(handleRotation(_:))
         )
@@ -2251,7 +2264,30 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
         previewAnchor.addChild(previewCamera)
         arView.scene.addAnchor(previewAnchor)
     }
+    
+    func spawnCharacter(item: SpawnItem, scale: Float) {
 
+        guard !item.modelFileName.isEmpty else {
+            print("❌ Empty modelFileName")
+            return
+        }
+
+        do {
+            let entity = try Entity.load(named: item.modelFileName)
+            entity.scale = SIMD3(repeating: scale)
+
+            let anchor = AnchorEntity(world: .zero)
+            anchor.addChild(entity)
+            arView.scene.addAnchor(anchor)
+
+            print("✅ Character spawned successfully")
+
+        } catch {
+            print("❌ Failed to load character model:", error)
+        }
+    }
+
+    
 }
 
 
@@ -2260,11 +2296,33 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
 // MARK: - Character Detail Delegate
 extension CanvasViewController: CharacterDetailDelegate {
     
-        func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
-            // Pass the 'scale' variable to the function
-            spawnEntity(item: item, toolType: .character, customName: name, scale: scale)
-        }
+//    func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
+//            print("Received request to add character: \(name) with model: \(item.modelFileName)")
+//            
+//            // 1. Dismiss the detail view (and the tool sheet below it)
+//            self.dismiss(animated: true) { [weak self] in
+//                // 2. Actually spawn the model using the filename from the item
+//                // IMPORTANT: Ensure 'item.modelFileName' matches your .usdz file exactly
+//                self?.spawnEntity(
+//                    item: item,
+//                    toolType: .character,
+//                    customName: name,
+//                    scale: scale
+//                )
+//            }
+//        }
     
+  
+
+        func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
+
+            print("✅ Character confirmed:", item.title)
+            print("Model:", item.modelFileName)
+            print("Scale:", scale)
+
+            spawnCharacter(item: item, scale: scale)
+        }
+
     
     func didConfirmCharacterSelection(modelName: String, scale: Float) {
         print("Confirmed: \(modelName), Scale: \(scale)")

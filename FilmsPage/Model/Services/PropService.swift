@@ -109,62 +109,14 @@ class PropService {
         // Initialize with default template props (no filmId - templates)
         if props.isEmpty {
             props = [
-                PropItem(
-                    id: UUID(),
-                    name: "Plant",
-                    imageName: "Plant",
-                    filmId: nil,
-                    description: "A decorative indoor plant used to add freshness and life to a scene."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Bookshelf",
-                    imageName: "Bookshelf",
-                    filmId: nil,
-                    description: "A wooden bookshelf filled with books, ideal for study rooms or living spaces."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Fridge",
-                    imageName: "Fridge",
-                    filmId: nil,
-                    description: "A modern refrigerator commonly placed in kitchens for storing food and drinks."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Wardrobe",
-                    imageName: "Wardrobe",
-                    filmId: nil,
-                    description: "A tall wardrobe used for storing clothes, suitable for bedrooms."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Handbag",
-                    imageName: "Handbag",
-                    filmId: nil,
-                    description: "A stylish handbag that characters can carry or place in indoor scenes."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Flower Vase",
-                    imageName: "Flower Vase",
-                    filmId: nil,
-                    description: "A decorative flower vase used to enhance tables, shelves, or room corners."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Bag Pack",
-                    imageName: "Bag Pack",
-                    filmId: nil,
-                    description: "A casual backpack suitable for travel, school, or outdoor scenes."
-                ),
-                PropItem(
-                    id: UUID(),
-                    name: "Shoe Rack",
-                    imageName: "Shoe Rack",
-                    filmId: nil,
-                    description: "A compact rack designed to neatly store shoes near entrances or rooms."
-                )
+                PropItem(id: UUID(), name: "Chair", imageName: "chair_img", filmId: nil, description: "Standard chair", modelFileName: "chair"),
+                PropItem(id: UUID(), name: "Table", imageName: "Table_img", filmId: nil, description: "Standard table", modelFileName: "Table"),
+                PropItem(id: UUID(), name: "Lamp", imageName: "lamp_img", filmId: nil, description: "Desk lamp", modelFileName: "lamp"),
+                PropItem(id: UUID(), name: "Robot", imageName: "robot_img", filmId: nil, description: "Toy robot", modelFileName: "Robot"),
+                PropItem(name: "Flower Vase", imageName: "flowerVase_img", filmId: nil, description: "Flower vase", modelFileName: "flowerVase"),
+                PropItem(name: "Plant", imageName: "Plant_img", filmId: nil, description: "House Plant", modelFileName: "Plant"),
+                PropItem(name: "Wardrobe", imageName: "wardrobe_img", filmId: nil, description: "Wardrobe", modelFileName: "wardrobe"),
+                PropItem(id: UUID(), name: "Ball", imageName: "ball_img", filmId: nil, description: "Sports ball", modelFileName: "ball")
             ]
         }
     }

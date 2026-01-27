@@ -96,86 +96,26 @@ class CharacterService {
             characters = [
                 CharacterItem(
                     id: UUID(),
-                    name: "Character 1",
-                    imageName: "woman2",
+                    name: "Woman",
+                    imageName: "woman1_img",
                     filmId: nil,
                     pose: [
-                        CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Sleeping", imageName: "Sleeping"),
-                        CharacterPoseItem(id: UUID(), name: "Falling", imageName: "Falling"),
-                        CharacterPoseItem(id: UUID(), name: "Buffering", imageName: "Buffering")
+                        CharacterPoseItem(id: UUID(), name: "Standing", imageName: "woman1_img", modelFilename: "woman1"),
+                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Woman1Sit_img", modelFilename: "Woman1Sit"),
+                        CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Woman1MegLay_img", modelFilename: "Woman1MegLay"),
+                        CharacterPoseItem(id: UUID(), name: "On a call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
                     ]
                 ),
                 CharacterItem(
                     id: UUID(),
-                    name: "Character 2",
-                    imageName: "man1",
+                    name: "Man",
+                    imageName: "man1_img",
                     filmId: nil,
                     pose: [
-                        CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
-                        CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
-                        CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
-                        CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
-                    ]
-                ),
-                CharacterItem(
-                    id: UUID(),
-                    name: "Character 3",
-                    imageName: "woman1",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
-                        CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
-                    ]
-                ),
-                CharacterItem(
-                    id: UUID(),
-                    name: "Character 4",
-                    imageName: "woman3",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Fighting Pose", imageName: "fighting pose"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Woman"),
-                        CharacterPoseItem(id: UUID(), name: "Sleeping", imageName: "Sleeping"),
-                        CharacterPoseItem(id: UUID(), name: "Falling", imageName: "Falling"),
-                        CharacterPoseItem(id: UUID(), name: "Buffering", imageName: "Buffering")
-                    ]
-                ),
-                CharacterItem(
-                    id: UUID(),
-                    name: "Character 5",
-                    imageName: "Asian man",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
-                        CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
-                        CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
-                        CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
-                    ]
-                ),
-                CharacterItem(
-                    id: UUID(),
-                    name: "Character 6",
-                    imageName: "Man in a jersey",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Arms stretched", imageName: "Arms stretched"),
-                        CharacterPoseItem(id: UUID(), name: "Talking", imageName: "Talking Man"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Sitting Man"),
-                        CharacterPoseItem(id: UUID(), name: "Laying Down", imageName: "Lying down"),
-                        CharacterPoseItem(id: UUID(), name: "Waving", imageName: "Waving Man"),
-                        CharacterPoseItem(id: UUID(), name: "Joining Hands", imageName: "Joining hands")
+                        CharacterPoseItem(id: UUID(), name: "Standing", imageName: "man1_img", modelFilename: "man1"),
+                        CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Man1LyingIdle_img", modelFilename: "Man1LyingIdle"),
+                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Man1SittingIdle_img", modelFilename: "Man1SittingIdle"),
+                        CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Man1OnCall_img", modelFilename: "Man1OnCall")
                     ]
                 )
             ]

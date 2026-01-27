@@ -17,12 +17,11 @@ class CharacterDetailViewController: UIViewController {
     //Properties
     weak var delegate: CharacterDetailDelegate?
     private let item: SpawnItem
+    // Data source for the collection view
+    private var poses: [SpawnPose] = [] // Changed from [String] to [SpawnPose]
     
     private var selectedPoseModelName: String
     private var currentScale: Float = 1.0
-    
-    // Data source for the collection view
-    private var poses: [String] = []
     
     //UI Constants
     private let accentColor = UIColor.systemBlue // Changed to Blue for Light Theme standard
@@ -61,7 +60,6 @@ class CharacterDetailViewController: UIViewController {
         return btn
     }()
     
-    // --- Top Section: Image ---
     private lazy var characterImageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFit
@@ -73,7 +71,6 @@ class CharacterDetailViewController: UIViewController {
         return iv
     }()
     
-    // --- Top Section: Controls ---
     
     // Name Input
     private lazy var nameLabel: UILabel = {
@@ -157,13 +154,16 @@ class CharacterDetailViewController: UIViewController {
     // MARK: - Init
     init(item: SpawnItem) {
         self.item = item
-        if let firstPose = item.poses?.first {
-            self.poses = item.poses ?? []
-            self.selectedPoseModelName = firstPose
+        // Load the rich pose data
+        self.poses = item.poses ?? []
+
+        // Default selection
+        if let firstPose = self.poses.first {
+            self.selectedPoseModelName = firstPose.modelFileName
         } else {
-            self.poses = []
             self.selectedPoseModelName = item.modelFileName
         }
+
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -295,11 +295,15 @@ class CharacterDetailViewController: UIViewController {
     @objc private func didTapConfirm() {
             // Use the text from the field, or fallback to the original title
             let finalName = nameTextField.text ?? item.title
-            
-            // Pass the item, scale, AND name back to CanvasViewController
-            delegate?.didConfirmCharacterSelection(item: item, scale: currentScale, name: finalName)
+        
+            var finalItem = item
+        finalItem.title = finalName
+        finalItem.modelFileName = selectedPoseModelName
+
+            delegate?.didConfirmCharacterSelection(item: finalItem, scale: currentScale, name: finalName)
             
             self.presentingViewController?.presentingViewController?.dismiss(animated: true, completion: nil)
+
         }
 }
 
@@ -311,16 +315,29 @@ extension CharacterDetailViewController: UICollectionViewDataSource, UICollectio
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PoseCell.reuseID, for: indexPath) as? PoseCell else { return UICollectionViewCell() }
-        
-        let poseName = poses[indexPath.item]
-        let image = UIImage(named: poseName) ?? UIImage(named: item.imageName)
-        
-        cell.configure(image: image, title: poseName)
+
+        let pose = poses[indexPath.item]
+
+        // Use the specific image name for this pose
+        // If that fails, fallback to main item image
+        let image = UIImage(named: pose.imageName) ?? UIImage(named: item.imageName)
+
+        cell.configure(image: image, title: pose.title)
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        selectedPoseModelName = poses[indexPath.item]
-        print("Selected pose: \(selectedPoseModelName)")
-    }
+            // 1. DEFINE selectedPose by getting it from the array
+            let selectedPose = poses[indexPath.item]
+            
+            // 2. NOW you can use it
+            selectedPoseModelName = selectedPose.modelFileName
+            
+            print("Selected pose: \(selectedPoseModelName)")
+            
+            // Optional: Update the big main image to match the selected pose
+            if let poseImage = UIImage(named: selectedPose.imageName) {
+                characterImageView.image = poseImage
+            }
+        }
 }

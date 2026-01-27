@@ -14,4 +14,5 @@ struct PropItem: Codable {
     var description: String
     var surfaceTexture: String?
     var colour: String?
+    var modelFileName: String?
 }

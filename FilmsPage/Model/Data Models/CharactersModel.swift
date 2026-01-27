@@ -21,4 +21,5 @@ struct CharacterPoseItem: Codable {
     var id: UUID?
     var name: String
     var imageName: String
+    var modelFilename: String?
 }
