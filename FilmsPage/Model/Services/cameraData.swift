@@ -11,8 +11,8 @@ enum CameraLibraryDataStore {
         .init(
             type: .cameras,
             items: [
+                .init(name: "DSLR",      imageName: "DSLR",    description: "Digital single-lens reflex camera with interchangeable lenses.", modelFileName: "cam1"),
                 .init(name: "Default",   imageName: "Default", description: "Standard camera setup for general shooting."),
-                .init(name: "DSLR",      imageName: "DSLR",    description: "Digital single-lens reflex camera with interchangeable lenses."),
                 .init(name: "Sony",      imageName: "Sony",    description: "Sony camera, great for video with strong autofocus."),
                 .init(name: "Canon",     imageName: "Canon",   description: "Canon camera, popular for both photo and video."),
                 .init(name: "iPhone",    imageName: "iPhone",  description: "Mobile shooting with an iPhone or similar smartphone."),

@@ -16,7 +16,7 @@ class CharacterDetailViewController: UIViewController {
     
     //Properties
     weak var delegate: CharacterDetailDelegate?
-    private let item: SpawnItem
+    private var item: SpawnItem
     // Data source for the collection view
     private var poses: [SpawnPose] = [] // Changed from [String] to [SpawnPose]
     
@@ -150,9 +150,9 @@ class CharacterDetailViewController: UIViewController {
         cv.translatesAutoresizingMaskIntoConstraints = false
         return cv
     }()
-    
+    var onSelectModel:(_ item: SpawnItem) -> Void
     // MARK: - Init
-    init(item: SpawnItem) {
+    init(item: SpawnItem, onSelectModel: @escaping (_ item: SpawnItem) -> Void) {
         self.item = item
         // Load the rich pose data
         self.poses = item.poses ?? []
@@ -163,6 +163,7 @@ class CharacterDetailViewController: UIViewController {
         } else {
             self.selectedPoseModelName = item.modelFileName
         }
+        self.onSelectModel = onSelectModel
 
         super.init(nibName: nil, bundle: nil)
     }
@@ -292,19 +293,21 @@ class CharacterDetailViewController: UIViewController {
         heightValueLabel.text = "\(approxHeightCm) cms"
     }
     
+
     @objc private func didTapConfirm() {
-            // Use the text from the field, or fallback to the original title
-            let finalName = nameTextField.text ?? item.title
+        guard let name = nameTextField.text, !name.isEmpty else { return }
         
-            var finalItem = item
-        finalItem.title = finalName
+        // 1. Create a COPY of the item
+        var finalItem = self.item
+        
+        // 2. IMPORTANT: Overwrite the model name with the user's selection
+        // If you skip this, it will always spawn the default T-Pose/Standing model
         finalItem.modelFileName = selectedPoseModelName
+        
+        // 3. Send to delegate
+        delegate?.didConfirmCharacterSelection(item: finalItem, scale: currentScale, name: name)
+    }
 
-            delegate?.didConfirmCharacterSelection(item: finalItem, scale: currentScale, name: finalName)
-            
-            self.presentingViewController?.presentingViewController?.dismiss(animated: true, completion: nil)
-
-        }
 }
 
 // MARK: - Collection View Data Source & Delegate
@@ -327,17 +330,19 @@ extension CharacterDetailViewController: UICollectionViewDataSource, UICollectio
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            // 1. DEFINE selectedPose by getting it from the array
-            let selectedPose = poses[indexPath.item]
-            
-            // 2. NOW you can use it
-            selectedPoseModelName = selectedPose.modelFileName
-            
-            print("Selected pose: \(selectedPoseModelName)")
-            
-            // Optional: Update the big main image to match the selected pose
-            if let poseImage = UIImage(named: selectedPose.imageName) {
-                characterImageView.image = poseImage
-            }
+        let selectedPose = poses[indexPath.item]
+        
+        // Just update the tracking variable
+        print("Selected pose: \(selectedPoseModelName)", selectedPose)
+        item.modelFileName = selectedPose.modelFileName
+        item.selectedPose = selectedPose.modelFileName
+        print("\n\n", item, "\n\n")
+        
+        // Update the preview image if needed
+        if let poseImage = UIImage(named: selectedPose.imageName) {
+            characterImageView.image = poseImage
         }
+        dismiss(animated: true)
+        self.onSelectModel(item)
+    }
 }

@@ -183,7 +183,12 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
         if tool == .character {
             print("🔥 didSelectItemAt fired for tool:", tool)
             let item = tool.items[indexPath.item]
-            let detailVC = CharacterDetailViewController(item: item)
+            let detailVC = CharacterDetailViewController(item: item){
+                (selectedItem: SpawnItem) in
+                print("Selecting", selectedItem)
+                self.onSelect(selectedItem)
+                self.dismiss(animated: true)
+            }
             if let canvasVC = self.presentingViewController as? CanvasViewController {
                 detailVC.delegate = canvasVC
             }
@@ -191,11 +196,13 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
                 sheet.detents = [.medium(), .large()]
             }
             present(detailVC, animated: true)
+//            onSelect(item)
             return
         }
 
         // 3. Handle Props/Lights/etc
         let item = tool.items[indexPath.item]
+        print("Selecting props")
         onSelect(item)
         dismiss(animated: true)
     }

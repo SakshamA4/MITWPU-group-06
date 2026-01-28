@@ -926,13 +926,17 @@ class CanvasViewController: UIViewController {
     }
 
     
-    func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil, scale: Float = 1.0) {
-        
+    func spawnEntity(
+        item: SpawnItem,
+        toolType: ToolType,
+        customName: String? = nil,
+        scale: Float = 1.0
+    ) {
         saveCurrentStateToUndo()
-        
+
         Task {
             do {
-                // 1. Handle special non-model types first
+                // Special tools
                 if item.modelFileName == "cam1" {
                     spawnSceneCamera()
                     return
@@ -948,52 +952,48 @@ class CanvasViewController: UIViewController {
                 if item.isBackground {
                     return
                 }
-                
-                // 2. LOAD THE ENTITY FIRST
-                // You cannot modify 'entity' before this line exists.
+
+                // LOAD FINAL CHARACTER MODEL (POSE INCLUDED)
                 let entity = try await Entity(named: item.modelFileName)
-                
-                // 3. APPLY SCALING LOGIC
-                if item.modelFileName == "Spotlight" {
-                    // FORCE SMALL SCALE for Spotlight
-                    // This ignores the slider 'scale' because the asset is naturally huge.
-                    entity.scale = SIMD3(repeating: 0.01)
-                } else {
-                    // Use the slider value for Characters/Props
-                    entity.scale = SIMD3<Float>(repeating: scale)
-                }
-                
-                // 4. Common Setup
+
+                // Scale
+                entity.scale = item.modelFileName == "Spotlight"
+                    ? SIMD3(repeating: 0.01)
+                    : SIMD3<Float>(repeating: scale)
+
+                // Setup
                 entity.name = customName ?? item.modelFileName
                 entity.position = [
                     Float.random(in: -1...1),
                     0,
                     Float.random(in: -1...1)
                 ]
-                
+
                 entity.components.set(CategoryComponent(toolType: toolType))
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
-                
-                // 5. Add Light Effects
-                // Now that the entity exists and is scaled, we attach the light guts
+
+                // Lights
                 if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
                     addRealLightToModel(entity)
                 }
 
-                // 6. Add to Scene
+                // Add to scene
                 if let anchor = arView.scene.findEntity(named: "MainAnchor") {
                     anchor.addChild(entity)
                     self.refreshSidebarContent()
                 }
-                
+
             } catch {
-                print("Failed to load \(item.modelFileName): \(error)")
+                print("❌ Failed to load \(item.modelFileName): \(error)")
             }
         }
     }
+
+
     
     
+
     func applyBackgroundImage(_ image: UIImage) {
             guard let cgImage = image.cgImage,
                   let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
@@ -2113,6 +2113,8 @@ class CanvasViewController: UIViewController {
         // Ensure the sidebar stays on top of the 3D scene
         view.bringSubviewToFront(sidebarView)
         view.bringSubviewToFront(layersButton)
+        
+        
     }
     
     
@@ -2294,68 +2296,34 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
 
 
 // MARK: - Character Detail Delegate
+// In CanvasViewController.swift
+
 extension CanvasViewController: CharacterDetailDelegate {
+    // In CanvasViewController.swift
     
-//    func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
-//            print("Received request to add character: \(name) with model: \(item.modelFileName)")
-//            
-//            // 1. Dismiss the detail view (and the tool sheet below it)
-//            self.dismiss(animated: true) { [weak self] in
-//                // 2. Actually spawn the model using the filename from the item
-//                // IMPORTANT: Ensure 'item.modelFileName' matches your .usdz file exactly
-//                self?.spawnEntity(
-//                    item: item,
-//                    toolType: .character,
-//                    customName: name,
-//                    scale: scale
-//                )
-//            }
-//        }
+    // In CanvasViewController.swift
     
-  
-
-        func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
-
-            print("✅ Character confirmed:", item.title)
-            print("Model:", item.modelFileName)
-            print("Scale:", scale)
-
-            spawnCharacter(item: item, scale: scale)
+    func didConfirmCharacterSelection(item: SpawnItem, scale: Float, name: String) {
+        print("✅ Character confirmed:", item.title)
+        print("📝 Model File To Load:", item.modelFileName) // Verify this prints "Woman1Sit"
+        
+        // 1. Create a copy of the item to ensure the name is correct
+        var finalItem = item
+        finalItem.title = name
+        
+        // 2. CRITICAL FIX: Wrap the async call in 'Task' and use the correct function name
+        Task {
+            // Use 'spawnEntity', NOT 'spawnCharacter'
+            await spawnEntity(
+                item: finalItem,
+                toolType: .character,
+                customName: name,
+                scale: scale
+            )
         }
-
-    
-    func didConfirmCharacterSelection(modelName: String, scale: Float) {
-        print("Confirmed: \(modelName), Scale: \(scale)")
         
-        // 1. Create a temporary item for the selected pose
-        let specificPoseItem = SpawnItem(
-            title: "Character",
-            imageName: "",
-            modelFileName: modelName
-        )
-        
-        // 2. Spawn it using your existing method
-        // (Ensure spawnEntity accepts SpawnItem. If it only accepts String, use modelName)
-        spawnEntity(
-            item: specificPoseItem,
-            toolType: .character
-        )
-
-        
-        // 3. Apply Scale to the newly added entity
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self else { return }
-            
-            // Try to find the selected or last added entity
-            if let entity = self.selectedEntity {
-                entity.scale = SIMD3<Float>(repeating: scale)
-            }
-            else if let entity = self.selectedEntity {
-                entity.scale = SIMD3<Float>(repeating: scale)
-            }
-        }
+        dismiss(animated: true)
     }
-    
 }
 
 class EntityActionMenu: UIView {
@@ -2391,6 +2359,37 @@ class EntityActionMenu: UIView {
             }
         }
     }
+    
+        
+        // MARK: - New Top Bar UI Elements
+        
+        private let topBarView: UIView = {
+            let view = UIView()
+            view.backgroundColor = .black // Or .systemBackground / custom dark color
+            view.translatesAutoresizingMaskIntoConstraints = false
+            return view
+        }()
+        
+        private let backButton: UIButton = {
+            let button = UIButton(type: .system)
+            let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+            button.setImage(UIImage(systemName: "chevron.left", withConfiguration: config), for: .normal)
+            button.tintColor = .white
+            button.translatesAutoresizingMaskIntoConstraints = false
+            return button
+        }()
+        
+        private let sceneNameLabel: UILabel = {
+            let label = UILabel()
+            label.text = "Living Room" // Default text
+            label.font = .systemFont(ofSize: 17, weight: .semibold)
+            label.textColor = .white
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            return label
+        }()
+        
+        // ... existing properties ...
     
     private func setupUI() {
         backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
@@ -2434,3 +2433,4 @@ class EntityActionMenu: UIView {
         stackView.addArrangedSubview(line)
     }
 }
+

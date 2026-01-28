@@ -22,6 +22,7 @@ struct SpawnItem {
     
     var poses: [SpawnPose]? = nil
     var detailText: String? = nil
+    var selectedPose: String? = nil
 }
 
 class BackgroundStore {
@@ -75,4 +76,26 @@ extension SpawnItem {
             detailText: prop.description
         )
     }
+    
+    init(camera: CameraLibraryItem) {
+            self.init(
+                title: camera.name,
+                imageName: camera.imageName,
+                // Fallback to empty string if no model is defined, preventing crashes
+                modelFileName: camera.modelFileName ?? "",
+                isBackground: false,
+                // Use the description from the camera library
+                detailText: camera.description
+            )
+        }
+    init(light: LightItem) {
+            self.init(
+                title: light.name,
+                imageName: light.imageName,
+                // Use the modelFileName if it exists, otherwise empty string
+                modelFileName: light.modelFileName ?? "",
+                isBackground: false,
+                detailText: light.description
+            )
+        }
 }

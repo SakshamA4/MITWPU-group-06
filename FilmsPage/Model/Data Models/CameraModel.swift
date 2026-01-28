@@ -13,6 +13,7 @@ struct CameraLibraryItem: Hashable, Identifiable {
     let name: String
     let imageName: String
     let description: String
+    var modelFileName: String? = nil
 }
 
 // MARK: - Section Type

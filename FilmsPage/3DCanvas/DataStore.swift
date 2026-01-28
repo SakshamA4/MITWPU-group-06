@@ -54,22 +54,27 @@ enum ToolType: CaseIterable {
             return PropService.shared.getProps().map { SpawnItem(prop: $0) }
 
         case .camera:
-            return [
-                SpawnItem(
-                    title: "DSLR Camera",
-                    imageName: "DSLR_img",
-                    modelFileName: "cam1"
-                )
-            ]
+                    // 1. Get the 'Cameras' section from your global data store
+                    guard let cameraSection = CameraLibraryDataStore.sections.first(where: { $0.type == .cameras }) else {
+                        return []
+                    }
+            let playableCameras = cameraSection.items.filter { $0.modelFileName != nil }
 
-        case .light:
-            return [
-                SpawnItem(
-                    title: "Spotlight",
-                    imageName: "spotlight_img",
-                    modelFileName: "Spotlight"
-                )
-            ]
+                        // 3. Convert them to SpawnItems
+                        return playableCameras.map { SpawnItem(camera: $0) }
+
+            // In DataStore.swift
+
+                    case .light:
+                        // 1. Access the items directly (since there are no sections)
+                        let allLights = LightsDataStore.items
+                        
+                        // 2. Filter for items that actually have a 3D model
+                        // This ensures only "Spotlight" shows up, and the text-only ones are hidden
+                        let playableLights = allLights.filter { $0.modelFileName != nil }
+
+                        // 3. Convert them to SpawnItems
+                        return playableLights.map { SpawnItem(light: $0) }
 
 
         case .background:

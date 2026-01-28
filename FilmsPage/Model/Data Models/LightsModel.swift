@@ -4,6 +4,7 @@ struct LightItem {
     let name: String
     let imageName: String
     let description: String
+    var modelFileName: String? = nil
 }
 
 struct LightsDataStore {
@@ -42,8 +43,9 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Spotlight",
-            imageName: "Spotlight1",
-            description: "Narrow beam for highlighting specific areas or subjects."
+            imageName: "Spotlight",
+            description: "Narrow beam for highlighting specific areas or subjects.",
+            modelFileName: "Spotlight"
         ),
         LightItem(
             name: "Flood Light",
