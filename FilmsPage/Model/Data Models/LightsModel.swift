@@ -14,7 +14,8 @@ struct LightsDataStore {
         LightItem(
             name: "LED Panel",
             imageName: "LED Panel",        // change to your asset name
-            description: "Soft, even light source ideal for key or fill."
+            description: "Soft, even light source ideal for key or fill.",
+            modelFileName: "LED Panel"
         ),
         LightItem(
             name: "Practical Lantern",
@@ -39,7 +40,8 @@ struct LightsDataStore {
         LightItem(
             name: "Lantern",
             imageName: "Lantern",
-            description: "Soft omnidirectional light often used as a hanging practical."
+            description: "Soft omnidirectional light often used as a hanging practical.",
+            modelFileName: "Lantern 2"
         ),
         LightItem(
             name: "Spotlight",

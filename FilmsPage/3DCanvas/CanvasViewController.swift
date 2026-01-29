@@ -926,66 +926,83 @@ class CanvasViewController: UIViewController {
     }
 
     
-    func spawnEntity(
-        item: SpawnItem,
-        toolType: ToolType,
-        customName: String? = nil,
-        scale: Float = 1.0
-    ) {
+func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil, scale: Float = 1.0) {
         saveCurrentStateToUndo()
-
+        
         Task {
             do {
-                // Special tools
-                if item.modelFileName == "cam1" {
-                    spawnSceneCamera()
-                    return
-                }
-                if item.modelFileName == "cube" {
-                    spawnWall()
-                    return
-                }
-                if item.modelFileName == "ground" {
-                    spawnGround()
-                    return
-                }
-                if item.isBackground {
-                    return
-                }
+                // 1. Initial checks (Camera, Wall, Ground)
+                if item.modelFileName == "cam1" { spawnSceneCamera(); return }
+                if item.modelFileName == "cube" { spawnWall(); return }
+                if item.modelFileName == "ground" { spawnGround(); return }
+                if item.isBackground { return }
 
-                // LOAD FINAL CHARACTER MODEL (POSE INCLUDED)
+                // 2. Load the Entity
                 let entity = try await Entity(named: item.modelFileName)
+                
+                // 📍 STEP A: NORMALIZE (The Permanent Scaling Fix)
+                // We use .relativeTo(nil) to get the true world-space dimensions
+                let bounds = entity.visualBounds(relativeTo: nil)
+                let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+                
+                if maxDim > 0.0001 { // Safety check for empty models
+                    let normalizationFactor = 1.0 / maxDim
+                    entity.scale = SIMD3(repeating: normalizationFactor)
+                }
 
-                // Scale
-                entity.scale = item.modelFileName == "Spotlight"
-                    ? SIMD3(repeating: 0.01)
-                    : SIMD3<Float>(repeating: scale)
+                // 📍 STEP B: APPLY PROP-SPECIFIC SCALES
+                var verticalOffset: Float = 0.0
+                
+                if item.modelFileName == "Spotlight" {
+                    entity.scale = SIMD3(repeating: 0.01)
+                    verticalOffset = 0.25
+                } else if item.modelFileName.contains("LED") {
+                    entity.scale = SIMD3(repeating: 0.01)
+                } else if item.modelFileName.contains("Lantern") {
+                    entity.scale = SIMD3(repeating: 0.0025)
+                    verticalOffset = 0.25
+                } else if item.modelFileName.contains("Plant") {
+                    // Now that it's normalized to 1m, 0.5 makes it exactly 50cm
+                    entity.scale = SIMD3(repeating: 0.01)
+                } else {
+                    // Slider scale (1.0 = 1 meter tall/wide)
+                    entity.scale = SIMD3<Float>(repeating: scale)
+                }
 
-                // Setup
+                // 📍 STEP C: APPLY POSITION
+                let randomX = Float.random(in: -1...1)
+                let randomZ = Float.random(in: -1...1)
+                
+                // Recalculate grounding lift after the final scale is set
+                let finalBounds = entity.visualBounds(relativeTo: nil)
+                let liftToGround = -finalBounds.min.y
+                
+                // Use your manual verticalOffset if it exists, otherwise auto-ground it
+                let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
+                
                 entity.name = customName ?? item.modelFileName
-                entity.position = [
-                    Float.random(in: -1...1),
-                    0,
-                    Float.random(in: -1...1)
-                ]
+                entity.position = [randomX, finalY, randomZ]
 
+                // 3. Components & Light Attachment
                 entity.components.set(CategoryComponent(toolType: toolType))
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
-                // Lights
                 if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
                     addRealLightToModel(entity)
+                } else if item.title.lowercased() == "light" || item.modelFileName == "LED Panel" {
+                    addLEDPanel(to: entity)
+                } else if item.title.lowercased() == "lantern" || item.modelFileName == "Lantern" {
+                    addLantern(to: entity)
                 }
 
-                // Add to scene
+                // 4. Add to Scene
                 if let anchor = arView.scene.findEntity(named: "MainAnchor") {
                     anchor.addChild(entity)
                     self.refreshSidebarContent()
                 }
-
             } catch {
-                print("❌ Failed to load \(item.modelFileName): \(error)")
+                print("Failed to load \(item.modelFileName): \(error)")
             }
         }
     }
@@ -1047,6 +1064,72 @@ class CanvasViewController: UIViewController {
     }
 
 
+    //Export logic starts
+        // 📍 STEP 1: Implement the logic to capture the 3D ARView
+        private func captureCanvasAndShare(isPNG: Bool) {
+            // Hide UI elements you don't want in the final photo
+            layersButton.isHidden = true
+            playbackButtonStack.isHidden = true
+            
+            // Use RealityKit's native snapshot for high-quality 3D rendering
+            arView.snapshot(saveToHDR: false) { [weak self] image in
+                guard let self = self, let image = image else { return }
+                
+                let data: Data? = isPNG ? image.pngData() : image.jpegData(compressionQuality: 0.9)
+                
+                guard let exportData = data, let imageToShare = UIImage(data: exportData) else { return }
+                
+                let activityVC = UIActivityViewController(activityItems: [imageToShare], applicationActivities: nil)
+                
+                // iPad Support
+                if let popover = activityVC.popoverPresentationController {
+                    popover.sourceView = self.view
+                    popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+                }
+                
+                self.present(activityVC, animated: true) {
+                    // Bring UI back after capture
+                    self.layersButton.isHidden = false
+                    self.playbackButtonStack.isHidden = false
+                }
+            }
+        }
+
+        // STEP 2: Update your button tap to show the Project's ExportVC
+        @objc func didTapExportButton() {
+            let exportVC = ExportVC()
+            
+            exportVC.projectName = "Film: Project Alpha"
+            
+            exportVC.onFormatSelected = { [weak self] format in
+                guard let self = self else { return }
+                
+                // 1. Dismiss the modal first
+                exportVC.dismiss(animated: true) {
+                    // 2. Based on the selection, trigger the capture
+                    if format == "JPEG" {
+                        self.captureCanvasAndShare(isPNG: false)
+                    } else if format == "PNG" {
+                        self.captureCanvasAndShare(isPNG: true)
+                    } else {
+                        // Placeholder for PDF/MP4
+                        let alert = UIAlertController(title: "Info", message: "\(format) export coming soon!", preferredStyle: .alert)
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(alert, animated: true)
+                    }
+                }
+            }
+            
+            // 3. Presentation Logic for a nice half-screen sheet
+            if let sheet = exportVC.sheetPresentationController {
+                sheet.detents = [.medium()] // Only takes up half the screen
+                sheet.prefersGrabberVisible = true // Shows the little handle at the top
+            }
+            
+            self.present(exportVC, animated: true)
+        }
+        
+        //export logic ends
 
     
     //light part starts here
@@ -1081,6 +1164,46 @@ class CanvasViewController: UIViewController {
             realLight.addChild(beamVisual)
             
             model.addChild(realLight)
+        }
+    
+    func addLEDPanel(to model: Entity) {
+            let lightGroup = Entity()
+            lightGroup.name = "LED_Guts_Group"
+            
+            // Scale isolation: ensure light math is in meters relative to 0.01 parent scale
+            lightGroup.scale = SIMD3(repeating: 80.0)
+
+            // 1. Setup the SpotLight (The actual light emitter)
+            let ledWash = SpotLight()
+            ledWash.light.intensity = 200000
+            ledWash.light.innerAngleInDegrees = 65
+            ledWash.light.outerAngleInDegrees = 110
+            ledWash.light.color = .white
+            
+            // 📍 PLACEMENT: 1.6m high (center of panel) and 0.02m back from the very front
+            ledWash.position = [0, 1.5, 0.02]
+            ledWash.orientation = simd_quaternion(Float.pi - (.pi*2/3), [0, 1, 0])
+            
+            lightGroup.addChild(ledWash)
+            model.addChild(lightGroup)
+        }
+        
+        func addLantern(to model: Entity) {
+            let lanternGroup = Entity()
+            lanternGroup.name = "Lantern_Guts_Group"
+            
+            lanternGroup.scale = SIMD3(repeating: 80.0)
+            
+            let lanternWash = PointLight()
+            lanternWash.name = "LanternInternalLight"
+            
+            lanternWash.light.intensity = 100000
+            lanternWash.light.color = .systemYellow
+            lanternWash.light.attenuationRadius = 5.0
+            lanternWash.position = [0, 0.5, 0]
+            
+            lanternGroup.addChild(lanternWash)
+            model.addChild(lanternGroup)
         }
 
         func spawnPointLight() {
@@ -1182,22 +1305,19 @@ class CanvasViewController: UIViewController {
         }
 
     private func selectEntityFromSidebar(named name: String) {
-        // 1. Entity in the 3D scene by the name displayed in the row
+
         guard let entity = arView.scene.findEntity(named: name) else { return }
         
-        // 2. Set as selected so Pan/Rotate gestures work on it
+
         self.selectedEntity = entity
-        
-        // 3. Project 3D position to 2D screen coordinates to place the menu correctly
+        self.refreshSidebarContent()
+
         if let screenPosition = arView.project(entity.position(relativeTo: nil)) {
-            
-            // Remove existing menu if any
+        
             currentActionMenu?.removeFromSuperview()
-            
-            // Show the Action Menu exactly where the object is on screen
+
             showActionMenu(at: screenPosition)
             
-            // 4. Visual Feedback: Play a tiny animation so the user sees which one was picked
             if let animation = entity.availableAnimations.first {
                 entity.playAnimation(animation.repeat(count: 1))
             }
@@ -1210,7 +1330,8 @@ class CanvasViewController: UIViewController {
         
         // 2. Set the title and color
         config.title = title
-        config.baseForegroundColor = .systemRed
+        let isSelected = selectedEntity?.name == title
+        config.baseForegroundColor = isSelected ? .systemRed : .label
         
         config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 32, bottom: 4, trailing: 0)
 
@@ -1434,10 +1555,6 @@ class CanvasViewController: UIViewController {
             }
             
         }
-    
-
-
-
     
     
     func showActionMenu(at point: CGPoint) {
