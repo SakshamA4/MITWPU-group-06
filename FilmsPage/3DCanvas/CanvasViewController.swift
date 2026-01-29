@@ -1830,14 +1830,13 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
             let location = gesture.location(in: arView)
 
-            // ─────────────────────────────────────────────
-            // 🔵 STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
-            // ─────────────────────────────────────────────
+
+            //  STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
         if let hit = arView.entity(at: location),
            hit.name.hasPrefix("path."),
            let handleData = hit.components[MotionPathHandleComponent.self] {
 
-            // ✅ ONLY EDIT SELECTED (RED) PATH
+            //  ONLY EDIT SELECTED (RED) PATH
             guard handleData.clipID == selectedPathClipID else {
                 return
             }
@@ -1853,7 +1852,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
             switch gesture.state {
 
 
-                // ───── BEGIN DRAG ─────
+                // BEGIN DRAG
                 case .began:
 
                     lastWorldDragPoint = nil
@@ -1871,7 +1870,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                     return
 
 
-                // ───── DRAGGING ─────
+                //DRAGGING
                 case .changed:
 
                     guard
@@ -1892,13 +1891,13 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                         planeNormal: planeNormal
                     ) else { return }
 
-                    // 🔑 FIRST FRAME — STORE ONLY
+                    //  FIRST FRAME — STORE ONLY
                     if lastWorldDragPoint == nil {
                         lastWorldDragPoint = worldPoint
                         return
                     }
 
-                    // 🔥 DELTA-BASED MOVEMENT
+                    //  DELTA-BASED MOVEMENT
                     let delta = worldPoint - lastWorldDragPoint!
                     lastWorldDragPoint = worldPoint
 
@@ -1927,10 +1926,10 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                     }
 
 
-                    // ✅ move root in WORLD SPACE
+                    //  move root in WORLD SPACE
                     visual.root.position = path.start
 
-                    // ✅ handles in LOCAL SPACE
+                    // handles in LOCAL SPACE
                     visual.startHandle.position = .zero
                     visual.control1Handle.position = path.control1 - path.start
                     visual.control2Handle.position = path.control2 - path.start
@@ -1956,7 +1955,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
 
 
-                // ───── END DRAG ─────
+                //END DRAG
                 case .ended, .cancelled:
 
                     activeDragPlaneNormal = nil
@@ -1969,18 +1968,15 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                 }
             }
 
-            // ─────────────────────────────────────────────
-            // 🟡 STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
-            // ─────────────────────────────────────────────
+
+            //  STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
 
             switch gesture.state {
-
+                
             case .began:
-
                 saveCurrentStateToUndo()
-
+               
                 if let hit = arView.entity(at: location) {
-
                     if hit.name == GizmoNames.xHandle {
                         currentAxis = .x
                     } else if hit.name == GizmoNames.yHandle {
@@ -1990,96 +1986,93 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                     } else {
                         currentAxis = .none
                     }
-
+                   
                     var root: Entity? = hit
-                    while let parent = root?.parent,
-                          parent.name != "MainAnchor" {
+                    while let parent = root?.parent, parent.name != "MainAnchor" {
                         root = parent
                     }
-
+                   
                     selectedEntity = root
                     dragStartPosition = root?.position
                     initialRotation = root?.orientation
-
+                   
                     if interactionMode == .none {
                         interactionMode = .move
                     }
                 }
-
+               
             case .changed:
-
                 guard editorMode == .edit else { return }
-
-                guard let entity = selectedEntity,
-                      let startPos = dragStartPosition else {
+               
+                //If selected entity is locked, orbit camera instead
+                if let entity = selectedEntity {
+                    let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
+                    if isLocked {
+                        handleCameraOrbit(gesture)
+                        return
+                    }
+                }
+               
+                guard let entity = selectedEntity, let startPos = dragStartPosition else {
                     handleCameraOrbit(gesture)
                     return
                 }
-
+               
                 let translation = gesture.translation(in: arView)
-
-                let mouseDelta = SIMD2<Float>(
-                    Float(translation.x),
-                    Float(translation.y)
-                )
-
+                let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
+               
                 switch interactionMode {
-
+                   
                 case .move:
-
                     var newPosition = startPos
-
+                   
                     if currentAxis != .none {
-
                         let moveDelta = calculateAxisMovement(
                             entity: entity,
                             axis: currentAxis,
                             mouseDelta: mouseDelta,
                             view: arView
                         )
-
                         newPosition += moveDelta
-
+                       
                     } else {
-
                         let sensitivity: Float = 0.005
                         let dx = mouseDelta.x * sensitivity
                         let dy = -mouseDelta.y * sensitivity
+                       
+                        if currentDragMode == .ground {
+                            let camOri = arView.cameraTransform.rotation
+                            let right = camOri.act([1, 0, 0])
+                            let forward = camOri.act([0, 0, -1])
 
-                        let camOri = arView.cameraTransform.rotation
-                        let forward = camOri.act([0, 0, 1])
-                        let right = camOri.act([1, 0, 0])
+                            let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
+                            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
 
-                        let flatForward = simd_normalize(
-                            SIMD3<Float>(forward.x, 0, forward.z)
-                        )
-                        let flatRight = simd_normalize(
-                            SIMD3<Float>(right.x, 0, right.z)
-                        )
-
-                        newPosition += flatRight * dx
-                        newPosition += flatForward * dy
-                        newPosition.y = startPos.y
+                            newPosition += (flatRight * dx) + (flatForward * dy)
+                            newPosition.y = startPos.y
+                           
+                        } else {
+                            newPosition.x = startPos.x
+                            newPosition.z = startPos.z
+                            newPosition.y = startPos.y + (dy * 2.0)
+                        }
                     }
-
                     entity.position = newPosition
-
+                   
                 case .rotate:
-
                     let angle = Float(translation.x) * 0.01
-                    let rotation = simd_quatf(angle: -angle, axis: [0, 1, 0])
+                    let rotation = simd_quatf(angle: angle, axis: [0, 1, 0])
                     entity.orientation = rotation * (initialRotation ?? simd_quatf())
-
+                   
                 case .none:
                     break
                 }
-
+               
             case .ended, .cancelled:
-
                 dragStartPosition = nil
                 initialRotation = nil
                 currentAxis = .none
-
+               
             default:
                 break
             }
