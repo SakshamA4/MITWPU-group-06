@@ -2005,7 +2005,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         viewModeControl.selectedSegmentIndex = 1
         viewModeControl.translatesAutoresizingMaskIntoConstraints = false
         viewModeControl.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-        viewModeControl.selectedSegmentTintColor = .systemBlue
+        viewModeControl.selectedSegmentTintColor = UIColor(red: 177/255 , green: 32/255,blue:57/255,alpha: 1.0)
         viewModeControl.setTitleTextAttributes(
             [.foregroundColor: UIColor.white],
             for: .selected
@@ -2072,7 +2072,16 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                 redoBtn.layer.cornerRadius = 20
                 redoBtn.translatesAutoresizingMaskIntoConstraints = false
                 redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
-
+        
+                let exportBtn = UIButton(type: .system)
+                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+                exportBtn.tintColor = .white
+                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+                exportBtn.layer.cornerRadius = 20
+                exportBtn.translatesAutoresizingMaskIntoConstraints = false
+                exportBtn.addTarget(self, action: #selector(didTapExportButton), for: .touchUpInside)
+                
+                view.addSubview(exportBtn)
                 view.addSubview(undoBtn)
                 view.addSubview(redoBtn)
 
@@ -2085,7 +2094,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                NSLayoutConstraint.activate([
                     // Redo Button (Closest to Layers Button)
                     redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-                    redoBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor,constant: -16),
+                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
                     redoBtn.widthAnchor.constraint(equalToConstant: 40),
                     redoBtn.heightAnchor.constraint(equalToConstant: 40),
                     
@@ -2093,8 +2102,18 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                     undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
                     undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
                     undoBtn.widthAnchor.constraint(equalToConstant: 40),
-                    undoBtn.heightAnchor.constraint(equalToConstant: 40)
+                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
                 ])
+        
+        NSLayoutConstraint.activate([
+                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+                            // Place it to the left of your Undo button
+                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
+                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
+                        ])
+
+
                 //new undo redo ends
 
         // 7. CONSTRAINTS
@@ -2214,7 +2233,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         let closeBtn = UIButton(type: .system)
         closeBtn.setImage(UIImage(systemName: "xmark", withConfiguration: config), for: .normal)
         closeBtn.tintColor = .white
-        closeBtn.backgroundColor = .systemGray
+        closeBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         closeBtn.layer.cornerRadius = 20
         closeBtn.translatesAutoresizingMaskIntoConstraints = false
         closeBtn.addTarget(self, action: #selector(didTapLayersButton), for: .touchUpInside)
@@ -2537,7 +2556,7 @@ class EntityActionMenu: UIView {
         let btn = UIButton(type: .system)
         btn.setTitle(title, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 17, weight: .regular)
-        btn.tintColor = isDestructive ? .systemRed : .label
+        btn.tintColor = isDestructive ? UIColor(red: 169/255 , green: 32/255, blue: 57/255, alpha: 1) : .label
         btn.addAction(UIAction { [weak self] _ in self?.onAction?(action) }, for: .touchUpInside)
         stackView.addArrangedSubview(btn)
     }

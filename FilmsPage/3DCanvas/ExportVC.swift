@@ -8,39 +8,39 @@ class ExportVC: UIViewController {
     
     private var selectedFormat: String = "JPEG"
     private var selectedQuality: String = "High"
-
+    
     // MARK: - UI Components
     private lazy var projectTitleLabel: UILabel = {
-            let label = UILabel()
-            label.text = projectName.uppercased()
-            label.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-            label.textColor = .systemGray
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            return label
-        }()
+        let label = UILabel()
+        label.text = "PROJECT: \(projectName.uppercased())"
+        label.font = UIFont.systemFont(ofSize: 12, weight: .black)
+        label.textColor = .lightGray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
     
     private lazy var formatStackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .horizontal
         stack.distribution = .fillEqually
-        stack.spacing = 16
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
-
+    
     private lazy var qualityStackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .horizontal
-        stack.spacing = 10
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
-
+    
     private lazy var headerLabel: UILabel = {
         let label = UILabel()
         label.text = "Export Options"
-        label.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        label.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -50,7 +50,6 @@ class ExportVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Match the Dark Navy theme of your main project
         view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1.0)
         
         setupHeader()
@@ -60,9 +59,11 @@ class ExportVC: UIViewController {
         updateFormatButtonAppearance(selectedFormat)
         updateQualityButtonAppearance(selectedQuality)
     }
-
+    
     private func setupHeader() {
         view.addSubview(headerLabel)
+        view.addSubview(projectTitleLabel)
+        view.addSubview(formatStackView)
         
         // Add a close button (top left corner)
         let closeButton = UIButton(type: .system)
@@ -71,10 +72,13 @@ class ExportVC: UIViewController {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
         view.addSubview(closeButton)
-
+        
         NSLayoutConstraint.activate([
             headerLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             headerLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+            
+            projectTitleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            projectTitleLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 4),
             
             closeButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             closeButton.centerYAnchor.constraint(equalTo: headerLabel.centerYAnchor)
@@ -86,7 +90,8 @@ class ExportVC: UIViewController {
         let formatContainer = UIView()
         formatContainer.translatesAutoresizingMaskIntoConstraints = false
         formatContainer.addSubview(formatStackView)
-        
+        formatStackView.distribution = .fill // Change from .fillEqually if it feels too stretched
+        formatStackView.spacing = 16
         let formats = ["JPEG", "PNG", "PDF", "MP4"]
         
         for format in formats {
@@ -96,14 +101,13 @@ class ExportVC: UIViewController {
         
         view.addSubview(formatLabel)
         view.addSubview(formatContainer)
-
+        
         NSLayoutConstraint.activate([
             formatLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             formatLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 60),
             
-            formatContainer.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 20),
+            formatContainer.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 12),
             formatContainer.centerYAnchor.constraint(equalTo: formatLabel.centerYAnchor),
-            formatContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
             formatStackView.topAnchor.constraint(equalTo: formatContainer.topAnchor),
             formatStackView.bottomAnchor.constraint(equalTo: formatContainer.bottomAnchor),
@@ -111,39 +115,47 @@ class ExportVC: UIViewController {
             formatStackView.trailingAnchor.constraint(equalTo: formatContainer.trailingAnchor)
         ])
     }
-    
     private func setupQualitySelection() {
         let qualityLabel = createSubtitleLabel(text: "Quality:")
-        let qualityContainer = UIView()
-        qualityContainer.translatesAutoresizingMaskIntoConstraints = false
-        qualityContainer.addSubview(qualityStackView)
+        view.addSubview(qualityLabel)
+        qualityStackView.distribution = .fill
+        qualityStackView.spacing = 16
+        view.addSubview(qualityStackView)
+        qualityStackView.isUserInteractionEnabled = true
+        qualityStackView.axis = .horizontal
+        qualityStackView.alignment = .fill
+        qualityStackView.distribution = .fill
+        qualityStackView.spacing = 16
         
         let qualities = ["High", "Good"]
-        
         for quality in qualities {
             let button = createSelectionButton(title: quality, action: #selector(didTapQualityButton(_:)))
+            button.accessibilityIdentifier = quality
             qualityStackView.addArrangedSubview(button)
         }
         
-        view.addSubview(qualityLabel)
-        view.addSubview(qualityContainer)
-
+        // 2. 📍 Ensure we have the top row buttons to match sizes
+        guard let jpegBtn = formatStackView.arrangedSubviews.first as? UIButton,
+              let pngBtn = formatStackView.arrangedSubviews.count > 1 ? formatStackView.arrangedSubviews[1] as? UIButton : nil
+        else { return }
+        
         NSLayoutConstraint.activate([
             qualityLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            
-            // 📍 THE FIX: Anchor to the stack view which IS in scope
             qualityLabel.topAnchor.constraint(equalTo: formatStackView.bottomAnchor, constant: 40),
             
-            qualityContainer.leadingAnchor.constraint(equalTo: qualityLabel.trailingAnchor, constant: 20),
-            qualityContainer.centerYAnchor.constraint(equalTo: qualityLabel.centerYAnchor),
+            // 3. 📍 Anchor the stack directly to the top row's leading edge
+            qualityStackView.leadingAnchor.constraint(equalTo: formatStackView.leadingAnchor),
+            qualityStackView.centerYAnchor.constraint(equalTo: qualityLabel.centerYAnchor),
             
-            qualityStackView.topAnchor.constraint(equalTo: qualityContainer.topAnchor),
-            qualityStackView.bottomAnchor.constraint(equalTo: qualityContainer.bottomAnchor),
-            qualityStackView.leadingAnchor.constraint(equalTo: qualityContainer.leadingAnchor),
-            qualityStackView.trailingAnchor.constraint(equalTo: qualityContainer.trailingAnchor)
+            // 4. 📍 Match High to JPEG and Good to PNG
+            (qualityStackView.arrangedSubviews[0]).widthAnchor.constraint(equalTo: jpegBtn.widthAnchor),
+            (qualityStackView.arrangedSubviews[1]).widthAnchor.constraint(equalTo: pngBtn.widthAnchor),
+            
+            // 5. 📍 Match the height of the format stack
+            qualityStackView.heightAnchor.constraint(equalTo: formatStackView.heightAnchor)
         ])
     }
-
+    
     // MARK: - UI Helper Functions
     
     private func createSubtitleLabel(text: String) -> UILabel {
@@ -159,15 +171,17 @@ class ExportVC: UIViewController {
         let button = UIButton(type: .system)
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
-        button.setTitleColor(.lightGray, for: .normal)
-        button.backgroundColor = UIColor(white: 0.3, alpha: 0.5)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = UIColor(white: 0.1, alpha: 0.5)
         button.layer.cornerRadius = 6
         button.translatesAutoresizingMaskIntoConstraints = false
         button.accessibilityIdentifier = title
+        button.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 40).isActive = true
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
-
+    
     // MARK: - Action Handlers
     
     @objc private func didTapClose() {
@@ -179,35 +193,46 @@ class ExportVC: UIViewController {
         selectedFormat = title
         updateFormatButtonAppearance(title)
         
-        // ⚡️ IMMEDIATELY TRIGGER EXPORT:
-        // Since the button is in the CanvasVC, clicking the format here
-        // acts as the final confirmation.
         onFormatSelected?(selectedFormat)
     }
     
     @objc private func didTapQualityButton(_ sender: UIButton) {
+        print("Button tapped with ID: \(sender.accessibilityIdentifier ?? "NIL")")
+        
         guard let title = sender.accessibilityIdentifier else { return }
         selectedQuality = title
         updateQualityButtonAppearance(title)
     }
-
+    
     private func updateFormatButtonAppearance(_ selectedTitle: String) {
-        for view in formatStackView.arrangedSubviews {
-            if let button = view as? UIButton {
-                let isSelected = (button.accessibilityIdentifier == selectedTitle)
-                button.backgroundColor = isSelected ? .systemBlue : UIColor(white: 0.3, alpha: 0.5)
-                button.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
-            }
+        let appRed = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1.0)
+        
+        formatStackView.arrangedSubviews.compactMap { $0 as? UIButton }.forEach { btn in
+            let isSelected = btn.accessibilityIdentifier == selectedTitle
+            
+            
+            btn.backgroundColor = isSelected ? appRed : UIColor.white.withAlphaComponent(0.05)
+            btn.layer.borderWidth = isSelected ? 0 : 1
+            btn.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
+            
+            // Ensure text is white when selected for contrast
+            btn.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
         }
     }
     
     private func updateQualityButtonAppearance(_ selectedTitle: String) {
-        for view in qualityStackView.arrangedSubviews {
-            if let button = view as? UIButton {
-                let isSelected = (button.accessibilityIdentifier == selectedTitle)
-                button.backgroundColor = isSelected ? .systemGray : UIColor(white: 0.3, alpha: 0.5)
-                button.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
-            }
+        let appRed = UIColor(red: 169/255, green: 32/255, blue: 57/255, alpha: 1.0)
+        
+        qualityStackView.arrangedSubviews.compactMap { $0 as? UIButton }.forEach { btn in
+            let isSelected = btn.accessibilityIdentifier == selectedTitle
+            
+            if isSelected { print("📍 UI Success: Selected \(selectedTitle)") }
+            
+            btn.layer.borderWidth = isSelected ? 0 : 1
+            btn.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
+            btn.backgroundColor = isSelected ? appRed : UIColor.white.withAlphaComponent(0.05)
+            
+            btn.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
         }
     }
 }
