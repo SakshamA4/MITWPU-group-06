@@ -69,6 +69,35 @@ struct AnimationClip: Identifiable, Codable {
     // Track-specific values
     let fromValue: SIMD3<Float>
     let toValue: SIMD3<Float>
+    
+    var motionPath: BezierMotionPath?
+
+    struct DragPlane {
+
+        var normal: SIMD3<Float>
+        var point: SIMD3<Float>
+
+        func intersect(
+            rayOrigin: SIMD3<Float>,
+            rayDirection: SIMD3<Float>
+        ) -> SIMD3<Float>? {
+
+            let denom = simd_dot(normal, rayDirection)
+
+            // Parallel → no hit
+            if abs(denom) < 0.0001 {
+                return nil
+            }
+
+            let t = simd_dot(point - rayOrigin, normal) / denom
+
+            if t < 0 {
+                return nil
+            }
+
+            return rayOrigin + rayDirection * t
+        }
+    }
 
     init(
         entityName: String,
@@ -78,7 +107,8 @@ struct AnimationClip: Identifiable, Codable {
         startTime: Float,
         duration: Float,
         fromValue: SIMD3<Float>,
-        toValue: SIMD3<Float>
+        toValue: SIMD3<Float>,
+        motionPath: BezierMotionPath? = nil
     ) {
         self.id = UUID()
         self.entityName = entityName
@@ -89,7 +119,25 @@ struct AnimationClip: Identifiable, Codable {
         self.duration = duration
         self.fromValue = fromValue
         self.toValue = toValue
+        self.motionPath = motionPath
     }
+}
+struct MotionPathVisual {
+
+    let root: Entity
+    let startHandle: ModelEntity
+    let control1Handle: ModelEntity
+    let control2Handle: ModelEntity
+    let endHandle: ModelEntity
+
+    func update(path: BezierMotionPath) {
+
+        startHandle.position = path.start
+        control1Handle.position = path.control1
+        control2Handle.position = path.control2
+        endHandle.position = path.end
+    }
+
 }
 
 
@@ -158,6 +206,25 @@ extension Transform {
         )
     }
 }
+
+func rayPlaneIntersection(
+    rayOrigin: SIMD3<Float>,
+    rayDirection: SIMD3<Float>,
+    planePoint: SIMD3<Float>,
+    planeNormal: SIMD3<Float>
+) -> SIMD3<Float>? {
+
+    let denom = simd_dot(planeNormal, rayDirection)
+
+    if abs(denom) < 0.0001 { return nil }
+
+    let t = simd_dot(planePoint - rayOrigin, planeNormal) / denom
+
+    if t < 0 { return nil }
+
+    return rayOrigin + rayDirection * t
+}
+
 func applyEasing(_ t: Float, easing: EasingType) -> Float {
     switch easing {
     case .linear:
@@ -176,13 +243,12 @@ func applyEasing(_ t: Float, easing: EasingType) -> Float {
 class CanvasViewController: UIViewController {
     
     var undoStack: [SceneSnapshot] = []
-        var redoStack: [SceneSnapshot] = []
+    var redoStack: [SceneSnapshot] = []
         func saveCurrentStateToUndo() {
             let allEntities = arView.scene.anchors.flatMap { $0.children }
             var snapshotDict: [String: Transform] = [:]
             
             for entity in allEntities {
-                // We use the entity's name as the key to find it later
                 snapshotDict[entity.name] = entity.transform
             }
             
@@ -336,12 +402,7 @@ class CanvasViewController: UIViewController {
         var stopButton: UIButton!
         var pauseButton: UIButton!
         var playbackButtonStack: UIStackView!
-
-
-        
         var scrubber: UISlider!
-        
-
         var displayLink: CADisplayLink?
         var playbackStartTime: CFTimeInterval = 0
         var currentTimelineTime: Float = 0
@@ -354,525 +415,681 @@ class CanvasViewController: UIViewController {
 
         var playbackState: PlaybackState = .stopped
         var baseTransforms: [String: Transform] = [:]
+        var selectedPathClipID: UUID?
 
+    func setupTimelineControls() {
 
+        timelineContainer = UIView()
+        timelineContainer.translatesAutoresizingMaskIntoConstraints = false
+        timelineContainer.backgroundColor = UIColor.systemGray6
+        timelineContainer.layer.borderWidth = 1
+        timelineContainer.layer.borderColor = UIColor.systemGray3.cgColor
+        timelineContainer.isHidden = true
+        
+        view.addSubview(timelineContainer)
 
-        func setupTimelineControls() {
+        playButton = UIButton(type: .system)
+        playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
+        playButton.tintColor = .white
+        playButton.backgroundColor = .systemGreen
+        playButton.layer.cornerRadius = 22
+        playButton.translatesAutoresizingMaskIntoConstraints = false
+        playButton.addTarget(self, action: #selector(playTimeline), for: .touchUpInside)
+        
+        
+        pauseButton = UIButton(type: .system)
+        pauseButton.setImage(UIImage(systemName: "pause.fill"), for: .normal)
+        pauseButton.tintColor = .white
+        pauseButton.backgroundColor = .systemOrange
+        pauseButton.layer.cornerRadius = 22
+        pauseButton.translatesAutoresizingMaskIntoConstraints = false
+        pauseButton.isHidden = true
+        pauseButton.addTarget(self, action: #selector(pauseTimeline), for: .touchUpInside)
+        
+        
+        stopButton = UIButton(type: .system)
+        stopButton.setImage(UIImage(systemName: "stop.fill"), for: .normal)
+        stopButton.tintColor = .white
+        stopButton.backgroundColor = .systemRed
+        stopButton.layer.cornerRadius = 22
+        stopButton.translatesAutoresizingMaskIntoConstraints = false
+        stopButton.isHidden = true
+        stopButton.addTarget(self, action: #selector(stopTimeline), for: .touchUpInside)
+        
+        playbackButtonStack = UIStackView(arrangedSubviews: [
+            playButton,
+            pauseButton,
+            stopButton
+        ])
+        playbackButtonStack.axis = .horizontal
+        playbackButtonStack.spacing = 12
+        playbackButtonStack.alignment = .center
+        playbackButtonStack.distribution = .equalSpacing
+        playbackButtonStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        view.addSubview(playbackButtonStack)
+        
+        // Constraints
+        
+        NSLayoutConstraint.activate([
+            
+            // Timeline container (bottom)
+            timelineContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            timelineContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            timelineContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            timelineContainer.heightAnchor.constraint(equalToConstant: 120),
+            
+            // Playback buttons (bottom-left, above timeline)
+            playbackButtonStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            playbackButtonStack.bottomAnchor.constraint(
+                equalTo: timelineContainer.topAnchor,
+                constant: -12
+            ),
+            
+            // Button sizes (explicit, consistent)
+            playButton.widthAnchor.constraint(equalToConstant: 44),
+            playButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            pauseButton.widthAnchor.constraint(equalToConstant: 44),
+            pauseButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            stopButton.widthAnchor.constraint(equalToConstant: 44),
+            stopButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
+        
+        // Scrubber
+        
+        setupScrubber()
+    }
+    
+    func updatePathSelection() {
 
+        for (clipID, visual) in activeMotionPaths {
 
-            timelineContainer = UIView()
-            timelineContainer.translatesAutoresizingMaskIntoConstraints = false
-            timelineContainer.backgroundColor = UIColor.systemGray6
-            timelineContainer.layer.borderWidth = 1
-            timelineContainer.layer.borderColor = UIColor.systemGray3.cgColor
-            timelineContainer.isHidden = true
+            guard
+                let pathEntity = visual.root
+                    .findEntity(named: "MotionPath") as? ModelEntity
+            else { continue }
 
-            view.addSubview(timelineContainer)
+            let color: UIColor =
+                (clipID == selectedPathClipID)
+                ? .systemRed
+                : .systemBlue
 
-
-            playButton = UIButton(type: .system)
-            playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
-            playButton.tintColor = .white
-            playButton.backgroundColor = .systemGreen
-            playButton.layer.cornerRadius = 22
-            playButton.translatesAutoresizingMaskIntoConstraints = false
-            playButton.addTarget(self, action: #selector(playTimeline), for: .touchUpInside)
-
-
-            pauseButton = UIButton(type: .system)
-            pauseButton.setImage(UIImage(systemName: "pause.fill"), for: .normal)
-            pauseButton.tintColor = .white
-            pauseButton.backgroundColor = .systemOrange
-            pauseButton.layer.cornerRadius = 22
-            pauseButton.translatesAutoresizingMaskIntoConstraints = false
-            pauseButton.isHidden = true
-            pauseButton.addTarget(self, action: #selector(pauseTimeline), for: .touchUpInside)
-
-
-            stopButton = UIButton(type: .system)
-            stopButton.setImage(UIImage(systemName: "stop.fill"), for: .normal)
-            stopButton.tintColor = .white
-            stopButton.backgroundColor = .systemRed
-            stopButton.layer.cornerRadius = 22
-            stopButton.translatesAutoresizingMaskIntoConstraints = false
-            stopButton.isHidden = true
-            stopButton.addTarget(self, action: #selector(stopTimeline), for: .touchUpInside)
-
-
-
-            playbackButtonStack = UIStackView(arrangedSubviews: [
-                playButton,
-                pauseButton,
-                stopButton
-            ])
-            playbackButtonStack.axis = .horizontal
-            playbackButtonStack.spacing = 12
-            playbackButtonStack.alignment = .center
-            playbackButtonStack.distribution = .equalSpacing
-            playbackButtonStack.translatesAutoresizingMaskIntoConstraints = false
-
-            view.addSubview(playbackButtonStack)
-
-
-            // Constraints
-
-            NSLayoutConstraint.activate([
-
-                // Timeline container (bottom)
-                timelineContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                timelineContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                timelineContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-                timelineContainer.heightAnchor.constraint(equalToConstant: 120),
-
-                // Playback buttons (bottom-left, above timeline)
-                playbackButtonStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-                playbackButtonStack.bottomAnchor.constraint(
-                    equalTo: timelineContainer.topAnchor,
-                    constant: -12
-                ),
-
-                // Button sizes (explicit, consistent)
-                playButton.widthAnchor.constraint(equalToConstant: 44),
-                playButton.heightAnchor.constraint(equalToConstant: 44),
-
-                pauseButton.widthAnchor.constraint(equalToConstant: 44),
-                pauseButton.heightAnchor.constraint(equalToConstant: 44),
-
-                stopButton.widthAnchor.constraint(equalToConstant: 44),
-                stopButton.heightAnchor.constraint(equalToConstant: 44),
-            ])
-
-            // Scrubber
-
-            setupScrubber()
+            MotionPathRenderer.setPathColor(
+                entity: pathEntity,
+                color: color
+            )
         }
+    }
 
-
-        @objc func playTimeline() {
-
-            // RESUME FROM PAUSE
-
-            if playbackState == .paused {
-                // Adjust start time so playback resumes correctly
-                playbackStartTime = CACurrentMediaTime()
-                    - CFTimeInterval(currentTimelineTime)
-
-                startPlayback()
-                playbackState = .playing
-
-                playButton.isHidden = true
-                pauseButton.isHidden = false
-                stopButton.isHidden = false
-
-                return
-            }
-
-
-            // START FROM BEGINNING
-
-            guard editorMode == .edit else { return }
-            guard !timeline.clips.isEmpty else { return }
-
-            enterTimelineMode()
-
-            // Show timeline UI
-            timelineContainer.isHidden = false
+    
+    @objc func playTimeline() {
+        
+        // RESUME FROM PAUSE
+        
+        if playbackState == .paused {
+            // Adjust start time so playback resumes correctly
+            playbackStartTime = CACurrentMediaTime()
+            - CFTimeInterval(currentTimelineTime)
+            
+            startPlayback()
+            playbackState = .playing
+            
             playButton.isHidden = true
             pauseButton.isHidden = false
             stopButton.isHidden = false
             
-
-            // Setup scrubber
-            scrubber.minimumValue = 0
-            scrubber.maximumValue = timeline.duration
-            scrubber.value = 0
-
-            // Reset timeline time
-            currentTimelineTime = 0
-            playbackStartTime = CACurrentMediaTime()
-            playbackState = .playing
-
-            // Start playback loop
-            startPlayback()
+            return
         }
 
+        // START FROM BEGINNING
         
-        @objc func pauseTimeline() {
-            guard playbackState == .playing else { return }
-
-            stopPlayback()
-            playbackState = .paused
-
-            pauseButton.isHidden = true
-            playButton.isHidden = false
+        guard editorMode == .edit else { return }
+        guard !timeline.clips.isEmpty else { return }
+        
+        enterTimelineMode()
+        
+        // Show timeline UI
+        timelineContainer.isHidden = false
+        playButton.isHidden = true
+        pauseButton.isHidden = false
+        stopButton.isHidden = false
+        
+        
+        // Setup scrubber
+        scrubber.minimumValue = 0
+        scrubber.maximumValue = timeline.duration
+        scrubber.value = 0
+        
+        // Reset timeline time
+        currentTimelineTime = 0
+        playbackStartTime = CACurrentMediaTime()
+        playbackState = .playing
+        
+        // Start playback loop
+        startPlayback()
+    }
+    
+    
+    @objc func pauseTimeline() {
+        guard playbackState == .playing else { return }
+        
+        stopPlayback()
+        playbackState = .paused
+        
+        pauseButton.isHidden = true
+        playButton.isHidden = false
+        
+    }
+    
+    
+    func startPlayback() {
+        stopPlayback() // safety
+        
+        displayLink = CADisplayLink(
+            target: self,
+            selector: #selector(updatePlayback)
+        )
+        displayLink?.add(to: .main, forMode: .common)
+    }
+    
+    func stopPlayback() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+    
+    @objc func updatePlayback() {
+        let elapsed = Float(CACurrentMediaTime() - playbackStartTime)
+        currentTimelineTime = elapsed
+        
+        if currentTimelineTime >= timeline.duration {
+            stopTimeline()
+            return
+        }
+        
+        scrubber.value = currentTimelineTime
+        evaluateTimeline(at: currentTimelineTime)
+    }
+    
+    
+    @objc func stopTimeline() {
+        guard editorMode == .timeline else { return }
+        
+        stopPlayback()
+        playbackState = .stopped
+        
+        
+        scrubber.value = 0
+        currentTimelineTime = 0
+        playbackStartTime = 0
+        
+        exitTimelineMode()
+        
+        timelineContainer.isHidden = true
+        playButton.isHidden = false
+        stopButton.isHidden = true
+        pauseButton.isHidden = true
+        
+        // Re-evaluate timeline at t = 0 so objects
+        // snap back to their initial transforms
+        evaluateTimeline(at: 0)
+    }
+    
+    
+    func evaluateTimeline(at time: Float) {
+        
+        let clipsByEntity = Dictionary(
+            grouping: timeline.effectiveClips(at: time),
+            by: { $0.entityName }
+        )
+        
+        for (entityName, clips) in clipsByEntity {
             
-        }
-
-
-        func startPlayback() {
-            stopPlayback() // safety
-
-            displayLink = CADisplayLink(
-                target: self,
-                selector: #selector(updatePlayback)
-            )
-            displayLink?.add(to: .main, forMode: .common)
-        }
-
-        func stopPlayback() {
-            displayLink?.invalidate()
-            displayLink = nil
-        }
-
-        @objc func updatePlayback() {
-            let elapsed = Float(CACurrentMediaTime() - playbackStartTime)
-            currentTimelineTime = elapsed
-
-            if currentTimelineTime >= timeline.duration {
-                stopTimeline()
-                return
-            }
-
-            scrubber.value = currentTimelineTime
-            evaluateTimeline(at: currentTimelineTime)
-        }
-
-
-        @objc func stopTimeline() {
-            guard editorMode == .timeline else { return }
-
-            stopPlayback()
-            playbackState = .stopped
+            guard
+                let entity = arView.scene.findEntity(named: entityName),
+                let baseTransform = baseTransforms[entityName]
+            else { continue }
             
-
-            scrubber.value = 0
-            currentTimelineTime = 0
-            playbackStartTime = 0
-
-            exitTimelineMode()
-
-            timelineContainer.isHidden = true
-            playButton.isHidden = false
-            stopButton.isHidden = true
-            pauseButton.isHidden = true
+            var translation = baseTransform.translation
+            var rotation = baseTransform.rotation
+            var scale = baseTransform.scale
             
-            evaluateTimeline(at: 0)
-        }
-
-
-        func evaluateTimeline(at time: Float) {
-
-            let clipsByEntity = Dictionary(
-                grouping: timeline.effectiveClips(at: time),
-                by: { $0.entityName }
-            )
-
-            for (entityName, clips) in clipsByEntity {
-
-                guard
-                    let entity = arView.scene.findEntity(named: entityName),
-                    let baseTransform = baseTransforms[entityName]
-                else { continue }
-
-                var translation = baseTransform.translation
-                var rotation = baseTransform.rotation
-                var scale = baseTransform.scale
-
-                // Sort clips by start time (important!)
-                let sortedClips = clips.sorted { $0.startTime < $1.startTime }
-
-                for clip in sortedClips {
-
-                    let localTime = time - clip.startTime
-
-                    let progress: Float
-                    if localTime <= 0 {
-                        continue
-                    } else if localTime >= clip.duration {
-                        progress = 1
-                    } else {
-                        progress = localTime / clip.duration
-                    }
-
-                    let eased = applyEasing(progress, easing: clip.easing)
-
-                    let value = simd_mix(
-                        clip.fromValue,
-                        clip.toValue,
-                        SIMD3<Float>(repeating: eased)
-                    )
-
-                    switch clip.track {
-
-                    case .position:
-                        translation += value
-
-                    case .rotation:
-                        let delta = simd_quatf(
-                            angle: value.y,
-                            axis: [0, 1, 0]
-                        )
-                        rotation = delta * rotation
-
-                    case .scale:
-                        scale *= value
-                    }
+            // Sort clips by start time (important!)
+            let sortedClips = clips.sorted { $0.startTime < $1.startTime }
+            
+            for clip in sortedClips {
+                
+                let localTime = time - clip.startTime
+                
+                let progress: Float
+                if localTime <= 0 {
+                    continue
+                } else if localTime >= clip.duration {
+                    progress = 1          // 🔑 HOLD FINAL VALUE
+                } else {
+                    progress = localTime / clip.duration
                 }
-
-                entity.transform = Transform(
-                    scale: scale,
-                    rotation: rotation,
-                    translation: translation
+                
+                let eased = applyEasing(progress, easing: clip.easing)
+                
+                let value = simd_mix(
+                    clip.fromValue,
+                    clip.toValue,
+                    SIMD3<Float>(repeating: eased)
                 )
+                
+                switch clip.track {
+                    
+                case .position:
+
+                    if let path = clip.motionPath {
+
+                        let t = max(
+                            0,
+                            min(1,
+                                (time - clip.startTime) / clip.duration
+                            )
+                        )
+
+                        translation = path.evaluateConstantSpeed(t)
+
+                    }
+
+                case .rotation:
+                    let delta = simd_quatf(
+                        angle: value.y,
+                        axis: [0, 1, 0]
+                    )
+                    rotation = delta * rotation
+                    
+                case .scale:
+                    scale *= value
+                }
             }
+            
+            entity.transform = Transform(
+                scale: scale,
+                rotation: rotation,
+                translation: translation
+            )
+        }
+    }
+    
+    // MARK: - Motion Path Rendering
+    func makePathHandle(
+        color: UIColor,
+        name: String
+    ) -> ModelEntity {
+
+        // small visible handle
+        let mesh = MeshResource.generateSphere(radius: 0.04)
+
+        let material = SimpleMaterial(
+            color: color,
+            roughness: 0.2,
+            isMetallic: true
+        )
+
+        let handle = ModelEntity(mesh: mesh, materials: [material])
+        handle.name = name
+
+        // LARGE invisible touch radius
+        let collision = CollisionComponent(
+            shapes: [.generateSphere(radius: 0.15)]
+        )
+
+        handle.components.set(collision)
+        handle.components.set(InputTargetComponent())
+
+        return handle
+    }
+
+    func showMotionPath(for clip: AnimationClip) {
+
+        guard let path = clip.motionPath else { return }
+
+        // remove previous
+        activeMotionPaths[clip.id]?.root.removeFromParent()
+
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else {
+            return
         }
 
-        
-        // MARK: - Timeline
-        var timeline = Timeline()
+        let pathRoot = Entity()
+        pathRoot.name = "PathRoot_\(clip.id)"
 
-        func debugPrintTimeline() {
-            print("📽 Timeline Clips:")
-            for clip in timeline.clips {
-                print("""
+        pathRoot.position = path.start
+
+        let start = makePathHandle(color: .gray, name: "path.start")
+        let c1    = makePathHandle(color: .orange, name: "path.c1")
+        let c2    = makePathHandle(color: .orange, name: "path.c2")
+        let end   = makePathHandle(color: .systemBlue, name: "path.end")
+        
+        start.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+
+        c1.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+
+        c2.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+
+        end.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+
+
+        start.position = .zero
+        c1.position = path.control1 - path.start
+        c2.position = path.control2 - path.start
+        end.position = path.end - path.start
+
+
+        let curve = MotionPathRenderer.makePathEntity(path: path)
+        curve.name = "MotionPath"
+        
+        curve.position = .zero
+        curve.orientation = simd_quatf()
+        curve.scale = .one
+
+        pathRoot.addChild(curve)
+        pathRoot.addChild(start)
+        pathRoot.addChild(c1)
+        pathRoot.addChild(c2)
+        pathRoot.addChild(end)
+
+        anchor.addChild(pathRoot)
+
+        activeMotionPaths[clip.id] = MotionPathVisual(
+            root: pathRoot,
+            startHandle: start,
+            control1Handle: c1,
+            control2Handle: c2,
+            endHandle: end
+        )
+    }
+
+    // MARK: - Motion Path Handle Ownership
+
+    struct MotionPathHandleComponent: Component {
+        let clipID: UUID
+    }
+    // MARK: - Timeline
+    var timeline = Timeline()
+    
+    // MARK: - Motion Path
+    
+    
+    // MARK: - World-Space Path Dragging
+
+    var lastWorldDragPoint: SIMD3<Float>?
+
+    var activeDragPlaneNormal: SIMD3<Float>?
+    var activeDragPlanePoint: SIMD3<Float>?
+        
+    var initialHandleOffset: SIMD3<Float> = .zero
+
+    var activeMotionPaths: [UUID: MotionPathVisual] = [:]
+        
+    func debugPrintTimeline() {
+        print("Timeline Clips:")
+        for clip in timeline.clips {
+            print("""
                 ├─ \(clip.type.rawValue.uppercased())
                    Entity: \(clip.entityName)
                    Start: \(clip.startTime)s
                    Duration: \(clip.duration)s
                 """)
+        }
+    }
+    
+    func setupScrubber() {
+        
+        scrubber = UISlider()
+        scrubber.translatesAutoresizingMaskIntoConstraints = false
+        scrubber.minimumValue = 0
+        scrubber.maximumValue = 1
+        scrubber.value = 0
+        
+        scrubber.addTarget(
+            self,
+            action: #selector(scrubberChanged(_:)),
+            for: .valueChanged
+        )
+        
+        timelineContainer.addSubview(scrubber)
+        
+        NSLayoutConstraint.activate([
+            scrubber.leadingAnchor.constraint(equalTo: timelineContainer.leadingAnchor, constant: 16),
+            scrubber.trailingAnchor.constraint(equalTo: timelineContainer.trailingAnchor, constant: -16),
+            scrubber.centerYAnchor.constraint(equalTo: timelineContainer.centerYAnchor)
+        ])
+    }
+    
+    @objc func scrubberChanged(_ sender: UISlider) {
+        let time = sender.value
+        evaluateTimeline(at: time)
+    }
+    
+    func makeRay(from screenPoint: CGPoint)
+    -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+
+        guard let ray = arView.ray(through: screenPoint) else {
+
+            // fallback forward ray
+            let cam = arView.cameraTransform
+            let forward = cam.rotation.act([0, 0, -1])
+            return (cam.translation, forward)
+        }
+
+        return (ray.origin, ray.direction)
+    }
+
+    
+    
+    // MARK: - Editor Mode
+    var editorMode: EditorMode = .edit
+    
+    enum EditorMode {
+        case edit
+        case timeline
+    }
+    
+    func enterTimelineMode() {
+        editorMode = .timeline
+        hideAnimationPanel()
+        selectedEntity = nil
+        
+        baseTransforms.removeAll()
+        
+        for anchor in arView.scene.anchors {
+            for entity in anchor.children {
+                baseTransforms[entity.name] = entity.transform
             }
         }
+    }
+    
+    
+    func exitTimelineMode() {
+        editorMode = .edit
         
-        func setupScrubber() {
-
-            scrubber = UISlider()
-            scrubber.translatesAutoresizingMaskIntoConstraints = false
-            scrubber.minimumValue = 0
-            scrubber.maximumValue = 1
-            scrubber.value = 0
-
-            scrubber.addTarget(
-                self,
-                action: #selector(scrubberChanged(_:)),
-                for: .valueChanged
+        for (name, transform) in baseTransforms {
+            arView.scene.findEntity(named: name)?.transform = transform
+        }
+        
+        baseTransforms.removeAll()
+    }
+    // MARK: - Animation UI
+    
+    var animationPanel: UIStackView!
+    
+    func setupAnimationPanel() {
+        animationPanel = UIStackView()
+        animationPanel.axis = .horizontal
+        animationPanel.spacing = 12
+        animationPanel.alignment = .center
+        animationPanel.distribution = .fillEqually
+        animationPanel.translatesAutoresizingMaskIntoConstraints = false
+        animationPanel.alpha = 0
+        
+        let moveBtn = makeAnimButton(title: "Move", action: #selector(animateMove))
+        let rotateBtn = makeAnimButton(title: "Rotate", action: #selector(animateRotate))
+        
+        animationPanel.addArrangedSubview(moveBtn)
+        animationPanel.addArrangedSubview(rotateBtn)
+        
+        view.addSubview(animationPanel)
+        
+        NSLayoutConstraint.activate([
+            animationPanel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            animationPanel.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -90
+            ),
+            animationPanel.heightAnchor.constraint(equalToConstant: 44),
+            animationPanel.widthAnchor.constraint(equalToConstant: 220)
+        ])
+    }
+    
+    func makeAnimButton(title: String, action: Selector) -> UIButton {
+        let btn = UIButton(type: .system)
+        btn.setTitle(title, for: .normal)
+        btn.backgroundColor = .systemIndigo
+        btn.setTitleColor(.white, for: .normal)
+        btn.layer.cornerRadius = 10
+        btn.addTarget(self, action: action, for: .touchUpInside)
+        return btn
+    }
+    
+    func showAnimationPanel() {
+        UIView.animate(withDuration: 0.2) {
+            self.animationPanel.alpha = 1
+        }
+    }
+    
+    func hideAnimationPanel() {
+        UIView.animate(withDuration: 0.2) {
+            self.animationPanel?.alpha = 0
+        }
+    }
+    
+    @objc func animateMove() {
+        presentAnimationPrompt(type: .move)
+    }
+    
+    @objc func animateRotate() {
+        presentAnimationPrompt(type: .rotate)
+    }
+    
+    func presentAnimationPrompt(type: AnimationType) {
+        guard editorMode == .edit else { return }
+        guard let entity = selectedEntity else { return }
+        
+        let title = "Add \(type.rawValue.capitalized) Animation"
+        
+        let alert = UIAlertController(
+            title: title,
+            message: "Enter start time and duration (seconds)",
+            preferredStyle: .alert
+        )
+        
+        alert.addTextField { field in
+            field.placeholder = "Start Time (e.g. 0.0)"
+            field.keyboardType = .decimalPad
+            field.text = "0.0"
+        }
+        
+        alert.addTextField { field in
+            field.placeholder = "Duration (e.g. 1.0)"
+            field.keyboardType = .decimalPad
+            field.text = "0.5"
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        alert.addAction(
+            UIAlertAction(title: "Add to Timeline", style: .default) { _ in
+                self.handleAnimationPromptConfirm(
+                    type: type,
+                    entity: entity,
+                    alert: alert
+                )
+            }
+        )
+        
+        present(alert, animated: true)
+    }
+    
+    func handleAnimationPromptConfirm(
+        type: AnimationType,
+        entity: Entity,
+        alert: UIAlertController
+    ) {
+        guard
+            let startText = alert.textFields?[0].text,
+            let durationText = alert.textFields?[1].text,
+            let startTime = Float(startText),
+            let duration = Float(durationText),
+            duration > 0
+        else {
+            return
+        }
+        
+        let easing: EasingType = .easeInOut
+        
+        var track: AnimationTrack
+        var fromValue = SIMD3<Float>.zero
+        var toValue = SIMD3<Float>.zero
+        var motionPath: BezierMotionPath? = nil
+        
+        switch type {
+            
+            // ───── MOVE ─────
+        case .move:
+            track = .position
+            
+            let start = entity.position
+            let end = start + SIMD3<Float>(2, 0, 0)
+            
+            motionPath = BezierMotionPath(
+                start: start,
+                control1: start + SIMD3<Float>(0.5, 0, 0),
+                control2: start + SIMD3<Float>(1.5, 0, 0),
+                end: end
             )
 
-            timelineContainer.addSubview(scrubber)
-
-            NSLayoutConstraint.activate([
-                scrubber.leadingAnchor.constraint(equalTo: timelineContainer.leadingAnchor, constant: 16),
-                scrubber.trailingAnchor.constraint(equalTo: timelineContainer.trailingAnchor, constant: -16),
-                scrubber.centerYAnchor.constraint(equalTo: timelineContainer.centerYAnchor)
-            ])
-        }
-
-        @objc func scrubberChanged(_ sender: UISlider) {
-            let time = sender.value
-            evaluateTimeline(at: time)
-        }
-
-
-
-        //Editor Mode
-        var editorMode: EditorMode = .edit
-        
-        enum EditorMode {
-            case edit
-            case timeline
+        case .rotate:
+            track = .rotation
+            fromValue = SIMD3<Float>(0, 0, 0)
+            toValue = SIMD3<Float>(0, .pi / 2, 0)
         }
         
-        func enterTimelineMode() {
-            editorMode = .timeline
-            hideAnimationPanel()
-            selectedEntity = nil
+        let clip = AnimationClip(
+            entityName: entity.name,
+            type: type,
+            track: track,
+            easing: easing,
+            startTime: startTime,
+            duration: duration,
+            fromValue: fromValue,
+            toValue: toValue,
+            motionPath: motionPath
+        )
 
-            baseTransforms.removeAll()
+        timeline.addClip(clip)
 
-            for anchor in arView.scene.anchors {
-                for entity in anchor.children {
-                    baseTransforms[entity.name] = entity.transform
-                }
-            }
+        if let path = clip.motionPath {
+            showMotionPath(for: clip)
         }
 
-
-        func exitTimelineMode() {
-            editorMode = .edit
-
-            for (name, transform) in baseTransforms {
-                arView.scene.findEntity(named: name)?.transform = transform
-            }
-
-            baseTransforms.removeAll()
-        }
-
-
-        //Animation UI
-
-        var animationPanel: UIStackView!
-
-        func setupAnimationPanel() {
-            animationPanel = UIStackView()
-            animationPanel.axis = .horizontal
-            animationPanel.spacing = 12
-            animationPanel.alignment = .center
-            animationPanel.distribution = .fillEqually
-            animationPanel.translatesAutoresizingMaskIntoConstraints = false
-            animationPanel.alpha = 0
-
-            let moveBtn = makeAnimButton(title: "Move", action: #selector(animateMove))
-            let rotateBtn = makeAnimButton(title: "Rotate", action: #selector(animateRotate))
-
-            animationPanel.addArrangedSubview(moveBtn)
-            animationPanel.addArrangedSubview(rotateBtn)
-
-            view.addSubview(animationPanel)
-
-            NSLayoutConstraint.activate([
-                animationPanel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                animationPanel.bottomAnchor.constraint(
-                    equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                    constant: -90
-                ),
-                animationPanel.heightAnchor.constraint(equalToConstant: 44),
-                animationPanel.widthAnchor.constraint(equalToConstant: 220)
-            ])
-        }
-
-        func makeAnimButton(title: String, action: Selector) -> UIButton {
-            let btn = UIButton(type: .system)
-            btn.setTitle(title, for: .normal)
-            btn.backgroundColor = .systemIndigo
-            btn.setTitleColor(.white, for: .normal)
-            btn.layer.cornerRadius = 10
-            btn.addTarget(self, action: action, for: .touchUpInside)
-            return btn
-        }
-
-        func showAnimationPanel() {
-            UIView.animate(withDuration: 0.2) {
-                self.animationPanel.alpha = 1
-            }
-        }
-
-        func hideAnimationPanel() {
-            UIView.animate(withDuration: 0.2) {
-                self.animationPanel?.alpha = 0
-            }
-        }
+        debugPrintTimeline()
         
-        @objc func animateMove() {
-            presentAnimationPrompt(type: .move)
-        }
-
-        @objc func animateRotate() {
-            presentAnimationPrompt(type: .rotate)
-        }
-
-        func presentAnimationPrompt(type: AnimationType) {
-            guard editorMode == .edit else { return }
-            guard let entity = selectedEntity else { return }
-
-            let title = "Add \(type.rawValue.capitalized) Animation"
-
-            let alert = UIAlertController(
-                title: title,
-                message: "Enter start time and duration (seconds)",
-                preferredStyle: .alert
-            )
-
-            alert.addTextField { field in
-                field.placeholder = "Start Time (e.g. 0.0)"
-                field.keyboardType = .decimalPad
-                field.text = "0.0"
-            }
-
-            alert.addTextField { field in
-                field.placeholder = "Duration (e.g. 1.0)"
-                field.keyboardType = .decimalPad
-                field.text = "0.5"
-            }
-
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-            alert.addAction(
-                UIAlertAction(title: "Add to Timeline", style: .default) { _ in
-                    self.handleAnimationPromptConfirm(
-                        type: type,
-                        entity: entity,
-                        alert: alert
-                    )
-                }
-            )
-
-            present(alert, animated: true)
-        }
-
-        func handleAnimationPromptConfirm(
-            type: AnimationType,
-            entity: Entity,
-            alert: UIAlertController
-        ) {
-            guard
-                let startText = alert.textFields?[0].text,
-                let durationText = alert.textFields?[1].text,
-                let startTime = Float(startText),
-                let duration = Float(durationText),
-                duration > 0
-            else {
-                return
-            }
-
-
-            // Track + Easing (AUTO for now)
-
-            let track: AnimationTrack
-            let easing: EasingType = .easeInOut
-
-
-            // FROM / TO VALUES
-
-            let fromValue: SIMD3<Float>
-            let toValue: SIMD3<Float>
-
-            switch type {
-
-            // MOVE
-            case .move:
-                track = .position
-
-                fromValue = SIMD3<Float>(0, 0, 0)
-                toValue = SIMD3<Float>(2.0, 0, 0)
-
-            // ROTATE
-            case .rotate:
-                track = .rotation
-
-                // Rotation is RELATIVE to base pose
-                fromValue = SIMD3<Float>(0, 0, 0)
-                toValue = SIMD3<Float>(0, .pi / 2, 0)
-
-            }
-
-            // CREATE CLIP
-            let clip = AnimationClip(
-                entityName: entity.name,
-                type: type,
-                track: track,
-                easing: easing,
-                startTime: startTime,
-                duration: duration,
-                fromValue: fromValue,
-                toValue: toValue
-            )
-
-            timeline.addClip(clip)
-            debugPrintTimeline()
-        }
-
-
-
-        
+    }
+    
         enum InteractionMode {
             case move
             case rotate
@@ -880,7 +1097,6 @@ class CanvasViewController: UIViewController {
         }
 
         var interactionMode: InteractionMode = .move
-
 
     //Lifecycle
     override func viewDidLoad() {
@@ -1476,7 +1692,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         )
         arView.addGestureRecognizer(pinch)
         
-        _ = UIRotationGestureRecognizer(
+        let rotation = UIRotationGestureRecognizer(
             target: self,
             action: #selector(handleRotation(_:))
         )
@@ -1528,101 +1744,243 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
     
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            let location = gesture.location(in: arView)
+        
+        let location = gesture.location(in: arView)
+        if let hit = arView.entity(at: location),
+           let handle = hit.components[MotionPathHandleComponent.self] {
 
-            currentActionMenu?.removeFromSuperview()
-            currentActionMenu = nil
-
-            guard let hitEntity = arView.entity(at: location) else {
-
-                selectedEntity = nil
-                interactionMode = .none
-                hideAnimationPanel()
-                return
-            }
-
-            var root: Entity = hitEntity
-            while let parent = root.parent, parent.name != "MainAnchor" {
-                root = parent
-            }
-            selectedEntity = root
-
-            showActionMenu(at: location)
-
-            if let animation = root.availableAnimations.first {
-                let singlePlay = animation.repeat(count: 1)
-                root.playAnimation(singlePlay)
-            }
-            
+            selectedPathClipID = handle.clipID
+            updatePathSelection()
         }
+
+        currentActionMenu?.removeFromSuperview()
+        currentActionMenu = nil
+        
+        // 2. Perform Hit Test
+        guard let hitEntity = arView.entity(at: location) else {
+            selectedEntity = nil
+            interactionMode = .none
+            hideAnimationPanel() // Hides the purple buttons if they were visible
+            return
+        }
+        var root: Entity = hitEntity
+        while let parent = root.parent, parent.name != "MainAnchor" {
+            root = parent
+        }
+        selectedEntity = root
+        // Select path for this entity
+        if let clip = timeline.clips.last(where: {
+            $0.entityName == root.name && $0.motionPath != nil
+        }) {
+            selectedPathClipID = clip.id
+            updatePathSelection()
+        }
+
+        showActionMenu(at: location)
+        
+        // 5. Visual Feedback (Animation)
+        if let animation = root.availableAnimations.first {
+            let singlePlay = animation.repeat(count: 1)
+            root.playAnimation(singlePlay)
+        }
+
+    }
     
     
     func showActionMenu(at point: CGPoint) {
-           guard let entity = selectedEntity else { return }
-           
-           let menu = EntityActionMenu()
-           
-           let isCurrentlyLocked = entity.components[LockComponent.self]?.isLocked ?? false
-           menu.setLockTitle(isLocked: isCurrentlyLocked)
-           
-           menu.translatesAutoresizingMaskIntoConstraints = false
-           view.addSubview(menu)
-           
-           NSLayoutConstraint.activate([
-               menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
-               menu.bottomAnchor.constraint(equalTo: view.topAnchor, constant: point.y - 40)
-           ])
-           
-           menu.onAction = { [weak self] action in
-               guard let self = self else { return }
-               
-               switch action {
-               case .move:
-                   // Prevent interaction if locked
-                   if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                       self.interactionMode = .move
-                       self.presentAnimationPrompt(type: .move)
-                   }
-                   menu.removeFromSuperview()
-                   
-               case .rotate:
-                   // Prevent interaction if locked
-                   if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                       self.interactionMode = .rotate
-                       self.presentAnimationPrompt(type: .rotate)
-                   }
-                   menu.removeFromSuperview()
-                   
-               case .lock:
-                   // 2. Toggle the Lock State
-                   let newState = !isCurrentlyLocked
-                   var lockComp = entity.components[LockComponent.self] ?? LockComponent()
-                   lockComp.isLocked = newState
-                   entity.components.set(lockComp)
-                   
-                   if newState {
-                       self.interactionMode = .none
-                   }
-                   
-                   menu.removeFromSuperview()
-                   
-               case .delete:
-                   self.deleteSelected()
-                   menu.removeFromSuperview()
-               }
-           }
-           self.currentActionMenu = menu
-       }
-
+        let menu = EntityActionMenu()
+        menu.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(menu)
+        
+        NSLayoutConstraint.activate([
+            menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
+            menu.bottomAnchor.constraint(equalTo: view.topAnchor, constant: point.y - 40)
+        ])
+        
+        menu.onAction = { [weak self] action in
+            guard let self = self else { return }
+            
+            switch action {
+            case .move:
+                self.interactionMode = .move
+                // Directly trigger the "Add Move Animation" prompt
+                self.presentAnimationPrompt(type: .move)
+                menu.removeFromSuperview()
+                
+            case .rotate:
+                self.interactionMode = .rotate
+                // Directly trigger the "Add Rotate Animation" prompt
+                self.presentAnimationPrompt(type: .rotate)
+                menu.removeFromSuperview()
+                
+            case .lock:
+                self.interactionMode = .none
+                menu.removeFromSuperview()
+                
+            case .delete:
+                self.deleteSelected()
+                menu.removeFromSuperview()
+            }
+        }
+        self.currentActionMenu = menu
+    }
+    
+    
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+
             let location = gesture.location(in: arView)
-           
+
+            // ─────────────────────────────────────────────
+            // 🔵 STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
+            // ─────────────────────────────────────────────
+        if let hit = arView.entity(at: location),
+           hit.name.hasPrefix("path."),
+           let handleData = hit.components[MotionPathHandleComponent.self] {
+
+            // ✅ ONLY EDIT SELECTED (RED) PATH
+            guard handleData.clipID == selectedPathClipID else {
+                return
+            }
+
+            guard
+                let visual = activeMotionPaths[handleData.clipID],
+                let clipIndex = timeline.clips.firstIndex(
+                    where: { $0.id == handleData.clipID }
+                ),
+                var path = timeline.clips[clipIndex].motionPath
+            else { return }
+
             switch gesture.state {
-               
+
+
+                // ───── BEGIN DRAG ─────
+                case .began:
+
+                    lastWorldDragPoint = nil
+
+                    // Camera-facing drag plane
+                    let cameraForward = -SIMD3<Float>(
+                        arView.cameraTransform.matrix.columns.2.x,
+                        arView.cameraTransform.matrix.columns.2.y,
+                        arView.cameraTransform.matrix.columns.2.z
+                    )
+
+                    activeDragPlaneNormal = cameraForward
+                    activeDragPlanePoint = hit.position(relativeTo: nil)
+
+                    return
+
+
+                // ───── DRAGGING ─────
+                case .changed:
+
+                    guard
+                        let planeNormal = activeDragPlaneNormal,
+                        let planePoint = activeDragPlanePoint
+                    else { return }
+
+                    let rayOrigin = arView.cameraTransform.translation
+
+                    guard let rayDirection =
+                        arView.ray(through: location)?.direction
+                    else { return }
+
+                    guard let worldPoint = rayPlaneIntersection(
+                        rayOrigin: rayOrigin,
+                        rayDirection: rayDirection,
+                        planePoint: planePoint,
+                        planeNormal: planeNormal
+                    ) else { return }
+
+                    // 🔑 FIRST FRAME — STORE ONLY
+                    if lastWorldDragPoint == nil {
+                        lastWorldDragPoint = worldPoint
+                        return
+                    }
+
+                    // 🔥 DELTA-BASED MOVEMENT
+                    let delta = worldPoint - lastWorldDragPoint!
+                    lastWorldDragPoint = worldPoint
+
+                    switch hit.name {
+
+                    case "path.start":
+
+                        // move entire path
+                        path.start    += delta
+                        path.control1 += delta
+                        path.control2 += delta
+                        path.end      += delta
+
+                    case "path.c1":
+                        path.control1 += delta
+
+                    case "path.c2":
+                        path.control2 += delta
+
+                    case "path.end":
+                        path.end += delta
+
+
+                    default:
+                        return
+                    }
+
+
+                    // ✅ move root in WORLD SPACE
+                    visual.root.position = path.start
+
+                    // ✅ handles in LOCAL SPACE
+                    visual.startHandle.position = .zero
+                    visual.control1Handle.position = path.control1 - path.start
+                    visual.control2Handle.position = path.control2 - path.start
+                    visual.endHandle.position = path.end - path.start
+
+
+                    path.rebuildArcLengthTable()
+
+                    // Save path back into this clip only
+                    timeline.clips[clipIndex].motionPath = path
+
+                    // 🔥 STEP 13 — GPU vertex update only
+                    if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+
+                        MotionPathRenderer.updatePathMesh(
+                            entity: pathEntity,
+                            path: path
+                        )
+                    }
+
+
+                    return
+
+
+
+                // ───── END DRAG ─────
+                case .ended, .cancelled:
+
+                    activeDragPlaneNormal = nil
+                    activeDragPlanePoint = nil
+                    lastWorldDragPoint = nil
+                    return
+
+                default:
+                    break
+                }
+            }
+
+            // ─────────────────────────────────────────────
+            // 🟡 STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
+            // ─────────────────────────────────────────────
+
+            switch gesture.state {
+
             case .began:
+
                 saveCurrentStateToUndo()
-               
+
                 if let hit = arView.entity(at: location) {
+
                     if hit.name == GizmoNames.xHandle {
                         currentAxis = .x
                     } else if hit.name == GizmoNames.yHandle {
@@ -1632,97 +1990,121 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                     } else {
                         currentAxis = .none
                     }
-                   
+
                     var root: Entity? = hit
-                    while let parent = root?.parent, parent.name != "MainAnchor" {
+                    while let parent = root?.parent,
+                          parent.name != "MainAnchor" {
                         root = parent
                     }
-                   
+
                     selectedEntity = root
                     dragStartPosition = root?.position
                     initialRotation = root?.orientation
-                   
+
                     if interactionMode == .none {
                         interactionMode = .move
                     }
                 }
-               
+
             case .changed:
+
                 guard editorMode == .edit else { return }
-               
-                //If selected entity is locked, orbit camera instead
-                if let entity = selectedEntity {
-                    let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-                    if isLocked {
-                        handleCameraOrbit(gesture)
-                        return
-                    }
-                }
-               
-                guard let entity = selectedEntity, let startPos = dragStartPosition else {
+
+                guard let entity = selectedEntity,
+                      let startPos = dragStartPosition else {
                     handleCameraOrbit(gesture)
                     return
                 }
-               
+
                 let translation = gesture.translation(in: arView)
-                let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
-               
+
+                let mouseDelta = SIMD2<Float>(
+                    Float(translation.x),
+                    Float(translation.y)
+                )
+
                 switch interactionMode {
-                   
+
                 case .move:
+
                     var newPosition = startPos
-                   
+
                     if currentAxis != .none {
+
                         let moveDelta = calculateAxisMovement(
                             entity: entity,
                             axis: currentAxis,
                             mouseDelta: mouseDelta,
                             view: arView
                         )
+
                         newPosition += moveDelta
-                       
+
                     } else {
+
                         let sensitivity: Float = 0.005
                         let dx = mouseDelta.x * sensitivity
                         let dy = -mouseDelta.y * sensitivity
-                       
-                        if currentDragMode == .ground {
-                            let camOri = arView.cameraTransform.rotation
-                            let right = camOri.act([1, 0, 0])
-                            let forward = camOri.act([0, 0, -1])
 
-                            let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-                            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
+                        let camOri = arView.cameraTransform.rotation
+                        let forward = camOri.act([0, 0, 1])
+                        let right = camOri.act([1, 0, 0])
 
-                            newPosition += (flatRight * dx) + (flatForward * dy)
-                            newPosition.y = startPos.y
-                           
-                        } else {
-                            newPosition.x = startPos.x
-                            newPosition.z = startPos.z
-                            newPosition.y = startPos.y + (dy * 2.0)
-                        }
+                        let flatForward = simd_normalize(
+                            SIMD3<Float>(forward.x, 0, forward.z)
+                        )
+                        let flatRight = simd_normalize(
+                            SIMD3<Float>(right.x, 0, right.z)
+                        )
+
+                        newPosition += flatRight * dx
+                        newPosition += flatForward * dy
+                        newPosition.y = startPos.y
                     }
+
                     entity.position = newPosition
-                   
+
                 case .rotate:
+
                     let angle = Float(translation.x) * 0.01
-                    let rotation = simd_quatf(angle: angle, axis: [0, 1, 0])
+                    let rotation = simd_quatf(angle: -angle, axis: [0, 1, 0])
                     entity.orientation = rotation * (initialRotation ?? simd_quatf())
-                   
+
                 case .none:
                     break
                 }
-               
+
             case .ended, .cancelled:
+
                 dragStartPosition = nil
                 initialRotation = nil
                 currentAxis = .none
-               
+
             default:
                 break
             }
         }
+
+    
+    
+    func calculateWorldDragDelta(_ gesture: UIPanGestureRecognizer) -> SIMD3<Float> {
+        
+        let translation = gesture.translation(in: arView)
+        gesture.setTranslation(.zero, in: arView)
+        
+        let sensitivity: Float = 0.005
+        
+        let dx = Float(translation.x) * sensitivity
+        let dz = Float(translation.y) * sensitivity
+        
+        let cam = arView.cameraTransform.rotation
+        
+        let right = cam.act([1, 0, 0])
+        let forward = cam.act([0, 0, 1])
+        
+        return (right * dx) + (forward * dz)
+    }
+    
             
 
     
@@ -2406,7 +2788,7 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
     func spawnCharacter(item: SpawnItem, scale: Float) {
 
         guard !item.modelFileName.isEmpty else {
-            print("❌ Empty modelFileName")
+            print(" Empty modelFileName")
             return
         }
 
@@ -2418,10 +2800,10 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
             anchor.addChild(entity)
             arView.scene.addAnchor(anchor)
 
-            print("✅ Character spawned successfully")
+            print(" Character spawned successfully")
 
         } catch {
-            print("❌ Failed to load character model:", error)
+            print("Failed to load character model:", error)
         }
     }
 
@@ -2429,9 +2811,6 @@ extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDele
 }
 
 
-
-
-// MARK: - Character Detail Delegate
 // In CanvasViewController.swift
 
 extension CanvasViewController: CharacterDetailDelegate {
