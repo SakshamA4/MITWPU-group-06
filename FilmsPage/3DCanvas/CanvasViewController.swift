@@ -723,6 +723,80 @@ class CanvasViewController: UIViewController {
             )
         }
     }
+    func evaluateEntityTransform(
+        entityName: String,
+        at time: Float
+    ) -> Transform {
+
+        // Base transform before any animation
+        guard let base = baseTransforms[entityName] else {
+            return Transform()
+        }
+
+        var translation = base.translation
+        var rotation = base.rotation
+        var scale = base.scale
+
+        // All clips affecting this entity before given time
+        let clips = timeline.clips
+            .filter {
+                $0.entityName == entityName &&
+                $0.startTime <= time
+            }
+            .sorted { $0.startTime < $1.startTime }
+
+        for clip in clips {
+
+            let localTime = time - clip.startTime
+
+            let progress: Float
+            if localTime <= 0 {
+                continue
+            } else if localTime >= clip.duration {
+                progress = 1
+            } else {
+                progress = localTime / clip.duration
+            }
+
+            let eased = applyEasing(progress, easing: clip.easing)
+
+            switch clip.track {
+
+            case .position:
+
+                if let path = clip.motionPath {
+                    translation = path.evaluateConstantSpeed(eased)
+                } else {
+                    translation = simd_mix(
+                        clip.fromValue,
+                        clip.toValue,
+                        SIMD3<Float>(repeating: eased)
+                    )
+                }
+
+            case .rotation:
+                let delta = simd_quatf(
+                    angle: clip.toValue.y * eased,
+                    axis: [0, 1, 0]
+                )
+                rotation = delta * rotation
+
+            case .scale:
+                scale *= simd_mix(
+                    clip.fromValue,
+                    clip.toValue,
+                    SIMD3<Float>(repeating: eased)
+                )
+            }
+        }
+
+        return Transform(
+            scale: scale,
+            rotation: rotation,
+            translation: translation
+        )
+    }
+
     
     // MARK: - Motion Path Rendering
     func makePathHandle(
@@ -1031,6 +1105,28 @@ class CanvasViewController: UIViewController {
         
         present(alert, animated: true)
     }
+    func updateEntityFinalTransforms() {
+
+        let entities = Set(timeline.clips.map { $0.entityName })
+
+        for entityName in entities {
+
+            let lastTime = timeline.clips
+                .filter { $0.entityName == entityName }
+                .map { $0.startTime + $0.duration }
+                .max() ?? 0
+
+            let transform = evaluateEntityTransform(
+                entityName: entityName,
+                at: lastTime
+            )
+
+            if let entity = arView.scene.findEntity(named: entityName) {
+                entity.transform = transform
+            }
+        }
+    }
+
     
     func handleAnimationPromptConfirm(
         type: AnimationType,
@@ -1060,7 +1156,17 @@ class CanvasViewController: UIViewController {
         case .move:
             track = .position
             
-            let start = entity.position
+            if baseTransforms[entity.name] == nil {
+                baseTransforms[entity.name] = entity.transform
+            }
+
+            let evaluatedTransform = evaluateEntityTransform(
+                entityName: entity.name,
+                at: startTime
+            )
+
+            let start = evaluatedTransform.translation
+
             let end = start + SIMD3<Float>(2, 0, 0)
             
             motionPath = BezierMotionPath(
@@ -1076,6 +1182,11 @@ class CanvasViewController: UIViewController {
             toValue = SIMD3<Float>(0, .pi / 2, 0)
         }
         
+        // ✅ Store base transform once per entity
+        if baseTransforms[entity.name] == nil {
+            baseTransforms[entity.name] = entity.transform
+        }
+
         let clip = AnimationClip(
             entityName: entity.name,
             type: type,
@@ -1722,22 +1833,65 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
 
     @objc func deleteSelected() {
-        if let camera = selectedEntity?
-            .children
-            .compactMap({ $0 as? PerspectiveCamera })
-            .first {
 
-            sceneCameras.removeAll { $0 == camera }
-            cameraToVisualMap[camera] = nil
+        // ───────────────────────────────
+        // 1️⃣ DELETE MOTION PATH (if selected)
+        // ───────────────────────────────
+        if let clipID = selectedPathClipID {
 
-            if activeCamera === camera {
-                activateEditorCamera()
+            // find the clip before deleting
+            guard let clip = timeline.clips.first(where: { $0.id == clipID }) else {
+                return
             }
+
+            let entityName = clip.entityName
+
+            // remove visuals
+            activeMotionPaths[clipID]?.root.removeFromParent()
+            activeMotionPaths.removeValue(forKey: clipID)
+
+            // remove clip
+            timeline.clips.removeAll { $0.id == clipID }
+
+            // 🔥 FREEZE CURRENT WORLD POSITION AS NEW BASE
+            if let entity = arView.scene.findEntity(named: entityName) {
+                baseTransforms[entityName] = entity.transform
+            }
+
+            selectedPathClipID = nil
+
+            // re-evaluate remaining clips safely
+            updateEntityFinalTransforms()
+
+            return
         }
 
-        selectedEntity?.removeFromParent()
+
+        // ───────────────────────────────
+        // 2️⃣ DELETE ENTITY + ALL ITS CLIPS
+        // ───────────────────────────────
+        guard let entity = selectedEntity else { return }
+
+        let entityName = entity.name
+
+        // remove motion paths
+        for clip in timeline.clips where clip.entityName == entityName {
+            activeMotionPaths[clip.id]?.root.removeFromParent()
+            activeMotionPaths.removeValue(forKey: clip.id)
+        }
+
+        // remove clips
+        timeline.clips.removeAll {
+            $0.entityName == entityName
+        }
+
+        // remove entity itself
+        entity.removeFromParent()
         selectedEntity = nil
-        
+
+        // recompute all remaining entities
+        updateEntityFinalTransforms()
+
         refreshSidebarContent()
     }
 
