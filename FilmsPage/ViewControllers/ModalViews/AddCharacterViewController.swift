@@ -4,25 +4,41 @@
 //
 //  Created by SDC-USER on 08/12/25.
 //
-
 import UIKit
 
 class AddCharacterViewController: UIViewController {
 
+    // MARK: - Services
     private let characterService = CharacterService.shared
-    var film: Film?
 
+    // MARK: - Inputs
+    var film: Film!
+
+    // MARK: - UI
     @IBOutlet weak var collectionView: UICollectionView!
 
-    var characters: [CharacterItem] = []
-    let characterCellId = "character_cell"
+    // MARK: - Data
+    private var characters: [CharacterItem] = []
 
+    private let characterCellId = "character_cell"
+
+    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        loadCharacters()
+        setupCollectionView()
+    }
+
+    private func loadCharacters() {
         characters = characterService.getCharacters()
+    }
 
-
+    private func setupCollectionView() {
+        collectionView.register(
+            UINib(nibName: "CharactersCollectionViewCell", bundle: nil),
+            forCellWithReuseIdentifier: characterCellId
+        )
 
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
@@ -32,40 +48,28 @@ class AddCharacterViewController: UIViewController {
 
         collectionView.dataSource = self
         collectionView.delegate = self
-
-        registerCells()
-        collectionView.reloadData()
     }
-    
-    func registerCells() {
-
-            collectionView.register(UINib(nibName: "CharactersCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "character_cell")
-        
-    }
-
 }
 
-
-
 extension AddCharacterViewController: UICollectionViewDataSource {
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-
-        guard let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: characterCellId,
-            for: indexPath
-        ) as? CharactersCollectionViewCell else {
-            return UICollectionViewCell()
-        }
-
-        let characterItem = characters[indexPath.item]
-        cell.configureCell(character: characterItem)
-        return cell
-    }
 
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
-        return characters.count
+        characters.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: characterCellId,
+            for: indexPath
+        ) as! CharactersCollectionViewCell
+
+        let characterItem = characters[indexPath.item]
+        cell.configureForLibrary(character: characterItem)
+
+        return cell
     }
 }
 
@@ -77,16 +81,17 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
         let characterItem = characters[indexPath.item]
         performSegue(withIdentifier: "characterDetailSegue", sender: characterItem)
     }
-    
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "characterDetailSegue" {
-            let vc = segue.destination as! CharacterDetailsViewController
-            vc.character = sender as? CharacterItem
-            vc.film = film
-        }
+        guard
+            segue.identifier == "characterDetailSegue",
+            let vc = segue.destination as? CharacterDetailsViewController,
+            let character = sender as? CharacterItem
+        else { return }
+
+        vc.character = character
+        vc.film = film
     }
-    
 
     func collectionView(_ collectionView: UICollectionView,
                         layout collectionViewLayout: UICollectionViewLayout,
@@ -98,14 +103,12 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
         let spacing = inset * 2 + interItem * (columns - 1)
 
         let width = (collectionView.bounds.width - spacing) / columns
-
         return CGSize(width: width, height: width - 40)
     }
 
     func collectionView(_ collectionView: UICollectionView,
                         layout collectionViewLayout: UICollectionViewLayout,
                         insetForSectionAt section: Int) -> UIEdgeInsets {
-        return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
+        UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }
-    
 }

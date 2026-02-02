@@ -25,6 +25,7 @@ enum NotificationNames {
     static let sequencesUpdated = "sequencesUpdated"
     static let scenesUpdated = "scenesUpdated"
     static let charactersUpdated = "charactersUpdated"
+    static let filmCharactersUpdated = "filmCharactersUpdated"
     static let propsUpdated = "propsUpdated"
     static let posesUpdated = "posesUpdated"
 }
