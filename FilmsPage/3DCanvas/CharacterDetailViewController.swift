@@ -294,20 +294,36 @@ class CharacterDetailViewController: UIViewController {
     }
     
 
+//    @objc private func didTapConfirm() {
+//        guard let name = nameTextField.text, !name.isEmpty else { return }
+//        
+//        // 1. Create a COPY of the item
+//        var finalItem = self.item
+//        
+//        // 2. IMPORTANT: Overwrite the model name with the user's selection
+//        // If you skip this, it will always spawn the default T-Pose/Standing model
+//        finalItem.modelFileName = selectedPoseModelName
+//        
+//        // 3. Send to delegate
+//        delegate?.didConfirmCharacterSelection(item: finalItem, scale: currentScale, name: name)
+//    }
     @objc private func didTapConfirm() {
         guard let name = nameTextField.text, !name.isEmpty else { return }
         
-        // 1. Create a COPY of the item
+        // 1. Prepare final item selection
         var finalItem = self.item
-        
-        // 2. IMPORTANT: Overwrite the model name with the user's selection
-        // If you skip this, it will always spawn the default T-Pose/Standing model
         finalItem.modelFileName = selectedPoseModelName
         
-        // 3. Send to delegate
+        // 2. Notify the canvas to spawn the character
         delegate?.didConfirmCharacterSelection(item: finalItem, scale: currentScale, name: name)
+        
+        // 3. Trigger secondary closure logic
+        self.onSelectModel(finalItem)
+        
+        // 4. 📍 THE FIX: Dismiss both modals
+        // Calling dismiss on presentingViewController closes the chain
+        self.presentingViewController?.presentingViewController?.dismiss(animated: true)
     }
-
 }
 
 // MARK: - Collection View Data Source & Delegate
@@ -329,20 +345,36 @@ extension CharacterDetailViewController: UICollectionViewDataSource, UICollectio
         return cell
     }
     
+//    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+//        let selectedPose = poses[indexPath.item]
+//        
+//        // Just update the tracking variable
+//        print("Selected pose: \(selectedPoseModelName)", selectedPose)
+//        item.modelFileName = selectedPose.modelFileName
+//        item.selectedPose = selectedPose.modelFileName
+//        print("\n\n", item, "\n\n")
+//        
+//        // Update the preview image if needed
+//        if let poseImage = UIImage(named: selectedPose.imageName) {
+//            characterImageView.image = poseImage
+//        }
+//        dismiss(animated: true)
+//        self.onSelectModel(item)
+//    }
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedPose = poses[indexPath.item]
         
-        // Just update the tracking variable
-        print("Selected pose: \(selectedPoseModelName)", selectedPose)
-        item.modelFileName = selectedPose.modelFileName
-        item.selectedPose = selectedPose.modelFileName
-        print("\n\n", item, "\n\n")
+        // 1. Update the tracking variable to the new model filename
+        self.selectedPoseModelName = selectedPose.modelFileName
         
-        // Update the preview image if needed
+        // 2. Sync the internal item state for the preview
+        self.item.modelFileName = selectedPose.modelFileName
+        self.item.selectedPose = selectedPose.modelFileName
+        
+        // 3. Update the preview image on the left side of the container
         if let poseImage = UIImage(named: selectedPose.imageName) {
             characterImageView.image = poseImage
         }
-        dismiss(animated: true)
-        self.onSelectModel(item)
+         print("Pose selection updated to: \(selectedPose.modelFileName). Press 'Add' to confirm.")
     }
 }
