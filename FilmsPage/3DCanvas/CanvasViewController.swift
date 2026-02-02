@@ -405,6 +405,9 @@ class CanvasViewController: UIViewController {
         //Scene Hierarchy properties ends
 
 
+    var activeDraggedClipID: UUID?
+    var activeDraggedHandleName: String?
+    
         var timelineContainer: UIView!
         var playButton: UIButton!
         var stopButton: UIButton!
@@ -868,7 +871,7 @@ class CanvasViewController: UIViewController {
         start.position = .zero
         c1.position = path.control1 - path.start
         c2.position = path.control2 - path.start
-        end.position = path.end - path.start
+        end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
 
 
         let curve = MotionPathRenderer.makePathEntity(path: path)
@@ -981,8 +984,21 @@ class CanvasViewController: UIViewController {
         case timeline
     }
     
+    func hideAllMotionPaths() {
+        for (_, visual) in activeMotionPaths {
+            visual.root.isEnabled = false
+        }
+    }
+
+    func showAllMotionPaths() {
+        for (_, visual) in activeMotionPaths {
+            visual.root.isEnabled = true
+        }
+    }
+
     func enterTimelineMode() {
         editorMode = .timeline
+        hideAllMotionPaths()
         hideAnimationPanel()
         selectedEntity = nil
         
@@ -998,7 +1014,7 @@ class CanvasViewController: UIViewController {
     
     func exitTimelineMode() {
         editorMode = .edit
-        
+        showAllMotionPaths()
         for (name, transform) in baseTransforms {
             arView.scene.findEntity(named: name)?.transform = transform
         }
@@ -2143,7 +2159,52 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                         path.control2 += delta
 
                     case "path.end":
+
+                        // Move end of THIS path
                         path.end += delta
+
+                        // 🔗 LIVE-UPDATE NEXT PATH IF IT EXISTS
+                        let thisClip = timeline.clips[clipIndex]
+
+                        if let nextIndex = timeline.clips
+                            .enumerated()
+                            .first(where: {
+                                $0.offset > clipIndex &&
+                                $0.element.entityName == thisClip.entityName &&
+                                $0.element.motionPath != nil
+                            })?
+                            .offset
+                        {
+                            var nextPath = timeline.clips[nextIndex].motionPath!
+
+                            // Move entire next path forward by same delta
+                            nextPath.start    += delta
+                            nextPath.control1 += delta
+                            nextPath.control2 += delta
+                            nextPath.end      += delta
+
+                            nextPath.rebuildArcLengthTable()
+                            timeline.clips[nextIndex].motionPath = nextPath
+
+                            // Update visuals LIVE
+                            if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+                                nextVisual.root.position = nextPath.start
+                                nextVisual.startHandle.position = .zero
+                                nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
+                                nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
+                                nextVisual.endHandle.position =
+                                    (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
+
+                                if let entity =
+                                    nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                                    MotionPathRenderer.updatePathMesh(
+                                        entity: entity,
+                                        path: nextPath
+                                    )
+                                }
+                            }
+                        }
+
 
 
                     default:
@@ -2165,6 +2226,8 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
                     // Save path back into this clip only
                     timeline.clips[clipIndex].motionPath = path
+                
+
 
                     // 🔥 STEP 13 — GPU vertex update only
                     if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
@@ -2183,6 +2246,45 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
                 //END DRAG
                 case .ended, .cancelled:
 
+                    
+                // 🔗 FINALIZE CONTINUITY AFTER DRAG
+                if hit.name == "path.end" {
+
+                    let thisClip = timeline.clips[clipIndex]
+
+                    if let nextIndex = timeline.clips
+                        .enumerated()
+                        .first(where: {
+                            $0.offset > clipIndex &&
+                            $0.element.entityName == thisClip.entityName &&
+                            $0.element.motionPath != nil
+                        })?
+                        .offset
+                    {
+                        var nextPath = timeline.clips[nextIndex].motionPath!
+                        nextPath.start = path.end
+                        nextPath.rebuildArcLengthTable()
+                        timeline.clips[nextIndex].motionPath = nextPath
+
+                        if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+                            nextVisual.root.position = nextPath.start
+                            nextVisual.startHandle.position = .zero
+                            nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
+                            nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
+                            nextVisual.endHandle.position =
+                                (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
+
+                            if let entity =
+                                nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                                MotionPathRenderer.updatePathMesh(
+                                    entity: entity,
+                                    path: nextPath
+                                )
+                            }
+                        }
+                    }
+                }
+
                     activeDragPlaneNormal = nil
                     activeDragPlanePoint = nil
                     lastWorldDragPoint = nil
@@ -2199,6 +2301,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
             switch gesture.state {
                 
             case .began:
+                
                 saveCurrentStateToUndo()
                
                 if let hit = arView.entity(at: location) {
@@ -2551,6 +2654,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
         editorCamera.isEnabled = true
         activeCamera = editorCamera
+        showAllMotionPaths() 
     }
     
     
@@ -2562,6 +2666,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         editorCamera.isEnabled = false
         camera.isEnabled = true
         activeCamera = camera
+        hideAllMotionPaths()
     }
 
 
