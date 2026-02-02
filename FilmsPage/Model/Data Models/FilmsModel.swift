@@ -18,6 +18,7 @@ struct Film: Codable {
     var characters: Int = 0
     var props: Int = 0
     var image : String
+    var notes: String = ""
 }
 
 

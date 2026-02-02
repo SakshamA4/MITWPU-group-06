@@ -55,7 +55,7 @@ class FilmService {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(updateFilmCounts),
-            name: NSNotification.Name(NotificationNames.charactersUpdated),
+            name: NSNotification.Name(NotificationNames.filmCharactersUpdated),
             object: nil
         )
     }
@@ -82,16 +82,33 @@ class FilmService {
         if let index = films.firstIndex(where: { $0.id == film.id }) {
             films[index] = film
         }
+
+        if favFilm?.id == film.id {
+            favFilm = film
+        }
     }
-    
+
     func deleteFilm(at index: Int) {
         guard index < films.count else { return }
         films.remove(at: index)
     }
     
-    func deleteFilm(by id: UUID) {
-        films.removeAll { $0.id == id }
+    func deleteFilm(_ film: Film) {
+        // If deleting favourite film, clear it
+        if favFilm?.id == film.id {
+            favFilm = nil
+        }
+
+        films.removeAll { $0.id == film.id }
     }
+    
+    func clearFavIfNeeded() {
+        if let fav = favFilm, !films.contains(where: { $0.id == fav.id }) {
+            favFilm = films.first
+        }
+    }
+
+
     
     func getFilm(by id: UUID) -> Film? {
         return films.first { $0.id == id }
@@ -104,19 +121,20 @@ class FilmService {
         
         let sequenceService = SequenceService.shared
         let sceneService = SceneService.shared
-        let characterService = CharacterService.shared
+        let characterService = FilmCharacterService.shared
         
         for i in 0..<films.count {
             let filmId = films[i].id
             films[i].sequences = sequenceService.getSequenceCount(forFilmId: filmId)
-            films[i].characters = characterService.getCharacterCount(forFilmId: filmId)
+            films[i].characters = FilmCharacterService.shared.getCharacterCount(forFilmId: filmId)
             let sequenceIds = sequenceService.getSequenceIds(forFilmId: filmId)
             films[i].scenes = sceneService.getSceneCount(forSequenceIds: sequenceIds)
         }
         
         if var fav = favFilm {
             fav.sequences = sequenceService.getSequenceCount(forFilmId: fav.id)
-            fav.characters = characterService.getCharacterCount(forFilmId: fav.id)
+            fav.characters = FilmCharacterService.shared.getCharacterCount(forFilmId: fav.id)
+
             let sequenceIds = sequenceService.getSequenceIds(forFilmId: fav.id)
             fav.scenes = sceneService.getSceneCount(forSequenceIds: sequenceIds)
             favFilm = fav

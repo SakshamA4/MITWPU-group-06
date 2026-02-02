@@ -4,19 +4,23 @@
 //
 //  Created by SDC-USER on 17/12/25.
 //
-
 import Foundation
 
-class CharacterService {
+final class CharacterService {
+
     static let shared = CharacterService()
     private let storageKey = StorageKeys.characters
     private var isInitialized = false
 
+    // MARK: - Library Characters ONLY
     private var characters: [CharacterItem] = [] {
         didSet {
             guard isInitialized else { return }
             save()
-            NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.charactersUpdated), object: nil)
+            NotificationCenter.default.post(
+                name: NSNotification.Name(NotificationNames.charactersUpdated),
+                object: nil
+            )
         }
     }
 
@@ -25,59 +29,50 @@ class CharacterService {
         isInitialized = true
     }
 
-    
+    // MARK: - Public API
+
+    /// All characters available in the global library
     func getCharacters() -> [CharacterItem] {
-        return characters
+        characters
     }
-    
-    func getCharacters(forFilmId filmId: UUID) -> [CharacterItem] {
-        return characters.filter { $0.filmId == filmId }
-    }
-    
+
+    /// Fetch a single library character
     func getCharacter(by id: UUID) -> CharacterItem? {
-        return characters.first { $0.id == id }
+        characters.first { $0.id == id }
     }
-    
+
+    /// Add a new character to the LIBRARY (not films)
     func addCharacter(_ character: CharacterItem) {
         characters.append(character)
     }
-    
+
+    /// Update a library character
     func updateCharacter(_ character: CharacterItem) {
-        if let charId = character.id,
-           let index = characters.firstIndex(where: { $0.id == charId }) {
-            characters[index] = character
+        guard let index = characters.firstIndex(where: { $0.id == character.id }) else {
+            return
         }
+        characters[index] = character
     }
-    
-    func deleteCharacter(at index: Int) {
-        guard index < characters.count else { return }
-        characters.remove(at: index)
-    }
-    
+
+    /// Delete a character from the LIBRARY
     func deleteCharacter(by id: UUID) {
         characters.removeAll { $0.id == id }
     }
-    
-    func deleteCharacters(forFilmId filmId: UUID) {
-        characters.removeAll { $0.filmId == filmId }
-    }
-    
-    func getCharacterCount(forFilmId filmId: UUID) -> Int {
-        return characters.filter { $0.filmId == filmId }.count
-    }
-    
+
+    /// Convenience: get poses for a character template
     func getPoses(forCharacterId characterId: UUID) -> [CharacterPoseItem] {
-        return characters.first { $0.id == characterId }?.pose ?? []
+        characters.first { $0.id == characterId }?.pose ?? []
     }
 
-    
+    // MARK: - Persistence
+
     private func save() {
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(characters)
             UserDefaults.standard.set(data, forKey: storageKey)
         } catch {
-            print("Failed to save characters: \(error)")
+            print("❌ Failed to save character library:", error)
         }
     }
 
@@ -86,39 +81,36 @@ class CharacterService {
             do {
                 let decoder = JSONDecoder()
                 characters = try decoder.decode([CharacterItem].self, from: data)
+                return
             } catch {
-                print("Failed to load characters: \(error)")
+                print("❌ Failed to load character library:", error)
             }
         }
-        
 
-        if characters.isEmpty {
-            characters = [
-                CharacterItem(
-                    id: UUID(),
-                    name: "Woman",
-                    imageName: "woman1_img",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Standing", imageName: "woman1_img", modelFilename: "woman1"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Woman1Sit_img", modelFilename: "Woman1Sit"),
-                        CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Woman1MegLay_img", modelFilename: "Woman1MegLay"),
-                        CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
-                    ]
-                ),
-                CharacterItem(
-                    id: UUID(),
-                    name: "Man",
-                    imageName: "man1_img",
-                    filmId: nil,
-                    pose: [
-                        CharacterPoseItem(id: UUID(), name: "Standing", imageName: "man1_img", modelFilename: "man1"),
-                        CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Man1LyingIdle_img", modelFilename: "Man1LyingIdle"),
-                        CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Man1SittingIdle_img", modelFilename: "Man1SittingIdle"),
-                        CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Man1OnCall_img", modelFilename: "Man1OnCall")
-                    ]
-                )
-            ]
-        }
+        // MARK: - Default Library Characters
+        characters = [
+            CharacterItem(
+                id: UUID(),
+                name: "Woman",
+                imageName: "woman1_img",
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "woman1_img", modelFilename: "woman1"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Woman1Sit_img", modelFilename: "Woman1Sit"),
+                    CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Woman1MegLay_img", modelFilename: "Woman1MegLay"),
+                    CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
+                ]
+            ),
+            CharacterItem(
+                id: UUID(),
+                name: "Man",
+                imageName: "man1_img",
+                pose: [
+                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "man1_img", modelFilename: "man1"),
+                    CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Man1LyingIdle_img", modelFilename: "Man1LyingIdle"),
+                    CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Man1SittingIdle_img", modelFilename: "Man1SittingIdle"),
+                    CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Man1OnCall_img", modelFilename: "Man1OnCall")
+                ]
+            )
+        ]
     }
 }

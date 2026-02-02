@@ -35,15 +35,27 @@ class CharactersCollectionViewCell: UICollectionViewCell {
         // Initialization code
     }
    
-    
-    func configureCell(character: CharacterItem) {
-        if !character.imageName.isEmpty {
-            imageView.image = UIImage(named: character.imageName)
-        } else {
-            imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
-        }
+    func configureForLibrary(character: CharacterItem) {
+        imageView.image = UIImage(named: character.imageName)
         titleLabel.text = character.name.capitalized
     }
+
+    
+    func configureCell(
+        filmCharacter: FilmCharacter,
+        template: CharacterItem?
+    ) {
+        // Image always comes from the library template
+        if let imageName = template?.imageName {
+            imageView.image = UIImage(named: imageName)
+        } else {
+            imageView.image = UIImage(named: "placeholder")
+        }
+
+        // Name can be overridden per film
+        titleLabel.text = (filmCharacter.nameOverride ?? template?.name ?? "Character").capitalized
+    }
+
 
 
 }

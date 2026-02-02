@@ -18,10 +18,9 @@ class CharacterDetailsViewController: UIViewController {
     var film: Film?
     
     // Character Service
-    private let characterService = CharacterService.shared
+    private let characterService = FilmCharacterService.shared
     
     // Characters for this film
-    var characters: [CharacterItem] = []
     
     // The currently selected character
     var character: CharacterItem?
@@ -31,29 +30,16 @@ class CharacterDetailsViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         registerCells()
-        
-        // Load data
-     //   dataStore.loadData()
-        
-        // Load characters belonging to the film
-        if let film = film {
-            characters = characterService.getCharacters(forFilmId: film.id)
-        } else {
-            characters = characterService.getCharacters()
-        }
-        
         updateTitle()
-        
-        // Apply compositional layout
+
         collectionView.collectionViewLayout = createLayout()
-        
         collectionView.dataSource = self
         collectionView.delegate = self
-        
         collectionView.reloadData()
     }
+
     
     private func updateTitle() {
         characterTitle.text = character?.name ?? "Character"
@@ -128,23 +114,22 @@ class CharacterDetailsViewController: UIViewController {
     
     
     @IBAction func addButtonTapped(_ sender: Any) {
-        
+
         guard let film = film,
-              var selectedCharacter = character else {
+              let selectedCharacter = character else {
             return
         }
 
-        selectedCharacter.id = UUID()
-        selectedCharacter.filmId = film.id
-        if characterNameInput != "" {
-            selectedCharacter.name = characterNameInput
-        }
+        // Name override handled inside service later if needed
+        characterService.addCharacter(
+            template: selectedCharacter,
+            filmId: film.id,
+            nameOverride: characterNameInput.isEmpty ? nil : characterNameInput
+        )
 
-        characterService.addCharacter(selectedCharacter)
         dismiss(animated: true)
     }
-    
-    
+
 }
 
 

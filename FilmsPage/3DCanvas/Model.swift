@@ -99,3 +99,37 @@ extension SpawnItem {
             )
         }
 }
+
+
+extension SpawnItem {
+
+    init(
+        filmCharacter: FilmCharacter,
+        template: CharacterItem
+    ) {
+
+        let poseItems = template.pose.map { pose in
+            SpawnPose(
+                title: pose.name,
+                imageName: pose.imageName,
+                modelFileName: pose.modelFilename ?? ""
+            )
+        }
+
+        let selectedPoseModel =
+            template.pose.first {
+                $0.id == filmCharacter.selectedPoseId
+            }?.modelFilename
+            ?? template.pose.first?.modelFilename
+            ?? ""
+
+        self.init(
+            title: filmCharacter.nameOverride ?? template.name,
+            imageName: template.imageName,
+            modelFileName: selectedPoseModel,
+            isBackground: false,
+            UUId: filmCharacter.id,
+            poses: poseItems
+        )
+    }
+}

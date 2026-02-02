@@ -21,7 +21,10 @@ class MyFilmViewController: UIViewController {
     private let propCellId = "prop_cell"
     
     var sequence: [Sequence] = []
-    var character: [CharacterItem] = []
+    var characters: [FilmCharacter] = []
+
+    private let filmCharacterService = FilmCharacterService.shared
+
     var prop: [PropItem] = []
     
     // Services
@@ -63,7 +66,7 @@ class MyFilmViewController: UIViewController {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(refreshData),
-            name: NSNotification.Name(NotificationNames.charactersUpdated),
+            name: NSNotification.Name(NotificationNames.filmCharactersUpdated),
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -77,7 +80,7 @@ class MyFilmViewController: UIViewController {
     @objc private func refreshData() {
         guard let film = film else { return }
         sequence = sequenceService.getSequences(forFilmId: film.id)
-        character = characterService.getCharacters(forFilmId: film.id)
+        characters = filmCharacterService.getCharacters(forFilmId: film.id)
         prop = propService.getProps(forFilmId: film.id)
         collectionView?.reloadData()
     }
@@ -175,7 +178,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
         if section == 0 { return sequence.isEmpty ? 1 : sequence.count }
-        if section == 1 { return character.isEmpty ? 1 : character.count }
+        if section == 1 { return characters.isEmpty ? 1 : characters.count }
         return prop.isEmpty ? 1 : prop.count
     }
 
@@ -193,9 +196,16 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             return cell
 
         case 1:
-            if character.isEmpty { return placeholder(collectionView, indexPath) }
+            if characters.isEmpty { return placeholder(collectionView, indexPath) }
             let cell = dequeue(characterCellId, as: CharactersCollectionViewCell.self, collectionView, indexPath)
-            cell.configureCell(character: character[indexPath.item])
+            let filmCharacter = characters[indexPath.item]
+            let template = characterService.getCharacter(by: filmCharacter.characterTemplateId)
+
+            cell.configureCell(
+                filmCharacter: filmCharacter,
+                template: template
+            )
+
             return cell
 
         default:
@@ -231,7 +241,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     
     func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         if indexPath.section == 0 && sequence.isEmpty { return false }
-        if indexPath.section == 1 && character.isEmpty { return false }
+        if indexPath.section == 1 && characters.isEmpty { return false }
         if indexPath.section == 2 && prop.isEmpty { return false }
         return true
     }
@@ -242,7 +252,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if indexPath.section == 0 {
             performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
         } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: character[indexPath.item])
+            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
         } else {
             performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
         }
@@ -277,7 +287,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
-            vc.character = sender as! [CharacterItem]
+            vc.characters = sender as! [FilmCharacter]
         }
 
         if segue.identifier == "allPropsSegue" {
@@ -293,7 +303,7 @@ extension MyFilmViewController: HeaderViewDelegate {
         if section == 0 {
             performSegue(withIdentifier: "allSequencesSegue", sender: sequence)
         } else if section == 1 {
-            performSegue(withIdentifier: "allCharactersSegue", sender: character)
+            performSegue(withIdentifier: "allCharactersSegue", sender: characters)
         } else if section == 2 {
             performSegue(withIdentifier: "allPropsSegue", sender: prop)
         }
