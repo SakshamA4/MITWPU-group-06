@@ -11,7 +11,7 @@ import RealityKit
 import Combine
 import PhotosUI
 
-//new: undo redo code starts here
+
 struct SceneSnapshot {
     var entityTransforms: [String: Transform]
 }
@@ -324,6 +324,14 @@ class CanvasViewController: UIViewController {
             
             applySnapshot(nextState)
         }
+    
+    @objc private func moreTapped() {
+        // Show an action sheet or menu
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Settings", style: .default))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
 
         // 5. The Application Function (Receives the Struct)
         private func applySnapshot(_ snapshot: SceneSnapshot) {
@@ -1048,7 +1056,7 @@ class CanvasViewController: UIViewController {
         
         switch type {
             
-            // ───── MOVE ─────
+            // MOVE
         case .move:
             track = .position
             
@@ -1082,7 +1090,7 @@ class CanvasViewController: UIViewController {
 
         timeline.addClip(clip)
 
-        if let path = clip.motionPath {
+        if clip.motionPath != nil {
             showMotionPath(for: clip)
         }
 
@@ -1107,12 +1115,75 @@ class CanvasViewController: UIViewController {
         setupUI()
         setupGestures()
         setupTimelineControls()
+        setupNavigationBar()
 
                 BackgroundStore.shared.onImageSelected = { [weak self] pickedImage in
                     DispatchQueue.main.async {
                         self?.applyBackgroundImage(pickedImage)
                     }
                 }
+    }
+    
+    private func setupNavigationBar() {
+        // 1. Back Button Logic
+
+        // This creates a custom back button that pops the view controller
+        let backButton = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backButtonTapped)
+        )
+        
+        // 2. Undo & Redo (Moved beside the back button)
+        let undoBtn = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.uturn.backward"),
+            style: .plain,
+            target: self,
+            action: #selector(undoTapped)
+        )
+        
+        let redoBtn = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.uturn.forward"),
+            style: .plain,
+            target: self,
+            action: #selector(redoTapped)
+        )
+        
+        // Combine Back, Undo, Redo on the left
+        navigationItem.leftBarButtonItems = [backButton, undoBtn, redoBtn]
+        
+        // 3. Right Side: Export and 3-Dots
+        let exportBtn = UIBarButtonItem(
+            image: UIImage(systemName: "square.and.arrow.up"),
+            style: .plain,
+            target: self,
+            action: #selector(exportTapped) // Uses your existing export logic
+        )
+        
+        let moreBtn = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(moreTapped)
+        )
+        
+        navigationItem.rightBarButtonItems = [moreBtn, exportBtn]
+        
+        // 4. Configure Appearance (Dark background like your image)
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
+        navigationController?.navigationBar.tintColor = .systemBlue
+    }
+    
+    @objc private func backButtonTapped() {
+        // This takes you back to the previous page
+        print("Clicking back button")
+            // Fallback: dismiss if it was presented modally
+            self.dismiss(animated: true)
     }
 
     //Setup
@@ -1281,7 +1352,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
 
 
     //Export logic starts
-        // 📍 STEP 1: Implement the logic to capture the 3D ARView
+        // STEP 1: Implement the logic to capture the 3D ARView
         private func captureCanvasAndShare(isPNG: Bool) {
             // Hide UI elements you don't want in the final photo
             layersButton.isHidden = true
@@ -1312,7 +1383,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         }
 
         // STEP 2: Update your button tap to show the Project's ExportVC
-        @objc func didTapExportButton() {
+        @objc func exportTapped() {
             let exportVC = ExportVC()
             
             exportVC.projectName = "Film: Project Alpha"
@@ -1692,7 +1763,7 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         )
         arView.addGestureRecognizer(pinch)
         
-        let rotation = UIRotationGestureRecognizer(
+        _ = UIRotationGestureRecognizer(
             target: self,
             action: #selector(handleRotation(_:))
         )
@@ -2432,33 +2503,33 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         movementToggleButton.translatesAutoresizingMaskIntoConstraints = false
         movementToggleButton.addTarget(self, action: #selector(toggleMovementTapped(_:)), for: .touchUpInside)
         
-                let undoBtn = UIButton(type: .system)
-                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
-                undoBtn.tintColor = .white
-                undoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-                undoBtn.layer.cornerRadius = 20
-                undoBtn.translatesAutoresizingMaskIntoConstraints = false
-                undoBtn.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
-
-                let redoBtn = UIButton(type: .system)
-                redoBtn.setImage(UIImage(systemName: "arrow.uturn.forward"), for: .normal)
-                redoBtn.tintColor = .white
-                redoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-                redoBtn.layer.cornerRadius = 20
-                redoBtn.translatesAutoresizingMaskIntoConstraints = false
-                redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
-        
-                let exportBtn = UIButton(type: .system)
-                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-                exportBtn.tintColor = .white
-                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-                exportBtn.layer.cornerRadius = 20
-                exportBtn.translatesAutoresizingMaskIntoConstraints = false
-                exportBtn.addTarget(self, action: #selector(didTapExportButton), for: .touchUpInside)
-                
-                view.addSubview(exportBtn)
-                view.addSubview(undoBtn)
-                view.addSubview(redoBtn)
+//                let undoBtn = UIButton(type: .system)
+//                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
+//                undoBtn.tintColor = .white
+//                undoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+//                undoBtn.layer.cornerRadius = 20
+//                undoBtn.translatesAutoresizingMaskIntoConstraints = false
+//                undoBtn.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
+//
+//                let redoBtn = UIButton(type: .system)
+//                redoBtn.setImage(UIImage(systemName: "arrow.uturn.forward"), for: .normal)
+//                redoBtn.tintColor = .white
+//                redoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+//                redoBtn.layer.cornerRadius = 20
+//                redoBtn.translatesAutoresizingMaskIntoConstraints = false
+//                redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
+//        
+//                let exportBtn = UIButton(type: .system)
+//                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+//                exportBtn.tintColor = .white
+//                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+//                exportBtn.layer.cornerRadius = 20
+//                exportBtn.translatesAutoresizingMaskIntoConstraints = false
+//                exportBtn.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
+//                
+//                view.addSubview(exportBtn)
+//                view.addSubview(undoBtn)
+//                view.addSubview(redoBtn)
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
@@ -2466,27 +2537,27 @@ func spawnEntity(item: SpawnItem, toolType: ToolType, customName: String? = nil,
         view.addSubview(movementToggleButton)
         
         //undo redo
-               NSLayoutConstraint.activate([
-                    // Redo Button (Closest to Layers Button)
-                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
-                    redoBtn.widthAnchor.constraint(equalToConstant: 40),
-                    redoBtn.heightAnchor.constraint(equalToConstant: 40),
-                    
-                    // Undo Button (To the left of Redo)
-                    undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-                    undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
-                    undoBtn.widthAnchor.constraint(equalToConstant: 40),
-                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
-                ])
-        
-        NSLayoutConstraint.activate([
-                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-                            // Place it to the left of your Undo button
-                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
-                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
-                        ])
+//               NSLayoutConstraint.activate([
+//                    // Redo Button (Closest to Layers Button)
+//                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+//                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
+//                    redoBtn.widthAnchor.constraint(equalToConstant: 40),
+//                    redoBtn.heightAnchor.constraint(equalToConstant: 40),
+//                    
+//                    // Undo Button (To the left of Redo)
+//                    undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+//                    undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
+//                    undoBtn.widthAnchor.constraint(equalToConstant: 40),
+//                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
+//                ])
+//        
+//        NSLayoutConstraint.activate([
+//                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+//                            // Place it to the left of your Undo button
+//                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+//                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
+//                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
+//                        ])
 
 
                 //new undo redo ends

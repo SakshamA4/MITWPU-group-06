@@ -103,7 +103,7 @@ class CharacterService {
                         CharacterPoseItem(id: UUID(), name: "Standing", imageName: "woman1_img", modelFilename: "woman1"),
                         CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Woman1Sit_img", modelFilename: "Woman1Sit"),
                         CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Woman1MegLay_img", modelFilename: "Woman1MegLay"),
-                        CharacterPoseItem(id: UUID(), name: "On a call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
+                        CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
                     ]
                 ),
                 CharacterItem(

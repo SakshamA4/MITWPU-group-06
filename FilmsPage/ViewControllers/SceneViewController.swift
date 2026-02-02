@@ -135,7 +135,11 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
     
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
-//        print("Selected Scene:", allScenes[indexPath.item].title)
+        let vc = CanvasViewController()
+       // navigationController?.pushViewController(vc, animated: true)
+        let navController = UINavigationController(rootViewController: vc)
+        navController.modalPresentationStyle = .fullScreen
+        self.present(navController, animated: true)
     }
 }
 
