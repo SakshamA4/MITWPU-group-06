@@ -242,6 +242,25 @@ func applyEasing(_ t: Float, easing: EasingType) -> Float {
 
 class CanvasViewController: UIViewController {
     
+    // MARK: - NEW Properties
+        var currentSceneObject: Scene?
+        var sceneName: String = "Untitled Scene"
+        var filmName: String?
+        var sequenceName: String?
+        var sceneNotes: String = ""
+        var lastEditedDate: Date = Date()
+    
+    private lazy var sceneNameLabel: UILabel = {
+            let label = UILabel()
+            // Accessing the instance property here
+            label.text = self.sceneName.uppercased()
+            label.font = .systemFont(ofSize: 17, weight: .semibold)
+            label.textColor = .white
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            return label
+        }()
+//    var projectName: String = "Untitled Scene"  //new
     var undoStack: [SceneSnapshot] = []
     var redoStack: [SceneSnapshot] = []
         func saveCurrentStateToUndo() {
@@ -325,13 +344,7 @@ class CanvasViewController: UIViewController {
             applySnapshot(nextState)
         }
     
-    @objc private func moreTapped() {
-        // Show an action sheet or menu
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "Settings", style: .default))
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        present(alert, animated: true)
-    }
+    
 
         // 5. The Application Function (Receives the Struct)
         private func applySnapshot(_ snapshot: SceneSnapshot) {
@@ -1170,6 +1183,8 @@ class CanvasViewController: UIViewController {
         
         navigationItem.rightBarButtonItems = [moreBtn, exportBtn]
         
+        
+        
         // 4. Configure Appearance (Dark background like your image)
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -1177,6 +1192,50 @@ class CanvasViewController: UIViewController {
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .systemBlue
+    }
+    
+    @objc func moreTapped() {
+        let infoVC = SceneInfoViewController()
+                
+                // Pass tracked data to the modal
+                infoVC.sceneName = self.sceneName
+                infoVC.sequenceName = self.sequenceName
+                infoVC.filmName = self.filmName
+                infoVC.initialNotes = self.sceneNotes
+                infoVC.lastEditedDate = self.lastEditedDate
+                
+        infoVC.onSave = { [weak self] newName, newNotes in
+            guard let self = self else { return }
+            
+            // 1. Update local UI state
+            self.sceneName = newName
+            self.sceneNotes = newNotes
+            self.lastEditedDate = Date()
+            self.sceneNameLabel.text = newName.uppercased()
+            
+            // 2. 📍 SAVE TO DATABASE: This now works because 'notes' is in ScenesModel
+            if var sceneToUpdate = self.currentSceneObject {
+                sceneToUpdate.name = newName
+                sceneToUpdate.notes = newNotes
+                
+                // Use your service to save changes permanently
+                SceneService.shared.updateScene(sceneToUpdate)
+                
+                // Update local reference
+                self.currentSceneObject = sceneToUpdate
+            }
+            
+            NotificationCenter.default.post(name: NSNotification.Name("scenesUpdated"), object: nil)
+        }
+        
+        // Snapshot logic
+        arView.snapshot(saveToHDR: false) { image in
+            infoVC.sceneImage = image
+        }
+        
+        infoVC.modalPresentationStyle = .overCurrentContext
+        infoVC.modalTransitionStyle = .crossDissolve
+        self.present(infoVC, animated: true)
     }
     
     @objc private func backButtonTapped() {
@@ -2958,16 +3017,16 @@ class EntityActionMenu: UIView {
             return button
         }()
         
-        private let sceneNameLabel: UILabel = {
-            let label = UILabel()
-            label.text = "Living Room" // Default text
-            label.font = .systemFont(ofSize: 17, weight: .semibold)
-            label.textColor = .white
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            return label
-        }()
-        
+//        private let sceneNameLabel: UILabel = {
+//            let label = UILabel()
+//            label.text = "Living Room" // Default text
+//            label.font = .systemFont(ofSize: 17, weight: .semibold)
+//            label.textColor = .white
+//            label.textAlignment = .center
+//            label.translatesAutoresizingMaskIntoConstraints = false
+//            return label
+//        }()
+   
         // ... existing properties ...
     
     private func setupUI() {

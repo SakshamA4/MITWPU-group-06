@@ -254,6 +254,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "sequenceSegue" {
             let vc = segue.destination as! SequenceViewController
             vc.sequence = sender as? Sequence
+            vc.filmName = self.film?.name  //NEW
         }
 
         if segue.identifier == "characterInfoSegue" {
