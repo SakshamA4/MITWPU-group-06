@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -18,7 +18,29 @@
                 <subviews>
                     <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="xvb-Td-uKy">
                         <rect key="frame" x="0.0" y="0.0" width="245" height="235"/>
+                        <subviews>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="+" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="P2y-H3-r4R">
+                                <rect key="frame" x="0.0" y="70" width="245" height="63"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="52"/>
+                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Add New" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="7D6-1e-6dy">
+                                <rect key="frame" x="0.0" y="181" width="245" height="21"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                        </subviews>
                         <color key="backgroundColor" red="0.1019897461" green="0.1019897461" blue="0.1600341797" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+                        <constraints>
+                            <constraint firstItem="7D6-1e-6dy" firstAttribute="leading" secondItem="xvb-Td-uKy" secondAttribute="leading" id="ECu-C6-pyo"/>
+                            <constraint firstAttribute="trailing" secondItem="P2y-H3-r4R" secondAttribute="trailing" id="LAl-WF-yUL"/>
+                            <constraint firstItem="P2y-H3-r4R" firstAttribute="leading" secondItem="xvb-Td-uKy" secondAttribute="leading" id="cA5-AN-FCC"/>
+                            <constraint firstItem="P2y-H3-r4R" firstAttribute="top" secondItem="xvb-Td-uKy" secondAttribute="top" constant="70" id="d0G-W8-3vv"/>
+                            <constraint firstAttribute="bottom" secondItem="7D6-1e-6dy" secondAttribute="bottom" constant="33" id="lYZ-Od-Pnv"/>
+                            <constraint firstAttribute="trailing" secondItem="7D6-1e-6dy" secondAttribute="trailing" id="m3a-TG-FCb"/>
+                        </constraints>
                     </view>
                 </subviews>
             </view>
@@ -31,6 +53,7 @@
             </constraints>
             <size key="customSize" width="245" height="235"/>
             <connections>
+                <outlet property="addNew" destination="7D6-1e-6dy" id="2cV-zN-CjS"/>
                 <outlet property="bgView" destination="xvb-Td-uKy" id="ELt-ot-XlM"/>
             </connections>
             <point key="canvasLocation" x="209.63414634146341" y="150.76271186440678"/>

@@ -28,11 +28,16 @@ class BackgroundCollectionViewCell: UICollectionViewCell {
            gradientLayer.frame = backgroundImageView.bounds
        }
        
-       func configure(with item: BackgroundItem) {
-           backgroundImageView.image = UIImage(named: item.imageName)
-           titleLabel.text = item.title
-       }
-   }
+    func configure(with item: BackgroundItem) {
+        titleLabel.text = item.title
+        
+        if let customImg = item.customImage {
+            backgroundImageView.image = customImg
+        } else if let name = item.imageName {
+            backgroundImageView.image = UIImage(named: name)
+        }
+    }
+}
 
    // MARK: - Setup
    private extension BackgroundCollectionViewCell {

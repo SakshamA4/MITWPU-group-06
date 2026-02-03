@@ -10,7 +10,8 @@ import PhotosUI
 
 class BackgroundViewController: UIViewController {
     
-    // MARK: - Outlets
+    private var pendingName: String?
+    
     @IBOutlet weak var backgroundCollectionView: UICollectionView!
     
     // MARK: - Data
@@ -117,27 +118,68 @@ extension BackgroundViewController: UICollectionViewDataSource, UICollectionView
 private extension BackgroundViewController {
     
     @objc func addBackgroundTapped() {
+        print("Add bg tapped")
         let alert = UIAlertController(title: "New Background",
                                       message: "Enter a name for the new background",
                                       preferredStyle: .alert)
         alert.addTextField { $0.placeholder = "Background name" }
         
-        let addAction = UIAlertAction(title: "Add", style: .default) { [weak self] _ in
+        let addAction = UIAlertAction(title: "Select Image", style: .default) { [weak self] _ in
             guard let self = self else { return }
-            _ = alert.textFields?.first?.text?.isEmpty == false
-                ? alert.textFields?.first?.text!
-                : "New Background"
+            let name = alert.textFields?.first?.text ?? "New Background"
             
-            let newItem = BackgroundItem(title: "name", imageName: "bg_placeholder")
-            BackgroundData.addBackground(newItem)
-            self.items = BackgroundData.allBackgrounds
-            
-            let newIndexPath = IndexPath(item: self.items.count - 1, section: 0)
-            self.backgroundCollectionView.insertItems(at: [newIndexPath])
+            // Open the Gallery
+            self.presentImagePicker(withName: name)
         }
         
         alert.addAction(addAction)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+}
+
+private extension BackgroundViewController {
+    func presentImagePicker(withName name: String) {
+        var config = PHPickerConfiguration()
+        config.filter = .images // Only show images
+        config.selectionLimit = 1 // Limit to one selection
+        
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        
+        // We can temporarily store the name in a property or use an associated object,
+        // but for simplicity, let's just use a temporary property or a simple trick.
+        self.accessibilityLabel = name // Quick way to pass the name to the delegate
+        
+        present(picker, animated: true)
+    }
+}
+
+extension BackgroundViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        
+        guard let provider = results.first?.itemProvider,
+              provider.canLoadObject(ofClass: UIImage.self) else { return }
+        
+        provider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
+            guard let self = self, let uiImage = image as? UIImage else { return }
+            
+            DispatchQueue.main.async {
+                // Use the stored name, or a default
+                let name = self.pendingName ?? "New Background"
+                
+                // Now this matches the updated struct!
+                let newItem = BackgroundItem(title: name, imageName: nil, customImage: uiImage)
+                
+                BackgroundData.addBackground(newItem)
+                self.items = BackgroundData.allBackgrounds
+                
+                let newIndexPath = IndexPath(item: self.items.count - 1, section: 0)
+                self.backgroundCollectionView.insertItems(at: [newIndexPath])
+                
+                self.pendingName = nil // Reset
+            }
+        }
     }
 }
