@@ -83,7 +83,7 @@ final class FilmCharacterService {
     }
 
     /// Remove a character from a film
-    func deleteCharacter(by id: UUID) {
+    func removeCharacter(by id: UUID) {
         filmCharacters.removeAll { $0.id == id }
     }
 
@@ -117,7 +117,7 @@ final class FilmCharacterService {
             let data = try encoder.encode(filmCharacters)
             UserDefaults.standard.set(data, forKey: storageKey)
         } catch {
-            print("❌ Failed to save film characters:", error)
+            print(" Failed to save film characters:", error)
         }
     }
 
@@ -131,7 +131,7 @@ final class FilmCharacterService {
             let decoder = JSONDecoder()
             filmCharacters = try decoder.decode([FilmCharacter].self, from: data)
         } catch {
-            print("❌ Failed to load film characters:", error)
+            print("Failed to load film characters:", error)
             filmCharacters = []
         }
     }

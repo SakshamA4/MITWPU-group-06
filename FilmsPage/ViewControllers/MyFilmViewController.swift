@@ -38,23 +38,104 @@ class MyFilmViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         refreshData()
-        
+
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
-        
+
         registerCells()
         setupObservers()
-        
+
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.collectionViewLayout = generateLayout()
 
-        collectionView.reloadData()
-        
+        let longPress = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handleLongPress(_:))
+        )
+        collectionView.addGestureRecognizer(longPress)
+
         filmName.text = film?.name ?? "My Film"
     }
+
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+
+        let point = gesture.location(in: collectionView)
+        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
+
+        // Ignore placeholder cells
+        if (indexPath.section == 0 && sequence.isEmpty) ||
+           (indexPath.section == 1 && characters.isEmpty) ||
+           (indexPath.section == 2 && prop.isEmpty) {
+            return
+        }
+
+        presentMenu(for: indexPath)
+    }
+
+    private func presentMenu(for indexPath: IndexPath) {
+
+        let alert = UIAlertController(
+            title: "Options",
+            message: nil,
+            preferredStyle: .actionSheet
+        )
+
+        alert.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
+            self.handleEdit(at: indexPath)
+        })
+
+        alert.addAction(UIAlertAction(title: destructiveTitle(for: indexPath),
+                                      style: .destructive) { _ in
+            self.handleDeleteOrRemove(at: indexPath)
+        })
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        present(alert, animated: true)
+    }
+
+    private func destructiveTitle(for indexPath: IndexPath) -> String {
+        if indexPath.section == 0 {
+            return "Delete Sequence"
+        } else {
+            return "Remove from Film"
+        }
+    }
+
+    private func handleEdit(at indexPath: IndexPath) {
+        if indexPath.section == 0 {
+            performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
+        } else if indexPath.section == 1 {
+            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
+        } else {
+            performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
+        }
+    }
+
+    private func handleDeleteOrRemove(at indexPath: IndexPath) {
+        guard let film = film else { return }
+
+        if indexPath.section == 0 {
+            // 🔥 DELETE SEQUENCE COMPLETELY
+            let seq = sequence[indexPath.item]
+            sequenceService.deleteSequence(by: seq.id)
+
+        } else if indexPath.section == 1 {
+            // 🔗 REMOVE CHARACTER FROM FILM ONLY
+            let char = characters[indexPath.item]
+            filmCharacterService.removeCharacter(by: char.id)
+
+        } else {
+            // 🔗 REMOVE PROP FROM FILM ONLY
+            let pr = prop[indexPath.item]
+            guard let propId = pr.id else { return }
+            propService.removeProp(propId, fromFilmId: film.id)
+        }
+    }
+
     
     private func setupObservers() {
         NotificationCenter.default.addObserver(
@@ -289,6 +370,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
             vc.characters = sender as! [FilmCharacter]
+            vc.film = film
         }
 
         if segue.identifier == "allPropsSegue" {
