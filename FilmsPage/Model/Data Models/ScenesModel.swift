@@ -19,3 +19,4 @@ struct ScenesModel: Codable, Equatable, Hashable {
         self.image = image
     }
 }
+

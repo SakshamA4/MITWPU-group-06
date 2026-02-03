@@ -17,7 +17,7 @@ class SequenceViewController: UIViewController {
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
-    var filmName: String?   //NEW
+    
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
@@ -123,31 +123,17 @@ extension SequenceViewController: UICollectionViewDelegate,
         return CGSize(width: width, height: width)
     }
 
-//    func collectionView(
-//        _ collectionView: UICollectionView,
-//        didSelectItemAt indexPath: IndexPath
-//    ) {
-//        let vc = CanvasViewController()
-//       // navigationController?.pushViewController(vc, animated: true)
-//        let navController = UINavigationController(rootViewController: vc)
-//        navController.modalPresentationStyle = .fullScreen
-//        self.present(navController, animated: true)
-//    }
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // 1. Get the specific scene the user tapped on
-        let selectedScene = scene[indexPath.item]
+    func collectionView(
+        _ collectionView: UICollectionView,
+        didSelectItemAt indexPath: IndexPath
+    ) {
         let vc = CanvasViewController()
-        vc.currentSceneObject = selectedScene
-        
-        vc.sceneName = selectedScene.name               // Freedom: tracks previous name
-        vc.sequenceName = self.sequence?.name           // Origin: tracks the current sequence
-        vc.filmName = self.filmName
-     
+       // navigationController?.pushViewController(vc, animated: true)
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
     }
-    
+
     func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,

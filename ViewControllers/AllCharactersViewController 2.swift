@@ -9,8 +9,7 @@ import UIKit
 
 class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
 
-    var characters: [FilmCharacter] = []
-    var film: Film!
+    var character: [CharacterItem] = []
     
     
     @IBOutlet weak var collectionView: UICollectionView!
@@ -35,55 +34,21 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
         collectionView.dataSource = self
         collectionView.delegate = self
         // Do any additional setup after loading the view.
-        loadCharacters()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(refreshData),
-            name: NSNotification.Name(FilmCharacterService.NotificationNames.filmCharactersUpdated),
-            object: nil
-        )
-    }
-
-    @objc private func refreshData() {
-        loadCharacters()
-    }
-
-    
-    
-    private func loadCharacters() {
-        characters = FilmCharacterService.shared.getCharacters(forFilmId: film.id)
-        collectionView.reloadData()
-    }
-
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return characters.count
+        return character.count
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                           cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: "character_cell",
+            for: indexPath
+        ) as! CharactersCollectionViewCell
 
-           let cell = collectionView.dequeueReusableCell(
-               withReuseIdentifier: characterCellId,
-               for: indexPath
-           ) as! CharactersCollectionViewCell
-
-           let filmCharacter = characters[indexPath.item]
-
-           // Resolve template from service
-           let template = FilmCharacterService.shared.getTemplate(for: filmCharacter)
-
-           cell.configureCell(
-               filmCharacter: filmCharacter,
-               template: template
-           )
-
-           return cell
-       }
+        cell.configureCell(character: character[indexPath.row])
+        return cell
+    }
     /*
     // MARK: - Navigation
 

@@ -21,10 +21,7 @@ class MyFilmViewController: UIViewController {
     private let propCellId = "prop_cell"
     
     var sequence: [Sequence] = []
-    var characters: [FilmCharacter] = []
-
-    private let filmCharacterService = FilmCharacterService.shared
-
+    var character: [CharacterItem] = []
     var prop: [PropItem] = []
     
     // Services
@@ -38,104 +35,23 @@ class MyFilmViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
         refreshData()
-
+        
         let layout = generateLayout()
         collectionView.setCollectionViewLayout(layout, animated: true)
-
+        
         registerCells()
         setupObservers()
-
+        
         collectionView.dataSource = self
         collectionView.delegate = self
+        collectionView.collectionViewLayout = generateLayout()
 
-        let longPress = UILongPressGestureRecognizer(
-            target: self,
-            action: #selector(handleLongPress(_:))
-        )
-        collectionView.addGestureRecognizer(longPress)
-
+        collectionView.reloadData()
+        
         filmName.text = film?.name ?? "My Film"
     }
-
-    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
-
-        let point = gesture.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
-
-        // Ignore placeholder cells
-        if (indexPath.section == 0 && sequence.isEmpty) ||
-           (indexPath.section == 1 && characters.isEmpty) ||
-           (indexPath.section == 2 && prop.isEmpty) {
-            return
-        }
-
-        presentMenu(for: indexPath)
-    }
-
-    private func presentMenu(for indexPath: IndexPath) {
-
-        let alert = UIAlertController(
-            title: "Options",
-            message: nil,
-            preferredStyle: .actionSheet
-        )
-
-        alert.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
-            self.handleEdit(at: indexPath)
-        })
-
-        alert.addAction(UIAlertAction(title: destructiveTitle(for: indexPath),
-                                      style: .destructive) { _ in
-            self.handleDeleteOrRemove(at: indexPath)
-        })
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        present(alert, animated: true)
-    }
-
-    private func destructiveTitle(for indexPath: IndexPath) -> String {
-        if indexPath.section == 0 {
-            return "Delete Sequence"
-        } else {
-            return "Remove from Film"
-        }
-    }
-
-    private func handleEdit(at indexPath: IndexPath) {
-        if indexPath.section == 0 {
-            performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
-        } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
-        } else {
-            performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
-        }
-    }
-
-    private func handleDeleteOrRemove(at indexPath: IndexPath) {
-        guard let film = film else { return }
-
-        if indexPath.section == 0 {
-            // 🔥 DELETE SEQUENCE COMPLETELY
-            let seq = sequence[indexPath.item]
-            sequenceService.deleteSequence(by: seq.id)
-
-        } else if indexPath.section == 1 {
-            // 🔗 REMOVE CHARACTER FROM FILM ONLY
-            let char = characters[indexPath.item]
-            filmCharacterService.removeCharacter(by: char.id)
-
-        } else {
-            // 🔗 REMOVE PROP FROM FILM ONLY
-            let pr = prop[indexPath.item]
-            guard let propId = pr.id else { return }
-            propService.removeProp(propId, fromFilmId: film.id)
-        }
-    }
-
     
     private func setupObservers() {
         NotificationCenter.default.addObserver(
@@ -147,7 +63,7 @@ class MyFilmViewController: UIViewController {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(refreshData),
-            name: NSNotification.Name(NotificationNames.filmCharactersUpdated),
+            name: NSNotification.Name(NotificationNames.charactersUpdated),
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -161,7 +77,7 @@ class MyFilmViewController: UIViewController {
     @objc private func refreshData() {
         guard let film = film else { return }
         sequence = sequenceService.getSequences(forFilmId: film.id)
-        characters = filmCharacterService.getCharacters(forFilmId: film.id)
+        character = characterService.getCharacters(forFilmId: film.id)
         prop = propService.getProps(forFilmId: film.id)
         collectionView?.reloadData()
     }
@@ -259,7 +175,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
         if section == 0 { return sequence.isEmpty ? 1 : sequence.count }
-        if section == 1 { return characters.isEmpty ? 1 : characters.count }
+        if section == 1 { return character.isEmpty ? 1 : character.count }
         return prop.isEmpty ? 1 : prop.count
     }
 
@@ -277,16 +193,9 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             return cell
 
         case 1:
-            if characters.isEmpty { return placeholder(collectionView, indexPath) }
+            if character.isEmpty { return placeholder(collectionView, indexPath) }
             let cell = dequeue(characterCellId, as: CharactersCollectionViewCell.self, collectionView, indexPath)
-            let filmCharacter = characters[indexPath.item]
-            let template = characterService.getCharacter(by: filmCharacter.characterTemplateId)
-
-            cell.configureCell(
-                filmCharacter: filmCharacter,
-                template: template
-            )
-
+            cell.configureCell(character: character[indexPath.item])
             return cell
 
         default:
@@ -322,7 +231,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     
     func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         if indexPath.section == 0 && sequence.isEmpty { return false }
-        if indexPath.section == 1 && characters.isEmpty { return false }
+        if indexPath.section == 1 && character.isEmpty { return false }
         if indexPath.section == 2 && prop.isEmpty { return false }
         return true
     }
@@ -333,7 +242,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if indexPath.section == 0 {
             performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
         } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
+            performSegue(withIdentifier: "characterInfoSegue", sender: character[indexPath.item])
         } else {
             performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
         }
@@ -345,7 +254,6 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         if segue.identifier == "sequenceSegue" {
             let vc = segue.destination as! SequenceViewController
             vc.sequence = sender as? Sequence
-            vc.filmName = self.film?.name  //NEW
         }
 
         if segue.identifier == "characterInfoSegue" {
@@ -369,8 +277,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
         if segue.identifier == "allCharactersSegue" {
             let vc = segue.destination as! AllCharactersViewController
-            vc.characters = sender as! [FilmCharacter]
-            vc.film = film
+            vc.character = sender as! [CharacterItem]
         }
 
         if segue.identifier == "allPropsSegue" {
@@ -386,7 +293,7 @@ extension MyFilmViewController: HeaderViewDelegate {
         if section == 0 {
             performSegue(withIdentifier: "allSequencesSegue", sender: sequence)
         } else if section == 1 {
-            performSegue(withIdentifier: "allCharactersSegue", sender: characters)
+            performSegue(withIdentifier: "allCharactersSegue", sender: character)
         } else if section == 2 {
             performSegue(withIdentifier: "allPropsSegue", sender: prop)
         }

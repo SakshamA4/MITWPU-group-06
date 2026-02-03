@@ -9,7 +9,7 @@ import UIKit
 
 class AllPropsViewController: UIViewController, UICollectionViewDataSource {
 
-    
+    private var selectedProp: PropItem?
 
     @IBOutlet weak var collectionView: UICollectionView!
     
@@ -32,8 +32,70 @@ class AllPropsViewController: UIViewController, UICollectionViewDataSource {
         collectionView.setCollectionViewLayout(layout, animated: false)
         collectionView.dataSource = self
         collectionView.delegate = self
+        
+        let longPressGesture = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handleLongPress(_:))
+        )
+        collectionView.addGestureRecognizer(longPressGesture)
         // Do any additional setup after loading the view.
     }
+    
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+
+        let point = gesture.location(in: collectionView)
+
+        guard let indexPath = collectionView.indexPathForItem(at: point) else {
+            return
+        }
+
+        let selectedProp = prop[indexPath.item]
+        showPropActionSheet(for: selectedProp, at: indexPath)
+    }
+
+    private func showPropActionSheet(for propItem: PropItem, at indexPath: IndexPath) {
+        let alert = UIAlertController(
+            title: propItem.name,
+            message: "What would you like to do?",
+            preferredStyle: .actionSheet
+        )
+
+        alert.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
+            self.editProp(propItem, at: indexPath)
+        })
+
+        alert.addAction(UIAlertAction(title: "Remove", style: .destructive) { _ in
+            self.removeProp(at: indexPath)
+        })
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        present(alert, animated: true)
+    }
+
+    private func removeProp(at indexPath: IndexPath) {
+        prop.remove(at: indexPath.item)
+        collectionView.deleteItems(at: [indexPath])
+    }
+
+    private func editProp(_ propItem: PropItem, at indexPath: IndexPath) {
+        selectedProp = propItem
+        performSegue(withIdentifier: "editPropSegue", sender: self)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "editPropSegue" {
+            guard
+                let destination = segue.destination as? PropDetailViewController,
+                let prop = selectedProp
+            else { return }
+
+            destination.prop = prop
+        }
+    }
+
+
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return prop.count 

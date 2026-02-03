@@ -1,5 +1,5 @@
 //
-//  CharactersViewController.swift
+//  PropsViewController.swift
 //  FilmsPage
 //
 //  Created by SDC-USER on 08/12/25.
@@ -7,23 +7,21 @@
 
 import UIKit
 
-class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
+class AllPropsViewController: UIViewController, UICollectionViewDataSource {
 
-    var characters: [FilmCharacter] = []
-    var film: Film!
     
-    
+
     @IBOutlet weak var collectionView: UICollectionView!
     
-    private let characterCellId = "character_cell"
-
+    private let propCellId = "prop_cell"
+    var prop: [PropItem] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
 
         
-        collectionView.register(UINib(nibName: "CharactersCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "character_cell")
+        collectionView.register(UINib(nibName: "PropsCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "prop_cell")
         
 
         collectionView.dataSource = self
@@ -35,55 +33,21 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
         collectionView.dataSource = self
         collectionView.delegate = self
         // Do any additional setup after loading the view.
-        loadCharacters()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(refreshData),
-            name: NSNotification.Name(FilmCharacterService.NotificationNames.filmCharactersUpdated),
-            object: nil
-        )
-    }
-
-    @objc private func refreshData() {
-        loadCharacters()
-    }
-
-    
-    
-    private func loadCharacters() {
-        characters = FilmCharacterService.shared.getCharacters(forFilmId: film.id)
-        collectionView.reloadData()
-    }
-
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return characters.count
+        return prop.count 
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                           cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: "prop_cell",
+            for: indexPath
+        ) as! PropsCollectionViewCell
 
-           let cell = collectionView.dequeueReusableCell(
-               withReuseIdentifier: characterCellId,
-               for: indexPath
-           ) as! CharactersCollectionViewCell
-
-           let filmCharacter = characters[indexPath.item]
-
-           // Resolve template from service
-           let template = FilmCharacterService.shared.getTemplate(for: filmCharacter)
-
-           cell.configureCell(
-               filmCharacter: filmCharacter,
-               template: template
-           )
-
-           return cell
-       }
+        cell.configureCell(prop: prop[indexPath.row])
+        return cell
+    }
     /*
     // MARK: - Navigation
 
@@ -96,7 +60,7 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
 
 }
 
-extension AllCharactersViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+extension AllPropsViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let inset: CGFloat = 40
         let interItem: CGFloat = 40
@@ -110,5 +74,3 @@ extension AllCharactersViewController: UICollectionViewDelegate, UICollectionVie
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }
 }
-
-

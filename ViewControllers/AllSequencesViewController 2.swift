@@ -1,5 +1,5 @@
 //
-//  CharactersViewController.swift
+//  AllSequencesViewController.swift
 //  FilmsPage
 //
 //  Created by SDC-USER on 08/12/25.
@@ -7,23 +7,23 @@
 
 import UIKit
 
-class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
-
-    var characters: [FilmCharacter] = []
-    var film: Film!
+class AllSequencesViewController: UIViewController , UICollectionViewDataSource {
     
+    var film: [Film] = []
+    var sequence: [Sequence] = []
+    var selectedSequence: Sequence?
+  
+
     
     @IBOutlet weak var collectionView: UICollectionView!
     
-    private let characterCellId = "character_cell"
-
+    private let sequenceCellId = "sequence_cell"
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
-
         
-        collectionView.register(UINib(nibName: "CharactersCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "character_cell")
+        collectionView.register(UINib(nibName: "SequencesCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "sequence_cell")
         
 
         collectionView.dataSource = self
@@ -35,55 +35,21 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
         collectionView.dataSource = self
         collectionView.delegate = self
         // Do any additional setup after loading the view.
-        loadCharacters()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(refreshData),
-            name: NSNotification.Name(FilmCharacterService.NotificationNames.filmCharactersUpdated),
-            object: nil
-        )
-    }
-
-    @objc private func refreshData() {
-        loadCharacters()
-    }
-
-    
-    
-    private func loadCharacters() {
-        characters = FilmCharacterService.shared.getCharacters(forFilmId: film.id)
-        collectionView.reloadData()
-    }
-
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return characters.count
+        return sequence.count
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                           cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: "sequence_cell",
+            for: indexPath
+        ) as! SequencesCollectionViewCell
 
-           let cell = collectionView.dequeueReusableCell(
-               withReuseIdentifier: characterCellId,
-               for: indexPath
-           ) as! CharactersCollectionViewCell
-
-           let filmCharacter = characters[indexPath.item]
-
-           // Resolve template from service
-           let template = FilmCharacterService.shared.getTemplate(for: filmCharacter)
-
-           cell.configureCell(
-               filmCharacter: filmCharacter,
-               template: template
-           )
-
-           return cell
-       }
+        cell.configureCell(sequence: sequence[indexPath.row])
+        return cell
+    }
     /*
     // MARK: - Navigation
 
@@ -96,7 +62,7 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
 
 }
 
-extension AllCharactersViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+extension AllSequencesViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let inset: CGFloat = 40
         let interItem: CGFloat = 40
@@ -105,10 +71,27 @@ extension AllCharactersViewController: UICollectionViewDelegate, UICollectionVie
         let width = (collectionView.bounds.width - totalSpacing) / columns
         return CGSize(width: width, height: width)
     }
+    
+
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
     }
-}
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let sequence = sequence[indexPath.row]
+        selectedSequence = sequence
+        performSegue(withIdentifier: "sequence2Segue", sender: self)
+    }
 
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "sequence2Segue",
+           let vc = segue.destination as? SequenceViewController {
+            vc.sequence = selectedSequence
+        }
+    }
+
+
+}
 
