@@ -547,10 +547,22 @@ class CanvasViewController: UIViewController {
                     .findEntity(named: "MotionPath") as? ModelEntity
             else { continue }
 
-            let color: UIColor =
-                (clipID == selectedPathClipID)
-                ? .systemRed
-                : .systemBlue
+            // 🔒 Lock state lives on the PATH ROOT
+            let isLocked =
+                visual.root.components[LockComponent.self]?.isLocked ?? false
+
+            // 🎯 Color priority:
+            // 1. Locked  → Gray
+            // 2. Selected → Red
+            // 3. Default → Blue
+            let color: UIColor
+            if isLocked {
+                color = .systemGray
+            } else if clipID == selectedPathClipID {
+                color = .systemRed
+            } else {
+                color = .systemBlue
+            }
 
             MotionPathRenderer.setPathColor(
                 entity: pathEntity,
@@ -558,6 +570,7 @@ class CanvasViewController: UIViewController {
             )
         }
     }
+
 
     @objc func playTimeline() {
 
@@ -861,8 +874,8 @@ class CanvasViewController: UIViewController {
 
         let pathRoot = Entity()
         pathRoot.name = "PathRoot_\(clip.id)"
-
         pathRoot.position = path.start
+        pathRoot.components.set(LockComponent(isLocked: false))
 
         let start = makePathHandle(color: .gray, name: "path.start")
         let c1 = makePathHandle(color: .orange, name: "path.c1")
@@ -1884,6 +1897,101 @@ class CanvasViewController: UIViewController {
         }
     }
 
+    var pathEditToolbar: UIView?
+
+    func showPathEditToolbar(for clipID: UUID, at screenPoint: CGPoint) {
+
+        // Remove any existing toolbar
+        pathEditToolbar?.removeFromSuperview()
+
+        guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }) else {
+            return
+        }
+
+        let clip = timeline.clips[clipIndex]
+
+        // Container
+        let container = UIView()
+        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        container.layer.cornerRadius = 14
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.25
+        container.layer.shadowRadius = 8
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        // Start time field
+        let startField = UITextField()
+        startField.borderStyle = .roundedRect
+        startField.keyboardType = .decimalPad
+        startField.placeholder = "Start Time"
+        startField.text = String(format: "%.2f", clip.startTime)
+
+        // Duration field
+        let durationField = UITextField()
+        durationField.borderStyle = .roundedRect
+        durationField.keyboardType = .decimalPad
+        durationField.placeholder = "Duration"
+        durationField.text = String(format: "%.2f", clip.duration)
+
+        // Apply button
+        let applyButton = UIButton(type: .system)
+        applyButton.setTitle("Apply", for: .normal)
+        applyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+
+        // Stack
+        let stack = UIStackView(arrangedSubviews: [
+            startField,
+            durationField,
+            applyButton
+        ])
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(stack)
+        view.addSubview(container)
+
+        // Layout
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+
+            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
+            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
+            container.widthAnchor.constraint(equalToConstant: 220)
+        ])
+
+        // ✅ APPLY CHANGES (UIKit-native, no Obj-C runtime)
+        applyButton.addAction(UIAction { [weak self] _ in
+            guard
+                let self,
+                let newStart = Float(startField.text ?? ""),
+                let newDuration = Float(durationField.text ?? ""),
+                newDuration > 0
+            else { return }
+
+            let oldClip = self.timeline.clips[clipIndex]
+
+            self.timeline.clips[clipIndex] = AnimationClip(
+                entityName: oldClip.entityName,
+                type: oldClip.type,
+                track: oldClip.track,
+                easing: oldClip.easing,
+                startTime: newStart,
+                duration: newDuration,
+                fromValue: oldClip.fromValue,
+                toValue: oldClip.toValue,
+                motionPath: oldClip.motionPath
+            )
+
+            self.updateEntityFinalTransforms()
+        }, for: .touchUpInside)
+
+        pathEditToolbar = container
+    }
+
     private func createHierarchyItemRow(title: String) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
@@ -2023,37 +2131,38 @@ class CanvasViewController: UIViewController {
         selectedEntity = nil
 
         // ───────────────────────────────
-        // 1️⃣ DELETE MOTION PATH (if selected)
+        // 1️⃣ DELETE MOTION PATH ONLY
         // ───────────────────────────────
         if let clipID = selectedPathClipID {
 
-            // find the clip before deleting
-            guard let clip = timeline.clips.first(where: { $0.id == clipID })
-            else {
+            guard let clip = timeline.clips.first(where: { $0.id == clipID }) else {
+                selectedPathClipID = nil
                 return
             }
 
             let entityName = clip.entityName
 
-            // remove visuals
+            // Remove path visuals
             activeMotionPaths[clipID]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clipID)
 
-            // remove clip
+            // Remove only THIS clip
             timeline.clips.removeAll { $0.id == clipID }
 
-            // 🔥 FREEZE CURRENT WORLD POSITION AS NEW BASE
+            // IMPORTANT: Clear path selection
+            selectedPathClipID = nil
+
+            // Recompute final transforms safely
             if let entity = arView.scene.findEntity(named: entityName) {
                 baseTransforms[entityName] = entity.transform
             }
 
-            selectedPathClipID = nil
-
-            // re-evaluate remaining clips safely
             updateEntityFinalTransforms()
 
+            // ⛔️ ABSOLUTELY REQUIRED
             return
         }
+
 
         // ───────────────────────────────
         // 2️⃣ DELETE ENTITY + ALL ITS CLIPS
@@ -2098,17 +2207,28 @@ class CanvasViewController: UIViewController {
         )
         arView.addGestureRecognizer(pan)
 
+        // ✅ NEW: Long press for path context menu
+        let longPress = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handlePathLongPress(_:))
+        )
+        longPress.minimumPressDuration = 0.45
+        longPress.cancelsTouchesInView = false
+        arView.addGestureRecognizer(longPress)
+
         let pinch = UIPinchGestureRecognizer(
             target: self,
             action: #selector(handlePinch(_:))
         )
         arView.addGestureRecognizer(pinch)
 
-        _ = UIRotationGestureRecognizer(
+        let rotation = UIRotationGestureRecognizer(
             target: self,
             action: #selector(handleRotation(_:))
         )
+        arView.addGestureRecognizer(rotation)
     }
+
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard let entity = selectedEntity else { return }
@@ -2153,16 +2273,60 @@ class CanvasViewController: UIViewController {
         }
     }
 
+    @objc private func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+
+        let location = gesture.location(in: arView)
+
+        guard let hit = arView.entity(at: location) else { return }
+
+        // Case 1: Long-press on a path HANDLE
+        if let handle = hit.components[MotionPathHandleComponent.self],
+           let pathRoot = hit.parent
+        {
+            showPathContextMenu(
+                clipID: handle.clipID,
+                pathRoot: pathRoot
+            )
+            return
+        }
+
+        // Case 2: Long-press on the PATH CURVE itself
+        if hit.name == "MotionPath",
+           let pathRoot = hit.parent,
+           let handle = pathRoot
+                .children
+                .compactMap({ $0.components[MotionPathHandleComponent.self] })
+                .first
+        {
+            showPathContextMenu(
+                clipID: handle.clipID,
+                pathRoot: pathRoot
+            )
+            return
+        }
+    }
+
+
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
 
         let location = gesture.location(in: arView)
+        pathEditToolbar?.removeFromSuperview()
+        pathEditToolbar = nil
+
+        // ─────────────────────────────
+        // 1️⃣ MOTION PATH SELECTION
+        // ─────────────────────────────
         if let hit = arView.entity(at: location),
-            let handle = hit.components[MotionPathHandleComponent.self]
-        {
+           let handle = hit.components[MotionPathHandleComponent.self] {
 
             selectedPathClipID = handle.clipID
             updatePathSelection()
+
+            // ⛔ IMPORTANT: stop here
+            return
         }
+
 
         currentActionMenu?.removeFromSuperview()
         currentActionMenu = nil
@@ -2196,6 +2360,55 @@ class CanvasViewController: UIViewController {
         }
 
     }
+    
+    func showPathContextMenu(
+        clipID: UUID,
+        pathRoot: Entity
+    ) {
+        let alert = UIAlertController(
+            title: "Animation Path",
+            message: nil,
+            preferredStyle: .actionSheet
+        )
+
+        // ⏱ Edit Timing
+        alert.addAction(UIAlertAction(title: "Edit Timing", style: .default) { _ in
+            self.selectedPathClipID = clipID
+            self.updatePathSelection()
+
+            if let screenPos = self.arView.project(
+                pathRoot.position(relativeTo: nil)
+            ) {
+                self.showPathEditToolbar(for: clipID, at: screenPos)
+            }
+        })
+
+        // 🔒 Lock / Unlock
+        let isLocked =
+            pathRoot.components[LockComponent.self]?.isLocked ?? false
+        let lockTitle = isLocked ? "Unlock Path" : "Lock Path"
+
+        alert.addAction(UIAlertAction(title: lockTitle, style: .default) { _ in
+            var lock =
+                pathRoot.components[LockComponent.self]
+                ?? LockComponent(isLocked: false)
+            lock.isLocked.toggle()
+            pathRoot.components.set(lock)
+            self.updatePathSelection()
+        })
+
+        // 🗑 Delete
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
+            self.selectedPathClipID = clipID
+            self.deleteSelected()
+        })
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        present(alert, animated: true)
+    }
+
+
 
     func showActionMenu(at point: CGPoint) {
         let menu = EntityActionMenu()
@@ -2246,10 +2459,20 @@ class CanvasViewController: UIViewController {
         let location = gesture.location(in: arView)
 
         //  STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
+
         if let hit = arView.entity(at: location),
             hit.name.hasPrefix("path."),
             let handleData = hit.components[MotionPathHandleComponent.self]
         {
+            // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+            guard
+                let pathRoot = hit.parent,
+                let lock = pathRoot.components[LockComponent.self],
+                lock.isLocked == false
+            else {
+                return
+            }
+
 
             //  ONLY EDIT SELECTED (RED) PATH
             guard handleData.clipID == selectedPathClipID else {
@@ -3504,6 +3727,7 @@ class EntityActionMenu: UIView {
         }
     }
 
+    
     // MARK: - New Top Bar UI Elements
 
     private let topBarView: UIView = {

@@ -25,7 +25,7 @@ final class MotionPathHandles {
 
     static func createHandles(
         path: BezierMotionPath,
-        onChange: @escaping (BezierMotionPath) -> Void
+        clipID: UUID
     ) -> [Handle] {
 
         var handles: [Handle] = []
@@ -43,10 +43,14 @@ final class MotionPathHandles {
 
             let entity = ModelEntity(mesh: mesh, materials: [material])
             entity.position = position
-            entity.name = "PathHandle_\(type)"
+            entity.name = "path.\(type)"
 
             entity.generateCollisionShapes(recursive: true)
             entity.components.set(InputTargetComponent())
+
+            entity.components.set(
+                CanvasViewController.MotionPathHandleComponent(clipID: clipID)
+            )
 
             return Handle(type: type, entity: entity)
         }
