@@ -2558,10 +2558,43 @@ class CanvasViewController: UIViewController {
 
                 case "path.end":
 
-                    // Move end of THIS path
+                    // ───────────────────────────────
+                    // KEYNOTE-STYLE END HANDLE DRAG
+                    // Preserves curvature by
+                    // scaling + rotating control points
+                    // ───────────────────────────────
+
+                    let oldStart = path.start
+                    let oldEnd = path.end
+
+                    let oldDir = oldEnd - oldStart
+                    let oldLength = simd_length(oldDir)
+                    guard oldLength > 0.0001 else { return }
+
+                    let oldDirNorm = simd_normalize(oldDir)
+
+                    // Control points relative to start
+                    let c1Rel = path.control1 - oldStart
+                    let c2Rel = path.control2 - oldStart
+
+                    // Move end by drag delta
                     path.end += delta
 
-                    // 🔗 LIVE-UPDATE NEXT PATH IF IT EXISTS
+                    let newEnd = path.end
+                    let newDir = newEnd - oldStart
+                    let newLength = simd_length(newDir)
+                    guard newLength > 0.0001 else { return }
+
+                    let newDirNorm = simd_normalize(newDir)
+
+                    // Scale + rotate to preserve curvature
+                    let scale = newLength / oldLength
+                    let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
+
+                    path.control1 = oldStart + rotation.act(c1Rel * scale)
+                    path.control2 = oldStart + rotation.act(c2Rel * scale)
+
+                    // 🔗 KEEP NEXT PATH CONTINUOUS
                     let thisClip = timeline.clips[clipIndex]
 
                     if let nextIndex = timeline.clips
@@ -2575,16 +2608,16 @@ class CanvasViewController: UIViewController {
                     {
                         var nextPath = timeline.clips[nextIndex].motionPath!
 
-                        // Move entire next path forward by same delta
-                        nextPath.start += delta
-                        nextPath.control1 += delta
-                        nextPath.control2 += delta
-                        nextPath.end += delta
+                        let nextDelta = path.end - nextPath.start
+
+                        nextPath.start += nextDelta
+                        nextPath.end += nextDelta
+                        nextPath.control1 += nextDelta
+                        nextPath.control2 += nextDelta
 
                         nextPath.rebuildArcLengthTable()
                         timeline.clips[nextIndex].motionPath = nextPath
 
-                        // Update visuals LIVE
                         if let nextVisual = activeMotionPaths[
                             timeline.clips[nextIndex].id
                         ] {
@@ -2609,6 +2642,7 @@ class CanvasViewController: UIViewController {
                             }
                         }
                     }
+
 
                 default:
                     return
