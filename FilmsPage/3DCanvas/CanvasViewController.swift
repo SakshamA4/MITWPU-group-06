@@ -2155,22 +2155,6 @@ class CanvasViewController: UIViewController {
     }
 
     @objc func deleteSelected() {
-        if let camera = selectedEntity?
-            .children
-            .compactMap({ $0 as? PerspectiveCamera })
-            .first
-        {
-
-            sceneCameras.removeAll { $0 == camera }
-            cameraToVisualMap[camera] = nil
-
-            if activeCamera === camera {
-                activateEditorCamera()
-            }
-        }
-
-        selectedEntity?.removeFromParent()
-        selectedEntity = nil
 
         // ───────────────────────────────
         // 1️⃣ DELETE MOTION PATH ONLY
@@ -2191,20 +2175,19 @@ class CanvasViewController: UIViewController {
             // Remove only THIS clip
             timeline.clips.removeAll { $0.id == clipID }
 
-            // IMPORTANT: Clear path selection
+            // Clear path selection
             selectedPathClipID = nil
 
-            // Recompute final transforms safely
+            // ✅ EXACT PLACE TO INSERT THE FIX
+            // Stabilize entity transform BEFORE recompute
             if let entity = arView.scene.findEntity(named: entityName) {
                 baseTransforms[entityName] = entity.transform
             }
 
             updateEntityFinalTransforms()
-
-            // ⛔️ ABSOLUTELY REQUIRED
+            refreshSidebarContent()
             return
         }
-
 
         // ───────────────────────────────
         // 2️⃣ DELETE ENTITY + ALL ITS CLIPS
@@ -2228,11 +2211,10 @@ class CanvasViewController: UIViewController {
         entity.removeFromParent()
         selectedEntity = nil
 
-        // recompute all remaining entities
         updateEntityFinalTransforms()
-
         refreshSidebarContent()
     }
+
 
     //Gestures
     func setupGestures() {
