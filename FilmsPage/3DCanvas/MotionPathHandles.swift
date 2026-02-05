@@ -1,10 +1,3 @@
-//
-//  MotionPathHandles.swift
-//  3DCanvas
-//
-//  Created by SDC-USER on 21/01/26.
-//
-
 import Foundation
 import UIKit
 import RealityKit
@@ -25,7 +18,8 @@ final class MotionPathHandles {
 
     static func createHandles(
         path: BezierMotionPath,
-        clipID: UUID
+        clipID: UUID,
+        showStartHandle: Bool
     ) -> [Handle] {
 
         var handles: [Handle] = []
@@ -38,8 +32,11 @@ final class MotionPathHandles {
 
             let mesh = MeshResource.generateSphere(radius: 0.035)
 
-            var material = SimpleMaterial()
-            material.color = .init(tint: color, texture: nil)
+            let material = SimpleMaterial(
+                color: color,
+                roughness: 0.2,
+                isMetallic: true
+            )
 
             let entity = ModelEntity(mesh: mesh, materials: [material])
             entity.position = position
@@ -47,7 +44,6 @@ final class MotionPathHandles {
 
             entity.generateCollisionShapes(recursive: true)
             entity.components.set(InputTargetComponent())
-
             entity.components.set(
                 CanvasViewController.MotionPathHandleComponent(clipID: clipID)
             )
@@ -55,29 +51,40 @@ final class MotionPathHandles {
             return Handle(type: type, entity: entity)
         }
 
-        handles.append(makeHandle(
-            position: path.start,
-            color: .systemGray,
-            type: .start
-        ))
+        // ✅ START HANDLE — CONDITIONAL
+        if showStartHandle {
+            handles.append(
+                makeHandle(
+                    position: path.start,
+                    color: .systemGray,
+                    type: .start
+                )
+            )
+        }
 
-        handles.append(makeHandle(
-            position: path.control1,
-            color: .systemBlue,
-            type: .control1
-        ))
+        handles.append(
+            makeHandle(
+                position: path.control1,
+                color: .systemBlue,
+                type: .control1
+            )
+        )
 
-        handles.append(makeHandle(
-            position: path.control2,
-            color: .systemPurple,
-            type: .control2
-        ))
+        handles.append(
+            makeHandle(
+                position: path.control2,
+                color: .systemPurple,
+                type: .control2
+            )
+        )
 
-        handles.append(makeHandle(
-            position: path.end,
-            color: .systemGreen,
-            type: .end
-        ))
+        handles.append(
+            makeHandle(
+                position: path.end,
+                color: .systemGreen,
+                type: .end
+            )
+        )
 
         return handles
     }

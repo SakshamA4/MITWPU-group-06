@@ -120,20 +120,23 @@ struct AnimationClip: Identifiable, Codable {
 struct MotionPathVisual {
 
     let root: Entity
-    let startHandle: ModelEntity
+    let startHandle: ModelEntity?
     let control1Handle: ModelEntity
     let control2Handle: ModelEntity
     let endHandle: ModelEntity
 
     func update(path: BezierMotionPath) {
 
-        startHandle.position = path.start
-        control1Handle.position = path.control1
-        control2Handle.position = path.control2
-        endHandle.position = path.end
-    }
+        // ✅ Start handle may not exist
+        startHandle?.position = .zero
 
+        // ✅ All handles are LOCAL to path.start
+        control1Handle.position = path.control1 - path.start
+        control2Handle.position = path.control2 - path.start
+        endHandle.position = path.end - path.start
+    }
 }
+
 
 struct Timeline {
     var clips: [AnimationClip] = []
@@ -571,6 +574,24 @@ class CanvasViewController: UIViewController {
         }
     }
 
+    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
+
+        guard
+            let clipIndex = timeline.clips.firstIndex(where: { $0.id == clip.id })
+        else {
+            return true
+        }
+
+        // Check if ANY earlier clip for the same entity has a motion path
+        let hasEarlierMotionPath = timeline.clips[..<clipIndex].contains {
+            $0.entityName == clip.entityName && $0.motionPath != nil
+        }
+
+        // If entity already had motion before → NO start handle
+        return !hasEarlierMotionPath
+    }
+
+
 
     @objc func playTimeline() {
 
@@ -865,67 +886,88 @@ class CanvasViewController: UIViewController {
 
         guard let path = clip.motionPath else { return }
 
-        // remove previous
+        // Remove existing visual if any
         activeMotionPaths[clip.id]?.root.removeFromParent()
 
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else {
             return
         }
 
+        // Root for this path
         let pathRoot = Entity()
         pathRoot.name = "PathRoot_\(clip.id)"
         pathRoot.position = path.start
         pathRoot.components.set(LockComponent(isLocked: false))
 
-        let start = makePathHandle(color: .gray, name: "path.start")
-        let c1 = makePathHandle(color: .orange, name: "path.c1")
-        let c2 = makePathHandle(color: .orange, name: "path.c2")
-        let end = makePathHandle(color: .systemBlue, name: "path.end")
+        // ─────────────────────────────────────
+        // 1️⃣ Decide if START HANDLE should exist
+        // ─────────────────────────────────────
+        let showStartHandle = shouldShowStartHandle(for: clip)
 
-        start.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        c1.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        c2.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        end.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        start.position = .zero
-        c1.position = path.control1 - path.start
-        c2.position = path.control2 - path.start
-        end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
-
+        // ─────────────────────────────────────
+        // 2️⃣ Create curve mesh
+        // ─────────────────────────────────────
         let curve = MotionPathRenderer.makePathEntity(path: path)
         curve.name = "MotionPath"
-
         curve.position = .zero
         curve.orientation = simd_quatf()
         curve.scale = .one
 
         pathRoot.addChild(curve)
-        pathRoot.addChild(start)
+
+        // ─────────────────────────────────────
+        // 3️⃣ Create handles (conditionally)
+        // ─────────────────────────────────────
+        var startHandle: ModelEntity? = nil
+
+        if showStartHandle {
+            let start = makePathHandle(color: .gray, name: "path.start")
+            start.components.set(
+                MotionPathHandleComponent(clipID: clip.id)
+            )
+            start.position = .zero
+            pathRoot.addChild(start)
+            startHandle = start
+        }
+
+        let c1 = makePathHandle(color: .orange, name: "path.c1")
+        c1.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        c1.position = path.control1 - path.start
         pathRoot.addChild(c1)
+
+        let c2 = makePathHandle(color: .orange, name: "path.c2")
+        c2.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        c2.position = path.control2 - path.start
         pathRoot.addChild(c2)
+
+        let end = makePathHandle(color: .systemBlue, name: "path.end")
+        end.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
         pathRoot.addChild(end)
 
+        // ─────────────────────────────────────
+        // 4️⃣ Add to scene
+        // ─────────────────────────────────────
         anchor.addChild(pathRoot)
 
+        // ─────────────────────────────────────
+        // 5️⃣ Store visual (start may be nil)
+        // ─────────────────────────────────────
         activeMotionPaths[clip.id] = MotionPathVisual(
             root: pathRoot,
-            startHandle: start,
+            startHandle: startHandle,
             control1Handle: c1,
             control2Handle: c2,
             endHandle: end
         )
     }
+
 
     // MARK: - Motion Path Handle Ownership
 
@@ -2622,7 +2664,7 @@ class CanvasViewController: UIViewController {
                             timeline.clips[nextIndex].id
                         ] {
                             nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle.position = .zero
+                            nextVisual.startHandle?.position = SIMD3<Float>.zero
                             nextVisual.control1Handle.position =
                                 nextPath.control1 - nextPath.start
                             nextVisual.control2Handle.position =
@@ -2652,7 +2694,7 @@ class CanvasViewController: UIViewController {
                 visual.root.position = path.start
 
                 // handles in LOCAL SPACE
-                visual.startHandle.position = .zero
+                visual.startHandle?.position = SIMD3<Float>.zero
                 visual.control1Handle.position = path.control1 - path.start
                 visual.control2Handle.position = path.control2 - path.start
                 visual.endHandle.position = path.end - path.start
@@ -2701,7 +2743,7 @@ class CanvasViewController: UIViewController {
                             timeline.clips[nextIndex].id
                         ] {
                             nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle.position = .zero
+                            nextVisual.startHandle?.position = SIMD3<Float>.zero
                             nextVisual.control1Handle.position =
                                 nextPath.control1 - nextPath.start
                             nextVisual.control2Handle.position =
