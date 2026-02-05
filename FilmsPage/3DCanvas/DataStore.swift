@@ -78,9 +78,8 @@ enum ToolType: CaseIterable {
 
 
         case .background:
-            return [
-
-            ]
+                // CONNECT: Map global background items to SpawnItems
+                return BackgroundStore.shared.items.map { SpawnItem(background: $0) }
             
         case .wall:
             return [

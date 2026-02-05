@@ -4,7 +4,6 @@ import PhotosUI
 class ToolSheetViewController: UIViewController {
 
     let tool: ToolType
-
     let onSelect: (SpawnItem) -> Void
 
     private let titleLabel = UILabel()
@@ -38,32 +37,11 @@ class ToolSheetViewController: UIViewController {
         setupTitle()
         setupCollection()
 
+        // Only show Plus button for Background tool
         if tool == .background {
-                    let plusButton = UIButton(type: .system)
-                    
-                    let largeConfig = UIImage.SymbolConfiguration(pointSize: 44, weight: .light, scale: .default)
-                    
-                    plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
-                    
-                    plusButton.tintColor = .label
-                    plusButton.translatesAutoresizingMaskIntoConstraints = false
-                    
-                    // Logic to open picker
-                    plusButton.addAction(UIAction { [weak self] _ in
-                        self?.presentBackgroundImagePicker()
-                    }, for: .touchUpInside)
-
-                    view.addSubview(plusButton)
-
-                    NSLayoutConstraint.activate([
-                        plusButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-                        plusButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-                        
-                        plusButton.widthAnchor.constraint(equalToConstant: 60),
-                        plusButton.heightAnchor.constraint(equalToConstant: 60)
-                    ])
-                }
-            }
+            setupPlusButton()
+        }
+    }
 
     func setupTitle() {
         titleLabel.text = tool.title
@@ -99,6 +77,31 @@ class ToolSheetViewController: UIViewController {
         ])
     }
     
+    func setupPlusButton() {
+        let plusButton = UIButton(type: .system)
+        
+        let largeConfig = UIImage.SymbolConfiguration(pointSize: 44, weight: .light, scale: .default)
+        
+        plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
+        
+        plusButton.tintColor = .label
+        plusButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Logic to open picker
+        plusButton.addAction(UIAction { [weak self] _ in
+            self?.presentBackgroundImagePicker()
+        }, for: .touchUpInside)
+
+        view.addSubview(plusButton)
+
+        NSLayoutConstraint.activate([
+            plusButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            plusButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            
+            plusButton.widthAnchor.constraint(equalToConstant: 60),
+            plusButton.heightAnchor.constraint(equalToConstant: 60)
+        ])
+    }
     
     func presentBackgroundImagePicker() {
         var config = PHPickerConfiguration()
@@ -115,11 +118,6 @@ class ToolSheetViewController: UIViewController {
 extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        // Fetch items directly from your DataStore extension on ToolType
-        if tool == .background {
-            // Combine default backgrounds + user imported ones
-            return tool.items.count + BackgroundStore.shared.images.count
-        }
         return tool.items.count
     }
 
@@ -127,53 +125,28 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
         
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ToolCell", for: indexPath) as! ToolCell
         
-        // Logic to handle user-imported backgrounds vs standard items
-        if tool == .background {
-            // Standard items come first
-            if indexPath.item < tool.items.count {
-                let item = tool.items[indexPath.item]
-                cell.configure(with: item)
-            } else {
-                // User imported images
-                let imageIndex = indexPath.item - tool.items.count
-                let image = BackgroundStore.shared.images[imageIndex]
-                cell.imageView.image = image
-                cell.label.text = "Background \(imageIndex + 1)"
-            }
-        } else {
-            // Standard behavior for Characters, Props, Lights, etc.
-            let item = tool.items[indexPath.item]
-            cell.configure(with: item)
+        let item = tool.items[indexPath.item]
+        
+        cell.configure(with: item)
+        
+        if let customImage = item.customImage {
+            cell.imageView.image = customImage
         }
         
         return cell
     }
 
-  
-
-    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         
+        let item = tool.items[indexPath.item]
+
         // 1. Handle Background Logic
         if tool == .background {
-
-            var selectedImage: UIImage?
-
-            if indexPath.item < tool.items.count {
-
-                let item = tool.items[indexPath.item]
-                selectedImage = UIImage(named: item.imageName)
-            } else {
-                // It's a user-imported background
-                let imageIndex = indexPath.item - tool.items.count
-                if imageIndex < BackgroundStore.shared.images.count {
-                    selectedImage = BackgroundStore.shared.images[imageIndex]
-                }
-            }
-
-            if let image = selectedImage {
-                BackgroundStore.shared.selectImage(image)
-            }
+            // FIX: Only call onSelect.
+            // Do NOT call BackgroundStore.shared.selectBackground(item) here,
+            // because onSelect already triggers the spawn via the Canvas.
+            
+            onSelect(item)
             
             dismiss(animated: true)
             return
@@ -181,11 +154,8 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
 
         // 2. Handle Character Logic
         if tool == .character {
-            print("🔥 didSelectItemAt fired for tool:", tool)
-            let item = tool.items[indexPath.item]
             let detailVC = CharacterDetailViewController(item: item){
                 (selectedItem: SpawnItem) in
-                print("Selecting", selectedItem)
                 self.onSelect(selectedItem)
                 self.dismiss(animated: true)
             }
@@ -196,17 +166,13 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
                 sheet.detents = [.medium(), .large()]
             }
             present(detailVC, animated: true)
-//            onSelect(item)
             return
         }
 
         // 3. Handle Props/Lights/etc
-        let item = tool.items[indexPath.item]
-        print("Selecting props")
         onSelect(item)
         dismiss(animated: true)
     }
-    
 }
 
 // MARK: - PHPicker Delegate
@@ -219,15 +185,38 @@ extension ToolSheetViewController: PHPickerViewControllerDelegate {
               provider.canLoadObject(ofClass: UIImage.self) else { return }
 
         provider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
-            if let uiImage = image as? UIImage {
-                DispatchQueue.main.async {
-                    // 1. Add to the list (Your existing code)
-                    BackgroundStore.shared.images.append(uiImage)
-                    
-                    // 3. Reload UI
-                    self?.collectionView.reloadData()
-                }
+            guard let self = self, let uiImage = image as? UIImage else { return }
+            
+            DispatchQueue.main.async {
+                self.handleNewBackgroundImage(uiImage)
             }
         }
+    }
+    
+    func handleNewBackgroundImage(_ image: UIImage) {
+        let alert = UIAlertController(title: "Name your Background",
+                                      message: "Enter a name for this image",
+                                      preferredStyle: .alert)
+        
+        alert.addTextField { $0.placeholder = "Background Name" }
+        
+        let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+            guard let self = self else { return }
+            let name = alert.textFields?.first?.text ?? "New Background"
+            
+            // Create and Add to Store
+            let newItem = BackgroundItem(title: name, imageName: nil, customImage: image)
+            BackgroundStore.shared.addBackground(newItem)
+            
+            // Reload UI
+            self.collectionView.reloadData()
+        }
+        
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        
+        alert.addAction(saveAction)
+        alert.addAction(cancelAction)
+        
+        present(alert, animated: true)
     }
 }

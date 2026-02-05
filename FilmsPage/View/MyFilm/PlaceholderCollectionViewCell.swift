@@ -12,6 +12,9 @@ class PlaceholderCollectionViewCell: UICollectionViewCell {
     @IBOutlet weak var bgView: UIView!
     @IBOutlet weak var addNew: UILabel!
     
+    @IBAction func plusButtonTapped(_ sender: UIButton) {
+        
+    }
     override func awakeFromNib() {
         super.awakeFromNib()
         
