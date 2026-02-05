@@ -63,7 +63,26 @@ class MyFilmViewController: UIViewController {
         guard gesture.state == .began else { return }
 
         let point = gesture.location(in: collectionView)
+        
+        // In handleLongPress...
         guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
+
+        // Ignore Placeholder (Index 0)
+        if indexPath.item == 0 { return }
+
+        presentMenu(for: indexPath)
+        // Inside handleLongPress...
+//        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
+//
+//        // NEW: Ignore placeholder cells (Logic: if index equals count, it's the placeholder)
+//        let isPlaceholder: Bool
+//        if indexPath.section == 0 { isPlaceholder = indexPath.item == sequence.count }
+//        else if indexPath.section == 1 { isPlaceholder = indexPath.item == characters.count }
+//        else { isPlaceholder = indexPath.item == prop.count }
+//
+//        if isPlaceholder { return }
+//
+//        presentMenu(for: indexPath)
 
         // Ignore placeholder cells
         if (indexPath.section == 0 && sequence.isEmpty) ||
@@ -106,31 +125,30 @@ class MyFilmViewController: UIViewController {
     }
 
     private func handleEdit(at indexPath: IndexPath) {
+        let dataIndex = indexPath.item - 1 // Shift index
+        
         if indexPath.section == 0 {
-            performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
+            performSegue(withIdentifier: "sequenceSegue", sender: sequence[dataIndex])
         } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
+            performSegue(withIdentifier: "characterInfoSegue", sender: characters[dataIndex])
         } else {
-            performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
+            performSegue(withIdentifier: "propSegue", sender: prop[dataIndex])
         }
     }
-
     private func handleDeleteOrRemove(at indexPath: IndexPath) {
         guard let film = film else { return }
+        
+        // Shift index to find real data
+        let dataIndex = indexPath.item - 1
 
         if indexPath.section == 0 {
-            // 🔥 DELETE SEQUENCE COMPLETELY
-            let seq = sequence[indexPath.item]
+            let seq = sequence[dataIndex]
             sequenceService.deleteSequence(by: seq.id)
-
         } else if indexPath.section == 1 {
-            // 🔗 REMOVE CHARACTER FROM FILM ONLY
-            let char = characters[indexPath.item]
+            let char = characters[dataIndex]
             filmCharacterService.removeCharacter(by: char.id)
-
         } else {
-            // 🔗 REMOVE PROP FROM FILM ONLY
-            let pr = prop[indexPath.item]
+            let pr = prop[dataIndex]
             guard let propId = pr.id else { return }
             propService.removeProp(propId, fromFilmId: film.id)
         }
@@ -256,47 +274,51 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
     
     func numberOfSections(in collectionView: UICollectionView) -> Int { 3 }
     
-    func collectionView(_ collectionView: UICollectionView,
-                        numberOfItemsInSection section: Int) -> Int {
-        if section == 0 { return sequence.isEmpty ? 1 : sequence.count }
-        if section == 1 { return characters.isEmpty ? 1 : characters.count }
-        return prop.isEmpty ? 1 : prop.count
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if section == 0 { return sequence.count + 1 }
+        if section == 1 { return characters.count + 1 }
+        return prop.count + 1
     }
-
     
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+
+        // Helper to setup placeholder
+        func configurePlaceholder(segueIdentifier: String) -> UICollectionViewCell {
+            let cell = placeholder(collectionView, indexPath)
+            cell.onPlusButtonTapped = { [weak self] in
+                self?.performSegue(withIdentifier: segueIdentifier, sender: nil)
+            }
+            return cell
+        }
 
         switch indexPath.section {
-
-        case 0:
-            if sequence.isEmpty { return placeholder(collectionView, indexPath) }
-            let cell = dequeue(sequenceCellId, as: SequencesCollectionViewCell.self, collectionView, indexPath)
-            cell.configureCell(sequence: sequence[indexPath.item])
+        case 0: // Sequences
+            if indexPath.item == 0 { return configurePlaceholder(segueIdentifier: "AddNewSequenceSegue") }
             
+            let cell = dequeue(sequenceCellId, as: SequencesCollectionViewCell.self, collectionView, indexPath)
+            // SHIFT: Access data at [item - 1]
+            cell.configureCell(sequence: sequence[indexPath.item - 1])
             return cell
 
-        case 1:
-            if characters.isEmpty { return placeholder(collectionView, indexPath) }
+        case 1: // Characters
+            if indexPath.item == 0 { return configurePlaceholder(segueIdentifier: "AddNewCharacterSegue") }
+            
             let cell = dequeue(characterCellId, as: CharactersCollectionViewCell.self, collectionView, indexPath)
-            let filmCharacter = characters[indexPath.item]
+            // SHIFT: Access data at [item - 1]
+            let filmCharacter = characters[indexPath.item - 1]
             let template = characterService.getCharacter(by: filmCharacter.characterTemplateId)
-
-            cell.configureCell(
-                filmCharacter: filmCharacter,
-                template: template
-            )
-
+            cell.configureCell(filmCharacter: filmCharacter, template: template)
             return cell
 
-        default:
-            if prop.isEmpty { return placeholder(collectionView, indexPath) }
+        default: // Props
+            if indexPath.item == 0 { return configurePlaceholder(segueIdentifier: "AddNewPropSegue") }
+            
             let cell = dequeue(propCellId, as: PropsCollectionViewCell.self, collectionView, indexPath)
-            cell.configureCell(prop: prop[indexPath.item])
+            // SHIFT: Access data at [item - 1]
+            cell.configureCell(prop: prop[indexPath.item - 1])
             return cell
         }
     }
-
     
     func collectionView(_ collectionView: UICollectionView,
                         viewForSupplementaryElementOfKind kind: String,
@@ -327,57 +349,77 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
         return true
     }
 
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        // Ignore the placeholder (Index 0)
+        if indexPath.item == 0 { return }
+
+        // Shift index back by 1 to get the actual data
+        let dataIndex = indexPath.item - 1
 
         if indexPath.section == 0 {
-            performSegue(withIdentifier: "sequenceSegue", sender: sequence[indexPath.item])
+            performSegue(withIdentifier: "sequenceSegue", sender: sequence[dataIndex])
         } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: characters[indexPath.item])
+            performSegue(withIdentifier: "characterInfoSegue", sender: characters[dataIndex])
         } else {
-            performSegue(withIdentifier: "propSegue", sender: prop[indexPath.item])
+            performSegue(withIdentifier: "propSegue", sender: prop[dataIndex])
         }
     }
 
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        
-        if segue.identifier == "sequenceSegue" {
-            let vc = segue.destination as! SequenceViewController
-            vc.sequence = sender as? Sequence
-            vc.filmName = self.film?.name  //NEW
+            
+            // --- Existing Edit Segues ---
+            if segue.identifier == "sequenceSegue" {
+                let vc = segue.destination as! SequenceViewController
+                vc.sequence = sender as? Sequence
+                vc.filmName = self.film?.name
+            }
+            if segue.identifier == "characterInfoSegue" {
+                let vc = segue.destination as! CharacterDetailsViewController
+                vc.character = sender as? CharacterItem
+            }
+            if segue.identifier == "propSegue" {
+                let vc = segue.destination as! PropDetailViewController
+                vc.prop = sender as? PropItem
+            }
+            
+            // --- NEW ADD SEGUES (You must pass the Film!) ---
+            
+        if segue.identifier == "AddNewSequenceSegue" {
+                // Cast to AddSequenceViewController specifically
+                if let vc = segue.destination as? AddSequenceViewController {
+                    vc.film = self.film
+                }
+            }
+            
+            if segue.identifier == "AddNewCharacterSegue" {
+                // Cast to AddCharacterViewController specifically
+                if let vc = segue.destination as? AddCharacterViewController {
+                    vc.film = self.film
+                }
+            }
+            
+            if segue.identifier == "AddNewPropSegue" {
+                // Cast to AddPropViewController specifically
+                if let vc = segue.destination as? AddPropViewController {
+                    vc.film = self.film
+                }
+            }
+            // Keep existing "View All" logic...
+            if segue.identifier == "allSequencesSegue" {
+                let vc = segue.destination as! AllSequencesViewController
+                vc.sequence = sender as! [Sequence]
+            }
+            if segue.identifier == "allCharactersSegue" {
+                let vc = segue.destination as! AllCharactersViewController
+                vc.characters = sender as! [FilmCharacter]
+                vc.film = film
+            }
+            if segue.identifier == "allPropsSegue" {
+                let vc = segue.destination as! AllPropsViewController
+                vc.prop = sender as! [PropItem]
+            }
         }
-
-        if segue.identifier == "characterInfoSegue" {
-            let vc = segue.destination as! CharacterDetailsViewController
-            vc.character = sender as? CharacterItem
-        }
-
-        if segue.identifier == "propSegue" {
-            let vc = segue.destination as! PropDetailViewController
-            vc.prop = sender as? PropItem
-        }
-
-        if segue.identifier == "addButtonSegue" {
-            let vc = segue.destination as! AddViewController
-            vc.film = film
-        }
-        if segue.identifier == "allSequencesSegue" {
-            let vc = segue.destination as! AllSequencesViewController
-            vc.sequence = sender as! [Sequence]
-        }
-
-        if segue.identifier == "allCharactersSegue" {
-            let vc = segue.destination as! AllCharactersViewController
-            vc.characters = sender as! [FilmCharacter]
-            vc.film = film
-        }
-
-        if segue.identifier == "allPropsSegue" {
-            let vc = segue.destination as! AllPropsViewController
-            vc.prop = sender as! [PropItem]
-        }
-    }
 }
 
 

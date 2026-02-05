@@ -34,7 +34,7 @@
                                     <imageReference key="image" image="plus" catalog="system" symbolScale="large"/>
                                 </buttonConfiguration>
                                 <connections>
-                                    <action selector="plusButtonTapped:" destination="gTV-IL-0wX" eventType="touchUpInside" id="c2Y-7t-ovC"/>
+                                    <action selector="plusButtonTapped:" destination="gTV-IL-0wX" eventType="touchUpInside" id="v3b-k4-YFx"/>
                                 </connections>
                             </button>
                         </subviews>
@@ -59,8 +59,8 @@
             </constraints>
             <size key="customSize" width="245" height="235"/>
             <connections>
-                <outlet property="addNew" destination="7D6-1e-6dy" id="2cV-zN-CjS"/>
-                <outlet property="bgView" destination="xvb-Td-uKy" id="ELt-ot-XlM"/>
+                <outlet property="addNew" destination="7D6-1e-6dy" id="0ct-Wm-1sg"/>
+                <outlet property="bgView" destination="xvb-Td-uKy" id="bqT-J4-9sE"/>
             </connections>
             <point key="canvasLocation" x="209.63414634146341" y="150.76271186440678"/>
         </collectionViewCell>
