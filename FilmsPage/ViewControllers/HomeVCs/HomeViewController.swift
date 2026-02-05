@@ -25,6 +25,12 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         refreshData() // Initial load
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // 📍 THE FIX: Refresh data from the store to show updated notes/scenes
+        refreshData()
+    }
     // MARK: - Setup
     private func setupCollectionView() {
         // Ensure you register your NIBs/Classes here if not done in Storyboard
@@ -80,13 +86,13 @@ extension HomeViewController: UICollectionViewDataSource {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as! TemplatesCollectionViewCell
             let item = templates[indexPath.row]
             cell.templateLabel.text = item.name
-            cell.templatesImageView.image = UIImage(named: item.image)
+            cell.templatesImageView.image = UIImage(named: item.image ?? "Image")
             return cell
         } else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as! RecentScenesCollectionViewCell
             let item = recentScenes[indexPath.row]
             cell.recentLabel.text = item.name
-            cell.recentImageView.image = UIImage(named: item.image)
+            cell.recentImageView.image = UIImage(named: item.image ?? "Image")
             return cell
         }
     }
@@ -99,12 +105,16 @@ extension HomeViewController: UICollectionViewDataSource {
         return header
     }
     
-    func collectionView(
-        _ collectionView: UICollectionView,
-        didSelectItemAt indexPath: IndexPath
-    ) {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let selectedModel = (indexPath.section == 0) ? templates[indexPath.row] : recentScenes[indexPath.row]
         let vc = CanvasViewController()
-       // navigationController?.pushViewController(vc, animated: true)
+        
+        // Ensure the Canvas tracks the ID from the Home page
+        vc.currentSceneID = selectedModel.id
+        vc.sceneName = selectedModel.name
+        vc.sceneNotes = selectedModel.notes ?? ""
+        vc.sceneImageName = selectedModel.image
+        
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)

@@ -133,10 +133,20 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
         return cell
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//        let vc = CanvasViewController()
+//       // navigationController?.pushViewController(vc, animated: true)
+//        let navController = UINavigationController(rootViewController: vc)
+//        navController.modalPresentationStyle = .fullScreen
+//        self.present(navController, animated: true)
+//    }
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        //let selectedSceneModel = allScenes[indexPath.item]
+        let selectedModel = allScenes[indexPath.item]
         let vc = CanvasViewController()
-       // navigationController?.pushViewController(vc, animated: true)
+        vc.sceneName = selectedModel.name
+        vc.sceneNotes = selectedModel.notes ?? ""
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)

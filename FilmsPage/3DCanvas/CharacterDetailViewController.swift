@@ -32,7 +32,7 @@ class CharacterDetailViewController: UIViewController {
     private lazy var containerView: UIView = {
         let view = UIView()
         // Light Theme: Light Gray Card
-        view.backgroundColor = .secondarySystemBackground
+        view.backgroundColor = UIColor(red: 20/255, green:  20/255, blue: 30/255, alpha: 1)
         view.layer.cornerRadius = 24
         view.clipsToBounds = true
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -43,7 +43,7 @@ class CharacterDetailViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Edit Character"
         lbl.font = UIFont.systemFont(ofSize: 28, weight: .bold) // Increased font size
-        lbl.textColor = .label // Black in light mode
+        lbl.textColor = .white// Black in light mode
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -53,7 +53,7 @@ class CharacterDetailViewController: UIViewController {
         btn.setTitle("Add", for: .normal)
         btn.setTitleColor(.white, for: .normal)
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
-        btn.backgroundColor = accentColor
+        btn.backgroundColor = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
         btn.layer.cornerRadius = 18
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.addTarget(self, action: #selector(didTapConfirm), for: .touchUpInside)
@@ -77,7 +77,7 @@ class CharacterDetailViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Character Name"
         lbl.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        lbl.textColor = .secondaryLabel // Dark Gray
+        lbl.textColor = .white // Dark Gray
         return lbl
     }()
     
@@ -98,7 +98,7 @@ class CharacterDetailViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Height"
         lbl.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        lbl.textColor = .label
+        lbl.textColor = .white
         return lbl
     }()
     
@@ -106,7 +106,7 @@ class CharacterDetailViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "170 cms"
         lbl.font = UIFont.systemFont(ofSize: 14, weight: .regular)
-        lbl.textColor = .secondaryLabel
+        lbl.textColor = .white
         lbl.textAlignment = .right
         return lbl
     }()
@@ -129,7 +129,7 @@ class CharacterDetailViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Character Poses"
         lbl.font = UIFont.systemFont(ofSize: 22, weight: .bold)
-        lbl.textColor = .label
+        lbl.textColor = .white
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -176,7 +176,7 @@ class CharacterDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Light Theme Background
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor(red: 11/255, green:  11/255, blue: 22/255, alpha: 1)
         
         // Force Large Sheet
         if let sheet = sheetPresentationController {

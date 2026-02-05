@@ -33,7 +33,7 @@ class ToolSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor(red: 11/255, green:  11/255, blue: 22/255, alpha: 1)
 
         setupTitle()
         setupCollection()
@@ -45,7 +45,7 @@ class ToolSheetViewController: UIViewController {
                     
                     plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
                     
-                    plusButton.tintColor = .label
+                    plusButton.tintColor = .white
                     plusButton.translatesAutoresizingMaskIntoConstraints = false
                     
                     // Logic to open picker
