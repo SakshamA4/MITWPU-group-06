@@ -576,19 +576,44 @@ class CanvasViewController: UIViewController {
 
     func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
 
-        guard
-            let clipIndex = timeline.clips.firstIndex(where: { $0.id == clip.id })
-        else {
+        // Only position tracks with motion paths matter
+        guard clip.track == .position, clip.motionPath != nil else {
+            return false
+        }
+
+        // Find the immediately previous motion path for this entity
+        let previous = timeline.clips
+            .filter {
+                $0.entityName == clip.entityName &&
+                $0.motionPath != nil &&
+                $0.startTime + $0.duration <= clip.startTime
+            }
+            .sorted { $0.startTime < $1.startTime }
+            .last
+
+        // No previous path → this is the first → show start handle
+        guard let prev = previous else {
             return true
         }
 
-        // Check if ANY earlier clip for the same entity has a motion path
-        let hasEarlierMotionPath = timeline.clips[..<clipIndex].contains {
-            $0.entityName == clip.entityName && $0.motionPath != nil
-        }
+        // If there is a TIME GAP → show start handle
+        let prevEndTime = prev.startTime + prev.duration
+        let gap = clip.startTime - prevEndTime
 
-        // If entity already had motion before → NO start handle
-        return !hasEarlierMotionPath
+        return gap > 0.0001
+    }
+
+    func previousPathClip(
+        for clip: AnimationClip
+    ) -> AnimationClip? {
+        timeline.clips
+            .filter {
+                $0.entityName == clip.entityName &&
+                $0.motionPath != nil &&
+                $0.startTime + $0.duration <= clip.startTime
+            }
+            .sorted { $0.startTime < $1.startTime }
+            .last
     }
 
 
@@ -640,6 +665,7 @@ class CanvasViewController: UIViewController {
         startPlayback()
     }
 
+    
     @objc func pauseTimeline() {
         guard playbackState == .playing else { return }
 
@@ -1213,22 +1239,29 @@ class CanvasViewController: UIViewController {
 
         for entityName in entities {
 
+            guard let entity = arView.scene.findEntity(named: entityName) else {
+                continue
+            }
+
+            // 🔥 REBASE BASE TRANSFORM TO CURRENT WORLD STATE
+            baseTransforms[entityName] = entity.transform
+
             let lastTime =
                 timeline.clips
-                .filter { $0.entityName == entityName }
-                .map { $0.startTime + $0.duration }
-                .max() ?? 0
+                    .filter { $0.entityName == entityName }
+                    .map { $0.startTime + $0.duration }
+                    .max() ?? 0
 
-            let transform = evaluateEntityTransform(
+            let finalTransform = evaluateEntityTransform(
                 entityName: entityName,
                 at: lastTime
             )
 
-            if let entity = arView.scene.findEntity(named: entityName) {
-                entity.transform = transform
-            }
+            entity.transform = finalTransform
         }
     }
+
+
 
     func handleAnimationPromptConfirm(
         type: AnimationType,
@@ -2161,30 +2194,30 @@ class CanvasViewController: UIViewController {
         // ───────────────────────────────
         if let clipID = selectedPathClipID {
 
-            guard let clip = timeline.clips.first(where: { $0.id == clipID }) else {
+            guard let clipIndex = timeline.clips.firstIndex(
+                where: { $0.id == clipID }
+            ) else {
                 selectedPathClipID = nil
                 return
             }
-
-            let entityName = clip.entityName
 
             // Remove path visuals
             activeMotionPaths[clipID]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clipID)
 
-            // Remove only THIS clip
-            timeline.clips.removeAll { $0.id == clipID }
+            // Remove ONLY this clip
+            timeline.clips.remove(at: clipIndex)
 
-            // Clear path selection
+            // Clear selection
             selectedPathClipID = nil
 
-            // ✅ EXACT PLACE TO INSERT THE FIX
-            // Stabilize entity transform BEFORE recompute
-            if let entity = arView.scene.findEntity(named: entityName) {
-                baseTransforms[entityName] = entity.transform
-            }
+            // ❗ IMPORTANT
+            // DO NOT:
+            // - evaluate timeline
+            // - touch entity transform
+            // - touch baseTransforms
+            // The entity must stay exactly where it is
 
-            updateEntityFinalTransforms()
             refreshSidebarContent()
             return
         }
@@ -2196,24 +2229,27 @@ class CanvasViewController: UIViewController {
 
         let entityName = entity.name
 
-        // remove motion paths
+        // Remove all motion path visuals
         for clip in timeline.clips where clip.entityName == entityName {
             activeMotionPaths[clip.id]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clip.id)
         }
 
-        // remove clips
-        timeline.clips.removeAll {
-            $0.entityName == entityName
-        }
+        // Remove all clips for this entity
+        timeline.clips.removeAll { $0.entityName == entityName }
 
-        // remove entity itself
+        // Remove base transform
+        baseTransforms.removeValue(forKey: entityName)
+
+        // Remove entity itself
         entity.removeFromParent()
         selectedEntity = nil
 
         updateEntityFinalTransforms()
         refreshSidebarContent()
     }
+
+
 
 
     //Gestures
@@ -2477,6 +2513,39 @@ class CanvasViewController: UIViewController {
         }
         self.currentActionMenu = menu
     }
+    
+    func moveLaterPaths(
+        after clipIndex: Int,
+        entityName: String,
+        delta: SIMD3<Float>
+    ) {
+        for i in timeline.clips.indices {
+            guard i > clipIndex else { continue }
+            guard timeline.clips[i].entityName == entityName else { continue }
+            guard var p = timeline.clips[i].motionPath else { continue }
+
+            p.start += delta
+            p.end += delta
+            p.control1 += delta
+            p.control2 += delta
+            p.rebuildArcLengthTable()
+            timeline.clips[i].motionPath = p
+
+            if let visual = activeMotionPaths[timeline.clips[i].id] {
+                visual.root.position = p.start
+                visual.startHandle?.position = .zero
+                visual.control1Handle.position = p.control1 - p.start
+                visual.control2Handle.position = p.control2 - p.start
+                visual.endHandle.position = p.end - p.start
+
+                if let entity =
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                    MotionPathRenderer.updatePathMesh(entity: entity, path: p)
+                }
+            }
+        }
+    }
+
 
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
 
