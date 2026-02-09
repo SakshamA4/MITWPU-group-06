@@ -83,13 +83,12 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
     }
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        guard
-            segue.identifier == "characterDetailSegue",
-            let vc = segue.destination as? CharacterDetailsViewController,
-            let character = sender as? CharacterItem
-        else { return }
-
-        vc.character = character
+        guard segue.identifier == "characterDetailSegue",
+              let vc = segue.destination as? CharacterDetailsViewController,
+              let character = sender as? CharacterItem else { return }
+        
+        // FIX: Assign to characterTemplate
+        vc.characterTemplate = character
         vc.film = film
     }
 

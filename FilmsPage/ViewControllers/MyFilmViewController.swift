@@ -50,109 +50,97 @@ class MyFilmViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
 
-        let longPress = UILongPressGestureRecognizer(
-            target: self,
-            action: #selector(handleLongPress(_:))
-        )
-        collectionView.addGestureRecognizer(longPress)
+//        let longPress = UILongPressGestureRecognizer(
+//            target: self,
+//            action: #selector(handleLongPress(_:))
+//        )
+//        collectionView.addGestureRecognizer(longPress)
 
         filmName.text = film?.name ?? "My Film"
     }
 
-    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
-
-        let point = gesture.location(in: collectionView)
-        
-        // In handleLongPress...
-        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
-
-        // Ignore Placeholder (Index 0)
-        if indexPath.item == 0 { return }
-
-        presentMenu(for: indexPath)
-        // Inside handleLongPress...
+//    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+//        guard gesture.state == .began else { return }
+//
+//        let point = gesture.location(in: collectionView)
+//        
+//        // In handleLongPress...
 //        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
 //
-//        // NEW: Ignore placeholder cells (Logic: if index equals count, it's the placeholder)
-//        let isPlaceholder: Bool
-//        if indexPath.section == 0 { isPlaceholder = indexPath.item == sequence.count }
-//        else if indexPath.section == 1 { isPlaceholder = indexPath.item == characters.count }
-//        else { isPlaceholder = indexPath.item == prop.count }
-//
-//        if isPlaceholder { return }
+//        // Ignore Placeholder (Index 0)
+//        if indexPath.item == 0 { return }
 //
 //        presentMenu(for: indexPath)
-
-        // Ignore placeholder cells
-        if (indexPath.section == 0 && sequence.isEmpty) ||
-           (indexPath.section == 1 && characters.isEmpty) ||
-           (indexPath.section == 2 && prop.isEmpty) {
-            return
-        }
-
-        presentMenu(for: indexPath)
-    }
-
-    private func presentMenu(for indexPath: IndexPath) {
-
-        let alert = UIAlertController(
-            title: "Options",
-            message: nil,
-            preferredStyle: .actionSheet
-        )
-
-        alert.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
-            self.handleEdit(at: indexPath)
-        })
-
-        alert.addAction(UIAlertAction(title: destructiveTitle(for: indexPath),
-                                      style: .destructive) { _ in
-            self.handleDeleteOrRemove(at: indexPath)
-        })
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        present(alert, animated: true)
-    }
-
-    private func destructiveTitle(for indexPath: IndexPath) -> String {
-        if indexPath.section == 0 {
-            return "Delete Sequence"
-        } else {
-            return "Remove from Film"
-        }
-    }
-
-    private func handleEdit(at indexPath: IndexPath) {
-        let dataIndex = indexPath.item - 1 // Shift index
-        
-        if indexPath.section == 0 {
-            performSegue(withIdentifier: "sequenceSegue", sender: sequence[dataIndex])
-        } else if indexPath.section == 1 {
-            performSegue(withIdentifier: "characterInfoSegue", sender: characters[dataIndex])
-        } else {
-            performSegue(withIdentifier: "propSegue", sender: prop[dataIndex])
-        }
-    }
-    private func handleDeleteOrRemove(at indexPath: IndexPath) {
-        guard let film = film else { return }
-        
-        // Shift index to find real data
-        let dataIndex = indexPath.item - 1
-
-        if indexPath.section == 0 {
-            let seq = sequence[dataIndex]
-            sequenceService.deleteSequence(by: seq.id)
-        } else if indexPath.section == 1 {
-            let char = characters[dataIndex]
-            filmCharacterService.removeCharacter(by: char.id)
-        } else {
-            let pr = prop[dataIndex]
-            guard let propId = pr.id else { return }
-            propService.removeProp(propId, fromFilmId: film.id)
-        }
-    }
+//
+//        // Ignore placeholder cells
+//        if (indexPath.section == 0 && sequence.isEmpty) ||
+//           (indexPath.section == 1 && characters.isEmpty) ||
+//           (indexPath.section == 2 && prop.isEmpty) {
+//            return
+//        }
+//
+//        presentMenu(for: indexPath)
+//    }
+//
+//    private func presentMenu(for indexPath: IndexPath) {
+//
+//        let alert = UIAlertController(
+//            title: "Options",
+//            message: nil,
+//            preferredStyle: .actionSheet
+//        )
+//
+//        alert.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
+//            self.handleEdit(at: indexPath)
+//        })
+//
+//        alert.addAction(UIAlertAction(title: destructiveTitle(for: indexPath),
+//                                      style: .destructive) { _ in
+//            self.handleDeleteOrRemove(at: indexPath)
+//        })
+//
+//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//
+//        present(alert, animated: true)
+//    }
+//
+//    private func destructiveTitle(for indexPath: IndexPath) -> String {
+//        if indexPath.section == 0 {
+//            return "Delete Sequence"
+//        } else {
+//            return "Remove from Film"
+//        }
+//    }
+//
+//    private func handleEdit(at indexPath: IndexPath) {
+//        let dataIndex = indexPath.item - 1 // Shift index
+//        
+//        if indexPath.section == 0 {
+//            performSegue(withIdentifier: "sequenceSegue", sender: sequence[dataIndex])
+//        } else if indexPath.section == 1 {
+//            performSegue(withIdentifier: "characterInfoSegue", sender: characters[dataIndex])
+//        } else {
+//            performSegue(withIdentifier: "propSegue", sender: prop[dataIndex])
+//        }
+//    }
+//    private func handleDeleteOrRemove(at indexPath: IndexPath) {
+//        guard let film = film else { return }
+//        
+//        // Shift index to find real data
+//        let dataIndex = indexPath.item - 1
+//
+//        if indexPath.section == 0 {
+//            let seq = sequence[dataIndex]
+//            sequenceService.deleteSequence(by: seq.id)
+//        } else if indexPath.section == 1 {
+//            let char = characters[dataIndex]
+//            filmCharacterService.removeCharacter(by: char.id)
+//        } else {
+//            let pr = prop[dataIndex]
+//            guard let propId = pr.id else { return }
+//            propService.removeProp(propId, fromFilmId: film.id)
+//        }
+//    }
 
     
     private func setupObservers() {
@@ -374,11 +362,12 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
                 vc.sequence = sender as? Sequence
                 vc.filmName = self.film?.name
             }
-            if segue.identifier == "characterInfoSegue" {
-                let vc = segue.destination as! CharacterDetailsViewController
-                vc.character = sender as? CharacterItem
-            }
-            if segue.identifier == "propSegue" {
+        if segue.identifier == "characterInfoSegue" {
+                    let vc = segue.destination as! CharacterDetailsViewController
+                    // Sender is FilmCharacter (from didSelectItemAt), NOT CharacterItem
+                    vc.filmCharacter = sender as? FilmCharacter
+                }
+        if segue.identifier == "propSegue" {
                 let vc = segue.destination as! PropDetailViewController
                 vc.prop = sender as? PropItem
             }
@@ -436,4 +425,117 @@ extension MyFilmViewController: HeaderViewDelegate {
 }
 
 
+extension MyFilmViewController {
 
+    // MARK: - Context Menu (Native Long Press)
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        
+        // 1. Ignore Placeholder Cells (Index 0)
+        if indexPath.item == 0 { return nil }
+        
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
+            
+            var actions: [UIAction] = []
+            
+            // SECTION 0: SEQUENCES (Allow Rename & Delete)
+            if indexPath.section == 0 {
+                let renameAction = UIAction(title: "Rename Sequence", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                    self?.presentRenameSequenceAlert(at: indexPath)
+                }
+                actions.append(renameAction)
+            }
+            // SECTIONS 1 & 2: CHARACTERS & PROPS (Allow Edit Details)
+            else {
+                let editAction = UIAction(title: "Edit Details", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                    // For characters/props, we stick to the Segue since they are complex
+                    self?.performEditSegue(at: indexPath)
+                }
+                actions.append(editAction)
+            }
+            
+            // ALL SECTIONS: DELETE ACTION
+            let deleteAction = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                self?.deleteItem(at: indexPath)
+            }
+            actions.append(deleteAction)
+            
+            return UIMenu(title: "", children: actions)
+        }
+    }
+
+    // MARK: - Helper Functions
+
+    /// Handles Deletion (Service Only - No Manual UI Update)
+    private func deleteItem(at indexPath: IndexPath) {
+        guard let film = film else { return }
+        let dataIndex = indexPath.item - 1 // Shift index because of placeholder
+        
+        if indexPath.section == 0 {
+            // Sequence
+            let seq = sequence[dataIndex]
+            sequenceService.deleteSequence(by: seq.id)
+            // Note: Ensure SequenceService posts 'NotificationNames.sequencesUpdated'
+            
+        } else if indexPath.section == 1 {
+            // Character
+            let char = characters[dataIndex]
+            filmCharacterService.removeCharacter(by: char.id)
+            // Note: Ensure FilmCharacterService posts 'NotificationNames.filmCharactersUpdated'
+            
+        } else {
+            // Prop
+            let pr = prop[dataIndex]
+            guard let propId = pr.id else { return }
+            propService.removeProp(propId, fromFilmId: film.id)
+            // Note: Ensure PropService posts 'NotificationNames.propsUpdated'
+        }
+        
+        // CRITICAL: We do NOT manually delete from array or collectionView.
+        // We let the Observers in viewDidLoad call refreshData().
+    }
+
+    /// Handles Renaming for Sequences
+    private func presentRenameSequenceAlert(at indexPath: IndexPath) {
+        let dataIndex = indexPath.item - 1
+        let currentSequence = sequence[dataIndex]
+        
+        let alert = UIAlertController(title: "Rename Sequence", message: nil, preferredStyle: .alert)
+        alert.addTextField { tf in
+            tf.text = currentSequence.name
+            tf.placeholder = "Sequence Name"
+        }
+        
+        let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+            guard let self = self,
+                  let newName = alert.textFields?.first?.text,
+                  !newName.isEmpty else { return }
+            
+            // 1. Create mutable copy
+            var updatedSequence = currentSequence
+            updatedSequence.name = newName
+            
+            // 2. Update via Service
+            // Assuming you have an update method. If not, you need to add it to SequenceService.
+             self.sequenceService.updateSequence(updatedSequence)
+            
+            // 3. Optional: If your service doesn't post a notification for updates,
+            // you might need to manually reload:
+            // self.refreshData()
+        }
+        
+        alert.addAction(saveAction)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    /// Handles Navigation for Characters/Props
+    private func performEditSegue(at indexPath: IndexPath) {
+        let dataIndex = indexPath.item - 1
+        
+        if indexPath.section == 1 {
+            performSegue(withIdentifier: "characterInfoSegue", sender: characters[dataIndex])
+        } else if indexPath.section == 2 {
+            performSegue(withIdentifier: "propSegue", sender: prop[dataIndex])
+        }
+    }
+}

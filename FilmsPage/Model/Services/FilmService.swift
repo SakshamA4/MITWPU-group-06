@@ -79,15 +79,18 @@ class FilmService {
     }
     
     func updateFilm(_ film: Film) {
-        if let index = films.firstIndex(where: { $0.id == film.id }) {
-            films[index] = film
+            // 1. Find the film in your local array and replace it
+            if let index = films.firstIndex(where: { $0.id == film.id }) {
+                films[index] = film
+                
+                // 2. Save to UserDefaults
+                save()
+                
+                // 3. Notify the View Controller to reload
+                NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.filmsUpdated), object: nil)
+            }
         }
-
-        if favFilm?.id == film.id {
-            favFilm = film
-        }
-    }
-
+    
     func deleteFilm(at index: Int) {
         guard index < films.count else { return }
         films.remove(at: index)
@@ -121,7 +124,7 @@ class FilmService {
         
         let sequenceService = SequenceService.shared
         let sceneService = SceneService.shared
-        let characterService = FilmCharacterService.shared
+        _ = FilmCharacterService.shared
         
         for i in 0..<films.count {
             let filmId = films[i].id

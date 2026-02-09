@@ -45,61 +45,61 @@ class FilmsViewController: UIViewController {
 
         collectionView.reloadData()
         
-        let longPressGesture = UILongPressGestureRecognizer(
-            target: self,
-            action: #selector(handleLongPress(_:))
-        )
-        collectionView.addGestureRecognizer(longPressGesture)
+//        let longPressGesture = UILongPressGestureRecognizer(
+//            target: self,
+//            action: #selector(handleLongPress(_:))
+//        )
+//        collectionView.addGestureRecognizer(longPressGesture)
 
     }
     
     
-    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
-
-        let location = gesture.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: location) else {
-            return
-        }
-
-        let selectedFilm: Film
-        if indexPath.section == 0 {
-            selectedFilm = favouriteFilm
-        } else {
-            selectedFilm = allFilms[indexPath.item]
-        }
-
-        showFilmActionSheet(for: selectedFilm, at: indexPath)
-    }
-
-    private func showFilmActionSheet(for film: Film, at indexPath: IndexPath) {
-
-        let actionSheet = UIAlertController(
-            title: film.name,
-            message: "Choose an action",
-            preferredStyle: .actionSheet
-        )
-
-        // EDIT
-        actionSheet.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
-            self.editFilm(film)
-        })
-
-        // INFO
-        actionSheet.addAction(UIAlertAction(title: "Get Info", style: .default) { _ in
-            self.showFilmInfo(film)
-        })
-
-        // DELETE
-        actionSheet.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            self.deleteFilm(film, at: indexPath)
-        })
-
-        // CANCEL
-        actionSheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        present(actionSheet, animated: true)
-    }
+//    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+//        guard gesture.state == .began else { return }
+//
+//        let location = gesture.location(in: collectionView)
+//        guard let indexPath = collectionView.indexPathForItem(at: location) else {
+//            return
+//        }
+//
+//        let selectedFilm: Film
+//        if indexPath.section == 0 {
+//            selectedFilm = favouriteFilm
+//        } else {
+//            selectedFilm = allFilms[indexPath.item]
+//        }
+//
+//        showFilmActionSheet(for: selectedFilm, at: indexPath)
+//    }
+//
+//    private func showFilmActionSheet(for film: Film, at indexPath: IndexPath) {
+//
+//        let actionSheet = UIAlertController(
+//            title: film.name,
+//            message: "Choose an action",
+//            preferredStyle: .actionSheet
+//        )
+//
+//        // EDIT
+//        actionSheet.addAction(UIAlertAction(title: "Edit", style: .default) { _ in
+//            self.editFilm(film)
+//        })
+//
+//        // INFO
+//        actionSheet.addAction(UIAlertAction(title: "Get Info", style: .default) { _ in
+//            self.showFilmInfo(film)
+//        })
+//
+//        // DELETE
+//        actionSheet.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
+//            self.deleteFilm(film, at: indexPath)
+//        })
+//
+//        // CANCEL
+//        actionSheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//
+//        present(actionSheet, animated: true)
+//    }
 
     private func showFilmInfo(_ film: Film) {
         let alert = UIAlertController(
@@ -139,8 +139,43 @@ class FilmsViewController: UIViewController {
     }
     
     private func editFilm(_ film: Film) {
-        performSegue(withIdentifier: "editFilmSegue", sender: film)
-    }
+            // Create the Alert
+            let alert = UIAlertController(
+                title: "Rename Film",
+                message: "Enter a new name for this film",
+                preferredStyle: .alert
+            )
+            
+            // Add Text Field with current name
+            alert.addTextField { textField in
+                textField.text = film.name
+                textField.placeholder = "Film Name"
+                textField.autocapitalizationType = .words
+            }
+            
+            // Save Action
+            let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+                guard let self = self,
+                      let newName = alert.textFields?.first?.text,
+                      !newName.isEmpty else { return }
+                
+                // 1. Create a mutable copy of the film
+                var updatedFilm = film
+                updatedFilm.name = newName
+                
+                // 2. Update via Service
+                // This will trigger the notification and refresh the screen automatically
+                self.filmService.updateFilm(updatedFilm)
+            }
+            
+            // Cancel Action
+            let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+            
+            alert.addAction(saveAction)
+            alert.addAction(cancelAction)
+            
+            present(alert, animated: true)
+        }
 
 
     
@@ -366,3 +401,66 @@ extension FilmsViewController: UICollectionViewDataSource,
 
 }
 
+extension FilmsViewController {
+    
+    // MARK: - Context Menu (Native Long Press)
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
+            
+            // 1. Identify the Film
+            let film: Film
+            if indexPath.section == 0 {
+                // Handle case where favourite might be nil, though your code forces it (!)
+                guard let fav = self.favouriteFilm else { return nil }
+                film = fav
+            } else {
+                film = self.allFilms[indexPath.item]
+            }
+            
+            // 2. Action: Edit
+            let editAction = UIAction(title: "Edit", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                self?.editFilm(film)
+            }
+            
+            // 3. Action: Get Info
+            let infoAction = UIAction(title: "Get Info", image: UIImage(systemName: "info.circle")) { [weak self] _ in
+                self?.showFilmInfo(film)
+            }
+            
+            // 4. Action: Delete
+            let deleteAction = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                self?.presentDeleteAlert(for: film)
+            }
+            
+            return UIMenu(title: film.name, children: [editAction, infoAction, deleteAction])
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func presentDeleteAlert(for film: Film) {
+        let alert = UIAlertController(
+            title: "Delete Film",
+            message: "Are you sure you want to delete '\(film.name)'?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.performDelete(film)
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func performDelete(_ film: Film) {
+        // 1. Delete from Service
+        // This is the ONLY thing we do. We do not touch local arrays.
+        filmService.deleteFilm(film)
+        
+        // 2. The Service triggers 'NotificationNames.filmsUpdated'
+        // 3. Your 'setupObservers' catches it -> 'refreshData' runs -> UI Reloads automatically.
+    }
+}

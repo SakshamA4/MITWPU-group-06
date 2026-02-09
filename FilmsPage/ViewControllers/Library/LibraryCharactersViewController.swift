@@ -104,7 +104,7 @@ extension LibraryCharactersViewController: UICollectionViewDelegate {
             return
         }
         
-        vc.character = selectedCharacter
+        vc.characterTemplate = selectedCharacter
 
 
         navigationController?.pushViewController(vc, animated: true)
