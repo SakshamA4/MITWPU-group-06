@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" id="gTV-IL-0wX" customClass="PlaceholderCollectionViewCell" customModule="FilmsPage" customModuleProvider="target">
+            <rect key="frame" x="0.0" y="0.0" width="245" height="235"/>
+            <autoresizingMask key="autoresizingMask"/>
+            <view key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center">
+                <rect key="frame" x="0.0" y="0.0" width="245" height="235"/>
+                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                <subviews>
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="xvb-Td-uKy">
+                        <rect key="frame" x="0.0" y="0.0" width="245" height="235"/>
+                        <color key="backgroundColor" red="0.1019897461" green="0.1019897461" blue="0.1600341797" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+                    </view>
+                </subviews>
+            </view>
+            <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <constraints>
+                <constraint firstItem="xvb-Td-uKy" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="a0B-8N-CNr"/>
+                <constraint firstAttribute="trailing" secondItem="xvb-Td-uKy" secondAttribute="trailing" id="e54-Oo-6vH"/>
+                <constraint firstAttribute="bottom" secondItem="xvb-Td-uKy" secondAttribute="bottom" id="g5v-PF-4tD"/>
+                <constraint firstItem="xvb-Td-uKy" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="n9a-My-6ry"/>
+            </constraints>
+            <size key="customSize" width="245" height="235"/>
+            <connections>
+                <outlet property="bgView" destination="xvb-Td-uKy" id="ELt-ot-XlM"/>
+            </connections>
+            <point key="canvasLocation" x="209.63414634146341" y="150.76271186440678"/>
+        </collectionViewCell>
+    </objects>
+</document>

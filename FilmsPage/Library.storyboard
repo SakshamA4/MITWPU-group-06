@@ -181,6 +181,7 @@
                     </navigationItem>
                     <connections>
                         <outlet property="libraryCollectionView" destination="Gtc-NX-FN5" id="ZfG-v8-mmQ"/>
+                        <segue destination="Rbs-cT-bva" kind="show" identifier="BackgroundViewController" id="tPM-fk-MAX"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="cna-3N-U3W" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
@@ -240,7 +241,7 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="l0U-It-smc" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="1699.8347107438017" y="2798.5611510791368"/>
+            <point key="canvasLocation" x="2588" y="1690"/>
         </scene>
         <!--Background View Controller-->
         <scene sceneID="xQM-oU-KkI">
@@ -294,9 +295,7 @@
                     <navigationItem key="navigationItem" id="0lh-Gv-yQ3">
                         <barButtonItem key="rightBarButtonItem" style="plain" systemItem="add" id="AUz-JV-cl3">
                             <connections>
-                                <segue destination="oy3-hf-2AG" kind="popoverPresentation" popoverAnchorBarButtonItem="AUz-JV-cl3" id="0ZE-Mq-rQS">
-                                    <popoverArrowDirection key="popoverArrowDirection" up="YES" right="YES"/>
-                                </segue>
+                                <action selector="plusButtonTapped:" destination="Rbs-cT-bva" id="zGB-tK-g2o"/>
                             </connections>
                         </barButtonItem>
                     </navigationItem>
@@ -306,7 +305,7 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="XEK-cn-fzZ" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="1683" y="3563"/>
+            <point key="canvasLocation" x="1698" y="2105"/>
         </scene>
         <!--Camera Info View Controller-->
         <scene sceneID="GLM-NV-GfX">
@@ -395,51 +394,6 @@
                 <placeholder placeholderIdentifier="IBFirstResponder" id="8Pm-dU-id8" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="2587.9338842975208" y="2798.5611510791368"/>
-        </scene>
-        <!--View Controller-->
-        <scene sceneID="bWi-Zh-7u7">
-            <objects>
-                <viewController id="oy3-hf-2AG" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="DFe-M0-UuC">
-                        <rect key="frame" x="0.0" y="0.0" width="473" height="227"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" distribution="fillEqually" spacing="24" translatesAutoresizingMaskIntoConstraints="NO" id="cNt-hz-Q4W">
-                                <rect key="frame" x="40" y="47" width="393" height="146"/>
-                                <subviews>
-                                    <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Mlo-Pm-wv5">
-                                        <rect key="frame" x="0.0" y="0.0" width="393" height="61"/>
-                                        <color key="tintColor" red="0.63921570780000003" green="0.1843137443" blue="0.2352941036" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                                        <state key="normal" title="Button"/>
-                                        <buttonConfiguration key="configuration" style="filled" title="Select from Photos" cornerStyle="capsule">
-                                            <fontDescription key="titleFontDescription" style="UICTFontTextStyleTitle3"/>
-                                        </buttonConfiguration>
-                                    </button>
-                                    <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="7Rc-ac-JPU">
-                                        <rect key="frame" x="0.0" y="85" width="393" height="61"/>
-                                        <color key="tintColor" red="0.63921570780000003" green="0.1843137443" blue="0.2352941036" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                                        <state key="normal" title="Button"/>
-                                        <buttonConfiguration key="configuration" style="filled" title="Generate Image" cornerStyle="capsule">
-                                            <fontDescription key="titleFontDescription" style="UICTFontTextStyleTitle2"/>
-                                        </buttonConfiguration>
-                                    </button>
-                                </subviews>
-                            </stackView>
-                        </subviews>
-                        <viewLayoutGuide key="safeArea" id="bAr-oh-E5r"/>
-                        <color key="backgroundColor" red="0.1019607931" green="0.1019607931" blue="0.1607843041" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                        <constraints>
-                            <constraint firstItem="cNt-hz-Q4W" firstAttribute="leading" secondItem="bAr-oh-E5r" secondAttribute="leading" constant="40" id="V9M-TR-5Cl"/>
-                            <constraint firstItem="bAr-oh-E5r" firstAttribute="bottom" secondItem="cNt-hz-Q4W" secondAttribute="bottom" constant="34" id="fnx-z4-1g7"/>
-                            <constraint firstItem="bAr-oh-E5r" firstAttribute="trailing" secondItem="cNt-hz-Q4W" secondAttribute="trailing" constant="40" id="jUu-FY-TJq"/>
-                            <constraint firstItem="cNt-hz-Q4W" firstAttribute="top" secondItem="bAr-oh-E5r" secondAttribute="top" constant="34" id="yec-Bd-ns8"/>
-                        </constraints>
-                    </view>
-                    <value key="contentSizeForViewInPopover" type="size" width="473" height="214"/>
-                </viewController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="3n1-36-eV2" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
-            </objects>
-            <point key="canvasLocation" x="2605" y="3511"/>
         </scene>
         <!--Library-->
         <scene sceneID="Das-EC-v6j">

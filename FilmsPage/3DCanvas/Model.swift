@@ -15,10 +15,11 @@ struct SpawnPose {
 
 struct SpawnItem {
     var title: String
-    let imageName: String      // for UI
-    var modelFileName: String  // for RealityKit
+    let imageName: String?
+    var modelFileName: String
     var isBackground: Bool = false
     var UUId: UUID = UUID()
+    var customImage: UIImage? = nil
     
     var poses: [SpawnPose]? = nil
     var detailText: String? = nil
@@ -28,15 +29,22 @@ struct SpawnItem {
 class BackgroundStore {
     static let shared = BackgroundStore()
     
-
-        var images: [UIImage] = []
-
-        var currentSelectedImage: UIImage?
-        var onImageSelected: ((UIImage) -> Void)?
-
-        func selectImage(_ image: UIImage) {
-            onImageSelected?(image)
-        }
+    // 1. The Single Source of Truth
+    var items: [BackgroundItem] = BackgroundData.allBackgrounds
+    
+    // 2. Selection Handling
+    var onBackgroundSelected: ((BackgroundItem) -> Void)?
+    var onImageSelected: ((UIImage) -> Void)?
+    
+    func selectBackground(_ item: BackgroundItem) {
+        // Notify listeners (e.g., the Canvas)
+        onBackgroundSelected?(item)
+    }
+    
+    func addBackground(_ item: BackgroundItem) {
+        // Insert at the top
+        items.insert(item, at: 0)
+    }
 }
 
 // In DataStore.swift
@@ -44,26 +52,26 @@ class BackgroundStore {
 extension SpawnItem {
     // Your existing Character init...
     init(character: CharacterItem) {
-            // Map the full character data to our new SpawnPose struct
-            let poseItems = character.pose.map { pose in
-                SpawnPose(
-                    title: pose.name,
-                    imageName: pose.imageName,       // Passes "Woman1Sit_img"
-                    modelFileName: pose.modelFilename ?? "" // Passes "Woman1Sit"
-                )
-            }
-            
-            let defaultModel = character.pose.first?.modelFilename ?? character.imageName
-            
-            self.init(
-                title: character.name,
-                imageName: character.imageName,
-                modelFileName: defaultModel,
-                isBackground: false,
-                UUId: character.id ?? UUID(),
-                poses: poseItems // Pass the rich data here
+        // Map the full character data to our new SpawnPose struct
+        let poseItems = character.pose.map { pose in
+            SpawnPose(
+                title: pose.name,
+                imageName: pose.imageName,       // Passes "Woman1Sit_img"
+                modelFileName: pose.modelFilename ?? "" // Passes "Woman1Sit"
             )
         }
+        
+        let defaultModel = character.pose.first?.modelFilename ?? character.imageName
+        
+        self.init(
+            title: character.name,
+            imageName: character.imageName,
+            modelFileName: defaultModel,
+            isBackground: false,
+            UUId: character.id,
+            poses: poseItems // Pass the rich data here
+        )
+    }
     
     // NEW: Prop init
     init(prop: PropItem) {
@@ -78,24 +86,38 @@ extension SpawnItem {
     }
     
     init(camera: CameraLibraryItem) {
-            self.init(
-                title: camera.name,
-                imageName: camera.imageName,
-                // Fallback to empty string if no model is defined, preventing crashes
-                modelFileName: camera.modelFileName ?? "",
-                isBackground: false,
-                // Use the description from the camera library
-                detailText: camera.description
-            )
-        }
+        self.init(
+            title: camera.name,
+            imageName: camera.imageName,
+            // Fallback to empty string if no model is defined
+            modelFileName: camera.modelFileName ?? "",
+            isBackground: false,
+            // FIX: Pass the persistent ID from the camera item
+            UUId: camera.id,
+            // Use the description from the camera library
+            detailText: camera.description
+        )
+    }
+    
     init(light: LightItem) {
+        self.init(
+            title: light.name,
+            imageName: light.imageName,
+            // Use the modelFileName if it exists, otherwise empty string
+            modelFileName: light.modelFileName ?? "",
+            isBackground: false,
+            detailText: light.description
+        )
+    }
+    
+    init(background: BackgroundItem) {
             self.init(
-                title: light.name,
-                imageName: light.imageName,
-                // Use the modelFileName if it exists, otherwise empty string
-                modelFileName: light.modelFileName ?? "",
-                isBackground: false,
-                detailText: light.description
+                title: background.title,
+                imageName: background.imageName,
+                modelFileName: "plane", // Assuming you use a generic plane for backgrounds
+                isBackground: true,     // Crucial flag
+                UUId: background.id,
+                customImage: background.customImage
             )
         }
 }

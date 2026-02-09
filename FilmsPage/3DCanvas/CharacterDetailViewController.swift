@@ -63,7 +63,7 @@ class CharacterDetailViewController: UIViewController {
     private lazy var characterImageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFit
-        iv.image = UIImage(named: item.imageName)
+        iv.image = UIImage(named: item.imageName ?? "")
         iv.backgroundColor = .systemBackground // White bg for image
         iv.layer.cornerRadius = 16
         iv.clipsToBounds = true
@@ -339,28 +339,12 @@ extension CharacterDetailViewController: UICollectionViewDataSource, UICollectio
 
         // Use the specific image name for this pose
         // If that fails, fallback to main item image
-        let image = UIImage(named: pose.imageName) ?? UIImage(named: item.imageName)
+        let image = UIImage(named: pose.imageName) ?? UIImage(named: item.imageName ?? "")
 
         cell.configure(image: image, title: pose.title)
         return cell
     }
     
-//    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-//        let selectedPose = poses[indexPath.item]
-//        
-//        // Just update the tracking variable
-//        print("Selected pose: \(selectedPoseModelName)", selectedPose)
-//        item.modelFileName = selectedPose.modelFileName
-//        item.selectedPose = selectedPose.modelFileName
-//        print("\n\n", item, "\n\n")
-//        
-//        // Update the preview image if needed
-//        if let poseImage = UIImage(named: selectedPose.imageName) {
-//            characterImageView.image = poseImage
-//        }
-//        dismiss(animated: true)
-//        self.onSelectModel(item)
-//    }
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedPose = poses[indexPath.item]
         

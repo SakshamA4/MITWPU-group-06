@@ -53,10 +53,14 @@ class PropService {
         }
     }
     
-    func deleteProp(at index: Int) {
-        guard index < props.count else { return }
-        props.remove(at: index)
+    func removeProp(_ propId: UUID, fromFilmId filmId: UUID) {
+        guard let index = props.firstIndex(where: { $0.id == propId }) else { return }
+
+        props[index].filmId = props[index].filmId?
+            .compactMap { $0 }
+            .filter { $0 != filmId }
     }
+
     
     func deleteProp(by id: UUID) {
         props.removeAll { $0.id == id }
