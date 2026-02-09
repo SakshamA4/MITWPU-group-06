@@ -57,7 +57,7 @@ class ToolCell: UICollectionViewCell {
     }
 
     func configure(with item: SpawnItem) {
-        imageView.image = UIImage(named: item.imageName)
+        imageView.image = UIImage(named: item.imageName ?? "")
         label.text = item.title
     }
 }

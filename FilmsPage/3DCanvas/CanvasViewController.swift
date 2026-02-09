@@ -1363,11 +1363,17 @@ class CanvasViewController: UIViewController {
         setupTimelineControls()
         setupNavigationBar()
 
-        BackgroundStore.shared.onImageSelected = { [weak self] pickedImage in
-            DispatchQueue.main.async {
-                self?.applyBackgroundImage(pickedImage)
+        BackgroundStore.shared.onBackgroundSelected = { [weak self] backgroundItem in
+                self?.handleBackgroundSelection(backgroundItem)
             }
-        }
+    }
+    
+    // MARK: - Background Handling
+
+    func handleBackgroundSelection(_ item: BackgroundItem) {
+        print("Canvas received background: \(item.title)")
+        let spawnItem = SpawnItem(background: item)
+        self.spawnEntity(item: spawnItem, toolType: .background)
     }
 
     private func setupNavigationBar() {
@@ -1520,11 +1526,14 @@ class CanvasViewController: UIViewController {
 
         Task {
             do {
-                // 1. Initial checks (Camera, Wall, Ground)
+                // 1. Initial Checks for Special Types
+                
+                // Camera
                 if item.modelFileName == "cam1" {
                     spawnSceneCamera()
                     return
                 }
+                // Walls/Ground
                 if item.modelFileName == "cube" {
                     spawnWall()
                     return
@@ -1533,28 +1542,28 @@ class CanvasViewController: UIViewController {
                     spawnGround()
                     return
                 }
-                if item.isBackground { return }
+                if item.isBackground {
+                    spawnBackgroundPlane(item)
+                    return
+                }
 
-                // 2. Load the Entity
+                // 2. Load the 3D Model (Character/Prop/Light)
+                // If code reaches here, it assumes a valid .usdz file exists
                 let entity = try await Entity(named: item.modelFileName)
 
-                // 📍 STEP A: NORMALIZE (The Permanent Scaling Fix)
-                // We use .relativeTo(nil) to get the true world-space dimensions
+                // --- (Keep your existing Normalization, Scale, and Position logic here) ---
+                // 📍 STEP A: NORMALIZE
                 let bounds = entity.visualBounds(relativeTo: nil)
-                let maxDim = max(
-                    bounds.extents.x,
-                    max(bounds.extents.y, bounds.extents.z)
-                )
-
-                if maxDim > 0.0001 {  // Safety check for empty models
+                let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+                if maxDim > 0.0001 {
                     let normalizationFactor = 1.0 / maxDim
                     entity.scale = SIMD3(repeating: normalizationFactor)
                 }
 
-                // 📍 STEP B: APPLY PROP-SPECIFIC SCALES
+                // 📍 STEP B: APPLY SCALES
                 var verticalOffset: Float = 0.0
-
-                if item.modelFileName == "Spotlight" {
+                // ... (Your existing specific prop scaling logic) ...
+                 if item.modelFileName == "Spotlight" {
                     entity.scale = SIMD3(repeating: 0.01)
                     verticalOffset = 0.25
                 } else if item.modelFileName.contains("LED") {
@@ -1563,22 +1572,16 @@ class CanvasViewController: UIViewController {
                     entity.scale = SIMD3(repeating: 0.0025)
                     verticalOffset = 0.25
                 } else if item.modelFileName.contains("Plant") {
-                    // Now that it's normalized to 1m, 0.5 makes it exactly 50cm
                     entity.scale = SIMD3(repeating: 0.01)
                 } else {
-                    // Slider scale (1.0 = 1 meter tall/wide)
                     entity.scale = SIMD3<Float>(repeating: scale)
                 }
 
                 // 📍 STEP C: APPLY POSITION
                 let randomX = Float.random(in: -1...1)
                 let randomZ = Float.random(in: -1...1)
-
-                // Recalculate grounding lift after the final scale is set
                 let finalBounds = entity.visualBounds(relativeTo: nil)
                 let liftToGround = -finalBounds.min.y
-
-                // Use your manual verticalOffset if it exists, otherwise auto-ground it
                 let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
 
                 entity.name = customName ?? item.modelFileName
@@ -1589,17 +1592,12 @@ class CanvasViewController: UIViewController {
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
-                if item.title.lowercased() == "light"
-                    || item.modelFileName == "Spotlight"
-                {
+                // ... (Your light attachment logic) ...
+                if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
                     addRealLightToModel(entity)
-                } else if item.title.lowercased() == "light"
-                    || item.modelFileName == "LED Panel"
-                {
+                } else if item.title.lowercased() == "light" || item.modelFileName == "LED Panel" {
                     addLEDPanel(to: entity)
-                } else if item.title.lowercased() == "lantern"
-                    || item.modelFileName == "Lantern"
-                {
+                } else if item.title.lowercased() == "lantern" || item.modelFileName == "Lantern" {
                     addLantern(to: entity)
                 }
 
@@ -1613,13 +1611,29 @@ class CanvasViewController: UIViewController {
             }
         }
     }
+    
+    func spawnBackgroundPlane(_ item: SpawnItem) {
+        // Check for Custom Image first
+        if let customImage = item.customImage {
+            applyBackgroundImage(customImage)
+            return
+        }
+        // Check for Standard Asset Image
+        if let imageName = item.imageName, let image = UIImage(named: imageName) {
+            applyBackgroundImage(image)
+            return
+        }
+        print("Error: No image found for background \(item.title)")
+    }
 
+    // 2. The Renderer Function
     func applyBackgroundImage(_ image: UIImage) {
         guard let cgImage = image.cgImage,
-            let anchor = arView.scene.findEntity(named: "MainAnchor")
+              let anchor = arView.scene.findEntity(named: "MainAnchor")
         else { return }
 
         do {
+            // Create Material
             let texture = try TextureResource(
                 image: cgImage,
                 options: .init(semantic: .color)
@@ -1627,38 +1641,33 @@ class CanvasViewController: UIViewController {
             var material = UnlitMaterial()
             material.color.texture = .init(texture)
 
-            // 2. Increment counter and create unique name
+            // Unique Name
             backgroundCounter += 1
             let uniqueName = "Background \(backgroundCounter)"
 
-            // 1. DIMENSIONS
+            // Dimensions (Standard 1.5m height, aspect ratio matched)
             let aspect = Float(image.size.width / image.size.height)
             let height: Float = 1.5
             let width = height * aspect
             let thickness: Float = 0.05
 
-            // 2. BOX MESH (Double-sided and thick)
-            let mesh = MeshResource.generateBox(
-                width: width,
-                height: height,
-                depth: thickness
-            )
+            // Mesh
+            let mesh = MeshResource.generateBox(width: width, height: height, depth: thickness)
             let plane = ModelEntity(mesh: mesh, materials: [material])
             plane.name = uniqueName
 
-            plane.components.set(
-                BackgroundComponent(width: width, height: height)
-            )
-
-            // 3. INTERACTION
+            // Components
+            plane.components.set(BackgroundComponent(width: width, height: height))
             plane.generateCollisionShapes(recursive: true)
             plane.components.set(InputTargetComponent())
+            
+            // Orientation & Position
+            // Standard background position: pushed back -2 meters, slightly up
             plane.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
-
-            let offset = Float(backgroundCounter) * 0.1
+            let offset = Float(backgroundCounter) * 0.1 // Stagger if multiple
             plane.position = [offset, height / 2, -2.1 - offset]
 
-            // 6. GESTURES & CATEGORY
+            // Add Category for Sidebar
             plane.components.set(CategoryComponent(toolType: .background))
 
             anchor.addChild(plane)
@@ -1670,7 +1679,8 @@ class CanvasViewController: UIViewController {
             print("Texture failed: \(error)")
         }
     }
-
+    
+    
     struct BackgroundComponent: Component {
         var width: Float
         var height: Float

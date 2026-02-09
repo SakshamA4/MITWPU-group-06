@@ -112,3 +112,38 @@ extension AllCharactersViewController: UICollectionViewDelegate, UICollectionVie
 }
 
 
+// Add this extension to AllCharactersViewController.swift
+
+extension AllCharactersViewController {
+    
+    // MARK: - Context Menu
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
+            
+            let char = self.characters[indexPath.item]
+            
+            // 1. Edit Details (Standard navigation)
+            let editAction = UIAction(title: "Edit Details", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                // Assuming you have a segue identifier for this, or use the didSelect logic
+                 self?.performSegue(withIdentifier: "characterInfoSegue", sender: char)
+            }
+            
+            // 2. Delete Action
+            let deleteAction = UIAction(title: "Remove from Film", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                self?.deleteCharacter(char)
+            }
+            
+            return UIMenu(title: "Options", children: [editAction, deleteAction])
+        }
+    }
+    
+    private func deleteCharacter(_ char: FilmCharacter) {
+        // Remove from film via Service
+        FilmCharacterService.shared.removeCharacter(by: char.id)
+        
+        // The existing observer in viewWillAppear will catch this and call loadCharacters()
+    }
+}
+
+
