@@ -168,3 +168,73 @@ extension HomeViewController {
         }
     }
 }
+
+extension HomeViewController {
+    
+    // MARK: - Context Menu (Long Press)
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        
+        // 1. Only allow menu for Section 0 (Recent Scenes)
+        guard indexPath.section == 0 else { return nil }
+        
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
+            
+            // Get the model used in the view
+            let sceneModel = self.recentScenes[indexPath.item]
+            
+            // ACTION 1: Rename
+            let renameAction = UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                self?.presentRenameAlert(for: sceneModel)
+            }
+            
+            // ACTION 2: Delete
+            let deleteAction = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                self?.deleteRecentScene(sceneModel)
+            }
+            
+            return UIMenu(title: sceneModel.name, children: [renameAction, deleteAction])
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// Handle Delete
+    private func deleteRecentScene(_ sceneModel: ScenesModel) {
+        // Use the ID to tell the service to delete the real data
+        SceneService.shared.deleteScene(by: sceneModel.id)
+        
+        // The Observer in viewDidLoad will catch the update and refresh the UI automatically.
+    }
+    
+    /// Handle Rename
+    private func presentRenameAlert(for sceneModel: ScenesModel) {
+        let alert = UIAlertController(title: "Rename Scene", message: nil, preferredStyle: .alert)
+        
+        alert.addTextField { tf in
+            tf.text = sceneModel.name
+            tf.placeholder = "Scene Name"
+            tf.autocapitalizationType = .words
+        }
+        
+        let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+            guard let newName = alert.textFields?.first?.text, !newName.isEmpty else { return }
+            
+            // 1. Fetch the REAL Scene object from the service using the ID
+            // (Because 'ScenesModel' might just be a display struct, we need the real object to save)
+            if let originalScene = SceneService.shared.getScene(by: sceneModel.id) {
+                
+                // 2. Modify it
+                var updatedScene = originalScene
+                updatedScene.name = newName
+                
+                // 3. Save it back to Service
+                SceneService.shared.updateScene(updatedScene)
+            }
+        }
+        
+        alert.addAction(saveAction)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+}

@@ -407,6 +407,7 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
             if segue.identifier == "allPropsSegue" {
                 let vc = segue.destination as! AllPropsViewController
                 vc.prop = sender as! [PropItem]
+                vc.film = self.film
             }
         }
 }
