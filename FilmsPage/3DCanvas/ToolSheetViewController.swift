@@ -32,7 +32,7 @@ class ToolSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = UIColor(red: 11/255, green:  11/255, blue: 22/255, alpha: 1)
 
         setupTitle()
         setupCollection()

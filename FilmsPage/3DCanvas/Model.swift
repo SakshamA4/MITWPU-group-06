@@ -34,6 +34,7 @@ class BackgroundStore {
     
     // 2. Selection Handling
     var onBackgroundSelected: ((BackgroundItem) -> Void)?
+    var onImageSelected: ((UIImage) -> Void)?
     
     func selectBackground(_ item: BackgroundItem) {
         // Notify listeners (e.g., the Canvas)

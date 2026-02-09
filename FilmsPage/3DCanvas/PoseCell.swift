@@ -13,7 +13,7 @@ class PoseCell: UICollectionViewCell {
     private let imageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFit
-        iv.backgroundColor = .systemGray6
+        iv.backgroundColor = UIColor(red: 20/255, green:  20/255, blue: 30/255, alpha: 1)
         iv.clipsToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -21,7 +21,7 @@ class PoseCell: UICollectionViewCell {
     
     private let titleLabelContainer: UIView = {
         let v = UIView()
-        v.backgroundColor = .systemBackground
+        v.backgroundColor = UIColor(red: 20/255, green:  20/255, blue: 30/255, alpha: 1)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -29,7 +29,7 @@ class PoseCell: UICollectionViewCell {
     private let titleLabel: UILabel = {
         let lbl = UILabel()
         lbl.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        lbl.textColor = .label 
+        lbl.textColor = .white
         lbl.textAlignment = .center
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl

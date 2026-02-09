@@ -137,7 +137,6 @@ struct MotionPathVisual {
     }
 }
 
-
 struct Timeline {
     var clips: [AnimationClip] = []
 
@@ -245,6 +244,8 @@ class CanvasViewController: UIViewController {
     var sequenceName: String?
     var sceneNotes: String = ""
     var lastEditedDate: Date = Date()
+    var sceneImageName: String?
+    var currentSceneID: UUID?
 
     private lazy var sceneNameLabel: UILabel = {
         let label = UILabel()
@@ -323,8 +324,7 @@ class CanvasViewController: UIViewController {
 
         // Save current state to redo before going back
         redoStack.append(createCurrentSnapshot())
-
-        applySnapshot(previousState)
+        refreshSidebarContent()
     }
 
     @objc func redoTapped() {
@@ -336,6 +336,87 @@ class CanvasViewController: UIViewController {
         applySnapshot(nextState)
     }
 
+    // MARK: - Top Right UI Components
+    private let shotBreakdownBtn: UIButton = {
+        let btn = UIButton(type: .system)
+        var config = UIButton.Configuration.filled()
+
+        // 1. Icon setup
+        config.image = UIImage(systemName: "list.bullet.indent")
+        config.preferredSymbolConfigurationForImage =
+            UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+
+        // 2. Exact same look as Layers Button
+        config.baseBackgroundColor = UIColor(
+            red: 11 / 255,
+            green: 11 / 255,
+            blue: 22 / 255,
+            alpha: 1
+        )
+        config.baseForegroundColor = .white
+        config.cornerStyle = .capsule
+
+        btn.configuration = config
+        btn.translatesAutoresizingMaskIntoConstraints = false
+
+        // 3. Match shadow depth
+        btn.layer.shadowColor = UIColor.black.cgColor
+        btn.layer.shadowOpacity = 0.3
+        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
+        btn.layer.shadowRadius = 4
+
+        return btn
+    }()
+
+    //  PLACE THIS AT CLASS LEVEL (NOT INSIDE ANOTHER FUNC)
+    func setupTopControlsUI() {
+        // 1. Add Breakdown button
+        view.addSubview(shotBreakdownBtn)
+
+        // 2. Re-anchor Play Button from the old stack
+        view.addSubview(playButton)
+        playButton.translatesAutoresizingMaskIntoConstraints = false
+
+        // 3. Style Play Button to match Breakdown/Layers style
+        playButton.backgroundColor = UIColor(
+            red: 11 / 255,
+            green: 11 / 255,
+            blue: 22 / 255,
+            alpha: 1
+        )
+        playButton.tintColor = .white
+        playButton.layer.cornerRadius = 22
+        playButton.clipsToBounds = false
+
+        NSLayoutConstraint.activate([
+            shotBreakdownBtn.centerYAnchor.constraint(
+                equalTo: layersButton.centerYAnchor
+            ),
+            shotBreakdownBtn.trailingAnchor.constraint(
+                equalTo: view.trailingAnchor,
+                constant: -16
+            ),
+            shotBreakdownBtn.widthAnchor.constraint(equalToConstant: 44),
+            shotBreakdownBtn.heightAnchor.constraint(equalToConstant: 44),
+
+            playButton.centerYAnchor.constraint(
+                equalTo: layersButton.centerYAnchor
+            ),
+            playButton.trailingAnchor.constraint(
+                equalTo: shotBreakdownBtn.leadingAnchor,
+                constant: -16
+            ),
+            playButton.widthAnchor.constraint(equalToConstant: 44),
+            playButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
+
+        shotBreakdownBtn.addTarget(
+            self,
+            action: #selector(shotBreakdownTapped),
+            for: .touchUpInside
+        )
+    }
+
     // 5. The Application Function (Receives the Struct)
     private func applySnapshot(_ snapshot: SceneSnapshot) {
         // Unwrap the dictionary from the snapshot struct
@@ -344,7 +425,6 @@ class CanvasViewController: UIViewController {
                 entity.transform = transform
             }
         }
-        refreshSidebarContent()
     }
 
     func createCurrentSnapshot() -> SceneSnapshot {
@@ -584,9 +664,8 @@ class CanvasViewController: UIViewController {
         // Find the immediately previous motion path for this entity
         let previous = timeline.clips
             .filter {
-                $0.entityName == clip.entityName &&
-                $0.motionPath != nil &&
-                $0.startTime + $0.duration <= clip.startTime
+                $0.entityName == clip.entityName && $0.motionPath != nil
+                    && $0.startTime + $0.duration <= clip.startTime
             }
             .sorted { $0.startTime < $1.startTime }
             .last
@@ -608,15 +687,12 @@ class CanvasViewController: UIViewController {
     ) -> AnimationClip? {
         timeline.clips
             .filter {
-                $0.entityName == clip.entityName &&
-                $0.motionPath != nil &&
-                $0.startTime + $0.duration <= clip.startTime
+                $0.entityName == clip.entityName && $0.motionPath != nil
+                    && $0.startTime + $0.duration <= clip.startTime
             }
             .sorted { $0.startTime < $1.startTime }
             .last
     }
-
-
 
     @objc func playTimeline() {
 
@@ -665,7 +741,6 @@ class CanvasViewController: UIViewController {
         startPlayback()
     }
 
-    
     @objc func pauseTimeline() {
         guard playbackState == .playing else { return }
 
@@ -994,7 +1069,6 @@ class CanvasViewController: UIViewController {
         )
     }
 
-
     // MARK: - Motion Path Handle Ownership
 
     struct MotionPathHandleComponent: Component {
@@ -1248,9 +1322,9 @@ class CanvasViewController: UIViewController {
 
             let lastTime =
                 timeline.clips
-                    .filter { $0.entityName == entityName }
-                    .map { $0.startTime + $0.duration }
-                    .max() ?? 0
+                .filter { $0.entityName == entityName }
+                .map { $0.startTime + $0.duration }
+                .max() ?? 0
 
             let finalTransform = evaluateEntityTransform(
                 entityName: entityName,
@@ -1260,8 +1334,6 @@ class CanvasViewController: UIViewController {
             entity.transform = finalTransform
         }
     }
-
-
 
     func handleAnimationPromptConfirm(
         type: AnimationType,
@@ -1362,12 +1434,15 @@ class CanvasViewController: UIViewController {
         setupGestures()
         setupTimelineControls()
         setupNavigationBar()
-
-        BackgroundStore.shared.onBackgroundSelected = { [weak self] backgroundItem in
-                self?.handleBackgroundSelection(backgroundItem)
+        setupTopControlsUI()
+        BackgroundStore.shared.onImageSelected = { [weak self] pickedImage in
+            DispatchQueue.main.async {
+                self?.applyBackgroundImage(pickedImage)
             }
+        }
+        self.sceneNameLabel.text = self.sceneName
     }
-    
+
     // MARK: - Background Handling
 
     func handleBackgroundSelection(_ item: BackgroundItem) {
@@ -1377,6 +1452,9 @@ class CanvasViewController: UIViewController {
     }
 
     private func setupNavigationBar() {
+
+        self.navigationItem.title = self.sceneName
+
         // 1. Back Button Logic
 
         // This creates a custom back button that pops the view controller
@@ -1431,9 +1509,21 @@ class CanvasViewController: UIViewController {
             blue: 22 / 255,
             alpha: 1
         )
+
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor.white,
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+        ]
+
+        appearance.titleTextAttributes = titleAttributes  // 📍 Apply here
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .systemBlue
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor.white,
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+        ]
+
     }
 
     @objc func moreTapped() {
@@ -1445,7 +1535,9 @@ class CanvasViewController: UIViewController {
         infoVC.filmName = self.filmName
         infoVC.initialNotes = self.sceneNotes
         infoVC.lastEditedDate = self.lastEditedDate
-
+        if let imageName = self.sceneImageName {
+            infoVC.sceneImage = UIImage(named: imageName)
+        }
         infoVC.onSave = { [weak self] newName, newNotes in
             guard let self = self else { return }
 
@@ -1454,7 +1546,7 @@ class CanvasViewController: UIViewController {
             self.sceneNotes = newNotes
             self.lastEditedDate = Date()
             self.sceneNameLabel.text = newName.uppercased()
-
+            self.navigationItem.title = newName
             // 2. 📍 SAVE TO DATABASE: This now works because 'notes' is in ScenesModel
             if var sceneToUpdate = self.currentSceneObject {
                 sceneToUpdate.name = newName
@@ -1467,6 +1559,12 @@ class CanvasViewController: UIViewController {
                 self.currentSceneObject = sceneToUpdate
             }
 
+            let updatedModel = ScenesModel(
+                name: newName,
+                image: self.sceneImageName ?? "Image",
+                notes: newNotes
+            )
+            ScenesDataStore.shared.addToRecent(scene: updatedModel)
             NotificationCenter.default.post(
                 name: NSNotification.Name("scenesUpdated"),
                 object: nil
@@ -1484,9 +1582,34 @@ class CanvasViewController: UIViewController {
     }
 
     @objc private func backButtonTapped() {
-        // This takes you back to the previous page
-        print("Clicking back button")
-        // Fallback: dismiss if it was presented modally
+        let currentID =
+            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
+
+        // Handle Template check as you currently do
+        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
+            $0.id == currentID
+        }
+
+        if isTemplate {
+            ScenesDataStore.shared.saveTemplateNote(
+                id: currentID,
+                notes: self.sceneNotes
+            )
+        } else {
+            // 1. Update Recent Scenes (Global)
+            let updatedRecent = ScenesModel(
+                id: currentID,
+                name: self.sceneName,
+                image: self.sceneImageName ?? "Image",
+                notes: self.sceneNotes
+            )
+            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
+
+            if var projectScene = self.currentSceneObject {
+                projectScene.name = self.sceneName
+            }
+        }
+
         self.dismiss(animated: true)
     }
 
@@ -1527,7 +1650,7 @@ class CanvasViewController: UIViewController {
         Task {
             do {
                 // 1. Initial Checks for Special Types
-                
+
                 // Camera
                 if item.modelFileName == "cam1" {
                     spawnSceneCamera()
@@ -1554,7 +1677,10 @@ class CanvasViewController: UIViewController {
                 // --- (Keep your existing Normalization, Scale, and Position logic here) ---
                 // 📍 STEP A: NORMALIZE
                 let bounds = entity.visualBounds(relativeTo: nil)
-                let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+                let maxDim = max(
+                    bounds.extents.x,
+                    max(bounds.extents.y, bounds.extents.z)
+                )
                 if maxDim > 0.0001 {
                     let normalizationFactor = 1.0 / maxDim
                     entity.scale = SIMD3(repeating: normalizationFactor)
@@ -1563,7 +1689,7 @@ class CanvasViewController: UIViewController {
                 // 📍 STEP B: APPLY SCALES
                 var verticalOffset: Float = 0.0
                 // ... (Your existing specific prop scaling logic) ...
-                 if item.modelFileName == "Spotlight" {
+                if item.modelFileName == "Spotlight" {
                     entity.scale = SIMD3(repeating: 0.01)
                     verticalOffset = 0.25
                 } else if item.modelFileName.contains("LED") {
@@ -1593,11 +1719,17 @@ class CanvasViewController: UIViewController {
                 entity.components.set(InputTargetComponent())
 
                 // ... (Your light attachment logic) ...
-                if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
+                if item.title.lowercased() == "light"
+                    || item.modelFileName == "Spotlight"
+                {
                     addRealLightToModel(entity)
-                } else if item.title.lowercased() == "light" || item.modelFileName == "LED Panel" {
+                } else if item.title.lowercased() == "light"
+                    || item.modelFileName == "LED Panel"
+                {
                     addLEDPanel(to: entity)
-                } else if item.title.lowercased() == "lantern" || item.modelFileName == "Lantern" {
+                } else if item.title.lowercased() == "lantern"
+                    || item.modelFileName == "Lantern"
+                {
                     addLantern(to: entity)
                 }
 
@@ -1611,7 +1743,7 @@ class CanvasViewController: UIViewController {
             }
         }
     }
-    
+
     func spawnBackgroundPlane(_ item: SpawnItem) {
         // Check for Custom Image first
         if let customImage = item.customImage {
@@ -1619,7 +1751,8 @@ class CanvasViewController: UIViewController {
             return
         }
         // Check for Standard Asset Image
-        if let imageName = item.imageName, let image = UIImage(named: imageName) {
+        if let imageName = item.imageName, let image = UIImage(named: imageName)
+        {
             applyBackgroundImage(image)
             return
         }
@@ -1629,7 +1762,7 @@ class CanvasViewController: UIViewController {
     // 2. The Renderer Function
     func applyBackgroundImage(_ image: UIImage) {
         guard let cgImage = image.cgImage,
-              let anchor = arView.scene.findEntity(named: "MainAnchor")
+            let anchor = arView.scene.findEntity(named: "MainAnchor")
         else { return }
 
         do {
@@ -1652,19 +1785,25 @@ class CanvasViewController: UIViewController {
             let thickness: Float = 0.05
 
             // Mesh
-            let mesh = MeshResource.generateBox(width: width, height: height, depth: thickness)
+            let mesh = MeshResource.generateBox(
+                width: width,
+                height: height,
+                depth: thickness
+            )
             let plane = ModelEntity(mesh: mesh, materials: [material])
             plane.name = uniqueName
 
             // Components
-            plane.components.set(BackgroundComponent(width: width, height: height))
+            plane.components.set(
+                BackgroundComponent(width: width, height: height)
+            )
             plane.generateCollisionShapes(recursive: true)
             plane.components.set(InputTargetComponent())
-            
+
             // Orientation & Position
             // Standard background position: pushed back -2 meters, slightly up
             plane.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
-            let offset = Float(backgroundCounter) * 0.1 // Stagger if multiple
+            let offset = Float(backgroundCounter) * 0.1  // Stagger if multiple
             plane.position = [offset, height / 2, -2.1 - offset]
 
             // Add Category for Sidebar
@@ -1679,8 +1818,7 @@ class CanvasViewController: UIViewController {
             print("Texture failed: \(error)")
         }
     }
-    
-    
+
     struct BackgroundComponent: Component {
         var width: Float
         var height: Float
@@ -1989,7 +2127,10 @@ class CanvasViewController: UIViewController {
         // Remove any existing toolbar
         pathEditToolbar?.removeFromSuperview()
 
-        guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }) else {
+        guard
+            let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }
+            )
+        else {
             return
         }
 
@@ -1997,7 +2138,9 @@ class CanvasViewController: UIViewController {
 
         // Container
         let container = UIView()
-        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(
+            0.95
+        )
         container.layer.cornerRadius = 14
         container.layer.shadowColor = UIColor.black.cgColor
         container.layer.shadowOpacity = 0.25
@@ -2021,13 +2164,16 @@ class CanvasViewController: UIViewController {
         // Apply button
         let applyButton = UIButton(type: .system)
         applyButton.setTitle("Apply", for: .normal)
-        applyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        applyButton.titleLabel?.font = .systemFont(
+            ofSize: 15,
+            weight: .semibold
+        )
 
         // Stack
         let stack = UIStackView(arrangedSubviews: [
             startField,
             durationField,
-            applyButton
+            applyButton,
         ])
         stack.axis = .vertical
         stack.spacing = 8
@@ -2038,41 +2184,62 @@ class CanvasViewController: UIViewController {
 
         // Layout
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+            stack.topAnchor.constraint(
+                equalTo: container.topAnchor,
+                constant: 10
+            ),
+            stack.bottomAnchor.constraint(
+                equalTo: container.bottomAnchor,
+                constant: -10
+            ),
+            stack.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor,
+                constant: 10
+            ),
+            stack.trailingAnchor.constraint(
+                equalTo: container.trailingAnchor,
+                constant: -10
+            ),
 
-            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
-            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
-            container.widthAnchor.constraint(equalToConstant: 220)
+            container.centerXAnchor.constraint(
+                equalTo: view.leadingAnchor,
+                constant: screenPoint.x
+            ),
+            container.bottomAnchor.constraint(
+                equalTo: view.topAnchor,
+                constant: screenPoint.y - 20
+            ),
+            container.widthAnchor.constraint(equalToConstant: 220),
         ])
 
         // ✅ APPLY CHANGES (UIKit-native, no Obj-C runtime)
-        applyButton.addAction(UIAction { [weak self] _ in
-            guard
-                let self,
-                let newStart = Float(startField.text ?? ""),
-                let newDuration = Float(durationField.text ?? ""),
-                newDuration > 0
-            else { return }
+        applyButton.addAction(
+            UIAction { [weak self] _ in
+                guard
+                    let self,
+                    let newStart = Float(startField.text ?? ""),
+                    let newDuration = Float(durationField.text ?? ""),
+                    newDuration > 0
+                else { return }
 
-            let oldClip = self.timeline.clips[clipIndex]
+                let oldClip = self.timeline.clips[clipIndex]
 
-            self.timeline.clips[clipIndex] = AnimationClip(
-                entityName: oldClip.entityName,
-                type: oldClip.type,
-                track: oldClip.track,
-                easing: oldClip.easing,
-                startTime: newStart,
-                duration: newDuration,
-                fromValue: oldClip.fromValue,
-                toValue: oldClip.toValue,
-                motionPath: oldClip.motionPath
-            )
+                self.timeline.clips[clipIndex] = AnimationClip(
+                    entityName: oldClip.entityName,
+                    type: oldClip.type,
+                    track: oldClip.track,
+                    easing: oldClip.easing,
+                    startTime: newStart,
+                    duration: newDuration,
+                    fromValue: oldClip.fromValue,
+                    toValue: oldClip.toValue,
+                    motionPath: oldClip.motionPath
+                )
 
-            self.updateEntityFinalTransforms()
-        }, for: .touchUpInside)
+                self.updateEntityFinalTransforms()
+            },
+            for: .touchUpInside
+        )
 
         pathEditToolbar = container
     }
@@ -2204,9 +2371,11 @@ class CanvasViewController: UIViewController {
         // ───────────────────────────────
         if let clipID = selectedPathClipID {
 
-            guard let clipIndex = timeline.clips.firstIndex(
-                where: { $0.id == clipID }
-            ) else {
+            guard
+                let clipIndex = timeline.clips.firstIndex(
+                    where: { $0.id == clipID }
+                )
+            else {
                 selectedPathClipID = nil
                 return
             }
@@ -2259,9 +2428,6 @@ class CanvasViewController: UIViewController {
         refreshSidebarContent()
     }
 
-
-
-
     //Gestures
     func setupGestures() {
 
@@ -2298,7 +2464,6 @@ class CanvasViewController: UIViewController {
         )
         arView.addGestureRecognizer(rotation)
     }
-
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard let entity = selectedEntity else { return }
@@ -2343,7 +2508,9 @@ class CanvasViewController: UIViewController {
         }
     }
 
-    @objc private func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+    @objc private func handlePathLongPress(
+        _ gesture: UILongPressGestureRecognizer
+    ) {
         guard gesture.state == .began else { return }
 
         let location = gesture.location(in: arView)
@@ -2352,7 +2519,7 @@ class CanvasViewController: UIViewController {
 
         // Case 1: Long-press on a path HANDLE
         if let handle = hit.components[MotionPathHandleComponent.self],
-           let pathRoot = hit.parent
+            let pathRoot = hit.parent
         {
             showPathContextMenu(
                 clipID: handle.clipID,
@@ -2363,8 +2530,8 @@ class CanvasViewController: UIViewController {
 
         // Case 2: Long-press on the PATH CURVE itself
         if hit.name == "MotionPath",
-           let pathRoot = hit.parent,
-           let handle = pathRoot
+            let pathRoot = hit.parent,
+            let handle = pathRoot
                 .children
                 .compactMap({ $0.components[MotionPathHandleComponent.self] })
                 .first
@@ -2377,7 +2544,6 @@ class CanvasViewController: UIViewController {
         }
     }
 
-
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
 
         let location = gesture.location(in: arView)
@@ -2388,7 +2554,8 @@ class CanvasViewController: UIViewController {
         // 1️⃣ MOTION PATH SELECTION
         // ─────────────────────────────
         if let hit = arView.entity(at: location),
-           let handle = hit.components[MotionPathHandleComponent.self] {
+            let handle = hit.components[MotionPathHandleComponent.self]
+        {
 
             selectedPathClipID = handle.clipID
             updatePathSelection()
@@ -2396,7 +2563,6 @@ class CanvasViewController: UIViewController {
             // ⛔ IMPORTANT: stop here
             return
         }
-
 
         currentActionMenu?.removeFromSuperview()
         currentActionMenu = nil
@@ -2430,7 +2596,7 @@ class CanvasViewController: UIViewController {
         }
 
     }
-    
+
     func showPathContextMenu(
         clipID: UUID,
         pathRoot: Entity
@@ -2442,43 +2608,47 @@ class CanvasViewController: UIViewController {
         )
 
         // ⏱ Edit Timing
-        alert.addAction(UIAlertAction(title: "Edit Timing", style: .default) { _ in
-            self.selectedPathClipID = clipID
-            self.updatePathSelection()
+        alert.addAction(
+            UIAlertAction(title: "Edit Timing", style: .default) { _ in
+                self.selectedPathClipID = clipID
+                self.updatePathSelection()
 
-            if let screenPos = self.arView.project(
-                pathRoot.position(relativeTo: nil)
-            ) {
-                self.showPathEditToolbar(for: clipID, at: screenPos)
+                if let screenPos = self.arView.project(
+                    pathRoot.position(relativeTo: nil)
+                ) {
+                    self.showPathEditToolbar(for: clipID, at: screenPos)
+                }
             }
-        })
+        )
 
         // 🔒 Lock / Unlock
         let isLocked =
             pathRoot.components[LockComponent.self]?.isLocked ?? false
         let lockTitle = isLocked ? "Unlock Path" : "Lock Path"
 
-        alert.addAction(UIAlertAction(title: lockTitle, style: .default) { _ in
-            var lock =
-                pathRoot.components[LockComponent.self]
-                ?? LockComponent(isLocked: false)
-            lock.isLocked.toggle()
-            pathRoot.components.set(lock)
-            self.updatePathSelection()
-        })
+        alert.addAction(
+            UIAlertAction(title: lockTitle, style: .default) { _ in
+                var lock =
+                    pathRoot.components[LockComponent.self]
+                    ?? LockComponent(isLocked: false)
+                lock.isLocked.toggle()
+                pathRoot.components.set(lock)
+                self.updatePathSelection()
+            }
+        )
 
         // 🗑 Delete
-        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            self.selectedPathClipID = clipID
-            self.deleteSelected()
-        })
+        alert.addAction(
+            UIAlertAction(title: "Delete", style: .destructive) { _ in
+                self.selectedPathClipID = clipID
+                self.deleteSelected()
+            }
+        )
 
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
 
         present(alert, animated: true)
     }
-
-
 
     func showActionMenu(at point: CGPoint) {
         let menu = EntityActionMenu()
@@ -2523,7 +2693,7 @@ class CanvasViewController: UIViewController {
         }
         self.currentActionMenu = menu
     }
-    
+
     func moveLaterPaths(
         after clipIndex: Int,
         entityName: String,
@@ -2549,13 +2719,13 @@ class CanvasViewController: UIViewController {
                 visual.endHandle.position = p.end - p.start
 
                 if let entity =
-                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity
+                {
                     MotionPathRenderer.updatePathMesh(entity: entity, path: p)
                 }
             }
         }
     }
-
 
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
 
@@ -2575,7 +2745,6 @@ class CanvasViewController: UIViewController {
             else {
                 return
             }
-
 
             //  ONLY EDIT SELECTED (RED) PATH
             guard handleData.clipID == selectedPathClipID else {
@@ -2745,7 +2914,6 @@ class CanvasViewController: UIViewController {
                             }
                         }
                     }
-
 
                 default:
                     return
@@ -3399,31 +3567,6 @@ class CanvasViewController: UIViewController {
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
 
-        //undo redo
-        //               NSLayoutConstraint.activate([
-        //                    // Redo Button (Closest to Layers Button)
-        //                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
-        //                    redoBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                    redoBtn.heightAnchor.constraint(equalToConstant: 40),
-        //
-        //                    // Undo Button (To the left of Redo)
-        //                    undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                    undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
-        //                    undoBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
-        //                ])
-        //
-        //        NSLayoutConstraint.activate([
-        //                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                            // Place it to the left of your Undo button
-        //                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-        //                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
-        //                        ])
-
-        //new undo redo ends
-
         // 7. CONSTRAINTS
         NSLayoutConstraint.activate([
 
@@ -3575,8 +3718,8 @@ class CanvasViewController: UIViewController {
             ),
             layersButton.widthAnchor.constraint(equalToConstant: 44),
             layersButton.heightAnchor.constraint(equalToConstant: 44),
-            layersButton.widthAnchor.constraint(equalToConstant: 40),
-            layersButton.heightAnchor.constraint(equalToConstant: 40),
+            layersButton.widthAnchor.constraint(equalToConstant: 44),
+            layersButton.heightAnchor.constraint(equalToConstant: 44),
         ])
 
         let closeBtn = UIButton(type: .system)
@@ -3591,7 +3734,7 @@ class CanvasViewController: UIViewController {
             blue: 22 / 255,
             alpha: 1
         )
-        closeBtn.layer.cornerRadius = 20
+        closeBtn.layer.cornerRadius = 22
         closeBtn.translatesAutoresizingMaskIntoConstraints = false
         closeBtn.addTarget(
             self,
@@ -3606,13 +3749,21 @@ class CanvasViewController: UIViewController {
                 equalTo: sidebarView.trailingAnchor,
                 constant: -16
             ),
-            closeBtn.widthAnchor.constraint(equalToConstant: 40),
+            closeBtn.widthAnchor.constraint(equalToConstant: 44),
             closeBtn.heightAnchor.constraint(equalToConstant: 40),
         ])
 
         // Ensure the sidebar stays on top of the 3D scene
         view.bringSubviewToFront(sidebarView)
         view.bringSubviewToFront(layersButton)
+
+    }
+
+    @objc private func shotBreakdownTapped() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        print("🎬 Shot Breakdown Tapped")
 
     }
 
@@ -3864,7 +4015,6 @@ class EntityActionMenu: UIView {
         }
     }
 
-    
     // MARK: - New Top Bar UI Elements
 
     private let topBarView: UIView = {

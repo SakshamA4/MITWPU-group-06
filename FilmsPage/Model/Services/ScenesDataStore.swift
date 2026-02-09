@@ -12,7 +12,7 @@ class ScenesDataStore {
     static let shared = ScenesDataStore()
     static let scenesUpdatedNotification = Notification.Name("scenesDataStoreUpdated")
     
-    private let isPersistenceEnabled = false
+    private let isPersistenceEnabled = true
     
     private let kRecentScenesKey = "recentScenes"
     
@@ -23,12 +23,17 @@ class ScenesDataStore {
     }
 
     private var recentScenes: [ScenesModel] = []
+    private static let outdoorID = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
+    private static let houseID   = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440001")!
+    private static let scene3ID  = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440002")!
+    private static let scene4ID  = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440003")!
+    
     
     private let templates: [ScenesModel] = [
-        ScenesModel(name: "Outdoor Scene", image: "outdoor"),
-        ScenesModel(name: "House Scene", image: "scene1"),
-        ScenesModel(name: "Scene 3", image: "Image"),
-        ScenesModel(name: "Scene 4", image: "Image")
+        ScenesModel(id: outdoorID,name: "Outdoor Scene", image: "outdoor"),
+        ScenesModel(id: houseID,name: "House Scene", image: "scene1"),
+        ScenesModel(id: scene3ID,name: "Scene 3", image: "Image"),
+        ScenesModel(id: scene4ID,name: "Scene 4", image: "Image")
     ]
     
     //Getters
@@ -37,25 +42,44 @@ class ScenesDataStore {
     }
     
     var currentTemplates: [ScenesModel] {
-        return templates
+        let savedNotes = UserDefaults.standard.dictionary(forKey: kTemplateNotesKey) as? [String: String] ?? [:]
+            
+            return templates.map { template in
+                var t = template
+                // 📍 THE FIX: Attach the saved note to the template model
+                if let note = savedNotes[template.id.uuidString] {
+                    t.notes = note
+                }
+                return t
+            }
     }
 
+    private let kTemplateNotesKey = "templateNotes"
+
+    // 📍 Saves notes for templates by their unique ID without moving them to Recents
+    func saveTemplateNote(id: UUID, notes: String) {
+        var allNotes = UserDefaults.standard.dictionary(forKey: kTemplateNotesKey) as? [String: String] ?? [:]
+        allNotes[id.uuidString] = notes
+        UserDefaults.standard.set(allNotes, forKey: kTemplateNotesKey)
+    }
+    
+    
     func addToRecent(scene: ScenesModel) {
-        // Remove duplicate if exists (move to top)
-        recentScenes.removeAll { $0.id == scene.id }
+        // 1. Template check remains the same
+        let isTemplate = templates.contains { $0.name == scene.name }
+        if isTemplate { return }
+
+        // 📍 THE FIX: Remove by ID AND Name to ensure zero duplication
+        recentScenes.removeAll { $0.id == scene.id || $0.name == scene.name }
         
-        // Insert at the beginning
+        // 2. Insert at index 0 (Top of list)
         recentScenes.insert(scene, at: 0)
 
-        // Limit size (optional, keeps UI clean)
         if recentScenes.count > 10 {
             recentScenes.removeLast()
         }
 
-        if isPersistenceEnabled {
-            saveData()
-        }
-        
+        saveData() // Persist
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
     

@@ -28,10 +28,21 @@ class LibrarySceneCollectionViewCell: UICollectionViewCell {
            gradientLayer.frame = sceneImageView.bounds
        }
        
-       func configure(with item: ScenesModel) {
-           sceneImageView.image = UIImage(named: item.image)
-           titleLabel.text = item.name
-       }
+//       func configure(with item: ScenesModel) {
+//           sceneImageView.image = UIImage(named: item.image)
+//           titleLabel.text = item.name
+//       }
+    func configure(with item: ScenesModel) {
+        
+        if let imageName = item.image {
+            sceneImageView.image = UIImage(named: imageName)
+        } else {
+            // Fallback to a system placeholder if the string is nil
+            sceneImageView.image = UIImage(systemName: "photo.on.rectangle")
+        }
+        
+        titleLabel.text = item.name
+    }
    }
 
    // MARK: - Setup

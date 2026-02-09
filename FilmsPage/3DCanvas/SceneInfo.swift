@@ -39,7 +39,7 @@ class SceneInfoViewController: UIViewController {
             let btn = UIButton(type: .system)
             let config = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
             btn.setImage(UIImage(systemName: "checkmark.circle.fill", withConfiguration: config), for: .normal)
-            btn.tintColor = .systemGreen
+            btn.tintColor = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
             btn.translatesAutoresizingMaskIntoConstraints = false
             btn.addTarget(self, action: #selector(didTapSave), for: .touchUpInside)
             return btn
@@ -89,7 +89,7 @@ class SceneInfoViewController: UIViewController {
         tv.textContainerInset = UIEdgeInsets(top: 15, left: 12, bottom: 15, right: 12)
         tv.translatesAutoresizingMaskIntoConstraints = false
         
-        // 📍 THE FIX: Set the delegate to handle focus changes
+      
         tv.delegate = self
         return tv
     }()
@@ -97,6 +97,9 @@ class SceneInfoViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        if let image = sceneImage {
+                thumbnailImageView.image = image
+            }
         setupLayout()
         configureDataLabels()
         setupCancelGesture()

@@ -15,7 +15,7 @@ class ToolCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        contentView.backgroundColor = .secondarySystemBackground
+        contentView.backgroundColor = UIColor(red: 20/255,green: 20/255,blue: 30/255,alpha: 1)
         contentView.layer.cornerRadius = 14
         contentView.clipsToBounds = true
 
@@ -28,7 +28,7 @@ class ToolCell: UICollectionViewCell {
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 20, weight: .medium)
         label.numberOfLines = 1
-        label.textColor = .label
+        label.textColor = .white
 
         imageView.translatesAutoresizingMaskIntoConstraints = false
         label.translatesAutoresizingMaskIntoConstraints = false
