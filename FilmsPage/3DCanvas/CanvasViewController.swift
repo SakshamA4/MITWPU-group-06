@@ -120,20 +120,23 @@ struct AnimationClip: Identifiable, Codable {
 struct MotionPathVisual {
 
     let root: Entity
-    let startHandle: ModelEntity
+    let startHandle: ModelEntity?
     let control1Handle: ModelEntity
     let control2Handle: ModelEntity
     let endHandle: ModelEntity
 
     func update(path: BezierMotionPath) {
 
-        startHandle.position = path.start
-        control1Handle.position = path.control1
-        control2Handle.position = path.control2
-        endHandle.position = path.end
-    }
+        // ✅ Start handle may not exist
+        startHandle?.position = .zero
 
+        // ✅ All handles are LOCAL to path.start
+        control1Handle.position = path.control1 - path.start
+        control2Handle.position = path.control2 - path.start
+        endHandle.position = path.end - path.start
+    }
 }
+
 
 struct Timeline {
     var clips: [AnimationClip] = []
@@ -547,10 +550,22 @@ class CanvasViewController: UIViewController {
                     .findEntity(named: "MotionPath") as? ModelEntity
             else { continue }
 
-            let color: UIColor =
-                (clipID == selectedPathClipID)
-                ? .systemRed
-                : .systemBlue
+            // 🔒 Lock state lives on the PATH ROOT
+            let isLocked =
+                visual.root.components[LockComponent.self]?.isLocked ?? false
+
+            // 🎯 Color priority:
+            // 1. Locked  → Gray
+            // 2. Selected → Red
+            // 3. Default → Blue
+            let color: UIColor
+            if isLocked {
+                color = .systemGray
+            } else if clipID == selectedPathClipID {
+                color = .systemRed
+            } else {
+                color = .systemBlue
+            }
 
             MotionPathRenderer.setPathColor(
                 entity: pathEntity,
@@ -558,6 +573,50 @@ class CanvasViewController: UIViewController {
             )
         }
     }
+
+    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
+
+        // Only position tracks with motion paths matter
+        guard clip.track == .position, clip.motionPath != nil else {
+            return false
+        }
+
+        // Find the immediately previous motion path for this entity
+        let previous = timeline.clips
+            .filter {
+                $0.entityName == clip.entityName &&
+                $0.motionPath != nil &&
+                $0.startTime + $0.duration <= clip.startTime
+            }
+            .sorted { $0.startTime < $1.startTime }
+            .last
+
+        // No previous path → this is the first → show start handle
+        guard let prev = previous else {
+            return true
+        }
+
+        // If there is a TIME GAP → show start handle
+        let prevEndTime = prev.startTime + prev.duration
+        let gap = clip.startTime - prevEndTime
+
+        return gap > 0.0001
+    }
+
+    func previousPathClip(
+        for clip: AnimationClip
+    ) -> AnimationClip? {
+        timeline.clips
+            .filter {
+                $0.entityName == clip.entityName &&
+                $0.motionPath != nil &&
+                $0.startTime + $0.duration <= clip.startTime
+            }
+            .sorted { $0.startTime < $1.startTime }
+            .last
+    }
+
+
 
     @objc func playTimeline() {
 
@@ -606,6 +665,7 @@ class CanvasViewController: UIViewController {
         startPlayback()
     }
 
+    
     @objc func pauseTimeline() {
         guard playbackState == .playing else { return }
 
@@ -852,67 +912,88 @@ class CanvasViewController: UIViewController {
 
         guard let path = clip.motionPath else { return }
 
-        // remove previous
+        // Remove existing visual if any
         activeMotionPaths[clip.id]?.root.removeFromParent()
 
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else {
             return
         }
 
+        // Root for this path
         let pathRoot = Entity()
         pathRoot.name = "PathRoot_\(clip.id)"
-
         pathRoot.position = path.start
+        pathRoot.components.set(LockComponent(isLocked: false))
 
-        let start = makePathHandle(color: .gray, name: "path.start")
-        let c1 = makePathHandle(color: .orange, name: "path.c1")
-        let c2 = makePathHandle(color: .orange, name: "path.c2")
-        let end = makePathHandle(color: .systemBlue, name: "path.end")
+        // ─────────────────────────────────────
+        // 1️⃣ Decide if START HANDLE should exist
+        // ─────────────────────────────────────
+        let showStartHandle = shouldShowStartHandle(for: clip)
 
-        start.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        c1.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        c2.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        end.components.set(
-            MotionPathHandleComponent(clipID: clip.id)
-        )
-
-        start.position = .zero
-        c1.position = path.control1 - path.start
-        c2.position = path.control2 - path.start
-        end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
-
+        // ─────────────────────────────────────
+        // 2️⃣ Create curve mesh
+        // ─────────────────────────────────────
         let curve = MotionPathRenderer.makePathEntity(path: path)
         curve.name = "MotionPath"
-
         curve.position = .zero
         curve.orientation = simd_quatf()
         curve.scale = .one
 
         pathRoot.addChild(curve)
-        pathRoot.addChild(start)
+
+        // ─────────────────────────────────────
+        // 3️⃣ Create handles (conditionally)
+        // ─────────────────────────────────────
+        var startHandle: ModelEntity? = nil
+
+        if showStartHandle {
+            let start = makePathHandle(color: .gray, name: "path.start")
+            start.components.set(
+                MotionPathHandleComponent(clipID: clip.id)
+            )
+            start.position = .zero
+            pathRoot.addChild(start)
+            startHandle = start
+        }
+
+        let c1 = makePathHandle(color: .orange, name: "path.c1")
+        c1.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        c1.position = path.control1 - path.start
         pathRoot.addChild(c1)
+
+        let c2 = makePathHandle(color: .orange, name: "path.c2")
+        c2.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        c2.position = path.control2 - path.start
         pathRoot.addChild(c2)
+
+        let end = makePathHandle(color: .systemBlue, name: "path.end")
+        end.components.set(
+            MotionPathHandleComponent(clipID: clip.id)
+        )
+        end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
         pathRoot.addChild(end)
 
+        // ─────────────────────────────────────
+        // 4️⃣ Add to scene
+        // ─────────────────────────────────────
         anchor.addChild(pathRoot)
 
+        // ─────────────────────────────────────
+        // 5️⃣ Store visual (start may be nil)
+        // ─────────────────────────────────────
         activeMotionPaths[clip.id] = MotionPathVisual(
             root: pathRoot,
-            startHandle: start,
+            startHandle: startHandle,
             control1Handle: c1,
             control2Handle: c2,
             endHandle: end
         )
     }
+
 
     // MARK: - Motion Path Handle Ownership
 
@@ -1158,22 +1239,29 @@ class CanvasViewController: UIViewController {
 
         for entityName in entities {
 
+            guard let entity = arView.scene.findEntity(named: entityName) else {
+                continue
+            }
+
+            // 🔥 REBASE BASE TRANSFORM TO CURRENT WORLD STATE
+            baseTransforms[entityName] = entity.transform
+
             let lastTime =
                 timeline.clips
-                .filter { $0.entityName == entityName }
-                .map { $0.startTime + $0.duration }
-                .max() ?? 0
+                    .filter { $0.entityName == entityName }
+                    .map { $0.startTime + $0.duration }
+                    .max() ?? 0
 
-            let transform = evaluateEntityTransform(
+            let finalTransform = evaluateEntityTransform(
                 entityName: entityName,
                 at: lastTime
             )
 
-            if let entity = arView.scene.findEntity(named: entityName) {
-                entity.transform = transform
-            }
+            entity.transform = finalTransform
         }
     }
+
+
 
     func handleAnimationPromptConfirm(
         type: AnimationType,
@@ -1894,6 +1982,101 @@ class CanvasViewController: UIViewController {
         }
     }
 
+    var pathEditToolbar: UIView?
+
+    func showPathEditToolbar(for clipID: UUID, at screenPoint: CGPoint) {
+
+        // Remove any existing toolbar
+        pathEditToolbar?.removeFromSuperview()
+
+        guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }) else {
+            return
+        }
+
+        let clip = timeline.clips[clipIndex]
+
+        // Container
+        let container = UIView()
+        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        container.layer.cornerRadius = 14
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.25
+        container.layer.shadowRadius = 8
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        // Start time field
+        let startField = UITextField()
+        startField.borderStyle = .roundedRect
+        startField.keyboardType = .decimalPad
+        startField.placeholder = "Start Time"
+        startField.text = String(format: "%.2f", clip.startTime)
+
+        // Duration field
+        let durationField = UITextField()
+        durationField.borderStyle = .roundedRect
+        durationField.keyboardType = .decimalPad
+        durationField.placeholder = "Duration"
+        durationField.text = String(format: "%.2f", clip.duration)
+
+        // Apply button
+        let applyButton = UIButton(type: .system)
+        applyButton.setTitle("Apply", for: .normal)
+        applyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+
+        // Stack
+        let stack = UIStackView(arrangedSubviews: [
+            startField,
+            durationField,
+            applyButton
+        ])
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(stack)
+        view.addSubview(container)
+
+        // Layout
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+
+            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
+            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
+            container.widthAnchor.constraint(equalToConstant: 220)
+        ])
+
+        // ✅ APPLY CHANGES (UIKit-native, no Obj-C runtime)
+        applyButton.addAction(UIAction { [weak self] _ in
+            guard
+                let self,
+                let newStart = Float(startField.text ?? ""),
+                let newDuration = Float(durationField.text ?? ""),
+                newDuration > 0
+            else { return }
+
+            let oldClip = self.timeline.clips[clipIndex]
+
+            self.timeline.clips[clipIndex] = AnimationClip(
+                entityName: oldClip.entityName,
+                type: oldClip.type,
+                track: oldClip.track,
+                easing: oldClip.easing,
+                startTime: newStart,
+                duration: newDuration,
+                fromValue: oldClip.fromValue,
+                toValue: oldClip.toValue,
+                motionPath: oldClip.motionPath
+            )
+
+            self.updateEntityFinalTransforms()
+        }, for: .touchUpInside)
+
+        pathEditToolbar = container
+    }
+
     private func createHierarchyItemRow(title: String) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
@@ -2015,53 +2198,37 @@ class CanvasViewController: UIViewController {
     }
 
     @objc func deleteSelected() {
-        if let camera = selectedEntity?
-            .children
-            .compactMap({ $0 as? PerspectiveCamera })
-            .first
-        {
-
-            sceneCameras.removeAll { $0 == camera }
-            cameraToVisualMap[camera] = nil
-
-            if activeCamera === camera {
-                activateEditorCamera()
-            }
-        }
-
-        selectedEntity?.removeFromParent()
-        selectedEntity = nil
 
         // ───────────────────────────────
-        // 1️⃣ DELETE MOTION PATH (if selected)
+        // 1️⃣ DELETE MOTION PATH ONLY
         // ───────────────────────────────
         if let clipID = selectedPathClipID {
 
-            // find the clip before deleting
-            guard let clip = timeline.clips.first(where: { $0.id == clipID })
-            else {
+            guard let clipIndex = timeline.clips.firstIndex(
+                where: { $0.id == clipID }
+            ) else {
+                selectedPathClipID = nil
                 return
             }
 
-            let entityName = clip.entityName
-
-            // remove visuals
+            // Remove path visuals
             activeMotionPaths[clipID]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clipID)
 
-            // remove clip
-            timeline.clips.removeAll { $0.id == clipID }
+            // Remove ONLY this clip
+            timeline.clips.remove(at: clipIndex)
 
-            // 🔥 FREEZE CURRENT WORLD POSITION AS NEW BASE
-            if let entity = arView.scene.findEntity(named: entityName) {
-                baseTransforms[entityName] = entity.transform
-            }
-
+            // Clear selection
             selectedPathClipID = nil
 
-            // re-evaluate remaining clips safely
-            updateEntityFinalTransforms()
+            // ❗ IMPORTANT
+            // DO NOT:
+            // - evaluate timeline
+            // - touch entity transform
+            // - touch baseTransforms
+            // The entity must stay exactly where it is
 
+            refreshSidebarContent()
             return
         }
 
@@ -2072,26 +2239,28 @@ class CanvasViewController: UIViewController {
 
         let entityName = entity.name
 
-        // remove motion paths
+        // Remove all motion path visuals
         for clip in timeline.clips where clip.entityName == entityName {
             activeMotionPaths[clip.id]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clip.id)
         }
 
-        // remove clips
-        timeline.clips.removeAll {
-            $0.entityName == entityName
-        }
+        // Remove all clips for this entity
+        timeline.clips.removeAll { $0.entityName == entityName }
 
-        // remove entity itself
+        // Remove base transform
+        baseTransforms.removeValue(forKey: entityName)
+
+        // Remove entity itself
         entity.removeFromParent()
         selectedEntity = nil
 
-        // recompute all remaining entities
         updateEntityFinalTransforms()
-
         refreshSidebarContent()
     }
+
+
+
 
     //Gestures
     func setupGestures() {
@@ -2108,17 +2277,28 @@ class CanvasViewController: UIViewController {
         )
         arView.addGestureRecognizer(pan)
 
+        // ✅ NEW: Long press for path context menu
+        let longPress = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handlePathLongPress(_:))
+        )
+        longPress.minimumPressDuration = 0.45
+        longPress.cancelsTouchesInView = false
+        arView.addGestureRecognizer(longPress)
+
         let pinch = UIPinchGestureRecognizer(
             target: self,
             action: #selector(handlePinch(_:))
         )
         arView.addGestureRecognizer(pinch)
 
-        _ = UIRotationGestureRecognizer(
+        let rotation = UIRotationGestureRecognizer(
             target: self,
             action: #selector(handleRotation(_:))
         )
+        arView.addGestureRecognizer(rotation)
     }
+
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard let entity = selectedEntity else { return }
@@ -2163,16 +2343,60 @@ class CanvasViewController: UIViewController {
         }
     }
 
+    @objc private func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+
+        let location = gesture.location(in: arView)
+
+        guard let hit = arView.entity(at: location) else { return }
+
+        // Case 1: Long-press on a path HANDLE
+        if let handle = hit.components[MotionPathHandleComponent.self],
+           let pathRoot = hit.parent
+        {
+            showPathContextMenu(
+                clipID: handle.clipID,
+                pathRoot: pathRoot
+            )
+            return
+        }
+
+        // Case 2: Long-press on the PATH CURVE itself
+        if hit.name == "MotionPath",
+           let pathRoot = hit.parent,
+           let handle = pathRoot
+                .children
+                .compactMap({ $0.components[MotionPathHandleComponent.self] })
+                .first
+        {
+            showPathContextMenu(
+                clipID: handle.clipID,
+                pathRoot: pathRoot
+            )
+            return
+        }
+    }
+
+
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
 
         let location = gesture.location(in: arView)
+        pathEditToolbar?.removeFromSuperview()
+        pathEditToolbar = nil
+
+        // ─────────────────────────────
+        // 1️⃣ MOTION PATH SELECTION
+        // ─────────────────────────────
         if let hit = arView.entity(at: location),
-            let handle = hit.components[MotionPathHandleComponent.self]
-        {
+           let handle = hit.components[MotionPathHandleComponent.self] {
 
             selectedPathClipID = handle.clipID
             updatePathSelection()
+
+            // ⛔ IMPORTANT: stop here
+            return
         }
+
 
         currentActionMenu?.removeFromSuperview()
         currentActionMenu = nil
@@ -2206,6 +2430,55 @@ class CanvasViewController: UIViewController {
         }
 
     }
+    
+    func showPathContextMenu(
+        clipID: UUID,
+        pathRoot: Entity
+    ) {
+        let alert = UIAlertController(
+            title: "Animation Path",
+            message: nil,
+            preferredStyle: .actionSheet
+        )
+
+        // ⏱ Edit Timing
+        alert.addAction(UIAlertAction(title: "Edit Timing", style: .default) { _ in
+            self.selectedPathClipID = clipID
+            self.updatePathSelection()
+
+            if let screenPos = self.arView.project(
+                pathRoot.position(relativeTo: nil)
+            ) {
+                self.showPathEditToolbar(for: clipID, at: screenPos)
+            }
+        })
+
+        // 🔒 Lock / Unlock
+        let isLocked =
+            pathRoot.components[LockComponent.self]?.isLocked ?? false
+        let lockTitle = isLocked ? "Unlock Path" : "Lock Path"
+
+        alert.addAction(UIAlertAction(title: lockTitle, style: .default) { _ in
+            var lock =
+                pathRoot.components[LockComponent.self]
+                ?? LockComponent(isLocked: false)
+            lock.isLocked.toggle()
+            pathRoot.components.set(lock)
+            self.updatePathSelection()
+        })
+
+        // 🗑 Delete
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
+            self.selectedPathClipID = clipID
+            self.deleteSelected()
+        })
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        present(alert, animated: true)
+    }
+
+
 
     func showActionMenu(at point: CGPoint) {
         let menu = EntityActionMenu()
@@ -2250,16 +2523,59 @@ class CanvasViewController: UIViewController {
         }
         self.currentActionMenu = menu
     }
+    
+    func moveLaterPaths(
+        after clipIndex: Int,
+        entityName: String,
+        delta: SIMD3<Float>
+    ) {
+        for i in timeline.clips.indices {
+            guard i > clipIndex else { continue }
+            guard timeline.clips[i].entityName == entityName else { continue }
+            guard var p = timeline.clips[i].motionPath else { continue }
+
+            p.start += delta
+            p.end += delta
+            p.control1 += delta
+            p.control2 += delta
+            p.rebuildArcLengthTable()
+            timeline.clips[i].motionPath = p
+
+            if let visual = activeMotionPaths[timeline.clips[i].id] {
+                visual.root.position = p.start
+                visual.startHandle?.position = .zero
+                visual.control1Handle.position = p.control1 - p.start
+                visual.control2Handle.position = p.control2 - p.start
+                visual.endHandle.position = p.end - p.start
+
+                if let entity =
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                    MotionPathRenderer.updatePathMesh(entity: entity, path: p)
+                }
+            }
+        }
+    }
+
 
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
 
         let location = gesture.location(in: arView)
 
         //  STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
+
         if let hit = arView.entity(at: location),
             hit.name.hasPrefix("path."),
             let handleData = hit.components[MotionPathHandleComponent.self]
         {
+            // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+            guard
+                let pathRoot = hit.parent,
+                let lock = pathRoot.components[LockComponent.self],
+                lock.isLocked == false
+            else {
+                return
+            }
+
 
             //  ONLY EDIT SELECTED (RED) PATH
             guard handleData.clipID == selectedPathClipID else {
@@ -2345,10 +2661,43 @@ class CanvasViewController: UIViewController {
 
                 case "path.end":
 
-                    // Move end of THIS path
+                    // ───────────────────────────────
+                    // KEYNOTE-STYLE END HANDLE DRAG
+                    // Preserves curvature by
+                    // scaling + rotating control points
+                    // ───────────────────────────────
+
+                    let oldStart = path.start
+                    let oldEnd = path.end
+
+                    let oldDir = oldEnd - oldStart
+                    let oldLength = simd_length(oldDir)
+                    guard oldLength > 0.0001 else { return }
+
+                    let oldDirNorm = simd_normalize(oldDir)
+
+                    // Control points relative to start
+                    let c1Rel = path.control1 - oldStart
+                    let c2Rel = path.control2 - oldStart
+
+                    // Move end by drag delta
                     path.end += delta
 
-                    // 🔗 LIVE-UPDATE NEXT PATH IF IT EXISTS
+                    let newEnd = path.end
+                    let newDir = newEnd - oldStart
+                    let newLength = simd_length(newDir)
+                    guard newLength > 0.0001 else { return }
+
+                    let newDirNorm = simd_normalize(newDir)
+
+                    // Scale + rotate to preserve curvature
+                    let scale = newLength / oldLength
+                    let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
+
+                    path.control1 = oldStart + rotation.act(c1Rel * scale)
+                    path.control2 = oldStart + rotation.act(c2Rel * scale)
+
+                    // 🔗 KEEP NEXT PATH CONTINUOUS
                     let thisClip = timeline.clips[clipIndex]
 
                     if let nextIndex = timeline.clips
@@ -2362,21 +2711,21 @@ class CanvasViewController: UIViewController {
                     {
                         var nextPath = timeline.clips[nextIndex].motionPath!
 
-                        // Move entire next path forward by same delta
-                        nextPath.start += delta
-                        nextPath.control1 += delta
-                        nextPath.control2 += delta
-                        nextPath.end += delta
+                        let nextDelta = path.end - nextPath.start
+
+                        nextPath.start += nextDelta
+                        nextPath.end += nextDelta
+                        nextPath.control1 += nextDelta
+                        nextPath.control2 += nextDelta
 
                         nextPath.rebuildArcLengthTable()
                         timeline.clips[nextIndex].motionPath = nextPath
 
-                        // Update visuals LIVE
                         if let nextVisual = activeMotionPaths[
                             timeline.clips[nextIndex].id
                         ] {
                             nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle.position = .zero
+                            nextVisual.startHandle?.position = SIMD3<Float>.zero
                             nextVisual.control1Handle.position =
                                 nextPath.control1 - nextPath.start
                             nextVisual.control2Handle.position =
@@ -2397,6 +2746,7 @@ class CanvasViewController: UIViewController {
                         }
                     }
 
+
                 default:
                     return
                 }
@@ -2405,7 +2755,7 @@ class CanvasViewController: UIViewController {
                 visual.root.position = path.start
 
                 // handles in LOCAL SPACE
-                visual.startHandle.position = .zero
+                visual.startHandle?.position = SIMD3<Float>.zero
                 visual.control1Handle.position = path.control1 - path.start
                 visual.control2Handle.position = path.control2 - path.start
                 visual.endHandle.position = path.end - path.start
@@ -2454,7 +2804,7 @@ class CanvasViewController: UIViewController {
                             timeline.clips[nextIndex].id
                         ] {
                             nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle.position = .zero
+                            nextVisual.startHandle?.position = SIMD3<Float>.zero
                             nextVisual.control1Handle.position =
                                 nextPath.control1 - nextPath.start
                             nextVisual.control2Handle.position =
@@ -3514,6 +3864,7 @@ class EntityActionMenu: UIView {
         }
     }
 
+    
     // MARK: - New Top Bar UI Elements
 
     private let topBarView: UIView = {
