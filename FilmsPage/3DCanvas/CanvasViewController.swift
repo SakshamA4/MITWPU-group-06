@@ -1195,10 +1195,13 @@ class CanvasViewController: UIViewController {
                         self?.applyBackgroundImage(pickedImage)
                     }
                 }
-        self.sceneNameLabel.text = self.sceneName.uppercased()
+        self.sceneNameLabel.text = self.sceneName
     }
     
     private func setupNavigationBar() {
+        
+        self.navigationItem.title = self.sceneName
+        
         // 1. Back Button Logic
 
         // This creates a custom back button that pops the view controller
@@ -1250,9 +1253,21 @@ class CanvasViewController: UIViewController {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor.white,
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+            ]
+            
+        appearance.titleTextAttributes = titleAttributes // 📍 Apply here
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .systemBlue
+        appearance.titleTextAttributes = [
+                .foregroundColor: UIColor.white,
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+            ]
+        
     }
     
     @objc func moreTapped() {
@@ -1275,7 +1290,7 @@ class CanvasViewController: UIViewController {
             self.sceneNotes = newNotes
             self.lastEditedDate = Date()
             self.sceneNameLabel.text = newName.uppercased()
-            
+            self.navigationItem.title = newName
             // 2. 📍 SAVE TO DATABASE: This now works because 'notes' is in ScenesModel
             if var sceneToUpdate = self.currentSceneObject {
                 sceneToUpdate.name = newName
