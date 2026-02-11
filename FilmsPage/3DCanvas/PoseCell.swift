@@ -95,13 +95,13 @@ class PoseCell: UICollectionViewCell {
     func configure(image: UIImage?, title: String) {
         imageView.image = image
         titleLabel.text = title
-    }
+        }
     
     override var isSelected: Bool {
         didSet {
             checkmarkIcon.isHidden = !isSelected
-            contentView.layer.borderColor = isSelected ? UIColor.systemBlue.cgColor : UIColor.systemGray4.cgColor
-            contentView.layer.borderWidth = isSelected ? 2 : 1
+            contentView.layer.borderColor = isSelected ? UIColor.systemBlue.cgColor : UIColor.systemGray2.cgColor
+            contentView.layer.borderWidth = isSelected ? 2 : 0.5
         }
     }
 }

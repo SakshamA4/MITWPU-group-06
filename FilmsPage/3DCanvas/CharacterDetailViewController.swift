@@ -62,7 +62,7 @@ class CharacterDetailViewController: UIViewController {
     
     private lazy var characterImageView: UIImageView = {
         let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
+        iv.contentMode = .scaleAspectFill
         iv.image = UIImage(named: item.imageName ?? "")
         iv.backgroundColor = .systemBackground // White bg for image
         iv.layer.cornerRadius = 16
@@ -275,11 +275,11 @@ class CharacterDetailViewController: UIViewController {
             sliderFullStack.centerYAnchor.constraint(equalTo: sliderContainer.centerYAnchor),
             
             // Poses Header
-            posesTitleLabel.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 30),
+            posesTitleLabel.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 26),
             posesTitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             
             // Poses Collection
-            posesCollectionView.topAnchor.constraint(equalTo: posesTitleLabel.bottomAnchor, constant: 16),
+            posesCollectionView.topAnchor.constraint(equalTo: posesTitleLabel.bottomAnchor, constant: 12),
             posesCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             posesCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             posesCollectionView.heightAnchor.constraint(equalToConstant: 160)
@@ -358,6 +358,7 @@ extension CharacterDetailViewController: UICollectionViewDataSource, UICollectio
         // 3. Update the preview image on the left side of the container
         if let poseImage = UIImage(named: selectedPose.imageName) {
             characterImageView.image = poseImage
+            
         }
          print("Pose selection updated to: \(selectedPose.modelFileName). Press 'Add' to confirm.")
     }

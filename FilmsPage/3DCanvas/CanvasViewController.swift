@@ -324,6 +324,7 @@ class CanvasViewController: UIViewController {
 
         // Save current state to redo before going back
         redoStack.append(createCurrentSnapshot())
+        applySnapshot(previousState)
         refreshSidebarContent()
     }
 
@@ -417,16 +418,92 @@ class CanvasViewController: UIViewController {
         )
     }
 
-    // 5. The Application Function (Receives the Struct)
+//    // 5. The Application Function (Receives the Struct)
+//    private func applySnapshot(_ snapshot: SceneSnapshot) {
+//        // Unwrap the dictionary from the snapshot struct
+//        for (name, transform) in snapshot.entityTransforms {
+//            if let entity = arView.scene.findEntity(named: name) {
+//                entity.transform = transform
+//            }
+//        }
+//    }
     private func applySnapshot(_ snapshot: SceneSnapshot) {
-        // Unwrap the dictionary from the snapshot struct
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        let currentEntities = anchor.children
+        
+        // 1. REMOVE: If an entity is in the scene but NOT in the snapshot (Rollback addition)
+        for entity in currentEntities {
+            if entity.name == "Grid" || entity.name == "EditorCamera" { continue }
+            if snapshot.entityTransforms[entity.name] == nil {
+                entity.removeFromParent()
+            }
+        }
+        
+        // 2. RESTORE/UPDATE: If an entity is in the snapshot
         for (name, transform) in snapshot.entityTransforms {
             if let entity = arView.scene.findEntity(named: name) {
+                // Case A: Entity exists, just update its transform
                 entity.transform = transform
+            } else {
+                // Case B: Entity is MISSING from scene but present in snapshot (Redo addition)
+                // 📍 THE FIX: Re-spawn the item using its stored name
+                self.restoreEntity(named: name, with: transform)
+            }
+        }
+        
+        refreshSidebarContent()
+    }
+    
+    private func restoreEntity(named name: String, with transform: Transform) {
+        // 1. Detect category for all toolbar items based on your naming conventions
+        let toolType: ToolType
+        if name.contains("SceneCamera") {
+            toolType = .camera
+        } else if name.contains("Wall") || name.contains("Ground") {
+            toolType = .wall
+        } else if name.contains("Background") {
+            toolType = .background
+        } else if name.contains("Spotlight") || name.contains("LED") || name.contains("Lantern") {
+            toolType = .light
+        } else if name.contains("Woman") || name.contains("Man") {
+            toolType = .character
+        } else {
+            toolType = .prop
+        }
+        
+        // 2. Prepare the SpawnItem with all required compiler arguments
+        let item = SpawnItem(
+            title: name,
+            imageName: "Image",
+            modelFileName: name,
+            isBackground: name.contains("Background")
+        )
+        
+        Task {
+            // 3. Re-spawn using your master logic
+            // 📍 IMPORTANT: We pass 'isRestoring: true' so it doesn't create a new Undo point
+            await spawnEntity(
+                item: item,
+                toolType: toolType,
+                customName: name,
+                isRestoring: true
+            )
+            
+            // 4. 📍 THE FIX: Use a slight delay to ensure RealityKit has finished
+            // adding the entity to the anchor before applying the transform
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self = self else { return }
+                if let reSpawned = self.arView.scene.findEntity(named: name) {
+                    reSpawned.transform = transform
+                    print("✅ Redo Success: Restored \(name) to previous transform")
+                }
+                
+                // 5. Update Sidebar UI to show the restored item
+                self.refreshSidebarContent()
             }
         }
     }
-
+    
     func createCurrentSnapshot() -> SceneSnapshot {
         var snapshotDict: [String: Transform] = [:]
         let allEntities = arView.scene.anchors.flatMap { $0.children }
@@ -1639,32 +1716,141 @@ class CanvasViewController: UIViewController {
 
     }
 
+//    func spawnEntity(
+//        item: SpawnItem,
+//        toolType: ToolType,
+//        customName: String? = nil,
+//        scale: Float = 1.0
+//    ) {
+//        saveCurrentStateToUndo()
+//
+//        Task {
+//            do {
+//                // 1. Initial Checks for Special Types
+//
+//                // Camera
+//                if item.modelFileName == "cam1" {
+//                    spawnSceneCamera()
+//                    return
+//                }
+//                // Walls/Ground
+//                if item.modelFileName == "cube" {
+//                    spawnWall()
+//                    return
+//                }
+//                if item.modelFileName == "ground" {
+//                    spawnGround()
+//                    return
+//                }
+//                if item.isBackground {
+//                    spawnBackgroundPlane(item)
+//                    return
+//                }
+//
+//                // 2. Load the 3D Model (Character/Prop/Light)
+//                // If code reaches here, it assumes a valid .usdz file exists
+//                let entity = try await Entity(named: item.modelFileName)
+//
+//                // --- (Keep your existing Normalization, Scale, and Position logic here) ---
+//                // 📍 STEP A: NORMALIZE
+//                let bounds = entity.visualBounds(relativeTo: nil)
+//                let maxDim = max(
+//                    bounds.extents.x,
+//                    max(bounds.extents.y, bounds.extents.z)
+//                )
+//                if maxDim > 0.0001 {
+//                    let normalizationFactor = 1.0 / maxDim
+//                    entity.scale = SIMD3(repeating: normalizationFactor)
+//                }
+//
+//                // 📍 STEP B: APPLY SCALES
+//                var verticalOffset: Float = 0.0
+//                // ... (Your existing specific prop scaling logic) ...
+//                if item.modelFileName == "Spotlight" {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                    verticalOffset = 0.25
+//                } else if item.modelFileName.contains("LED") {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                } else if item.modelFileName.contains("Lantern") {
+//                    entity.scale = SIMD3(repeating: 0.0025)
+//                    verticalOffset = 0.25
+//                } else if item.modelFileName.contains("Plant") {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                } else {
+//                    entity.scale = SIMD3<Float>(repeating: scale)
+//                }
+//
+//                // 📍 STEP C: APPLY POSITION
+//                let randomX = Float.random(in: -1...1)
+//                let randomZ = Float.random(in: -1...1)
+//                let finalBounds = entity.visualBounds(relativeTo: nil)
+//                let liftToGround = -finalBounds.min.y
+//                let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
+//
+//                entity.name = customName ?? item.modelFileName
+//                entity.position = [randomX, finalY, randomZ]
+//
+//                // 3. Components & Light Attachment
+//                entity.components.set(CategoryComponent(toolType: toolType))
+//                entity.generateCollisionShapes(recursive: true)
+//                entity.components.set(InputTargetComponent())
+//
+//                // ... (Your light attachment logic) ...
+//                if item.title.lowercased() == "light"
+//                    || item.modelFileName == "Spotlight"
+//                {
+//                    addRealLightToModel(entity)
+//                } else if item.title.lowercased() == "light"
+//                    || item.modelFileName == "LED Panel"
+//                {
+//                    addLEDPanel(to: entity)
+//                } else if item.title.lowercased() == "lantern"
+//                    || item.modelFileName == "Lantern"
+//                {
+//                    addLantern(to: entity)
+//                }
+//
+//                // 4. Add to Scene
+//                if let anchor = arView.scene.findEntity(named: "MainAnchor") {
+//                    anchor.addChild(entity)
+//                    self.refreshSidebarContent()
+//                }
+//            } catch {
+//                print("Failed to load \(item.modelFileName): \(error)")
+//            }
+//        }
+//    }
+    
     func spawnEntity(
         item: SpawnItem,
         toolType: ToolType,
         customName: String? = nil,
-        scale: Float = 1.0
+        scale: Float = 1.0,
+        isRestoring: Bool = false
     ) {
-        saveCurrentStateToUndo()
+        if !isRestoring {
+                saveCurrentStateToUndo()
+            }
 
         Task {
             do {
                 // 1. Initial Checks for Special Types
 
                 // Camera
-                if item.modelFileName == "cam1" {
-                    spawnSceneCamera()
-                    return
-                }
-                // Walls/Ground
-                if item.modelFileName == "cube" {
-                    spawnWall()
-                    return
-                }
-                if item.modelFileName == "ground" {
-                    spawnGround()
-                    return
-                }
+                let checkName = (customName ?? item.modelFileName).lowercased()
+                            
+                            if checkName.contains("ground") {
+                                spawnGround() // Triggers your procedural generator
+                                return
+                            }
+                            if checkName.contains("wall") || item.modelFileName == "cube" {
+                                spawnWall() // Triggers your procedural generator
+                                return
+                            }
+                            if checkName.contains("scenecamera") || item.modelFileName == "cam1" {
+                                spawnSceneCamera() // Triggers your camera logic
+                                return
+                            }
                 if item.isBackground {
                     spawnBackgroundPlane(item)
                     return
@@ -3230,6 +3416,9 @@ class CanvasViewController: UIViewController {
     }
 
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        if gesture.state == .began {
+                saveCurrentStateToUndo()
+            }
         guard editorMode == .edit else { return }
 
         guard let entity = selectedEntity else {
@@ -3534,33 +3723,6 @@ class CanvasViewController: UIViewController {
             for: .touchUpInside
         )
 
-        //                let undoBtn = UIButton(type: .system)
-        //                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
-        //                undoBtn.tintColor = .white
-        //                undoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                undoBtn.layer.cornerRadius = 20
-        //                undoBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                undoBtn.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
-        //
-        //                let redoBtn = UIButton(type: .system)
-        //                redoBtn.setImage(UIImage(systemName: "arrow.uturn.forward"), for: .normal)
-        //                redoBtn.tintColor = .white
-        //                redoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                redoBtn.layer.cornerRadius = 20
-        //                redoBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
-        //
-        //                let exportBtn = UIButton(type: .system)
-        //                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        //                exportBtn.tintColor = .white
-        //                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                exportBtn.layer.cornerRadius = 20
-        //                exportBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                exportBtn.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
-        //
-        //                view.addSubview(exportBtn)
-        //                view.addSubview(undoBtn)
-        //                view.addSubview(redoBtn)
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
@@ -3852,7 +4014,8 @@ class CanvasViewController: UIViewController {
 
         return container
     }
-}
+    
+}//canvas VC ends
 
 extension CanvasViewController: UICollectionViewDataSource,
     UICollectionViewDelegate

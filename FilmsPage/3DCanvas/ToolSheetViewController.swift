@@ -48,7 +48,7 @@ class ToolSheetViewController: UIViewController {
         titleLabel.font = .systemFont(ofSize: 24, weight: .bold)
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-
+        titleLabel.textColor = .white
         view.addSubview(titleLabel)
 
         NSLayoutConstraint.activate([
