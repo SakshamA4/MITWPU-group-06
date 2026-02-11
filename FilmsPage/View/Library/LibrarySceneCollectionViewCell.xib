@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
-    <device id="ipad10_9rounded" orientation="portrait" layout="fullscreen" appearance="light"/>
+    <device id="ipad10_9rounded" orientation="portrait" layout="splitview2_3" appearance="light"/>
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
@@ -20,9 +20,9 @@
                         <rect key="frame" x="0.0" y="0.0" width="229" height="220"/>
                     </imageView>
                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Y8g-h8-47n">
-                        <rect key="frame" x="0.0" y="199.5" width="229" height="20.5"/>
-                        <fontDescription key="fontDescription" type="system" pointSize="17"/>
-                        <color key="textColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                        <rect key="frame" x="0.0" y="181" width="229" height="24"/>
+                        <fontDescription key="fontDescription" type="system" pointSize="20"/>
+                        <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <nil key="highlightedColor"/>
                     </label>
                 </subviews>
@@ -32,7 +32,7 @@
                 <constraint firstAttribute="bottom" secondItem="acA-SB-LGO" secondAttribute="bottom" id="GGc-WP-HkH"/>
                 <constraint firstItem="acA-SB-LGO" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="KUd-Sc-Z1S"/>
                 <constraint firstItem="Y8g-h8-47n" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="NA8-3k-eWc"/>
-                <constraint firstAttribute="bottom" secondItem="Y8g-h8-47n" secondAttribute="bottom" id="NsY-yO-pcF"/>
+                <constraint firstAttribute="bottom" secondItem="Y8g-h8-47n" secondAttribute="bottom" constant="15" id="NsY-yO-pcF"/>
                 <constraint firstAttribute="trailing" secondItem="acA-SB-LGO" secondAttribute="trailing" id="lIz-7T-usE"/>
                 <constraint firstAttribute="trailing" secondItem="Y8g-h8-47n" secondAttribute="trailing" id="sMm-tk-1BY"/>
                 <constraint firstItem="acA-SB-LGO" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="xwS-IP-53w"/>

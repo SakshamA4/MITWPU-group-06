@@ -76,39 +76,38 @@ private extension SceneViewController {
     }
     
     func configureFlowLayout() {
-        // Make sure we are working with a flow layout
-        guard let layout = SceneCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
-            let layout = UICollectionViewFlowLayout()
-            SceneCollectionView.setCollectionViewLayout(layout, animated: false)
-            configureFlowLayout()
-            return
+            // Make sure we are working with a flow layout
+            guard let layout = SceneCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
+                let layout = UICollectionViewFlowLayout()
+                SceneCollectionView.setCollectionViewLayout(layout, animated: false)
+                configureFlowLayout()
+                return
+            }
+            
+            layout.scrollDirection = .vertical
+            layout.estimatedItemSize = .zero    //  important: use our itemSize, not auto-layout sizing
+            
+            let itemsPerRow: CGFloat = 4
+            let sectionInset: CGFloat = 80
+            let interItemSpacing: CGFloat = 35
+            let lineSpacing: CGFloat = 35
+            
+            layout.sectionInset = UIEdgeInsets(
+                top: 0,
+                left: sectionInset,
+                bottom: 0,
+                right: sectionInset
+            )
+            layout.minimumInteritemSpacing = interItemSpacing
+            layout.minimumLineSpacing = lineSpacing
+            
+            let width = SceneCollectionView.bounds.width
+            let totalSpacing = (2 * sectionInset) + ((itemsPerRow - 1) * interItemSpacing)
+            let itemWidth = floor((width - totalSpacing) / itemsPerRow)
+            
+            layout.itemSize = CGSize(width: itemWidth, height: itemWidth)
+            layout.invalidateLayout()
         }
-        
-        layout.scrollDirection = .vertical
-        layout.estimatedItemSize = .zero    //  important: use our itemSize, not auto-layout sizing
-        
-        let itemsPerRow: CGFloat = 4
-        let sectionInset: CGFloat = 80
-        let interItemSpacing: CGFloat = 35
-        let lineSpacing: CGFloat = 35
-        
-        layout.sectionInset = UIEdgeInsets(
-            top: 0,
-            left: sectionInset,
-            bottom: 0,
-            right: sectionInset
-        )
-        layout.minimumInteritemSpacing = interItemSpacing
-        layout.minimumLineSpacing = lineSpacing
-        
-        let width = SceneCollectionView.bounds.width
-        let totalSpacing = (2 * sectionInset) + ((itemsPerRow - 1) * interItemSpacing)
-        let itemWidth = floor((width - totalSpacing) / itemsPerRow)
-        
-        layout.itemSize = CGSize(width: itemWidth, height: itemWidth)
-        layout.invalidateLayout()
-    }
-
 }
 
 // MARK: - Data Source

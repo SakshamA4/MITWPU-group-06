@@ -48,11 +48,10 @@
                         <viewLayoutGuide key="safeArea" id="boN-tn-T7X"/>
                         <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                         <constraints>
-                            <constraint firstAttribute="bottom" secondItem="Un0-oH-xj8" secondAttribute="bottom" id="BP1-qa-7Zn"/>
+                            <constraint firstItem="Un0-oH-xj8" firstAttribute="bottom" secondItem="47j-aU-RdA" secondAttribute="bottom" id="BP1-qa-7Zn"/>
                             <constraint firstItem="RWY-6n-8Ml" firstAttribute="leading" secondItem="boN-tn-T7X" secondAttribute="leading" constant="80" id="IFE-Tz-jKU"/>
-                            <constraint firstItem="Un0-oH-xj8" firstAttribute="top" secondItem="RWY-6n-8Ml" secondAttribute="bottom" constant="44" id="YlW-6L-CtA"/>
+                            <constraint firstItem="RWY-6n-8Ml" firstAttribute="bottom" secondItem="Un0-oH-xj8" secondAttribute="top" constant="-44" id="YlW-6L-CtA"/>
                             <constraint firstItem="RWY-6n-8Ml" firstAttribute="top" secondItem="47j-aU-RdA" secondAttribute="top" constant="151" id="cVO-jU-gVT"/>
-                            <constraint firstAttribute="bottom" secondItem="RWY-6n-8Ml" secondAttribute="bottom" constant="630" id="iXS-aZ-Qqx"/>
                             <constraint firstItem="Un0-oH-xj8" firstAttribute="leading" secondItem="boN-tn-T7X" secondAttribute="leading" id="ogO-xy-E7q"/>
                             <constraint firstItem="boN-tn-T7X" firstAttribute="trailing" secondItem="Un0-oH-xj8" secondAttribute="trailing" id="pmA-Gb-nSh"/>
                         </constraints>
@@ -64,7 +63,7 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="izt-kn-Jqn" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="994" y="-283"/>
+            <point key="canvasLocation" x="993.71900826446279" y="-283.45323741007195"/>
         </scene>
         <!--Lights View Controller-->
         <scene sceneID="bP1-Th-yME">
@@ -83,9 +82,6 @@
                             <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="ioc-U2-h2p">
                                 <rect key="frame" x="0.0" y="248" width="1210" height="586"/>
                                 <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                                <constraints>
-                                    <constraint firstAttribute="height" constant="586" id="JBv-ka-Fzy"/>
-                                </constraints>
                                 <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="fbL-Fp-H5D">
                                     <size key="itemSize" width="268" height="325"/>
                                     <size key="headerReferenceSize" width="0.0" height="0.0"/>
@@ -286,7 +282,6 @@
                             <constraint firstAttribute="bottom" secondItem="0p0-FY-Vbm" secondAttribute="bottom" id="0bu-XD-9ZU"/>
                             <constraint firstItem="pgb-jm-Yqz" firstAttribute="top" secondItem="A0P-6f-58c" secondAttribute="top" constant="151" id="3Fu-Sr-big"/>
                             <constraint firstItem="0p0-FY-Vbm" firstAttribute="leading" secondItem="exZ-k8-eYw" secondAttribute="leading" id="4RX-eO-pmq"/>
-                            <constraint firstAttribute="bottom" secondItem="pgb-jm-Yqz" secondAttribute="bottom" constant="630" id="Hv0-KG-BIX"/>
                             <constraint firstItem="pgb-jm-Yqz" firstAttribute="leading" secondItem="exZ-k8-eYw" secondAttribute="leading" constant="80" id="LUq-HO-AZb"/>
                             <constraint firstAttribute="trailing" secondItem="0p0-FY-Vbm" secondAttribute="trailing" id="qfQ-hX-jiB"/>
                             <constraint firstItem="0p0-FY-Vbm" firstAttribute="top" secondItem="pgb-jm-Yqz" secondAttribute="bottom" constant="42" id="u5j-4c-hil"/>
@@ -432,17 +427,14 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Characters" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="IZQ-Me-bwe">
-                                <rect key="frame" x="80" y="151" width="227" height="61"/>
+                                <rect key="frame" x="80" y="151" width="227" height="53"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="44"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <nil key="highlightedColor"/>
                             </label>
                             <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="JPT-dJ-tyF">
-                                <rect key="frame" x="0.0" y="248" width="1210" height="586"/>
+                                <rect key="frame" x="0.0" y="240" width="1210" height="594"/>
                                 <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                                <constraints>
-                                    <constraint firstAttribute="height" constant="586" id="G5U-4O-Lea"/>
-                                </constraints>
                                 <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="L5e-AN-Yym">
                                     <size key="itemSize" width="268" height="325"/>
                                     <size key="headerReferenceSize" width="0.0" height="0.0"/>
@@ -491,17 +483,14 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Props" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="JJS-ZG-9wK">
-                                <rect key="frame" x="80" y="151" width="118.5" height="61"/>
+                                <rect key="frame" x="80" y="151" width="118.5" height="53"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="44"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <nil key="highlightedColor"/>
                             </label>
                             <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="LVB-eP-r9z">
-                                <rect key="frame" x="0.0" y="248" width="1210" height="586"/>
+                                <rect key="frame" x="0.0" y="240" width="1210" height="594"/>
                                 <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
-                                <constraints>
-                                    <constraint firstAttribute="height" constant="586" id="ku3-OG-dqx"/>
-                                </constraints>
                                 <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="KB3-bB-xBA">
                                     <size key="itemSize" width="268" height="325"/>
                                     <size key="headerReferenceSize" width="0.0" height="0.0"/>
