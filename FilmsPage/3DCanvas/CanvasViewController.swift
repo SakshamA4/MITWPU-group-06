@@ -656,31 +656,22 @@ class CanvasViewController: UIViewController {
 
     func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
 
-        // Only position tracks with motion paths matter
+        // Only position clips with motion paths are relevant
         guard clip.track == .position, clip.motionPath != nil else {
             return false
         }
 
-        // Find the immediately previous motion path for this entity
-        let previous = timeline.clips
-            .filter {
-                $0.entityName == clip.entityName && $0.motionPath != nil
-                    && $0.startTime + $0.duration <= clip.startTime
-            }
-            .sorted { $0.startTime < $1.startTime }
-            .last
-
-        // No previous path → this is the first → show start handle
-        guard let prev = previous else {
-            return true
+        // Find ANY earlier motion path for this entity
+        let hasPreviousPath = timeline.clips.contains {
+            $0.entityName == clip.entityName &&
+            $0.motionPath != nil &&
+            $0.startTime < clip.startTime
         }
 
-        // If there is a TIME GAP → show start handle
-        let prevEndTime = prev.startTime + prev.duration
-        let gap = clip.startTime - prevEndTime
-
-        return gap > 0.0001
+        // Show start handle ONLY if this is the FIRST path
+        return !hasPreviousPath
     }
+
 
     func previousPathClip(
         for clip: AnimationClip
@@ -2731,42 +2722,34 @@ class CanvasViewController: UIViewController {
 
         let location = gesture.location(in: arView)
 
-        //  STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
-
+        // ─────────────────────────────────────────────
+        // STEP 1 — MOTION PATH HANDLE DRAGGING
+        // ─────────────────────────────────────────────
         if let hit = arView.entity(at: location),
-            hit.name.hasPrefix("path."),
-            let handleData = hit.components[MotionPathHandleComponent.self]
+           hit.name.hasPrefix("path."),
+           let handleData = hit.components[MotionPathHandleComponent.self]
         {
-            // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+            // Block if locked
             guard
                 let pathRoot = hit.parent,
                 let lock = pathRoot.components[LockComponent.self],
                 lock.isLocked == false
-            else {
-                return
-            }
+            else { return }
 
-            //  ONLY EDIT SELECTED (RED) PATH
-            guard handleData.clipID == selectedPathClipID else {
-                return
-            }
+            // Only selected path editable
+            guard handleData.clipID == selectedPathClipID else { return }
 
             guard
                 let visual = activeMotionPaths[handleData.clipID],
-                let clipIndex = timeline.clips.firstIndex(
-                    where: { $0.id == handleData.clipID }
-                ),
+                let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
                 var path = timeline.clips[clipIndex].motionPath
             else { return }
 
             switch gesture.state {
 
-            // BEGIN DRAG
             case .began:
-
                 lastWorldDragPoint = nil
 
-                // Camera-facing drag plane
                 let cameraForward = -SIMD3<Float>(
                     arView.cameraTransform.matrix.columns.2.x,
                     arView.cameraTransform.matrix.columns.2.y,
@@ -2775,48 +2758,36 @@ class CanvasViewController: UIViewController {
 
                 activeDragPlaneNormal = cameraForward
                 activeDragPlanePoint = hit.position(relativeTo: nil)
-
                 return
 
-            //DRAGGING
             case .changed:
-
                 guard
                     let planeNormal = activeDragPlaneNormal,
-                    let planePoint = activeDragPlanePoint
+                    let planePoint = activeDragPlanePoint,
+                    let rayDirection = arView.ray(through: location)?.direction
                 else { return }
 
                 let rayOrigin = arView.cameraTransform.translation
 
-                guard
-                    let rayDirection =
-                        arView.ray(through: location)?.direction
-                else { return }
+                guard let worldPoint = rayPlaneIntersection(
+                    rayOrigin: rayOrigin,
+                    rayDirection: rayDirection,
+                    planePoint: planePoint,
+                    planeNormal: planeNormal
+                ) else { return }
 
-                guard
-                    let worldPoint = rayPlaneIntersection(
-                        rayOrigin: rayOrigin,
-                        rayDirection: rayDirection,
-                        planePoint: planePoint,
-                        planeNormal: planeNormal
-                    )
-                else { return }
-
-                //  FIRST FRAME — STORE ONLY
                 if lastWorldDragPoint == nil {
                     lastWorldDragPoint = worldPoint
                     return
                 }
 
-                //  DELTA-BASED MOVEMENT
                 let delta = worldPoint - lastWorldDragPoint!
                 lastWorldDragPoint = worldPoint
 
+                // ───────── Modify CURRENT path ─────────
                 switch hit.name {
 
                 case "path.start":
-
-                    // move entire path
                     path.start += delta
                     path.control1 += delta
                     path.control2 += delta
@@ -2829,171 +2800,60 @@ class CanvasViewController: UIViewController {
                     path.control2 += delta
 
                 case "path.end":
-
-                    // ───────────────────────────────
-                    // KEYNOTE-STYLE END HANDLE DRAG
-                    // Preserves curvature by
-                    // scaling + rotating control points
-                    // ───────────────────────────────
-
                     let oldStart = path.start
                     let oldEnd = path.end
 
                     let oldDir = oldEnd - oldStart
-                    let oldLength = simd_length(oldDir)
-                    guard oldLength > 0.0001 else { return }
+                    let oldLen = simd_length(oldDir)
+                    guard oldLen > 0.0001 else { return }
 
-                    let oldDirNorm = simd_normalize(oldDir)
-
-                    // Control points relative to start
+                    let oldDirN = simd_normalize(oldDir)
                     let c1Rel = path.control1 - oldStart
                     let c2Rel = path.control2 - oldStart
 
-                    // Move end by drag delta
                     path.end += delta
 
-                    let newEnd = path.end
-                    let newDir = newEnd - oldStart
-                    let newLength = simd_length(newDir)
-                    guard newLength > 0.0001 else { return }
+                    let newDir = path.end - oldStart
+                    let newLen = simd_length(newDir)
+                    guard newLen > 0.0001 else { return }
 
-                    let newDirNorm = simd_normalize(newDir)
+                    let scale = newLen / oldLen
+                    let rot = simd_quatf(from: oldDirN, to: simd_normalize(newDir))
 
-                    // Scale + rotate to preserve curvature
-                    let scale = newLength / oldLength
-                    let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
-
-                    path.control1 = oldStart + rotation.act(c1Rel * scale)
-                    path.control2 = oldStart + rotation.act(c2Rel * scale)
-
-                    // 🔗 KEEP NEXT PATH CONTINUOUS
-                    let thisClip = timeline.clips[clipIndex]
-
-                    if let nextIndex = timeline.clips
-                        .enumerated()
-                        .first(where: {
-                            $0.offset > clipIndex
-                                && $0.element.entityName == thisClip.entityName
-                                && $0.element.motionPath != nil
-                        })?
-                        .offset
-                    {
-                        var nextPath = timeline.clips[nextIndex].motionPath!
-
-                        let nextDelta = path.end - nextPath.start
-
-                        nextPath.start += nextDelta
-                        nextPath.end += nextDelta
-                        nextPath.control1 += nextDelta
-                        nextPath.control2 += nextDelta
-
-                        nextPath.rebuildArcLengthTable()
-                        timeline.clips[nextIndex].motionPath = nextPath
-
-                        if let nextVisual = activeMotionPaths[
-                            timeline.clips[nextIndex].id
-                        ] {
-                            nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle?.position = SIMD3<Float>.zero
-                            nextVisual.control1Handle.position =
-                                nextPath.control1 - nextPath.start
-                            nextVisual.control2Handle.position =
-                                nextPath.control2 - nextPath.start
-                            nextVisual.endHandle.position =
-                                (nextPath.end - nextPath.start)
-                                + SIMD3<Float>(0, 0.02, 0)
-
-                            if let entity =
-                                nextVisual.root.findEntity(named: "MotionPath")
-                                as? ModelEntity
-                            {
-                                MotionPathRenderer.updatePathMesh(
-                                    entity: entity,
-                                    path: nextPath
-                                )
-                            }
-                        }
-                    }
+                    path.control1 = oldStart + rot.act(c1Rel * scale)
+                    path.control2 = oldStart + rot.act(c2Rel * scale)
 
                 default:
                     return
                 }
 
-                //  move root in WORLD SPACE
-                visual.root.position = path.start
+                // ✅ Move later paths ONLY if path POSITION changed
+                if hit.name == "path.start" || hit.name == "path.end" {
+                    moveLaterPaths(
+                        after: clipIndex,
+                        entityName: timeline.clips[clipIndex].entityName,
+                        delta: delta
+                    )
+                }
 
-                // handles in LOCAL SPACE
-                visual.startHandle?.position = SIMD3<Float>.zero
+
+                // ───────── Update THIS visual ─────────
+                visual.root.position = path.start
+                visual.startHandle?.position = .zero
                 visual.control1Handle.position = path.control1 - path.start
                 visual.control2Handle.position = path.control2 - path.start
                 visual.endHandle.position = path.end - path.start
 
                 path.rebuildArcLengthTable()
-
-                // Save path back into this clip only
                 timeline.clips[clipIndex].motionPath = path
 
-                // 🔥 STEP 13 — GPU vertex update only
-                if let pathEntity = visual.root.findEntity(named: "MotionPath")
-                    as? ModelEntity
-                {
-
-                    MotionPathRenderer.updatePathMesh(
-                        entity: pathEntity,
-                        path: path
-                    )
+                if let pathEntity =
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                    MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
                 }
-
                 return
 
-            //END DRAG
             case .ended, .cancelled:
-
-                // 🔗 FINALIZE CONTINUITY AFTER DRAG
-                if hit.name == "path.end" {
-
-                    let thisClip = timeline.clips[clipIndex]
-
-                    if let nextIndex = timeline.clips
-                        .enumerated()
-                        .first(where: {
-                            $0.offset > clipIndex
-                                && $0.element.entityName == thisClip.entityName
-                                && $0.element.motionPath != nil
-                        })?
-                        .offset
-                    {
-                        var nextPath = timeline.clips[nextIndex].motionPath!
-                        nextPath.start = path.end
-                        nextPath.rebuildArcLengthTable()
-                        timeline.clips[nextIndex].motionPath = nextPath
-
-                        if let nextVisual = activeMotionPaths[
-                            timeline.clips[nextIndex].id
-                        ] {
-                            nextVisual.root.position = nextPath.start
-                            nextVisual.startHandle?.position = SIMD3<Float>.zero
-                            nextVisual.control1Handle.position =
-                                nextPath.control1 - nextPath.start
-                            nextVisual.control2Handle.position =
-                                nextPath.control2 - nextPath.start
-                            nextVisual.endHandle.position =
-                                (nextPath.end - nextPath.start)
-                                + SIMD3<Float>(0, 0.02, 0)
-
-                            if let entity =
-                                nextVisual.root.findEntity(named: "MotionPath")
-                                as? ModelEntity
-                            {
-                                MotionPathRenderer.updatePathMesh(
-                                    entity: entity,
-                                    path: nextPath
-                                )
-                            }
-                        }
-                    }
-                }
-
                 activeDragPlaneNormal = nil
                 activeDragPlanePoint = nil
                 lastWorldDragPoint = nil
@@ -3003,6 +2863,7 @@ class CanvasViewController: UIViewController {
                 break
             }
         }
+
 
         //  STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
 
