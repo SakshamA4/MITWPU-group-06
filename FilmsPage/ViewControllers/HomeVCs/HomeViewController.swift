@@ -180,12 +180,13 @@ extension HomeViewController {
 }
 
 extension HomeViewController {
-    
+
     // MARK: - Context Menu (Long Press)
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         
-        // 1. Only allow menu for Section 0 (Recent Scenes)
-        guard indexPath.section == 0 else { return nil }
+        // FIX 1: Change section == 0 to section == 1
+        // In your DataSource, Section 0 is Templates, Section 1 is Recent Scenes.
+        guard indexPath.section == 1 else { return nil }
         
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
             
@@ -199,6 +200,7 @@ extension HomeViewController {
             
             // ACTION 2: Delete
             let deleteAction = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+                // We capture self here to call the local helper function
                 self?.deleteRecentScene(sceneModel)
             }
             
@@ -208,15 +210,11 @@ extension HomeViewController {
     
     // MARK: - Helper Functions
     
-    /// Handle Delete
     private func deleteRecentScene(_ sceneModel: ScenesModel) {
-        // Use the ID to tell the service to delete the real data
         SceneService.shared.deleteScene(by: sceneModel.id)
-        
-        // The Observer in viewDidLoad will catch the update and refresh the UI automatically.
+        // No need to reload manually; the NotificationCenter observer in viewDidLoad handles it.
     }
     
-    /// Handle Rename
     private func presentRenameAlert(for sceneModel: ScenesModel) {
         let alert = UIAlertController(title: "Rename Scene", message: nil, preferredStyle: .alert)
         
@@ -226,19 +224,18 @@ extension HomeViewController {
             tf.autocapitalizationType = .words
         }
         
-        let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+        // FIX 2: Removed [weak self]
+        // You are using SceneService.shared (Singleton), so you don't need 'self' here.
+        // This fixes the "Variable 'self' was written to, but never read" error.
+        let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
             guard let newName = alert.textFields?.first?.text, !newName.isEmpty else { return }
             
-            // 1. Fetch the REAL Scene object from the service using the ID
-            // (Because 'ScenesModel' might just be a display struct, we need the real object to save)
+            // Fetch and Update using the Service directly
             if let originalScene = SceneService.shared.getScene(by: sceneModel.id) {
-                
-                // 2. Modify it
-                var updatedScene = originalScene
+                var updatedScene = sceneModel
                 updatedScene.name = newName
                 
-                // 3. Save it back to Service
-                SceneService.shared.updateScene(updatedScene)
+                ScenesDataStore.shared.updateScene(updatedScene)
             }
         }
         
