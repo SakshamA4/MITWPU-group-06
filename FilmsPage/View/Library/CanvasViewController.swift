@@ -1493,16 +1493,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         gizmo.position = entity.position(relativeTo: nil)
     }
     
-   
-    func resetGizmoColors() {
-        guard let gizmo = gizmoRoot else { return }
-        if let arrow = gizmo.findEntity(named: "Gizmo_Arrow_Y") {
-            arrow.children.forEach { if let m = $0 as? ModelEntity { m.model?.materials = [UnlitMaterial(color: .systemGreen)] } }
-        }
-        if let dot = gizmo.findEntity(named: "Gizmo_Plane_XZ") as? ModelEntity {
-            dot.model?.materials = [UnlitMaterial(color: .systemBlue)]
-        }
-    }
     //Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -2979,363 +2969,675 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
 
     
+//    @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+//            
+//            let location = gesture.location(in: arView)
+//            
+//            // ──────────────────────────────────────────────
+//            // STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
+//            // (Existing Path Logic - Unchanged)
+//            // ──────────────────────────────────────────────
+//            
+//            if let hit = arView.entity(at: location),
+//               hit.name.hasPrefix("path."),
+//               let handleData = hit.components[MotionPathHandleComponent.self]
+//            {
+//                // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+//                guard
+//                    let pathRoot = hit.parent,
+//                    let lock = pathRoot.components[LockComponent.self],
+//                    lock.isLocked == false
+//                else { return }
+//                
+//                // ONLY EDIT SELECTED (RED) PATH
+//                guard handleData.clipID == selectedPathClipID else { return }
+//                
+//                guard
+//                    let visual = activeMotionPaths[handleData.clipID],
+//                    let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
+//                    var path = timeline.clips[clipIndex].motionPath
+//                else { return }
+//                
+//                switch gesture.state {
+//                case .began:
+//                    lastWorldDragPoint = nil
+//                    
+//                    // Camera-facing drag plane
+//                    let cameraForward = -SIMD3<Float>(
+//                        arView.cameraTransform.matrix.columns.2.x,
+//                        arView.cameraTransform.matrix.columns.2.y,
+//                        arView.cameraTransform.matrix.columns.2.z
+//                    )
+//                    activeDragPlaneNormal = cameraForward
+//                    activeDragPlanePoint = hit.position(relativeTo: nil)
+//                    
+//                case .changed:
+//                    // ... (Your existing Path Drag logic) ...
+//                    guard let planeNormal = activeDragPlaneNormal,
+//                          let planePoint = activeDragPlanePoint else { return }
+//                    
+//                    let rayOrigin = arView.cameraTransform.translation
+//                    guard let rayDirection = arView.ray(through: location)?.direction else { return }
+//                    
+//                    guard let worldPoint = rayPlaneIntersection(
+//                        rayOrigin: rayOrigin,
+//                        rayDirection: rayDirection,
+//                        planePoint: planePoint,
+//                        planeNormal: planeNormal
+//                    ) else { return }
+//                    
+//                    if lastWorldDragPoint == nil {
+//                        lastWorldDragPoint = worldPoint
+//                        return
+//                    }
+//                    
+//                    let delta = worldPoint - lastWorldDragPoint!
+//                    lastWorldDragPoint = worldPoint
+//                    
+//                    switch hit.name {
+//                    case "path.start":
+//                        path.start += delta
+//                        path.control1 += delta
+//                        path.control2 += delta
+//                        path.end += delta
+//                    case "path.c1":
+//                        path.control1 += delta
+//                    case "path.c2":
+//                        path.control2 += delta
+//                    case "path.end":
+//                        // Keynote-style end handle drag logic
+//                        let oldStart = path.start
+//                        let oldEnd = path.end
+//                        let oldDir = oldEnd - oldStart
+//                        let oldLength = simd_length(oldDir)
+//                        
+//                        if oldLength > 0.0001 {
+//                            let oldDirNorm = simd_normalize(oldDir)
+//                            let c1Rel = path.control1 - oldStart
+//                            let c2Rel = path.control2 - oldStart
+//                            
+//                            path.end += delta
+//                            
+//                            let newEnd = path.end
+//                            let newDir = newEnd - oldStart
+//                            let newLength = simd_length(newDir)
+//                            
+//                            if newLength > 0.0001 {
+//                                let newDirNorm = simd_normalize(newDir)
+//                                let scale = newLength / oldLength
+//                                let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
+//                                
+//                                path.control1 = oldStart + rotation.act(c1Rel * scale)
+//                                path.control2 = oldStart + rotation.act(c2Rel * scale)
+//                            }
+//                        }
+//                        
+//                        // Continuity logic for next clip
+//                        let thisClip = timeline.clips[clipIndex]
+//                        if let nextIndex = timeline.clips.enumerated().first(where: {
+//                            $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+//                        })?.offset {
+//                            var nextPath = timeline.clips[nextIndex].motionPath!
+//                            let nextDelta = path.end - nextPath.start
+//                            nextPath.start += nextDelta
+//                            nextPath.end += nextDelta
+//                            nextPath.control1 += nextDelta
+//                            nextPath.control2 += nextDelta
+//                            nextPath.rebuildArcLengthTable()
+//                            timeline.clips[nextIndex].motionPath = nextPath
+//                            
+//                            if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+//                                nextVisual.root.position = nextPath.start
+//                                nextVisual.startHandle?.position = .zero
+//                                nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
+//                                nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
+//                                nextVisual.endHandle.position = (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
+//                                if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+//                                    MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+//                                }
+//                            }
+//                        }
+//                    default: return
+//                    }
+//                    
+//                    // Update Visuals
+//                    visual.root.position = path.start
+//                    visual.startHandle?.position = .zero
+//                    visual.control1Handle.position = path.control1 - path.start
+//                    visual.control2Handle.position = path.control2 - path.start
+//                    visual.endHandle.position = path.end - path.start
+//                    path.rebuildArcLengthTable()
+//                    timeline.clips[clipIndex].motionPath = path
+//                    
+//                    if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+//                        MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
+//                    }
+//                    
+//                case .ended, .cancelled:
+//                    activeDragPlaneNormal = nil
+//                    activeDragPlanePoint = nil
+//                    lastWorldDragPoint = nil
+//                    
+//                    // Finalize continuity
+//                    if hit.name == "path.end" {
+//                        let thisClip = timeline.clips[clipIndex]
+//                        if let nextIndex = timeline.clips.enumerated().first(where: {
+//                            $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+//                        })?.offset {
+//                            var nextPath = timeline.clips[nextIndex].motionPath!
+//                            nextPath.start = path.end
+//                            nextPath.rebuildArcLengthTable()
+//                            timeline.clips[nextIndex].motionPath = nextPath
+//                            // ... update next visual ...
+//                            if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+//                                nextVisual.root.position = nextPath.start
+//                                // ... (Sync visual positions) ...
+//                                if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+//                                    MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+//                                }
+//                            }
+//                        }
+//                    }
+//                default: break
+//                }
+//                return
+//            }
+//            
+//            // ──────────────────────────────────────────────
+//            // STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
+//            // (This is the part we fixed)
+//            // ──────────────────────────────────────────────
+//            
+//            switch gesture.state {
+//                
+//            case .began:
+//                saveCurrentStateToUndo()
+//                
+//                // 1. HIT TEST
+//                let hits = arView.hitTest(location)
+//                
+//                // 2. CHECK FOR GIZMO PARTS (Priority)
+//                if let gizmoHit = hits.first(where: {
+//                    $0.entity.name == "Gizmo_Arrow_Y" ||
+//                    $0.entity.name == "Gizmo_Plane_XZ" ||
+//                    $0.entity.parent?.name == "Gizmo_Arrow_Y" || // Handle parent group hits
+//                    $0.entity.parent?.name == "PlaneHandle"
+//                }) {
+//                    let name = gizmoHit.entity.name
+//                    let parentName = gizmoHit.entity.parent?.name ?? ""
+//                    
+//                    if name == "Gizmo_Arrow_Y" || parentName == "Gizmo_Arrow_Y" {
+//                        activeGizmoPart = .arrowY
+//                        highlightGizmoPart(.arrowY)
+//                    } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
+//                        activeGizmoPart = .planeXZ
+//                        highlightGizmoPart(.planeXZ)
+//                    }
+//                    
+//                    dragStartPosition = selectedEntity?.position
+//                    isDraggingObject = true
+//                    return
+//                }
+//                
+//                // 3. STANDARD OBJECT SELECTION (Fallback)
+//                // If we didn't hit a gizmo, check if we hit an object
+//                if let hit = arView.entity(at: location) {
+//                    
+//                    // Old Handle Logic (Keep if you still use old handles, otherwise safe to ignore)
+//                    if hit.name == GizmoNames.xHandle { currentAxis = .x }
+//                    else if hit.name == GizmoNames.yHandle { currentAxis = .y }
+//                    else if hit.name == GizmoNames.zHandle { currentAxis = .z }
+//                    else { currentAxis = .none }
+//                    
+//                    // Find Root
+//                    var root: Entity? = hit
+//                    while let parent = root?.parent, parent.name != "MainAnchor" {
+//                        root = parent
+//                    }
+//                    
+//                    selectedEntity = root
+//                    dragStartPosition = root?.position
+//                    initialRotation = root?.orientation
+//                    
+//                    if interactionMode == .none {
+//                        interactionMode = .move
+//                    }
+//                    
+//                    // If hitting the object body, we are NOT using the gizmo part logic
+//                    activeGizmoPart = .none
+//                }
+//                
+//            case .changed:
+//                guard editorMode == .edit else { return }
+//                
+//                // 🔒 Lock Check
+//                if let entity = selectedEntity {
+//                    let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
+//                    if isLocked {
+//                        handleCameraOrbit(gesture)
+//                        return
+//                    }
+//                }
+//                
+//                guard let entity = selectedEntity, let startPos = dragStartPosition else {
+//                    handleCameraOrbit(gesture)
+//                    return
+//                }
+//                
+//                let translation = gesture.translation(in: arView)
+//                
+//                // ──────────────────────────────────────────────
+//                // NEW GIZMO DRAG LOGIC
+//                // ──────────────────────────────────────────────
+//                if activeGizmoPart != .none {
+//                    
+//                    let dist = simd_distance(entity.position, activeCamera.position)
+//                    let sensitivity: Float = 0.001 * dist
+//                    
+//                    var newPos = startPos
+//                    
+//                    if activeGizmoPart == .arrowY {
+//                        // Vertical Drag (Y Axis)
+//                        // Inverting translation.y because screen Y goes down, but 3D Y goes up
+//                        newPos.y = startPos.y - (Float(translation.y) * sensitivity)
+//                        
+//                    } else if activeGizmoPart == .planeXZ {
+//                        // Plane Drag (X/Z Axis) - Similar to your Ground Drag Mode logic
+//                        let camOri = arView.cameraTransform.rotation
+//                        let right = camOri.act([1, 0, 0])
+//                        let forward = camOri.act([0, 0, -1])
+//                        
+//                        let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
+//                        let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
+//                        
+//                        let dx = Float(translation.x) * sensitivity
+//                        let dy = Float(translation.y) * sensitivity
+//                        
+//                        // Combine vectors to move on the floor plane
+//                        let movement = (flatRight * dx) - (flatForward * dy)
+//                        
+//                        newPos.x = startPos.x + movement.x
+//                        newPos.z = startPos.z + movement.z
+//                    }
+//                    
+//                    entity.position = newPos
+//                    updateGizmoPosition() // 🔄 Keep gizmo attached!
+//                    return
+//                }
+//                
+//                // ──────────────────────────────────────────────
+//                // STANDARD BODY DRAG LOGIC (Existing)
+//                // ──────────────────────────────────────────────
+//                let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
+//                
+//                switch interactionMode {
+//                case .move:
+//                    var newPosition = startPos
+//                    
+//                    if currentAxis != .none {
+//                        // Old handle logic
+//                        let moveDelta = calculateAxisMovement(entity: entity, axis: currentAxis, mouseDelta: mouseDelta, view: arView)
+//                        newPosition += moveDelta
+//                    } else {
+//                        // Body Dragging (Ground vs Vertical Toggle)
+//                        let sensitivity: Float = 0.005
+//                        let dx = mouseDelta.x * sensitivity
+//                        let dy = -mouseDelta.y * sensitivity
+//                        
+//                        if currentDragMode == .ground {
+//                            let camOri = arView.cameraTransform.rotation
+//                            let right = camOri.act([1, 0, 0])
+//                            let forward = camOri.act([0, 0, -1])
+//                            
+//                            let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
+//                            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
+//                            
+//                            newPosition += (flatRight * dx) + (flatForward * dy)
+//                            newPosition.y = startPos.y
+//                        } else {
+//                            newPosition.x = startPos.x
+//                            newPosition.z = startPos.z
+//                            newPosition.y = startPos.y + (dy * 2.0)
+//                        }
+//                    }
+//                    entity.position = newPosition
+//                    updateGizmoPosition() // Update gizmo here too
+//                    
+//                case .rotate:
+//                    let angle = Float(translation.x) * 0.01
+//                    let rotation = simd_quatf(angle: angle, axis: [0, 1, 0])
+//                    entity.orientation = rotation * (initialRotation ?? simd_quatf())
+//                    
+//                case .none:
+//                    break
+//                }
+//                
+//            case .ended, .cancelled:
+//                dragStartPosition = nil
+//                initialRotation = nil
+//                currentAxis = .none
+//                activeGizmoPart = .none // Reset gizmo part
+//                isDraggingObject = false
+//                resetGizmoColors() // Reset colors
+//                
+//            default:
+//                break
+//            }
+//        }
+//    
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+        
+        let location = gesture.location(in: arView)
+        
+        // ──────────────────────────────────────────────
+        // STEP 1 — PATH HANDLE DRAG (Keep Existing)
+        // ──────────────────────────────────────────────
+        if let hit = arView.entity(at: location),
+                    hit.name.hasPrefix("path."),
+                    let handleData = hit.components[MotionPathHandleComponent.self]
+                 {
+                     // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+                     guard
+                         let pathRoot = hit.parent,
+                         let lock = pathRoot.components[LockComponent.self],
+                         lock.isLocked == false
+                     else { return }
+     
+                     // ONLY EDIT SELECTED (RED) PATH
+                     guard handleData.clipID == selectedPathClipID else { return }
+     
+                     guard
+                         let visual = activeMotionPaths[handleData.clipID],
+                         let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
+                         var path = timeline.clips[clipIndex].motionPath
+                     else { return }
+     
+                     switch gesture.state {
+                     case .began:
+                         
+                         
+                         let hits = arView.hitTest(location)
+                                 
+                                 // Check if we touched a Motion Path Handle (the orange/blue/gray spheres)
+                                 let hitPathHandle = hits.first { $0.entity.components.has(MotionPathHandleComponent.self) }
+                                 
+                                 if hitPathHandle != nil {
+                                     // ✅ Disable the main gizmo specifically when editing paths
+                                     hideGizmo()
+                                     // Continue with your existing path dragging logic...
+                                     return
+                                 }
+                         
+                         
+                         lastWorldDragPoint = nil
+     
+                         // Camera-facing drag plane
+                         let cameraForward = -SIMD3<Float>(
+                             arView.cameraTransform.matrix.columns.2.x,
+                             arView.cameraTransform.matrix.columns.2.y,
+                             arView.cameraTransform.matrix.columns.2.z
+                         )
+                         activeDragPlaneNormal = cameraForward
+                         activeDragPlanePoint = hit.position(relativeTo: nil)
+     
+                     case .changed:
+                         // ... (Your existing Path Drag logic) ...
+                         guard let planeNormal = activeDragPlaneNormal,
+                               let planePoint = activeDragPlanePoint else { return }
+     
+                         let rayOrigin = arView.cameraTransform.translation
+                         guard let rayDirection = arView.ray(through: location)?.direction else { return }
+     
+                         guard let worldPoint = rayPlaneIntersection(
+                             rayOrigin: rayOrigin,
+                             rayDirection: rayDirection,
+                             planePoint: planePoint,
+                             planeNormal: planeNormal
+                         ) else { return }
+     
+                         if lastWorldDragPoint == nil {
+                             lastWorldDragPoint = worldPoint
+                             return
+                         }
+     
+                         let delta = worldPoint - lastWorldDragPoint!
+                         lastWorldDragPoint = worldPoint
+     
+                         switch hit.name {
+                         case "path.start":
+                             path.start += delta
+                             path.control1 += delta
+                             path.control2 += delta
+                             path.end += delta
+                         case "path.c1":
+                             path.control1 += delta
+                         case "path.c2":
+                             path.control2 += delta
+                         case "path.end":
+                             // Keynote-style end handle drag logic
+                             let oldStart = path.start
+                             let oldEnd = path.end
+                             let oldDir = oldEnd - oldStart
+                             let oldLength = simd_length(oldDir)
+     
+                             if oldLength > 0.0001 {
+                                 let oldDirNorm = simd_normalize(oldDir)
+                                 let c1Rel = path.control1 - oldStart
+                                 let c2Rel = path.control2 - oldStart
+     
+                                 path.end += delta
+     
+                                 let newEnd = path.end
+                                 let newDir = newEnd - oldStart
+                                 let newLength = simd_length(newDir)
+     
+                                 if newLength > 0.0001 {
+                                     let newDirNorm = simd_normalize(newDir)
+                                     let scale = newLength / oldLength
+                                     let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
+     
+                                     path.control1 = oldStart + rotation.act(c1Rel * scale)
+                                     path.control2 = oldStart + rotation.act(c2Rel * scale)
+                                 }
+                             }
+     
+                             // Continuity logic for next clip
+                             let thisClip = timeline.clips[clipIndex]
+                             if let nextIndex = timeline.clips.enumerated().first(where: {
+                                 $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+                             })?.offset {
+                                 var nextPath = timeline.clips[nextIndex].motionPath!
+                                 let nextDelta = path.end - nextPath.start
+                                 nextPath.start += nextDelta
+                                 nextPath.end += nextDelta
+                                 nextPath.control1 += nextDelta
+                                 nextPath.control2 += nextDelta
+                                 nextPath.rebuildArcLengthTable()
+                                 timeline.clips[nextIndex].motionPath = nextPath
+     
+                                 if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+                                     nextVisual.root.position = nextPath.start
+                                     nextVisual.startHandle?.position = .zero
+                                     nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
+                                     nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
+                                     nextVisual.endHandle.position = (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
+                                     if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                                         MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+                                     }
+                                 }
+                             }
+                         default: return
+                         }
+     
+                         // Update Visuals
+                         visual.root.position = path.start
+                         visual.startHandle?.position = .zero
+                         visual.control1Handle.position = path.control1 - path.start
+                         visual.control2Handle.position = path.control2 - path.start
+                         visual.endHandle.position = path.end - path.start
+                         path.rebuildArcLengthTable()
+                         timeline.clips[clipIndex].motionPath = path
+     
+                         if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                             MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
+                         }
+     
+                     case .ended, .cancelled:
+                         activeDragPlaneNormal = nil
+                         activeDragPlanePoint = nil
+                         lastWorldDragPoint = nil
+     
+                         // Finalize continuity
+                         if hit.name == "path.end" {
+                             let thisClip = timeline.clips[clipIndex]
+                             if let nextIndex = timeline.clips.enumerated().first(where: {
+                                 $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+                             })?.offset {
+                                 var nextPath = timeline.clips[nextIndex].motionPath!
+                                 nextPath.start = path.end
+                                 nextPath.rebuildArcLengthTable()
+                                 timeline.clips[nextIndex].motionPath = nextPath
+                                 // ... update next visual ...
+                                 if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+                                     nextVisual.root.position = nextPath.start
+                                     // ... (Sync visual positions) ...
+                                     if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                                         MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+                                     }
+                                 }
+                             }
+                         }
+                     default: break
+                     }
+                     return
+                 }
+        
+        // ──────────────────────────────────────────────
+        // STEP 2 — GIZMO DRAGGING ONLY
+        // ──────────────────────────────────────────────
+        
+        switch gesture.state {
             
-            let location = gesture.location(in: arView)
+        case .began:
+            saveCurrentStateToUndo()
             
-            // ──────────────────────────────────────────────
-            // STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
-            // (Existing Path Logic - Unchanged)
-            // ──────────────────────────────────────────────
+            // 1. HIT TEST
+            let hits = arView.hitTest(location)
             
-            if let hit = arView.entity(at: location),
-               hit.name.hasPrefix("path."),
-               let handleData = hit.components[MotionPathHandleComponent.self]
-            {
-                // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
-                guard
-                    let pathRoot = hit.parent,
-                    let lock = pathRoot.components[LockComponent.self],
-                    lock.isLocked == false
-                else { return }
+            // 2. CHECK FOR GIZMO PARTS (Priority)
+            if let gizmoHit = hits.first(where: {
+                $0.entity.name == "Gizmo_Arrow_Y" ||
+                $0.entity.name == "Gizmo_Plane_XZ" ||
+                $0.entity.parent?.name == "Gizmo_Arrow_Y" ||
+                $0.entity.parent?.name == "PlaneHandle"
+            }) {
+                let name = gizmoHit.entity.name
+                let parentName = gizmoHit.entity.parent?.name ?? ""
                 
-                // ONLY EDIT SELECTED (RED) PATH
-                guard handleData.clipID == selectedPathClipID else { return }
-                
-                guard
-                    let visual = activeMotionPaths[handleData.clipID],
-                    let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
-                    var path = timeline.clips[clipIndex].motionPath
-                else { return }
-                
-                switch gesture.state {
-                case .began:
-                    lastWorldDragPoint = nil
-                    
-                    // Camera-facing drag plane
-                    let cameraForward = -SIMD3<Float>(
-                        arView.cameraTransform.matrix.columns.2.x,
-                        arView.cameraTransform.matrix.columns.2.y,
-                        arView.cameraTransform.matrix.columns.2.z
-                    )
-                    activeDragPlaneNormal = cameraForward
-                    activeDragPlanePoint = hit.position(relativeTo: nil)
-                    
-                case .changed:
-                    // ... (Your existing Path Drag logic) ...
-                    guard let planeNormal = activeDragPlaneNormal,
-                          let planePoint = activeDragPlanePoint else { return }
-                    
-                    let rayOrigin = arView.cameraTransform.translation
-                    guard let rayDirection = arView.ray(through: location)?.direction else { return }
-                    
-                    guard let worldPoint = rayPlaneIntersection(
-                        rayOrigin: rayOrigin,
-                        rayDirection: rayDirection,
-                        planePoint: planePoint,
-                        planeNormal: planeNormal
-                    ) else { return }
-                    
-                    if lastWorldDragPoint == nil {
-                        lastWorldDragPoint = worldPoint
-                        return
-                    }
-                    
-                    let delta = worldPoint - lastWorldDragPoint!
-                    lastWorldDragPoint = worldPoint
-                    
-                    switch hit.name {
-                    case "path.start":
-                        path.start += delta
-                        path.control1 += delta
-                        path.control2 += delta
-                        path.end += delta
-                    case "path.c1":
-                        path.control1 += delta
-                    case "path.c2":
-                        path.control2 += delta
-                    case "path.end":
-                        // Keynote-style end handle drag logic
-                        let oldStart = path.start
-                        let oldEnd = path.end
-                        let oldDir = oldEnd - oldStart
-                        let oldLength = simd_length(oldDir)
-                        
-                        if oldLength > 0.0001 {
-                            let oldDirNorm = simd_normalize(oldDir)
-                            let c1Rel = path.control1 - oldStart
-                            let c2Rel = path.control2 - oldStart
-                            
-                            path.end += delta
-                            
-                            let newEnd = path.end
-                            let newDir = newEnd - oldStart
-                            let newLength = simd_length(newDir)
-                            
-                            if newLength > 0.0001 {
-                                let newDirNorm = simd_normalize(newDir)
-                                let scale = newLength / oldLength
-                                let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
-                                
-                                path.control1 = oldStart + rotation.act(c1Rel * scale)
-                                path.control2 = oldStart + rotation.act(c2Rel * scale)
-                            }
-                        }
-                        
-                        // Continuity logic for next clip
-                        let thisClip = timeline.clips[clipIndex]
-                        if let nextIndex = timeline.clips.enumerated().first(where: {
-                            $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
-                        })?.offset {
-                            var nextPath = timeline.clips[nextIndex].motionPath!
-                            let nextDelta = path.end - nextPath.start
-                            nextPath.start += nextDelta
-                            nextPath.end += nextDelta
-                            nextPath.control1 += nextDelta
-                            nextPath.control2 += nextDelta
-                            nextPath.rebuildArcLengthTable()
-                            timeline.clips[nextIndex].motionPath = nextPath
-                            
-                            if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
-                                nextVisual.root.position = nextPath.start
-                                nextVisual.startHandle?.position = .zero
-                                nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
-                                nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
-                                nextVisual.endHandle.position = (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
-                                if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
-                                    MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
-                                }
-                            }
-                        }
-                    default: return
-                    }
-                    
-                    // Update Visuals
-                    visual.root.position = path.start
-                    visual.startHandle?.position = .zero
-                    visual.control1Handle.position = path.control1 - path.start
-                    visual.control2Handle.position = path.control2 - path.start
-                    visual.endHandle.position = path.end - path.start
-                    path.rebuildArcLengthTable()
-                    timeline.clips[clipIndex].motionPath = path
-                    
-                    if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
-                        MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
-                    }
-                    
-                case .ended, .cancelled:
-                    activeDragPlaneNormal = nil
-                    activeDragPlanePoint = nil
-                    lastWorldDragPoint = nil
-                    
-                    // Finalize continuity
-                    if hit.name == "path.end" {
-                        let thisClip = timeline.clips[clipIndex]
-                        if let nextIndex = timeline.clips.enumerated().first(where: {
-                            $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
-                        })?.offset {
-                            var nextPath = timeline.clips[nextIndex].motionPath!
-                            nextPath.start = path.end
-                            nextPath.rebuildArcLengthTable()
-                            timeline.clips[nextIndex].motionPath = nextPath
-                            // ... update next visual ...
-                            if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
-                                nextVisual.root.position = nextPath.start
-                                // ... (Sync visual positions) ...
-                                if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
-                                    MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
-                                }
-                            }
-                        }
-                    }
-                default: break
+                if name == "Gizmo_Arrow_Y" || parentName == "Gizmo_Arrow_Y" {
+                    activeGizmoPart = .arrowY
+                    highlightGizmoPart(.arrowY)
+                } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
+                    activeGizmoPart = .planeXZ
+                    highlightGizmoPart(.planeXZ)
                 }
+                
+                dragStartPosition = selectedEntity?.position
+                isDraggingObject = true
                 return
             }
             
-            // ──────────────────────────────────────────────
-            // STEP 2 — NORMAL OBJECT / GIZMO DRAGGING
-            // (This is the part we fixed)
-            // ──────────────────────────────────────────────
-            
-            switch gesture.state {
+            // 3. STANDARD OBJECT SELECTION (But NO Drag Init)
+            // If we hit the object body, we select it, but we DO NOT set up drag variables.
+            if let hit = arView.entity(at: location) {
                 
-            case .began:
-                saveCurrentStateToUndo()
-                
-                // 1. HIT TEST
-                let hits = arView.hitTest(location)
-                
-                // 2. CHECK FOR GIZMO PARTS (Priority)
-                if let gizmoHit = hits.first(where: {
-                    $0.entity.name == "Gizmo_Arrow_Y" ||
-                    $0.entity.name == "Gizmo_Plane_XZ" ||
-                    $0.entity.parent?.name == "Gizmo_Arrow_Y" || // Handle parent group hits
-                    $0.entity.parent?.name == "PlaneHandle"
-                }) {
-                    let name = gizmoHit.entity.name
-                    let parentName = gizmoHit.entity.parent?.name ?? ""
-                    
-                    if name == "Gizmo_Arrow_Y" || parentName == "Gizmo_Arrow_Y" {
-                        activeGizmoPart = .arrowY
-                        highlightGizmoPart(.arrowY)
-                    } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
-                        activeGizmoPart = .planeXZ
-                        highlightGizmoPart(.planeXZ)
-                    }
-                    
-                    dragStartPosition = selectedEntity?.position
-                    isDraggingObject = true
-                    return
+                // Find Root
+                var root: Entity? = hit
+                while let parent = root?.parent, parent.name != "MainAnchor" {
+                    root = parent
                 }
                 
-                // 3. STANDARD OBJECT SELECTION (Fallback)
-                // If we didn't hit a gizmo, check if we hit an object
-                if let hit = arView.entity(at: location) {
-                    
-                    // Old Handle Logic (Keep if you still use old handles, otherwise safe to ignore)
-                    if hit.name == GizmoNames.xHandle { currentAxis = .x }
-                    else if hit.name == GizmoNames.yHandle { currentAxis = .y }
-                    else if hit.name == GizmoNames.zHandle { currentAxis = .z }
-                    else { currentAxis = .none }
-                    
-                    // Find Root
-                    var root: Entity? = hit
-                    while let parent = root?.parent, parent.name != "MainAnchor" {
-                        root = parent
-                    }
-                    
+                // Only select if it's not the gizmo root
+                if root?.name != "GizmoRoot" {
                     selectedEntity = root
-                    dragStartPosition = root?.position
-                    initialRotation = root?.orientation
-                    
-                    if interactionMode == .none {
-                        interactionMode = .move
-                    }
-                    
-                    // If hitting the object body, we are NOT using the gizmo part logic
-                    activeGizmoPart = .none
+                    // We do NOT set activeGizmoPart here.
+                    // We do NOT set dragStartPosition here (prevents body drag).
                 }
                 
-            case .changed:
-                guard editorMode == .edit else { return }
-                
-                // 🔒 Lock Check
-                if let entity = selectedEntity {
-                    let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-                    if isLocked {
-                        handleCameraOrbit(gesture)
-                        return
-                    }
-                }
-                
-                guard let entity = selectedEntity, let startPos = dragStartPosition else {
+                // We ensure activeGizmoPart is none so no movement happens
+                activeGizmoPart = .none
+            }
+            
+        case .changed:
+            guard editorMode == .edit else { return }
+            
+            // 🔒 Lock Check
+            if let entity = selectedEntity {
+                let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
+                if isLocked {
                     handleCameraOrbit(gesture)
                     return
                 }
-                
-                let translation = gesture.translation(in: arView)
-                
-                // ──────────────────────────────────────────────
-                // NEW GIZMO DRAG LOGIC
-                // ──────────────────────────────────────────────
-                if activeGizmoPart != .none {
-                    
-                    let dist = simd_distance(entity.position, activeCamera.position)
-                    let sensitivity: Float = 0.001 * dist
-                    
-                    var newPos = startPos
-                    
-                    if activeGizmoPart == .arrowY {
-                        // Vertical Drag (Y Axis)
-                        // Inverting translation.y because screen Y goes down, but 3D Y goes up
-                        newPos.y = startPos.y - (Float(translation.y) * sensitivity)
-                        
-                    } else if activeGizmoPart == .planeXZ {
-                        // Plane Drag (X/Z Axis) - Similar to your Ground Drag Mode logic
-                        let camOri = arView.cameraTransform.rotation
-                        let right = camOri.act([1, 0, 0])
-                        let forward = camOri.act([0, 0, -1])
-                        
-                        let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-                        let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
-                        
-                        let dx = Float(translation.x) * sensitivity
-                        let dy = Float(translation.y) * sensitivity
-                        
-                        // Combine vectors to move on the floor plane
-                        let movement = (flatRight * dx) - (flatForward * dy)
-                        
-                        newPos.x = startPos.x + movement.x
-                        newPos.z = startPos.z + movement.z
-                    }
-                    
-                    entity.position = newPos
-                    updateGizmoPosition() // 🔄 Keep gizmo attached!
-                    return
-                }
-                
-                // ──────────────────────────────────────────────
-                // STANDARD BODY DRAG LOGIC (Existing)
-                // ──────────────────────────────────────────────
-                let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
-                
-                switch interactionMode {
-                case .move:
-                    var newPosition = startPos
-                    
-                    if currentAxis != .none {
-                        // Old handle logic
-                        let moveDelta = calculateAxisMovement(entity: entity, axis: currentAxis, mouseDelta: mouseDelta, view: arView)
-                        newPosition += moveDelta
-                    } else {
-                        // Body Dragging (Ground vs Vertical Toggle)
-                        let sensitivity: Float = 0.005
-                        let dx = mouseDelta.x * sensitivity
-                        let dy = -mouseDelta.y * sensitivity
-                        
-                        if currentDragMode == .ground {
-                            let camOri = arView.cameraTransform.rotation
-                            let right = camOri.act([1, 0, 0])
-                            let forward = camOri.act([0, 0, -1])
-                            
-                            let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-                            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
-                            
-                            newPosition += (flatRight * dx) + (flatForward * dy)
-                            newPosition.y = startPos.y
-                        } else {
-                            newPosition.x = startPos.x
-                            newPosition.z = startPos.z
-                            newPosition.y = startPos.y + (dy * 2.0)
-                        }
-                    }
-                    entity.position = newPosition
-                    updateGizmoPosition() // Update gizmo here too
-                    
-                case .rotate:
-                    let angle = Float(translation.x) * 0.01
-                    let rotation = simd_quatf(angle: angle, axis: [0, 1, 0])
-                    entity.orientation = rotation * (initialRotation ?? simd_quatf())
-                    
-                case .none:
-                    break
-                }
-                
-            case .ended, .cancelled:
-                dragStartPosition = nil
-                initialRotation = nil
-                currentAxis = .none
-                activeGizmoPart = .none // Reset gizmo part
-                isDraggingObject = false
-                resetGizmoColors() // Reset colors
-                
-            default:
-                break
             }
+            
+            // 🚫 CRITICAL CHANGE: Only proceed if we are explicitly holding a Gizmo Part
+            guard activeGizmoPart != .none,
+                  let entity = selectedEntity,
+                  let startPos = dragStartPosition else {
+                
+                // If we are dragging the body (gizmo is none), we Orbit Camera instead
+                handleCameraOrbit(gesture)
+                return
+            }
+            
+            let translation = gesture.translation(in: arView)
+            
+            // ──────────────────────────────────────────────
+            // EXECUTE GIZMO MOVEMENT
+            // ──────────────────────────────────────────────
+            
+            let dist = simd_distance(entity.position, activeCamera.position)
+            let sensitivity: Float = 0.001 * dist
+            
+            var newPos = startPos
+            
+            if activeGizmoPart == .arrowY {
+                // Vertical Drag (Y Axis)
+                newPos.y = startPos.y - (Float(translation.y) * sensitivity)
+                
+            } else if activeGizmoPart == .planeXZ {
+                // Plane Drag (X/Z Axis)
+                let camOri = arView.cameraTransform.rotation
+                let right = camOri.act([1, 0, 0])
+                let forward = camOri.act([0, 0, -1])
+                
+                let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
+                let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
+                
+                let dx = Float(translation.x) * sensitivity
+                let dy = Float(translation.y) * sensitivity
+                
+                // Combine vectors to move on the floor plane
+                let movement = (flatRight * dx) - (flatForward * dy)
+                
+                newPos.x = startPos.x + movement.x
+                newPos.z = startPos.z + movement.z
+            }
+            
+            entity.position = newPos
+            updateGizmoPosition()
+            
+        case .ended, .cancelled:
+            dragStartPosition = nil
+            initialRotation = nil
+            activeGizmoPart = .none
+            isDraggingObject = false
+            resetGizmoColors()
+            
+        default:
+            break
         }
-    
-    
+    }
 
     // Helper to get local axis from matrix
     func getLocalAxis(for part: GizmoPart, from entity: Entity) -> SIMD3<Float> {
@@ -3771,95 +4073,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             for: .touchUpInside
         )
         
-        let movementToggleButton = UIButton(type: .system)
-        //        // Default state: Ground Mode icon
-        let config = UIImage.SymbolConfiguration(
-            pointSize: 20,
-            weight: .regular
-        )
-        movementToggleButton.setImage(
-            UIImage(
-                systemName: "arrow.left.and.right",
-                withConfiguration: config
-            ),
-            for: .normal
-        )
-        //
-        //        // Styling
-        movementToggleButton.tintColor = .white
-        movementToggleButton.backgroundColor = .systemBlue
-        movementToggleButton.layer.cornerRadius = 20
-        //
-        //        // Shadow
-        movementToggleButton.layer.shadowColor = UIColor.black.cgColor
-        movementToggleButton.layer.shadowOpacity = 0.3
-        movementToggleButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        movementToggleButton.layer.shadowRadius = 4
+      
         
-        movementToggleButton.translatesAutoresizingMaskIntoConstraints = false
-        movementToggleButton.addTarget(
-            self,
-            action: #selector(toggleMovementTapped(_:)),
-            for: .touchUpInside
-        )
-        
-        //                let undoBtn = UIButton(type: .system)
-        //                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
-        //                undoBtn.tintColor = .white
-        //                undoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                undoBtn.layer.cornerRadius = 20
-        //                undoBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                undoBtn.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
-        //
-        //                let redoBtn = UIButton(type: .system)
-        //                redoBtn.setImage(UIImage(systemName: "arrow.uturn.forward"), for: .normal)
-        //                redoBtn.tintColor = .white
-        //                redoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                redoBtn.layer.cornerRadius = 20
-        //                redoBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
-        //
-        //                let exportBtn = UIButton(type: .system)
-        //                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        //                exportBtn.tintColor = .white
-        //                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        //                exportBtn.layer.cornerRadius = 20
-        //                exportBtn.translatesAutoresizingMaskIntoConstraints = false
-        //                exportBtn.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
-        //
-        //                view.addSubview(exportBtn)
-        //                view.addSubview(undoBtn)
-        //                view.addSubview(redoBtn)
+      
         
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
-        view.addSubview(movementToggleButton)
-        
-        //undo redo
-        //               NSLayoutConstraint.activate([
-        //                    // Redo Button (Closest to Layers Button)
-        //                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
-        //                    redoBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                    redoBtn.heightAnchor.constraint(equalToConstant: 40),
-        //
-        //                    // Undo Button (To the left of Redo)
-        //                    undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                    undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
-        //                    undoBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
-        //                ])
-        //
-        //        NSLayoutConstraint.activate([
-        //                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-        //                            // Place it to the left of your Undo button
-        //                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-        //                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
-        //                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
-        //                        ])
-        
-        //new undo redo ends
+      
         
         // 7. CONSTRAINTS
         NSLayoutConstraint.activate([
@@ -3894,17 +4115,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             ),
             rotateBtn.widthAnchor.constraint(equalToConstant: 40),
             rotateBtn.heightAnchor.constraint(equalToConstant: 40),
-            
-            // Movement Toggle Button (Right of Rotate Button)
-            movementToggleButton.leadingAnchor.constraint(
-                equalTo: rotateBtn.trailingAnchor,
-                constant: 20
-            ),
-            movementToggleButton.centerYAnchor.constraint(
-                equalTo: rotateBtn.centerYAnchor
-            ),
-            movementToggleButton.widthAnchor.constraint(equalToConstant: 40),
-            movementToggleButton.heightAnchor.constraint(equalToConstant: 40),
             
         ])
         
@@ -4016,6 +4226,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             layersButton.heightAnchor.constraint(equalToConstant: 40),
         ])
         
+        
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
         let closeBtn = UIButton(type: .system)
         closeBtn.setImage(
             UIImage(systemName: "xmark", withConfiguration: config),
@@ -4242,27 +4454,108 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
 
     func highlightGizmoPart(_ part: GizmoPart) {
+        // 1. Reset everything first to ensure clean state
         resetGizmoColors()
+        
         guard let gizmo = gizmoRoot else { return }
         
-        let targetName: String
-        switch part {
-        case .arrowY: targetName = "Arrow_Y"
-        case .planeXZ: targetName = "Plane_XZ"
-        case .rotateX: targetName = "xRing"
-        case .rotateY: targetName = "yRing"
-        case .rotateZ: targetName = "zRing"
-        default: return
-        }
+        // Define the highlight color
+        let highlightMaterial = UnlitMaterial(color: .systemYellow)
         
-        if let entity = gizmo.findEntity(named: targetName) as? ModelEntity {
-            var material = SimpleMaterial(color: .yellow, isMetallic: false)
-            // FIX: Wrap the color in .init() to avoid the "cannot infer" error
-//            material.emissiveColor = .init(color: .yellow)
-            entity.model?.materials = [material]
+        switch part {
+        case .arrowY:
+            // Find the Arrow Group
+            if let arrowHandle = gizmo.findEntity(named: "Gizmo_Arrow_Y") {
+                // Apply yellow to all visible parts (Shaft, Cone), ignoring the invisible collider
+                for child in arrowHandle.children {
+                    if let model = child as? ModelEntity {
+                        // Only color it if it's NOT the invisible collider
+                        if !model.name.contains("Collider") {
+                            model.model?.materials = [highlightMaterial]
+                        }
+                    }
+                }
+            }
+            
+        case .planeXZ:
+            // Find the Plane Group
+            if let planeHandle = gizmo.findEntity(named: "PlaneHandle") {
+                // Apply yellow to all visible rings/dots
+                for child in planeHandle.children {
+                    if let model = child as? ModelEntity {
+                        if !model.name.contains("Collider") {
+                            model.model?.materials = [highlightMaterial]
+                        }
+                    }
+                }
+            }
+            
+        // Keep your existing rotation ring logic
+        case .rotateX:
+            if let ring = gizmo.findEntity(named: "xRing") as? ModelEntity {
+                ring.model?.materials = [highlightMaterial]
+            }
+        case .rotateY:
+            if let ring = gizmo.findEntity(named: "yRing") as? ModelEntity {
+                ring.model?.materials = [highlightMaterial]
+            }
+        case .rotateZ:
+            if let ring = gizmo.findEntity(named: "zRing") as? ModelEntity {
+                ring.model?.materials = [highlightMaterial]
+            }
+            
+        case .none:
+            resetGizmoColors()
         }
     }
 
+    func resetGizmoColors() {
+        guard let gizmo = gizmoRoot else { return }
+        
+        // 1. Reset Arrow to Green
+        if let arrowHandle = gizmo.findEntity(named: "Gizmo_Arrow_Y") {
+            let greenMat = UnlitMaterial(color: .systemGreen)
+            for child in arrowHandle.children {
+                if let model = child as? ModelEntity {
+                    // Ensure we don't accidentally make the collider visible
+                    if !model.name.contains("Collider") {
+                        model.model?.materials = [greenMat]
+                    }
+                }
+            }
+        }
+        
+        // 2. Reset Plane to Blue (Rings are semi-transparent blue usually, but standard blue works for clarity)
+        if let planeHandle = gizmo.findEntity(named: "PlaneHandle") {
+            let planeMat = UnlitMaterial(color: .systemBlue)
+            let ringMat = UnlitMaterial(color: .systemBlue.withAlphaComponent(0.4))
+            
+            for child in planeHandle.children {
+                if let model = child as? ModelEntity {
+                    if !model.name.contains("Collider") {
+                        // Differentiate between the solid dot and the transparent rings if you wish,
+                        // or just use planeMat for everything. Here we restore your setup:
+                        if child.name.contains("Ring") { // Assuming mesh generation didn't name them explicitly, but this is safe
+                             model.model?.materials = [ringMat]
+                        } else {
+                             model.model?.materials = [planeMat]
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. Reset Rotation Rings
+        if let xRing = gizmo.findEntity(named: "xRing") as? ModelEntity {
+            xRing.model?.materials = [UnlitMaterial(color: .systemRed)]
+        }
+        if let yRing = gizmo.findEntity(named: "yRing") as? ModelEntity {
+            yRing.model?.materials = [UnlitMaterial(color: .systemGreen)]
+        }
+        if let zRing = gizmo.findEntity(named: "zRing") as? ModelEntity {
+            zRing.model?.materials = [UnlitMaterial(color: .systemBlue)]
+        }
+    }
 
     
 }
