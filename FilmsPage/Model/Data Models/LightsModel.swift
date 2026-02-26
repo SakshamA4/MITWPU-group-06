@@ -13,7 +13,7 @@ struct LightsDataStore {
     private(set) static var items: [LightItem] = [
         LightItem(
             name: "LED Panel",
-            imageName: "LED Panel",        // change to your asset name
+            imageName: "LED Panel_img",        // change to your asset name
             description: "Soft, even light source ideal for key or fill.",
             modelFileName: "LED Panel"
         ),
@@ -39,13 +39,13 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Lantern",
-            imageName: "Lantern",
+            imageName: "Lantern_img",
             description: "Soft omnidirectional light often used as a hanging practical.",
             modelFileName: "Lantern 2"
         ),
         LightItem(
             name: "Spotlight",
-            imageName: "Spotlight",
+            imageName: "Spotlight_img 1",
             description: "Narrow beam for highlighting specific areas or subjects.",
             modelFileName: "Spotlight"
         ),
