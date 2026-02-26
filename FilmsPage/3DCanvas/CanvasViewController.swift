@@ -1624,10 +1624,28 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 
                 // 5. Use the cross product to figure out the direction (clockwise vs counter-clockwise)
                 let crossDirection = simd_cross(lastVec, currentVec)
+<<<<<<< HEAD
                 if simd_dot(crossDirection, axis) < 0 {
                     deltaAngle = -deltaAngle
                 }
                 
+=======
+
+                
+                var isClockwise = simd_dot(crossDirection, axis) < 0
+
+                // If it's the Y-axis, we flip the logic because the
+                // world-up coordinate system usually results in inverted drag feel for Y
+                if activeGizmoPart == .rotateY {
+                    isClockwise = !isClockwise
+                }
+
+                if isClockwise {
+                    deltaAngle = -deltaAngle
+                }
+                
+                
+>>>>>>> 8927d57 (updated canvas vc with character function)
                 // 6. Safety limit to prevent wild spinning if you drag near the exact center
                 if deltaAngle > 0.25 { deltaAngle = 0.25 }
                 if deltaAngle < -0.25 { deltaAngle = -0.25 }
