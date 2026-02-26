@@ -139,7 +139,6 @@ struct MotionPathVisual {
     }
 }
 
-
 struct Timeline {
     var clips: [AnimationClip] = []
 
@@ -254,7 +253,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var sequenceName: String?
     var sceneNotes: String = ""
     var lastEditedDate: Date = Date()
-    
+    var sceneImageName: String?
+    var currentSceneID: UUID?
+
     private lazy var sceneNameLabel: UILabel = {
         let label = UILabel()
         // Accessing the instance property here
@@ -354,8 +355,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Save current state to redo before going back
         redoStack.append(createCurrentSnapshot())
-        
         applySnapshot(previousState)
+        refreshSidebarContent()
     }
     
     @objc func redoTapped() {
@@ -366,16 +367,172 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         applySnapshot(nextState)
     }
-    
-    // 5. The Application Function (Receives the Struct)
+
+    // MARK: - Top Right UI Components
+    private let shotBreakdownBtn: UIButton = {
+        let btn = UIButton(type: .system)
+        var config = UIButton.Configuration.filled()
+
+        // 1. Icon setup
+        config.image = UIImage(systemName: "list.bullet.indent")
+        config.preferredSymbolConfigurationForImage =
+            UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+
+        // 2. Exact same look as Layers Button
+        config.baseBackgroundColor = UIColor(
+            red: 11 / 255,
+            green: 11 / 255,
+            blue: 22 / 255,
+            alpha: 1
+        )
+        config.baseForegroundColor = .white
+        config.cornerStyle = .capsule
+
+        btn.configuration = config
+        btn.translatesAutoresizingMaskIntoConstraints = false
+
+        // 3. Match shadow depth
+        btn.layer.shadowColor = UIColor.black.cgColor
+        btn.layer.shadowOpacity = 0.3
+        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
+        btn.layer.shadowRadius = 4
+
+        return btn
+    }()
+
+    //  PLACE THIS AT CLASS LEVEL (NOT INSIDE ANOTHER FUNC)
+    func setupTopControlsUI() {
+        // 1. Add Breakdown button
+        view.addSubview(shotBreakdownBtn)
+
+        // 2. Re-anchor Play Button from the old stack
+        view.addSubview(playButton)
+        playButton.translatesAutoresizingMaskIntoConstraints = false
+
+        // 3. Style Play Button to match Breakdown/Layers style
+        playButton.backgroundColor = UIColor(
+            red: 11 / 255,
+            green: 11 / 255,
+            blue: 22 / 255,
+            alpha: 1
+        )
+        playButton.tintColor = .white
+        playButton.layer.cornerRadius = 22
+        playButton.clipsToBounds = false
+
+        NSLayoutConstraint.activate([
+            shotBreakdownBtn.centerYAnchor.constraint(
+                equalTo: layersButton.centerYAnchor
+            ),
+            shotBreakdownBtn.trailingAnchor.constraint(
+                equalTo: view.trailingAnchor,
+                constant: -16
+            ),
+            shotBreakdownBtn.widthAnchor.constraint(equalToConstant: 44),
+            shotBreakdownBtn.heightAnchor.constraint(equalToConstant: 44),
+
+            playButton.centerYAnchor.constraint(
+                equalTo: layersButton.centerYAnchor
+            ),
+            playButton.trailingAnchor.constraint(
+                equalTo: shotBreakdownBtn.leadingAnchor,
+                constant: -16
+            ),
+            playButton.widthAnchor.constraint(equalToConstant: 44),
+            playButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
+
+        shotBreakdownBtn.addTarget(
+            self,
+            action: #selector(shotBreakdownTapped),
+            for: .touchUpInside
+        )
+    }
+
+//    // 5. The Application Function (Receives the Struct)
+//    private func applySnapshot(_ snapshot: SceneSnapshot) {
+//        // Unwrap the dictionary from the snapshot struct
+//        for (name, transform) in snapshot.entityTransforms {
+//            if let entity = arView.scene.findEntity(named: name) {
+//                entity.transform = transform
+//            }
+//        }
+//    }
     private func applySnapshot(_ snapshot: SceneSnapshot) {
-        // Unwrap the dictionary from the snapshot struct
-        for (name, transform) in snapshot.entityTransforms {
-            if let entity = arView.scene.findEntity(named: name) {
-                entity.transform = transform
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        let currentEntities = anchor.children
+        
+        // 1. REMOVE: If an entity is in the scene but NOT in the snapshot (Rollback addition)
+        for entity in currentEntities {
+            if entity.name == "Grid" || entity.name == "EditorCamera" { continue }
+            if snapshot.entityTransforms[entity.name] == nil {
+                entity.removeFromParent()
             }
         }
+        
+        // 2. RESTORE/UPDATE: If an entity is in the snapshot
+        for (name, transform) in snapshot.entityTransforms {
+            if let entity = arView.scene.findEntity(named: name) {
+                // Case A: Entity exists, just update its transform
+                entity.transform = transform
+            } else {
+                // Case B: Entity is MISSING from scene but present in snapshot (Redo addition)
+                // 📍 THE FIX: Re-spawn the item using its stored name
+                self.restoreEntity(named: name, with: transform)
+            }
+        }
+        
         refreshSidebarContent()
+    }
+    
+    private func restoreEntity(named name: String, with transform: Transform) {
+        // 1. Detect category for all toolbar items based on your naming conventions
+        let toolType: ToolType
+        if name.contains("SceneCamera") {
+            toolType = .camera
+        } else if name.contains("Wall") || name.contains("Ground") {
+            toolType = .wall
+        } else if name.contains("Background") {
+            toolType = .background
+        } else if name.contains("Spotlight") || name.contains("LED") || name.contains("Lantern") {
+            toolType = .light
+        } else if name.contains("Woman") || name.contains("Man") {
+            toolType = .character
+        } else {
+            toolType = .prop
+        }
+        
+        // 2. Prepare the SpawnItem with all required compiler arguments
+        let item = SpawnItem(
+            title: name,
+            imageName: "Image",
+            modelFileName: name,
+            isBackground: name.contains("Background")
+        )
+        
+        Task {
+            // 3. Re-spawn using your master logic
+            // 📍 IMPORTANT: We pass 'isRestoring: true' so it doesn't create a new Undo point
+            await spawnEntity(
+                item: item,
+                toolType: toolType,
+                customName: name,
+                isRestoring: true
+            )
+            
+            // 4. 📍 THE FIX: Use a slight delay to ensure RealityKit has finished
+            // adding the entity to the anchor before applying the transform
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self = self else { return }
+                if let reSpawned = self.arView.scene.findEntity(named: name) {
+                    reSpawned.transform = transform
+                    print("✅ Redo Success: Restored \(name) to previous transform")
+                }
+                
+                // 5. Update Sidebar UI to show the restored item
+                self.refreshSidebarContent()
+            }
+        }
     }
     
     func createCurrentSnapshot() -> SceneSnapshot {
@@ -606,49 +763,36 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     
     func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
-        
-        // Only position tracks with motion paths matter
+
+        // Only position clips with motion paths are relevant
         guard clip.track == .position, clip.motionPath != nil else {
             return false
         }
-        
-        // Find the immediately previous motion path for this entity
-        let previous = timeline.clips
-            .filter {
-                $0.entityName == clip.entityName &&
-                $0.motionPath != nil &&
-                $0.startTime + $0.duration <= clip.startTime
-            }
-            .sorted { $0.startTime < $1.startTime }
-            .last
-        
-        // No previous path → this is the first → show start handle
-        guard let prev = previous else {
-            return true
+
+        // Find ANY earlier motion path for this entity
+        let hasPreviousPath = timeline.clips.contains {
+            $0.entityName == clip.entityName &&
+            $0.motionPath != nil &&
+            $0.startTime < clip.startTime
         }
-        
-        // If there is a TIME GAP → show start handle
-        let prevEndTime = prev.startTime + prev.duration
-        let gap = clip.startTime - prevEndTime
-        
-        return gap > 0.0001
+
+        // Show start handle ONLY if this is the FIRST path
+        return !hasPreviousPath
     }
-    
+
+
     func previousPathClip(
         for clip: AnimationClip
     ) -> AnimationClip? {
         timeline.clips
             .filter {
-                $0.entityName == clip.entityName &&
-                $0.motionPath != nil &&
-                $0.startTime + $0.duration <= clip.startTime
+                $0.entityName == clip.entityName && $0.motionPath != nil
+                    && $0.startTime + $0.duration <= clip.startTime
             }
             .sorted { $0.startTime < $1.startTime }
             .last
     }
-    
-    
-    
+
     @objc func playTimeline() {
         
         // RESUME FROM PAUSE
@@ -695,8 +839,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         // Start playback loop
         startPlayback()
     }
-    
-    
+
     @objc func pauseTimeline() {
         guard playbackState == .playing else { return }
         
@@ -1024,8 +1167,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             endHandle: end
         )
     }
-    
-    
     // MARK: - Motion Path Handle Ownership
     
     struct MotionPathHandleComponent: Component {
@@ -1278,11 +1419,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             baseTransforms[entityName] = entity.transform
             
             let lastTime =
-            timeline.clips
+                timeline.clips
                 .filter { $0.entityName == entityName }
                 .map { $0.startTime + $0.duration }
                 .max() ?? 0
-            
+
             let finalTransform = evaluateEntityTransform(
                 entityName: entityName,
                 at: lastTime
@@ -1291,8 +1432,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             entity.transform = finalTransform
         }
     }
-    
-    
+
     
     func handleAnimationPromptConfirm(
         type: AnimationType,
@@ -1503,6 +1643,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         setupGestures()
         setupTimelineControls()
         setupNavigationBar()
+        setupTopControlsUI()
         setupGizmo()
         updateGizmoMode()
         
@@ -1511,167 +1652,130 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 self?.applyBackgroundImage(pickedImage)
             }
         }
+        self.sceneNameLabel.text = self.sceneName
+    }
+
+
+    func handleBackgroundSelection(_ item: BackgroundItem) {
+        print("Canvas received background: \(item.title)")
+        let spawnItem = SpawnItem(background: item)
+        self.spawnEntity(item: spawnItem, toolType: .background)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handleRotationPan(_:)))
             pan.delegate = self // This will now work without error
             pan.cancelsTouchesInView = false
             arView.addGestureRecognizer(pan)
-        }
+    }
 
         // Add this method anywhere inside the CanvasViewController class
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             return true
         }
     
-
-    
-    
     @objc func handleRotationPan(_ gesture: UIPanGestureRecognizer) {
-            // Only run in rotation mode
-            guard interactionMode == .rotate else { return }
+        
+        
+        // Only run in rotation mode
+        guard interactionMode == .rotate else { return }
+        
+        let location = gesture.location(in: arView)
+        
+        switch gesture.state {
             
-            let location = gesture.location(in: arView)
+        case .began:
+            saveCurrentStateToUndo()
+            let hits = arView.hitTest(location)
             
-            switch gesture.state {
+            // 1. Reset selection state for this touch
+            activeRotationAxis = nil
+            activeGizmoPart = .none
+            
+            // 2. Priority: Check if we hit a GIZMO part
+            if let gizmoHit = hits.first(where: { $0.entity.name.contains("Ring") || $0.entity.name.contains("Arrow") || $0.entity.name.contains("Plane") }) {
+                let name = gizmoHit.entity.name
                 
-            case .began:
-                saveCurrentStateToUndo()
-                let hits = arView.hitTest(location)
-                
-                // 1. Reset selection state for this touch
-                activeRotationAxis = nil
-                activeGizmoPart = .none
-                
-                // 2. Priority: Check if we hit a GIZMO part
-                if let gizmoHit = hits.first(where: { $0.entity.name.contains("Ring") || $0.entity.name.contains("Arrow") || $0.entity.name.contains("Plane") }) {
-                    let name = gizmoHit.entity.name
-                    
-                    // Handle Movement Parts
-                    if name.contains("Arrow_Y") {
-                        activeGizmoPart = .arrowY
-                    } else if name.contains("Plane_XZ") {
-                        activeGizmoPart = .planeXZ
-                    }
-                    // Handle Rotation Rings
-                    else if name == "xRing" {
-                        activeGizmoPart = .rotateX
-                    } else if name == "yRing" {
-                        activeGizmoPart = .rotateY
-                    } else if name == "zRing" {
-                        activeGizmoPart = .rotateZ
-                    }
-                    
-                    // 🔧 FIX: Get the exact LOCAL axis oriented to the object's current rotation
-                    if let selected = selectedEntity, (activeGizmoPart == .rotateX || activeGizmoPart == .rotateY || activeGizmoPart == .rotateZ) {
-                        activeRotationAxis = getLocalAxis(for: activeGizmoPart, from: selected)
-                    }
-                    
-                    highlightGizmoPart(activeGizmoPart)
-                    lastPanLocation = location
-                    return // Stop here if we touched the gizmo
+                // Handle Movement Parts
+                if name.contains("Arrow_Y") {
+                    activeGizmoPart = .arrowY
+                } else if name.contains("Plane_XZ") {
+                    activeGizmoPart = .planeXZ
                 }
+                // Handle Rotation Rings
+                else if name == "xRing" {
+                    activeRotationAxis = [1, 0, 0]
+                    activeGizmoPart = .rotateX
+                } else if name == "yRing" {
+                    activeRotationAxis = [0, 1, 0]
+                    activeGizmoPart = .rotateY
+                } else if name == "zRing" {
+                    activeRotationAxis = [0, 0, 1]
+                    activeGizmoPart = .rotateZ
+                }
+                
+                highlightGizmoPart(activeGizmoPart)
+                lastPanLocation = location
+                return // Stop here if we touched the gizmo
+            }
 
-                // 3. Secondary: Check if we hit an OBJECT
-                if let hit = arView.entity(at: location) {
-                    var root: Entity? = hit
-                    while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
-                    
-                    if root?.name.contains("Gizmo") == false {
-                        selectedEntity = root
-                        updateGizmoVisibility()
-                    }
-                } else {
-                    // 4. Final: Hit BLANK SPACE -> Deselect and Hide
-                    selectedEntity = nil
+            // 3. Secondary: Check if we hit an OBJECT
+            if let hit = arView.entity(at: location) {
+                var root: Entity? = hit
+                while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
+                
+                if root?.name.contains("Gizmo") == false {
+                    selectedEntity = root
                     updateGizmoVisibility()
                 }
-                
-            case .changed:
-                
-                guard let axis = activeRotationAxis,
-                      let selected = selectedEntity else { return }
-                
-                // 1. Get the 3D center of the object
-                let center3D = selected.position(relativeTo: nil)
-                
-                // 2. Map the 2D screen touches exactly onto the 3D plane of the ring
-                guard let currentHit3D = getPlaneIntersection(location: location, planeNormal: axis, planePoint: center3D),
-                      let lastHit3D = getPlaneIntersection(location: lastPanLocation, planeNormal: axis, planePoint: center3D) else {
-                    
-                    // Fallback for extreme edge-on camera angles where the ray might miss the plane
-                    let dx = Float(location.x - lastPanLocation.x)
-                    let dy = Float(location.y - lastPanLocation.y)
-                    let drag = abs(dx) > abs(dy) ? dx : -dy
-                    let fallbackAngle = drag * 0.005
-                    
-                    let rotation = simd_quatf(angle: fallbackAngle, axis: axis)
-                    var transform = selected.transform
-                    transform.rotation = rotation * transform.rotation
-                    transform.rotation = simd_normalize(transform.rotation)
-                    selected.transform = transform
-                    
-                    lastPanLocation = location
-                    return
-                }
-                
-                // 3. Calculate directions from the center
-                let currentVec = simd_normalize(currentHit3D - center3D)
-                let lastVec = simd_normalize(lastHit3D - center3D)
-                
-                // 4. Determine the exact angle between the two touches
-                let dotProduct = simd_dot(lastVec, currentVec)
-                let clampedDot = max(-1.0, min(1.0, dotProduct)) // Prevent math crashes
-                var deltaAngle = acos(clampedDot)
-                
-                // 5. Use the cross product to figure out the direction (clockwise vs counter-clockwise)
-                let crossDirection = simd_cross(lastVec, currentVec)
-<<<<<<< HEAD
-                if simd_dot(crossDirection, axis) < 0 {
-                    deltaAngle = -deltaAngle
-                }
-                
-=======
-
-                
-                var isClockwise = simd_dot(crossDirection, axis) < 0
-
-                // If it's the Y-axis, we flip the logic because the
-                // world-up coordinate system usually results in inverted drag feel for Y
-                if activeGizmoPart == .rotateY {
-                    isClockwise = !isClockwise
-                }
-
-                if isClockwise {
-                    deltaAngle = -deltaAngle
-                }
-                
-                
->>>>>>> 8927d57 (updated canvas vc with character function)
-                // 6. Safety limit to prevent wild spinning if you drag near the exact center
-                if deltaAngle > 0.25 { deltaAngle = 0.25 }
-                if deltaAngle < -0.25 { deltaAngle = -0.25 }
-                
-                guard deltaAngle.isFinite else { return }
-                
-                // 7. Apply the perfect 1:1 rotation
-                let rotation = simd_quatf(angle: deltaAngle, axis: axis)
-                
-                var transform = selected.transform
-                transform.rotation = rotation * transform.rotation
-                transform.rotation = simd_normalize(transform.rotation)
-                
-                selected.transform = transform
-                lastPanLocation = location
-                
-            case .ended, .cancelled:
-                activeRotationAxis = nil
-                
-            default:
-                break
+            } else {
+                // 4. Final: Hit BLANK SPACE -> Deselect and Hide
+                selectedEntity = nil
+                updateGizmoVisibility()
             }
+        case .changed:
+            
+            
+            guard let axis = activeRotationAxis,
+                  let selected = selectedEntity else { return }
+            
+            let dx = Float(location.x - lastPanLocation.x)
+            let dy = Float(location.y - lastPanLocation.y)
+            
+            let drag = abs(dx) > abs(dy) ? dx : -dy
+            let angle = drag * 0.005
+            
+            // Safety check — prevent NaN rotations
+            guard angle.isFinite else { return }
+            
+            let rotation = simd_quatf(angle: angle, axis: axis)
+            
+            var transform = selected.transform
+            
+            // Stable incremental rotation
+            transform.rotation = rotation * transform.rotation
+            
+            // Safety normalize quaternion
+            transform.rotation = simd_normalize(transform.rotation)
+            
+            selected.transform = transform
+            
+            lastPanLocation = location
+            
+            
+        case .ended, .cancelled:
+            
+            activeRotationAxis = nil
+            
+        default:
+            break
         }
+        
+    }
+    
     
     
     private func setupNavigationBar() {
+
+        self.navigationItem.title = self.sceneName
+
         // 1. Back Button Logic
         
         // This creates a custom back button that pops the view controller
@@ -1726,9 +1830,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             blue: 22 / 255,
             alpha: 1
         )
+
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor.white,
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+        ]
+
+        appearance.titleTextAttributes = titleAttributes  // 📍 Apply here
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .systemBlue
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor.white,
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+        ]
+
     }
     
     @objc func moreTapped() {
@@ -1740,6 +1856,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         infoVC.filmName = self.filmName
         infoVC.initialNotes = self.sceneNotes
         infoVC.lastEditedDate = self.lastEditedDate
+        if let imageName = self.sceneImageName {
+            infoVC.sceneImage = UIImage(named: imageName)
+        }
         
         infoVC.onSave = { [weak self] newName, newNotes in
             guard let self = self else { return }
@@ -1749,6 +1868,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             self.sceneNotes = newNotes
             self.lastEditedDate = Date()
             self.sceneNameLabel.text = newName.uppercased()
+            self.navigationItem.title = newName
             
             // 2. 📍 SAVE TO DATABASE: This now works because 'notes' is in ScenesModel
             if var sceneToUpdate = self.currentSceneObject {
@@ -1761,6 +1881,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // Update local reference
                 self.currentSceneObject = sceneToUpdate
             }
+
+            let updatedModel = ScenesModel(
+                name: newName,
+                image: self.sceneImageName ?? "Image",
+                notes: newNotes
+            )
+            ScenesDataStore.shared.addToRecent(scene: updatedModel)
             
             NotificationCenter.default.post(
                 name: NSNotification.Name("scenesUpdated"),
@@ -1779,9 +1906,34 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     
     @objc private func backButtonTapped() {
-        // This takes you back to the previous page
-        print("Clicking back button")
-        // Fallback: dismiss if it was presented modally
+        let currentID =
+            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
+
+        // Handle Template check as you currently do
+        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
+            $0.id == currentID
+        }
+
+        if isTemplate {
+            ScenesDataStore.shared.saveTemplateNote(
+                id: currentID,
+                notes: self.sceneNotes
+            )
+        } else {
+            // 1. Update Recent Scenes (Global)
+            let updatedRecent = ScenesModel(
+                id: currentID,
+                name: self.sceneName,
+                image: self.sceneImageName ?? "Image",
+                notes: self.sceneNotes
+            )
+            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
+
+            if var projectScene = self.currentSceneObject {
+                projectScene.name = self.sceneName
+            }
+        }
+
         self.dismiss(animated: true)
     }
     
@@ -1810,13 +1962,153 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         updateEditorCamera()
         
     }
+
+//    func spawnEntity(
+//        item: SpawnItem,
+//        toolType: ToolType,
+//        customName: String? = nil,
+//        scale: Float = 1.0
+//    ) {
+//        saveCurrentStateToUndo()
+//
+//        Task {
+//            do {
+//                // 1. Initial Checks for Special Types
+//
+//                // Camera
+//                if item.modelFileName == "cam1" {
+//                    spawnSceneCamera()
+//                    return
+//                }
+//                // Walls/Ground
+//                if item.modelFileName == "cube" {
+//                    spawnWall()
+//                    return
+//                }
+//                if item.modelFileName == "ground" {
+//                    spawnGround()
+//                    return
+//                }
+//                if item.isBackground {
+//                    spawnBackgroundPlane(item)
+//                    return
+//                }
+//
+//                // 2. Load the 3D Model (Character/Prop/Light)
+//                // If code reaches here, it assumes a valid .usdz file exists
+//                let entity = try await Entity(named: item.modelFileName)
+//
+//                // --- (Keep your existing Normalization, Scale, and Position logic here) ---
+//                // 📍 STEP A: NORMALIZE
+//                let bounds = entity.visualBounds(relativeTo: nil)
+//                let maxDim = max(
+//                    bounds.extents.x,
+//                    max(bounds.extents.y, bounds.extents.z)
+//                )
+//                if maxDim > 0.0001 {
+//                    let normalizationFactor = 1.0 / maxDim
+//                    entity.scale = SIMD3(repeating: normalizationFactor)
+//                }
+//
+//                // 📍 STEP B: APPLY SCALES
+//                var verticalOffset: Float = 0.0
+//                // ... (Your existing specific prop scaling logic) ...
+//                if item.modelFileName == "Spotlight" {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                    verticalOffset = 0.25
+//                } else if item.modelFileName.contains("LED") {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                } else if item.modelFileName.contains("Lantern") {
+//                    entity.scale = SIMD3(repeating: 0.0025)
+//                    verticalOffset = 0.25
+//                } else if item.modelFileName.contains("Plant") {
+//                    entity.scale = SIMD3(repeating: 0.01)
+//                } else {
+//                    entity.scale = SIMD3<Float>(repeating: scale)
+//                }
+//
+//                // 📍 STEP C: APPLY POSITION
+//                let randomX = Float.random(in: -1...1)
+//                let randomZ = Float.random(in: -1...1)
+//                let finalBounds = entity.visualBounds(relativeTo: nil)
+//                let liftToGround = -finalBounds.min.y
+//                let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
+//
+//                entity.name = customName ?? item.modelFileName
+//                entity.position = [randomX, finalY, randomZ]
+//
+//                // 3. Components & Light Attachment
+//                entity.components.set(CategoryComponent(toolType: toolType))
+//                entity.generateCollisionShapes(recursive: true)
+//                entity.components.set(InputTargetComponent())
+//
+//                // ... (Your light attachment logic) ...
+//                if item.title.lowercased() == "light"
+//                    || item.modelFileName == "Spotlight"
+//                {
+//                    addRealLightToModel(entity)
+//                } else if item.title.lowercased() == "light"
+//                    || item.modelFileName == "LED Panel"
+//                {
+//                    addLEDPanel(to: entity)
+//                } else if item.title.lowercased() == "lantern"
+//                    || item.modelFileName == "Lantern"
+//                {
+//                    addLantern(to: entity)
+//                }
+//
+//                // 4. Add to Scene
+//                if let anchor = arView.scene.findEntity(named: "MainAnchor") {
+//                    anchor.addChild(entity)
+//                    self.refreshSidebarContent()
+//                }
+//            } catch {
+//                print("Failed to load \(item.modelFileName): \(error)")
+//            }
+//        }
+//    }
     
     func spawnEntity(
         item: SpawnItem,
         toolType: ToolType,
         customName: String? = nil,
-        scale: Float = 1.0
+        scale: Float = 1.0,
+        isRestoring: Bool = false
     ) {
+        if !isRestoring {
+                saveCurrentStateToUndo()
+            }
+
+        Task {
+            do {
+                // 1. Initial Checks for Special Types
+
+                // Camera
+                let checkName = (customName ?? item.modelFileName).lowercased()
+                            
+                            if checkName.contains("ground") {
+                                spawnGround() // Triggers your procedural generator
+                                return
+                            }
+                            if checkName.contains("wall") || item.modelFileName == "cube" {
+                                spawnWall() // Triggers your procedural generator
+                                return
+                            }
+                            if checkName.contains("scenecamera") || item.modelFileName == "cam1" {
+                                spawnSceneCamera() // Triggers your camera logic
+                                return
+                            }
+                if item.isBackground {
+                    spawnBackgroundPlane(item)
+                    return
+                }
+
+                // 2. Load the 3D Model (Character/Prop/Light)
+                // If code reaches here, it assumes a valid .usdz file exists
+                let entity = try await Entity(named: item.modelFileName)
+
+                // --- (Keep your existing Normalization, Scale, and Position logic here) ---
+                // 📍 STEP A: NORMALIZE
         saveCurrentStateToUndo()
         // Handle Sky separately
         if toolType == .sky {
@@ -1851,14 +2143,22 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     bounds.extents.x,
                     max(bounds.extents.y, bounds.extents.z)
                 )
-                
-                if maxDim > 0.0001 {  // Safety check for empty models
+                if maxDim > 0.0001 {
                     let normalizationFactor = 1.0 / maxDim
                     entity.scale = SIMD3(repeating: normalizationFactor)
                 }
-                
-                // 📍 STEP B: APPLY PROP-SPECIFIC SCALES
+
+                // 📍 STEP B: APPLY SCALES
                 var verticalOffset: Float = 0.0
+                // ... (Your existing specific prop scaling logic) ...
+                
+                // if maxDim > 0.0001 {  // Safety check for empty models
+                //     let normalizationFactor = 1.0 / maxDim
+                //     entity.scale = SIMD3(repeating: normalizationFactor)
+                // }
+                
+                // // 📍 STEP B: APPLY PROP-SPECIFIC SCALES
+                // var verticalOffset: Float = 0.0
                 
                 if item.modelFileName == "Spotlight" {
                     entity.scale = SIMD3(repeating: 0.01)
@@ -1869,22 +2169,17 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     entity.scale = SIMD3(repeating: 0.0025)
                     verticalOffset = 0.25
                 } else if item.modelFileName.contains("Plant") {
-                    // Now that it's normalized to 1m, 0.5 makes it exactly 50cm
                     entity.scale = SIMD3(repeating: 0.01)
                 } else {
-                    // Slider scale (1.0 = 1 meter tall/wide)
                     entity.scale = SIMD3<Float>(repeating: scale)
                 }
                 
                 // 📍 STEP C: APPLY POSITION
                 let randomX = Float.random(in: -1...1)
                 let randomZ = Float.random(in: -1...1)
-                
-                // Recalculate grounding lift after the final scale is set
                 let finalBounds = entity.visualBounds(relativeTo: nil)
                 let liftToGround = -finalBounds.min.y
                 
-                // Use your manual verticalOffset if it exists, otherwise auto-ground it
                 let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
                 
                 entity.name = customName ?? item.modelFileName
@@ -1894,6 +2189,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 entity.components.set(CategoryComponent(toolType: toolType))
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
+
+                // ... (Your light attachment logic) ...
                 
                 if item.title.lowercased() == "light"
                     || item.modelFileName == "Spotlight"
@@ -1919,6 +2216,23 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             }
         }
     }
+
+    func spawnBackgroundPlane(_ item: SpawnItem) {
+        // Check for Custom Image first
+        if let customImage = item.customImage {
+            applyBackgroundImage(customImage)
+            return
+        }
+        // Check for Standard Asset Image
+        if let imageName = item.imageName, let image = UIImage(named: imageName)
+        {
+            applyBackgroundImage(image)
+            return
+        }
+        print("Error: No image found for background \(item.title)")
+    }
+
+    // 2. The Renderer Function
     
     func applySky(type: String) {
         // 1. Remove existing sky
@@ -1974,22 +2288,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         else { return }
         
         do {
+            // Create Material
             let texture = try TextureResource(
                 image: cgImage,
                 options: .init(semantic: .color)
             )
             var material = UnlitMaterial()
             material.color.texture = .init(texture)
-            
-            // 2. Increment counter and create unique name
+
             backgroundCounter += 1
             let uniqueName = "Background \(backgroundCounter)"
+
             
             // 1. DIMENSIONS
             let aspect = Float(image.size.width / image.size.height)
             let height: Float = 1.5
             let width = height * aspect
             let thickness: Float = 0.05
+
             
             // 2. BOX MESH (Double-sided and thick)
             let mesh = MeshResource.generateBox(
@@ -2332,8 +2648,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Remove any existing toolbar
         pathEditToolbar?.removeFromSuperview()
-        
-        guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }) else {
+
+        guard
+            let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }
+            )
+        else {
             return
         }
         
@@ -2341,7 +2660,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Container
         let container = UIView()
-        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(
+            0.95
+        )
         container.layer.cornerRadius = 14
         container.layer.shadowColor = UIColor.black.cgColor
         container.layer.shadowOpacity = 0.25
@@ -2365,13 +2686,16 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         // Apply button
         let applyButton = UIButton(type: .system)
         applyButton.setTitle("Apply", for: .normal)
-        applyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-        
+        applyButton.titleLabel?.font = .systemFont(
+            ofSize: 15,
+            weight: .semibold
+        )
+
         // Stack
         let stack = UIStackView(arrangedSubviews: [
             startField,
             durationField,
-            applyButton
+            applyButton,
         ])
         stack.axis = .vertical
         stack.spacing = 8
@@ -2382,42 +2706,63 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Layout
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
-            
-            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
-            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
-            container.widthAnchor.constraint(equalToConstant: 220)
+            stack.topAnchor.constraint(
+                equalTo: container.topAnchor,
+                constant: 10
+            ),
+            stack.bottomAnchor.constraint(
+                equalTo: container.bottomAnchor,
+                constant: -10
+            ),
+            stack.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor,
+                constant: 10
+            ),
+            stack.trailingAnchor.constraint(
+                equalTo: container.trailingAnchor,
+                constant: -10
+            ),
+
+            container.centerXAnchor.constraint(
+                equalTo: view.leadingAnchor,
+                constant: screenPoint.x
+            ),
+            container.bottomAnchor.constraint(
+                equalTo: view.topAnchor,
+                constant: screenPoint.y - 20
+            ),
+            container.widthAnchor.constraint(equalToConstant: 220),
         ])
         
         // ✅ APPLY CHANGES (UIKit-native, no Obj-C runtime)
-        applyButton.addAction(UIAction { [weak self] _ in
-            guard
-                let self,
-                let newStart = Float(startField.text ?? ""),
-                let newDuration = Float(durationField.text ?? ""),
-                newDuration > 0
-            else { return }
-            
-            let oldClip = self.timeline.clips[clipIndex]
-            
-            self.timeline.clips[clipIndex] = AnimationClip(
-                entityName: oldClip.entityName,
-                type: oldClip.type,
-                track: oldClip.track,
-                easing: oldClip.easing,
-                startTime: newStart,
-                duration: newDuration,
-                fromValue: oldClip.fromValue,
-                toValue: oldClip.toValue,
-                motionPath: oldClip.motionPath
-            )
-            
-            self.updateEntityFinalTransforms()
-        }, for: .touchUpInside)
-        
+        applyButton.addAction(
+            UIAction { [weak self] _ in
+                guard
+                    let self,
+                    let newStart = Float(startField.text ?? ""),
+                    let newDuration = Float(durationField.text ?? ""),
+                    newDuration > 0
+                else { return }
+
+                let oldClip = self.timeline.clips[clipIndex]
+
+                self.timeline.clips[clipIndex] = AnimationClip(
+                    entityName: oldClip.entityName,
+                    type: oldClip.type,
+                    track: oldClip.track,
+                    easing: oldClip.easing,
+                    startTime: newStart,
+                    duration: newDuration,
+                    fromValue: oldClip.fromValue,
+                    toValue: oldClip.toValue,
+                    motionPath: oldClip.motionPath
+                )
+
+                self.updateEntityFinalTransforms()
+            },
+            for: .touchUpInside
+        )
+
         pathEditToolbar = container
     }
     
@@ -2547,10 +2892,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         // 1️⃣ DELETE MOTION PATH ONLY
         // ───────────────────────────────
         if let clipID = selectedPathClipID {
-            
-            guard let clipIndex = timeline.clips.firstIndex(
-                where: { $0.id == clipID }
-            ) else {
+
+            guard
+                let clipIndex = timeline.clips.firstIndex(
+                    where: { $0.id == clipID }
+                )
+            else {
                 selectedPathClipID = nil
                 return
             }
@@ -2603,9 +2950,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         refreshSidebarContent()
     }
     
-    
-    
-    
     //Gestures
     func setupGestures() {
         // 1. Tap to select (Existing)
@@ -2637,6 +2981,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
         arView.addGestureRecognizer(rotation)
     }
+
     
     @objc func handleCameraPan(_ gesture: UIPanGestureRecognizer) {
         let translation = gesture.translation(in: arView)
@@ -2697,8 +3042,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             break
         }
     }
-    
-    @objc private func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+
+    @objc private func handlePathLongPress(
+        _ gesture: UILongPressGestureRecognizer
+    ) {
         guard gesture.state == .began else { return }
         
         let location = gesture.location(in: arView)
@@ -2707,7 +3054,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Case 1: Long-press on a path HANDLE
         if let handle = hit.components[MotionPathHandleComponent.self],
-           let pathRoot = hit.parent
+            let pathRoot = hit.parent
         {
             showPathContextMenu(
                 clipID: handle.clipID,
@@ -2718,11 +3065,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         // Case 2: Long-press on the PATH CURVE itself
         if hit.name == "MotionPath",
-           let pathRoot = hit.parent,
-           let handle = pathRoot
-            .children
-            .compactMap({ $0.components[MotionPathHandleComponent.self] })
-            .first
+            let pathRoot = hit.parent,
+            let handle = pathRoot
+                .children
+                .compactMap({ $0.components[MotionPathHandleComponent.self] })
+                .first
         {
             showPathContextMenu(
                 clipID: handle.clipID,
@@ -2731,13 +3078,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             return
         }
     }
-    
-   
-    
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
+        pathEditToolbar?.removeFromSuperview()
+        pathEditToolbar = nil
+
+        // ─────────────────────────────
+        // 1️⃣ MOTION PATH SELECTION
+        // ─────────────────────────────
+        if let hit = arView.entity(at: location),
+            let handle = hit.components[MotionPathHandleComponent.self]
+        {
+
+            selectedPathClipID = handle.clipID
+            updatePathSelection()
+
+            // ⛔ IMPORTANT: stop here
+            return
+        }
+
         
-        // Always clear the menu on a new tap
         currentActionMenu?.removeFromSuperview()
         currentActionMenu = nil
         
@@ -2764,37 +3124,20 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 root = parent
             }
             
-     
-            
             // 4. Handle Selection Transitions
-                        if let previous = selectedEntity, previous != root {
-                            setEntityTransparency(previous, alpha: 1.0)
-                        }
-                        
-                        selectedEntity = root
-                        
-                        // 🔧 FIX: Check if the tapped object is locked before showing gizmos
-                        let isLocked = root.components[LockComponent.self]?.isLocked ?? false
-                        
-                        if isLocked {
-                            // If it's locked, keep it solid and hide all gizmos
-                            setEntityTransparency(root, alpha: 1.0)
-                            hideGizmo()
-                            hideRotationGizmo()
-                        } else {
-                            // If it's unlocked, apply transparency
-                            setEntityTransparency(root, alpha: 0.7)
-                            
-                            // 🔧 FIX: If interactionMode was stuck on .none from a previous lock, reset to .move
-                            if interactionMode == .none {
-                                interactionMode = .move
-                            }
-                            
-                            // 🔥 This decides whether we show move gizmo OR rotation rings
-                            updateGizmoMode()
-                        }
-                        
-                        showActionMenu(at: location)
+            if let previous = selectedEntity, previous != root {
+                setEntityTransparency(previous, alpha: 1.0)
+            }
+            
+            selectedEntity = root
+            
+            // Apply transparency so gizmo/rings are visible
+            setEntityTransparency(root, alpha: 0.7)
+            
+            // 🔥 This decides whether we show move gizmo OR rotation rings
+            updateGizmoMode()
+            
+            showActionMenu(at: location)
             
             if let animation = root.availableAnimations.first {
                 root.playAnimation(animation.repeat(count: 1))
@@ -2815,8 +3158,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         
     }
-    
-    
+
     
     func showPathContextMenu(
         clipID: UUID,
@@ -2829,44 +3171,47 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         )
         
         // ⏱ Edit Timing
-        alert.addAction(UIAlertAction(title: "Edit Timing", style: .default) { _ in
-            self.selectedPathClipID = clipID
-            self.updatePathSelection()
-            
-            if let screenPos = self.arView.project(
-                pathRoot.position(relativeTo: nil)
-            ) {
-                self.showPathEditToolbar(for: clipID, at: screenPos)
+        alert.addAction(
+            UIAlertAction(title: "Edit Timing", style: .default) { _ in
+                self.selectedPathClipID = clipID
+                self.updatePathSelection()
+
+                if let screenPos = self.arView.project(
+                    pathRoot.position(relativeTo: nil)
+                ) {
+                    self.showPathEditToolbar(for: clipID, at: screenPos)
+                }
             }
-        })
-        
-        // 🔒 Lock / Unlock
+        )
+
         let isLocked =
         pathRoot.components[LockComponent.self]?.isLocked ?? false
         let lockTitle = isLocked ? "Unlock Path" : "Lock Path"
-        
-        alert.addAction(UIAlertAction(title: lockTitle, style: .default) { _ in
-            var lock =
-            pathRoot.components[LockComponent.self]
-            ?? LockComponent(isLocked: false)
-            lock.isLocked.toggle()
-            pathRoot.components.set(lock)
-            self.updatePathSelection()
-        })
-        
+
+        alert.addAction(
+            UIAlertAction(title: lockTitle, style: .default) { _ in
+                var lock =
+                    pathRoot.components[LockComponent.self]
+                    ?? LockComponent(isLocked: false)
+                lock.isLocked.toggle()
+                pathRoot.components.set(lock)
+                self.updatePathSelection()
+            }
+        )
+
         // 🗑 Delete
-        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            self.selectedPathClipID = clipID
-            self.deleteSelected()
-        })
-        
+        alert.addAction(
+            UIAlertAction(title: "Delete", style: .destructive) { _ in
+                self.selectedPathClipID = clipID
+                self.deleteSelected()
+            }
+        )
+
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         
         present(alert, animated: true)
     }
-    
-    
-    
+
     func showActionMenu(at point: CGPoint) {
         
         guard let entity = selectedEntity else { return }
@@ -2916,44 +3261,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 }
                 menu.removeFromSuperview()
                 
-
-//                
-//            case .lock:
-//                            let newState = !isCurrentlyLocked
-//                            var lockComp = entity.components[LockComponent.self] ?? LockComponent()
-//                            lockComp.isLocked = newState
-//                            entity.components.set(lockComp)
-//                            
-//                            if newState {
-//                                self.interactionMode = .none
-//                                self.setEntityTransparency(entity, alpha: 1.0) // Reset if locking
-//                                self.hideGizmo()
-//                                self.hideRotationGizmo() // 🔧 Ensure rotation rings also hide instantly
-//                            } else {
-//                                self.interactionMode = .move // 🔧 FIX: Restore default movement mode
-//                                self.setEntityTransparency(entity, alpha: 0.7) // Restore if unlocking
-//                                self.updateGizmoMode() // 🔧 FIX: Safely route to the correct gizmo
-//                            }
-//                            menu.removeFromSuperview()
-                
             case .lock:
-                            let newState = !isCurrentlyLocked
-                            var lockComp = entity.components[LockComponent.self] ?? LockComponent()
-                            lockComp.isLocked = newState
-                            entity.components.set(lockComp)
-                            
-                            if newState {
-                                self.setEntityTransparency(entity, alpha: 1.0)
-                                self.hideGizmo()
-                                self.hideRotationGizmo()
-                            } else {
-                                self.setEntityTransparency(entity, alpha: 0.7)
-                                // 🔧 FIX: This will now look at your button state and draw the right gizmo instantly
-                                self.updateGizmoMode()
-                            }
-                            menu.removeFromSuperview()
+                let newState = !isCurrentlyLocked
+                var lockComp = entity.components[LockComponent.self] ?? LockComponent()
+                lockComp.isLocked = newState
+                entity.components.set(lockComp)
                 
-                
+                if newState {
+                    self.interactionMode = .none
+                    self.setEntityTransparency(entity, alpha: 1.0) // Reset if locking
+                    self.hideGizmo()
+                } else {
+                    self.setEntityTransparency(entity, alpha: 0.7) // Restore if unlocking
+                    self.showGizmo(at: entity)
+                }
+                menu.removeFromSuperview()
                 
             case .delete:
                 // 1. Reset transparency so the "ghost" version isn't saved in Undo/Redo
@@ -2969,7 +3291,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
         self.currentActionMenu = menu
     }
-    
+
     func moveLaterPaths(
         after clipIndex: Int,
         entityName: String,
@@ -2995,7 +3317,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 visual.endHandle.position = p.end - p.start
                 
                 if let entity =
-                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity
+                {
                     MotionPathRenderer.updatePathMesh(entity: entity, path: p)
                 }
             }
@@ -3003,7 +3326,138 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     
     
+    // @objc func handlePan(_ gesture: UIPanGestureRecognizer) { (SAKSHAM GITHUB 3D canvas file)
 
+    //     let location = gesture.location(in: arView)
+
+    //     // ─────────────────────────────────────────────
+    //     // STEP 1 — MOTION PATH HANDLE DRAGGING
+    //     // ─────────────────────────────────────────────
+    //     if let hit = arView.entity(at: location),
+    //        hit.name.hasPrefix("path."),
+    //        let handleData = hit.components[MotionPathHandleComponent.self]
+    //     {
+    //         // Block if locked
+    //         guard
+    //             let pathRoot = hit.parent,
+    //             let lock = pathRoot.components[LockComponent.self],
+    //             lock.isLocked == false
+    //         else { return }
+
+    //         // Only selected path editable
+    //         guard handleData.clipID == selectedPathClipID else { return }
+
+    //         guard
+    //             let visual = activeMotionPaths[handleData.clipID],
+    //             let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
+    //             var path = timeline.clips[clipIndex].motionPath
+    //         else { return }
+
+    //         switch gesture.state {
+
+    //         case .began:
+    //             lastWorldDragPoint = nil
+
+    //             let cameraForward = -SIMD3<Float>(
+    //                 arView.cameraTransform.matrix.columns.2.x,
+    //                 arView.cameraTransform.matrix.columns.2.y,
+    //                 arView.cameraTransform.matrix.columns.2.z
+    //             )
+
+    //             activeDragPlaneNormal = cameraForward
+    //             activeDragPlanePoint = hit.position(relativeTo: nil)
+    //             return
+
+    //         case .changed:
+    //             guard
+    //                 let planeNormal = activeDragPlaneNormal,
+    //                 let planePoint = activeDragPlanePoint,
+    //                 let rayDirection = arView.ray(through: location)?.direction
+    //             else { return }
+
+    //             let rayOrigin = arView.cameraTransform.translation
+
+    //             guard let worldPoint = rayPlaneIntersection(
+    //                 rayOrigin: rayOrigin,
+    //                 rayDirection: rayDirection,
+    //                 planePoint: planePoint,
+    //                 planeNormal: planeNormal
+    //             ) else { return }
+
+    //             if lastWorldDragPoint == nil {
+    //                 lastWorldDragPoint = worldPoint
+    //                 return
+    //             }
+
+    //             let delta = worldPoint - lastWorldDragPoint!
+    //             lastWorldDragPoint = worldPoint
+
+    //             // ───────── Modify CURRENT path ─────────
+    //             switch hit.name {
+
+    //             case "path.start":
+    //                 path.start += delta
+    //                 path.control1 += delta
+    //                 path.control2 += delta
+    //                 path.end += delta
+
+    //             case "path.c1":
+    //                 path.control1 += delta
+
+    //             case "path.c2":
+    //                 path.control2 += delta
+
+    //             case "path.end":
+    //                 let oldStart = path.start
+    //                 let oldEnd = path.end
+
+    //                 let oldDir = oldEnd - oldStart
+    //                 let oldLen = simd_length(oldDir)
+    //                 guard oldLen > 0.0001 else { return }
+
+    //                 let oldDirN = simd_normalize(oldDir)
+    //                 let c1Rel = path.control1 - oldStart
+    //                 let c2Rel = path.control2 - oldStart
+
+    //                 path.end += delta
+
+    //                 let newDir = path.end - oldStart
+    //                 let newLen = simd_length(newDir)
+    //                 guard newLen > 0.0001 else { return }
+
+    //                 let scale = newLen / oldLen
+    //                 let rot = simd_quatf(from: oldDirN, to: simd_normalize(newDir))
+
+    //                 path.control1 = oldStart + rot.act(c1Rel * scale)
+    //                 path.control2 = oldStart + rot.act(c2Rel * scale)
+
+    //             default:
+    //                 return
+    //             }
+
+    //             // ✅ Move later paths ONLY if path POSITION changed
+    //             if hit.name == "path.start" || hit.name == "path.end" {
+    //                 moveLaterPaths(
+    //                     after: clipIndex,
+    //                     entityName: timeline.clips[clipIndex].entityName,
+    //                     delta: delta
+    //                 )
+    //             }
+
+
+    //             // ───────── Update THIS visual ─────────
+    //             visual.root.position = path.start
+    //             visual.startHandle?.position = .zero
+    //             visual.control1Handle.position = path.control1 - path.start
+    //             visual.control2Handle.position = path.control2 - path.start
+    //             visual.endHandle.position = path.end - path.start
+
+    //             path.rebuildArcLengthTable()
+    //             timeline.clips[clipIndex].motionPath = path
+
+    //             if let pathEntity =
+    //                 visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+    //                 MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
     
 //    @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
 //            
@@ -3576,12 +4030,196 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
                     activeGizmoPart = .planeXZ
                     highlightGizmoPart(.planeXZ)
+>>>>>>> 6ebf957 (Just logo change on toggle from gizmo to rings left):FilmsPage/View/Library/CanvasViewController.swift
                 }
                 
                 dragStartPosition = selectedEntity?.position
                 isDraggingObject = true
                 return
-            }
+
+            case .ended, .cancelled:
+                activeDragPlaneNormal = nil
+                activeDragPlanePoint = nil
+                lastWorldDragPoint = nil
+                return
+             default:
+            break
+        }
+        }
+    
+    // @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            
+    //         let location = gesture.location(in: arView)
+            
+    //         // ──────────────────────────────────────────────
+    //         // STEP 1 — SMOOTH WORLD-SPACE PATH HANDLE DRAG
+    //         // (Existing Path Logic - Unchanged)
+    //         // ──────────────────────────────────────────────
+            
+    //         if let hit = arView.entity(at: location),
+    //            hit.name.hasPrefix("path."),
+    //            let handleData = hit.components[MotionPathHandleComponent.self]
+    //         {
+    //             // 🚫 BLOCK DRAGGING IF PATH IS LOCKED
+    //             guard
+    //                 let pathRoot = hit.parent,
+    //                 let lock = pathRoot.components[LockComponent.self],
+    //                 lock.isLocked == false
+    //             else { return }
+                
+    //             // ONLY EDIT SELECTED (RED) PATH
+    //             guard handleData.clipID == selectedPathClipID else { return }
+                
+    //             guard
+    //                 let visual = activeMotionPaths[handleData.clipID],
+    //                 let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleData.clipID }),
+    //                 var path = timeline.clips[clipIndex].motionPath
+    //             else { return }
+                
+    //             switch gesture.state {
+    //             case .began:
+    //                 lastWorldDragPoint = nil
+                    
+    //                 // Camera-facing drag plane
+    //                 let cameraForward = -SIMD3<Float>(
+    //                     arView.cameraTransform.matrix.columns.2.x,
+    //                     arView.cameraTransform.matrix.columns.2.y,
+    //                     arView.cameraTransform.matrix.columns.2.z
+    //                 )
+    //                 activeDragPlaneNormal = cameraForward
+    //                 activeDragPlanePoint = hit.position(relativeTo: nil)
+                    
+    //             case .changed:
+    //                 // ... (Your existing Path Drag logic) ...
+    //                 guard let planeNormal = activeDragPlaneNormal,
+    //                       let planePoint = activeDragPlanePoint else { return }
+                    
+    //                 let rayOrigin = arView.cameraTransform.translation
+    //                 guard let rayDirection = arView.ray(through: location)?.direction else { return }
+                    
+    //                 guard let worldPoint = rayPlaneIntersection(
+    //                     rayOrigin: rayOrigin,
+    //                     rayDirection: rayDirection,
+    //                     planePoint: planePoint,
+    //                     planeNormal: planeNormal
+    //                 ) else { return }
+                    
+    //                 if lastWorldDragPoint == nil {
+    //                     lastWorldDragPoint = worldPoint
+    //                     return
+    //                 }
+                    
+    //                 let delta = worldPoint - lastWorldDragPoint!
+    //                 lastWorldDragPoint = worldPoint
+                    
+    //                 switch hit.name {
+    //                 case "path.start":
+    //                     path.start += delta
+    //                     path.control1 += delta
+    //                     path.control2 += delta
+    //                     path.end += delta
+    //                 case "path.c1":
+    //                     path.control1 += delta
+    //                 case "path.c2":
+    //                     path.control2 += delta
+    //                 case "path.end":
+    //                     // Keynote-style end handle drag logic
+    //                     let oldStart = path.start
+    //                     let oldEnd = path.end
+    //                     let oldDir = oldEnd - oldStart
+    //                     let oldLength = simd_length(oldDir)
+                        
+    //                     if oldLength > 0.0001 {
+    //                         let oldDirNorm = simd_normalize(oldDir)
+    //                         let c1Rel = path.control1 - oldStart
+    //                         let c2Rel = path.control2 - oldStart
+                            
+    //                         path.end += delta
+                            
+    //                         let newEnd = path.end
+    //                         let newDir = newEnd - oldStart
+    //                         let newLength = simd_length(newDir)
+                            
+    //                         if newLength > 0.0001 {
+    //                             let newDirNorm = simd_normalize(newDir)
+    //                             let scale = newLength / oldLength
+    //                             let rotation = simd_quatf(from: oldDirNorm, to: newDirNorm)
+                                
+    //                             path.control1 = oldStart + rotation.act(c1Rel * scale)
+    //                             path.control2 = oldStart + rotation.act(c2Rel * scale)
+    //                         }
+    //                     }
+                        
+    //                     // Continuity logic for next clip
+    //                     let thisClip = timeline.clips[clipIndex]
+    //                     if let nextIndex = timeline.clips.enumerated().first(where: {
+    //                         $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+    //                     })?.offset {
+    //                         var nextPath = timeline.clips[nextIndex].motionPath!
+    //                         let nextDelta = path.end - nextPath.start
+    //                         nextPath.start += nextDelta
+    //                         nextPath.end += nextDelta
+    //                         nextPath.control1 += nextDelta
+    //                         nextPath.control2 += nextDelta
+    //                         nextPath.rebuildArcLengthTable()
+    //                         timeline.clips[nextIndex].motionPath = nextPath
+                            
+    //                         if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+    //                             nextVisual.root.position = nextPath.start
+    //                             nextVisual.startHandle?.position = .zero
+    //                             nextVisual.control1Handle.position = nextPath.control1 - nextPath.start
+    //                             nextVisual.control2Handle.position = nextPath.control2 - nextPath.start
+    //                             nextVisual.endHandle.position = (nextPath.end - nextPath.start) + SIMD3<Float>(0, 0.02, 0)
+    //                             if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+    //                                 MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+    //                             }
+    //                         }
+    //                     }
+    //                 default: return
+    //                 }
+                    
+    //                 // Update Visuals
+    //                 visual.root.position = path.start
+    //                 visual.startHandle?.position = .zero
+    //                 visual.control1Handle.position = path.control1 - path.start
+    //                 visual.control2Handle.position = path.control2 - path.start
+    //                 visual.endHandle.position = path.end - path.start
+    //                 path.rebuildArcLengthTable()
+    //                 timeline.clips[clipIndex].motionPath = path
+                    
+    //                 if let pathEntity = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
+    //                     MotionPathRenderer.updatePathMesh(entity: pathEntity, path: path)
+    //                 }
+                    
+    //             case .ended, .cancelled:
+    //                 activeDragPlaneNormal = nil
+    //                 activeDragPlanePoint = nil
+    //                 lastWorldDragPoint = nil
+                    
+    //                 // Finalize continuity
+    //                 if hit.name == "path.end" {
+    //                     let thisClip = timeline.clips[clipIndex]
+    //                     if let nextIndex = timeline.clips.enumerated().first(where: {
+    //                         $0.offset > clipIndex && $0.element.entityName == thisClip.entityName && $0.element.motionPath != nil
+    //                     })?.offset {
+    //                         var nextPath = timeline.clips[nextIndex].motionPath!
+    //                         nextPath.start = path.end
+    //                         nextPath.rebuildArcLengthTable()
+    //                         timeline.clips[nextIndex].motionPath = nextPath
+    //                         // ... update next visual ...
+    //                         if let nextVisual = activeMotionPaths[timeline.clips[nextIndex].id] {
+    //                             nextVisual.root.position = nextPath.start
+    //                             // ... (Sync visual positions) ...
+    //                             if let entity = nextVisual.root.findEntity(named: "MotionPath") as? ModelEntity {
+    //                                 MotionPathRenderer.updatePathMesh(entity: entity, path: nextPath)
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             default: break
+    //             }
+    //             return
+    //         }
             
             // 3. STANDARD OBJECT SELECTION (But NO Drag Init)
             // If we hit the object body, we select it, but we DO NOT set up drag variables.
@@ -3675,6 +4313,124 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
     }
 
+
+        //  OLD STEP 2 — NORMAL OBJECT / GIZMO DRAGGING (SAKSHAM)
+
+    //     switch gesture.state {
+
+    //     case .began:
+
+    //         saveCurrentStateToUndo()
+
+    //         if let hit = arView.entity(at: location) {
+    //             if hit.name == GizmoNames.xHandle {
+    //                 currentAxis = .x
+    //             } else if hit.name == GizmoNames.yHandle {
+    //                 currentAxis = .y
+    //             } else if hit.name == GizmoNames.zHandle {
+    //                 currentAxis = .z
+    //             } else {
+    //                 currentAxis = .none
+    //             }
+
+    //             var root: Entity? = hit
+    //             while let parent = root?.parent, parent.name != "MainAnchor" {
+    //                 root = parent
+    //             }
+
+    //             selectedEntity = root
+    //             dragStartPosition = root?.position
+    //             initialRotation = root?.orientation
+
+    //             if interactionMode == .none {
+    //                 interactionMode = .move
+    //             }
+    //         }
+
+    //     case .changed:
+    //         guard editorMode == .edit else { return }
+
+    //         //If selected entity is locked, orbit camera instead
+    //         if let entity = selectedEntity {
+    //             let isLocked =
+    //                 entity.components[LockComponent.self]?.isLocked ?? false
+    //             if isLocked {
+    //                 handleCameraOrbit(gesture)
+    //                 return
+    //             }
+    //         }
+
+    //         guard let entity = selectedEntity, let startPos = dragStartPosition
+    //         else {
+    //             handleCameraOrbit(gesture)
+    //             return
+    //         }
+
+    //         let translation = gesture.translation(in: arView)
+    //         let mouseDelta = SIMD2<Float>(
+    //             Float(translation.x),
+    //             Float(translation.y)
+    //         )
+
+    //         switch interactionMode {
+
+    //         case .move:
+    //             var newPosition = startPos
+
+    //             if currentAxis != .none {
+    //                 let moveDelta = calculateAxisMovement(
+    //                     entity: entity,
+    //                     axis: currentAxis,
+    //                     mouseDelta: mouseDelta,
+    //                     view: arView
+    //                 )
+    //                 newPosition += moveDelta
+
+    //             } else {
+    //                 let sensitivity: Float = 0.005
+    //                 let dx = mouseDelta.x * sensitivity
+    //                 let dy = -mouseDelta.y * sensitivity
+
+    //                 if currentDragMode == .ground {
+    //                     let camOri = arView.cameraTransform.rotation
+    //                     let right = camOri.act([1, 0, 0])
+    //                     let forward = camOri.act([0, 0, -1])
+
+    //                     let flatForward = simd_normalize(
+    //                         SIMD3<Float>(forward.x, 0, forward.z)
+    //                     )
+    //                     let flatRight = simd_normalize(
+    //                         SIMD3<Float>(right.x, 0, right.z)
+    //                     )
+
+    //                     newPosition += (flatRight * dx) + (flatForward * dy)
+    //                     newPosition.y = startPos.y
+
+    //                 } else {
+    //                     newPosition.x = startPos.x
+    //                     newPosition.z = startPos.z
+    //                     newPosition.y = startPos.y + (dy * 2.0)
+    //                 }
+    //             }
+    //             entity.position = newPosition
+
+    //         case .rotate:
+    //             let angle = Float(translation.x) * 0.01
+    //             let rotation = simd_quatf(angle: angle, axis: [0, 1, 0])
+    //             entity.orientation =
+    //                 rotation * (initialRotation ?? simd_quatf())
+
+    //         case .none:
+    //             break
+    //         }
+
+    //     case .ended, .cancelled:
+    //         dragStartPosition = nil
+    //         initialRotation = nil
+    //         currentAxis = .none
+
+    //     default:
+    //         break
     // Helper to get local axis from matrix
     func getLocalAxis(for part: GizmoPart, from entity: Entity) -> SIMD3<Float> {
         switch part {
@@ -3835,6 +4591,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        if gesture.state == .began {
+                saveCurrentStateToUndo()
+            }
         guard editorMode == .edit else { return }
         
         guard let entity = selectedEntity else {
@@ -4111,11 +4870,74 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
       
         
+        movementToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        movementToggleButton.addTarget(
+            self,
+            action: #selector(toggleMovementTapped(_:)),
+            for: .touchUpInside
+        )
+
+
+        
+        //                let undoBtn = UIButton(type: .system)
+        //                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
+        //                undoBtn.tintColor = .white
+        //                undoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        //                undoBtn.layer.cornerRadius = 20
+        //                undoBtn.translatesAutoresizingMaskIntoConstraints = false
+        //                undoBtn.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
+        //
+        //                let redoBtn = UIButton(type: .system)
+        //                redoBtn.setImage(UIImage(systemName: "arrow.uturn.forward"), for: .normal)
+        //                redoBtn.tintColor = .white
+        //                redoBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        //                redoBtn.layer.cornerRadius = 20
+        //                redoBtn.translatesAutoresizingMaskIntoConstraints = false
+        //                redoBtn.addTarget(self, action: #selector(redoTapped), for: .touchUpInside)
+        //
+        //                let exportBtn = UIButton(type: .system)
+        //                exportBtn.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+        //                exportBtn.tintColor = .white
+        //                exportBtn.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        //                exportBtn.layer.cornerRadius = 20
+        //                exportBtn.translatesAutoresizingMaskIntoConstraints = false
+        //                exportBtn.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
+        //
+        //                view.addSubview(exportBtn)
+        //                view.addSubview(undoBtn)
+        //                view.addSubview(redoBtn)
       
         
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
+        view.addSubview(movementToggleButton)
+
+        
+        //undo redo
+        //               NSLayoutConstraint.activate([
+        //                    // Redo Button (Closest to Layers Button)
+        //                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+        //                    redoBtn.trailingAnchor.constraint(equalTo: exportBtn.leadingAnchor,constant: -12),
+        //                    redoBtn.widthAnchor.constraint(equalToConstant: 40),
+        //                    redoBtn.heightAnchor.constraint(equalToConstant: 40),
+        //
+        //                    // Undo Button (To the left of Redo)
+        //                    undoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+        //                    undoBtn.trailingAnchor.constraint(equalTo: redoBtn.leadingAnchor, constant: -12),
+        //                    undoBtn.widthAnchor.constraint(equalToConstant: 40),
+        //                    undoBtn.heightAnchor.constraint(equalToConstant: 40),
+        //                ])
+        //
+        //        NSLayoutConstraint.activate([
+        //                            exportBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+        //                            // Place it to the left of your Undo button
+        //                            exportBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+        //                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
+        //                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
+        //                        ])
+        
+        //new undo redo ends
       
         
         // 7. CONSTRAINTS
@@ -4258,8 +5080,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             ),
             layersButton.widthAnchor.constraint(equalToConstant: 44),
             layersButton.heightAnchor.constraint(equalToConstant: 44),
-            layersButton.widthAnchor.constraint(equalToConstant: 40),
-            layersButton.heightAnchor.constraint(equalToConstant: 40),
+            layersButton.widthAnchor.constraint(equalToConstant: 44),
+            layersButton.heightAnchor.constraint(equalToConstant: 44),
         ])
         
         
@@ -4276,7 +5098,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             blue: 22 / 255,
             alpha: 1
         )
-        closeBtn.layer.cornerRadius = 20
+        closeBtn.layer.cornerRadius = 22
         closeBtn.translatesAutoresizingMaskIntoConstraints = false
         closeBtn.addTarget(
             self,
@@ -4291,7 +5113,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 equalTo: sidebarView.trailingAnchor,
                 constant: -16
             ),
-            closeBtn.widthAnchor.constraint(equalToConstant: 40),
+            closeBtn.widthAnchor.constraint(equalToConstant: 44),
             closeBtn.heightAnchor.constraint(equalToConstant: 40),
         ])
         
@@ -4300,7 +5122,15 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         view.bringSubviewToFront(layersButton)
         
     }
-    
+
+    @objc private func shotBreakdownTapped() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        print("🎬 Shot Breakdown Tapped")
+
+    }
+
     func presentToolSheet(tool: ToolType) {
         let sheet = ToolSheetViewController(tool: tool) { [weak self] item in
             self?.spawnEntity(item: item, toolType: tool)
@@ -4308,27 +5138,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         present(sheet, animated: true)
     }
     
-//    @objc func toggleRotationMode(_ button: UIButton) {
-//        interactionMode = (interactionMode == .move) ? .rotate : .move
-//        
-//        button.backgroundColor =
-//        interactionMode == .rotate
-//        ? .systemOrange
-//        : .systemBlue
-//    }
-    
     @objc func toggleRotationMode(_ button: UIButton) {
-            // Toggle the global state
-            interactionMode = (interactionMode == .rotate) ? .move : .rotate
-            
-            button.backgroundColor =
-            interactionMode == .rotate
-            ? .systemOrange
-            : .systemBlue
-            
-            // 🔧 FIX: Instantly refresh the UI to swap the gizmos on the selected object!
-            updateGizmoMode()
-        }
+        interactionMode = (interactionMode == .move) ? .rotate : .move
+        
+        button.backgroundColor =
+        interactionMode == .rotate
+        ? .systemOrange
+        : .systemBlue
+    }
     
     func makeIconToolbarButton(title: String, systemImage: String) -> UIButton {
         var config = UIButton.Configuration.plain()
@@ -4399,6 +5216,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         return container
     }
+}
     // MARK: - Transparency Helper
     func setEntityTransparency(_ entity: Entity?, alpha: Float) {
         guard let entity = entity else { return }
@@ -4431,58 +5249,29 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     // MARK: - Rotation Gizmo Mode
 
-//    func updateGizmoMode() {
-//
-//        guard let selected = selectedEntity else {
-//            hideRotationGizmo()
-//            hideGizmo()
-//            return
-//        }
-//
-//        if interactionMode == .move {
-//
-//            // Show normal gizmo
-//            hideRotationGizmo()
-//            showGizmo(at: selected)
-//
-//        } else if interactionMode == .rotate {
-//
-//            // Hide normal gizmo
-//            hideGizmo()
-//
-//            // Show rotation rings
-//            showRotationGizmo(for: selected)
-//        }
-//    }
-//
-    
     func updateGizmoMode() {
-            guard let selected = selectedEntity else {
-                hideRotationGizmo()
-                hideGizmo()
-                return
-            }
 
-            // 🔧 FIX: Never show ANY gizmos if the object is locked
-            let isLocked = selected.components[LockComponent.self]?.isLocked ?? false
-            if isLocked {
-                hideRotationGizmo()
-                hideGizmo()
-                return
-            }
-
-            // 🔧 FIX: Strictly follow the interactionMode (the button state)
-            if interactionMode == .move {
-                hideRotationGizmo()     // Instantly hide rings
-                showGizmo(at: selected) // Show XZ plane and arrow
-            } else if interactionMode == .rotate {
-                hideGizmo()             // Instantly hide XZ plane and arrow
-                showRotationGizmo(for: selected) // Show rings
-            } else {
-                hideRotationGizmo()
-                hideGizmo()
-            }
+        guard let selected = selectedEntity else {
+            hideRotationGizmo()
+            hideGizmo()
+            return
         }
+
+        if interactionMode == .move {
+
+            // Show normal gizmo
+            hideRotationGizmo()
+            showGizmo(at: selected)
+
+        } else if interactionMode == .rotate {
+
+            // Hide normal gizmo
+            hideGizmo()
+
+            // Show rotation rings
+            showRotationGizmo(for: selected)
+        }
+    }
     
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
 
@@ -4801,7 +5590,6 @@ class EntityActionMenu: UIView {
         }
     }
 
-    
     // MARK: - New Top Bar UI Elements
 
     private let topBarView: UIView = {
