@@ -61,3 +61,65 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# =========================
+# Xcode
+# =========================
+
+## User settings
+xcuserdata/
+*.xcuserstate
+
+## Xcode workspace user data
+*.xcworkspace/xcuserdata/
+
+## Derived data
+DerivedData/
+.build/
+
+## Build products
+build/
+Build/
+
+## Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+
+## CocoaPods
+Pods/
+Podfile.lock
+
+## Carthage
+Carthage/Build/
+
+## Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+## Archives
+*.xcarchive
+
+## Logs
+*.log
+
+## macOS
+.DS_Store
+
+## Temporary files
+*.swp
+*.tmp
+*.lock
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+## Firebase
+GoogleService-Info.plist
+
+## Environment files
+.env
+.env.local
