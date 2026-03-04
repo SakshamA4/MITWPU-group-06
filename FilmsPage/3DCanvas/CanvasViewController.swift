@@ -1509,8 +1509,13 @@ class CanvasViewController: UIViewController {
             }
         }
         self.sceneNameLabel.text = self.sceneName
+        loadSceneIfSaved()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
+    
     // MARK: - Background Handling
 
     func handleBackgroundSelection(_ item: BackgroundItem) {
@@ -1650,35 +1655,7 @@ class CanvasViewController: UIViewController {
     }
 
     @objc private func backButtonTapped() {
-        let currentID =
-            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
-
-        // Handle Template check as you currently do
-        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
-            $0.id == currentID
-        }
-
-        if isTemplate {
-            ScenesDataStore.shared.saveTemplateNote(
-                id: currentID,
-                notes: self.sceneNotes
-            )
-        } else {
-            // 1. Update Recent Scenes (Global)
-            let updatedRecent = ScenesModel(
-                id: currentID,
-                name: self.sceneName,
-                image: self.sceneImageName ?? "Image",
-                notes: self.sceneNotes
-            )
-            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
-
-            if var projectScene = self.currentSceneObject {
-                projectScene.name = self.sceneName
-            }
-        }
-
-        self.dismiss(animated: true)
+        promptSaveAndExit()
     }
 
     //Setup
@@ -1693,7 +1670,7 @@ class CanvasViewController: UIViewController {
         let anchor = AnchorEntity(world: .zero)
         anchor.name = "MainAnchor"
 
-        anchor.addChild(makeGrid(size: 100, spacing: 0.2))
+        anchor.addChild(makeGrid(size: 20, spacing: 0.5))
 
         editorCamera = PerspectiveCamera()
         editorCamera.name = "EditorCamera"
@@ -1707,110 +1684,6 @@ class CanvasViewController: UIViewController {
 
     }
 
-//    func spawnEntity(
-//        item: SpawnItem,
-//        toolType: ToolType,
-//        customName: String? = nil,
-//        scale: Float = 1.0
-//    ) {
-//        saveCurrentStateToUndo()
-//
-//        Task {
-//            do {
-//                // 1. Initial Checks for Special Types
-//
-//                // Camera
-//                if item.modelFileName == "cam1" {
-//                    spawnSceneCamera()
-//                    return
-//                }
-//                // Walls/Ground
-//                if item.modelFileName == "cube" {
-//                    spawnWall()
-//                    return
-//                }
-//                if item.modelFileName == "ground" {
-//                    spawnGround()
-//                    return
-//                }
-//                if item.isBackground {
-//                    spawnBackgroundPlane(item)
-//                    return
-//                }
-//
-//                // 2. Load the 3D Model (Character/Prop/Light)
-//                // If code reaches here, it assumes a valid .usdz file exists
-//                let entity = try await Entity(named: item.modelFileName)
-//
-//                // --- (Keep your existing Normalization, Scale, and Position logic here) ---
-//                // 📍 STEP A: NORMALIZE
-//                let bounds = entity.visualBounds(relativeTo: nil)
-//                let maxDim = max(
-//                    bounds.extents.x,
-//                    max(bounds.extents.y, bounds.extents.z)
-//                )
-//                if maxDim > 0.0001 {
-//                    let normalizationFactor = 1.0 / maxDim
-//                    entity.scale = SIMD3(repeating: normalizationFactor)
-//                }
-//
-//                // 📍 STEP B: APPLY SCALES
-//                var verticalOffset: Float = 0.0
-//                // ... (Your existing specific prop scaling logic) ...
-//                if item.modelFileName == "Spotlight" {
-//                    entity.scale = SIMD3(repeating: 0.01)
-//                    verticalOffset = 0.25
-//                } else if item.modelFileName.contains("LED") {
-//                    entity.scale = SIMD3(repeating: 0.01)
-//                } else if item.modelFileName.contains("Lantern") {
-//                    entity.scale = SIMD3(repeating: 0.0025)
-//                    verticalOffset = 0.25
-//                } else if item.modelFileName.contains("Plant") {
-//                    entity.scale = SIMD3(repeating: 0.01)
-//                } else {
-//                    entity.scale = SIMD3<Float>(repeating: scale)
-//                }
-//
-//                // 📍 STEP C: APPLY POSITION
-//                let randomX = Float.random(in: -1...1)
-//                let randomZ = Float.random(in: -1...1)
-//                let finalBounds = entity.visualBounds(relativeTo: nil)
-//                let liftToGround = -finalBounds.min.y
-//                let finalY = verticalOffset > 0 ? verticalOffset : liftToGround
-//
-//                entity.name = customName ?? item.modelFileName
-//                entity.position = [randomX, finalY, randomZ]
-//
-//                // 3. Components & Light Attachment
-//                entity.components.set(CategoryComponent(toolType: toolType))
-//                entity.generateCollisionShapes(recursive: true)
-//                entity.components.set(InputTargetComponent())
-//
-//                // ... (Your light attachment logic) ...
-//                if item.title.lowercased() == "light"
-//                    || item.modelFileName == "Spotlight"
-//                {
-//                    addRealLightToModel(entity)
-//                } else if item.title.lowercased() == "light"
-//                    || item.modelFileName == "LED Panel"
-//                {
-//                    addLEDPanel(to: entity)
-//                } else if item.title.lowercased() == "lantern"
-//                    || item.modelFileName == "Lantern"
-//                {
-//                    addLantern(to: entity)
-//                }
-//
-//                // 4. Add to Scene
-//                if let anchor = arView.scene.findEntity(named: "MainAnchor") {
-//                    anchor.addChild(entity)
-//                    self.refreshSidebarContent()
-//                }
-//            } catch {
-//                print("Failed to load \(item.modelFileName): \(error)")
-//            }
-//        }
-//    }
     
     func spawnEntity(
         item: SpawnItem,
@@ -1913,7 +1786,6 @@ class CanvasViewController: UIViewController {
                 // 4. Add to Scene
                 if let anchor = arView.scene.findEntity(named: "MainAnchor") {
                     anchor.addChild(entity)
-                    self.refreshSidebarContent()
                 }
             } catch {
                 print("Failed to load \(item.modelFileName): \(error)")
@@ -1989,7 +1861,6 @@ class CanvasViewController: UIViewController {
             anchor.addChild(plane)
             self.backgroundPlane = plane
 
-            self.refreshSidebarContent()
 
         } catch {
             print("Texture failed: \(error)")

@@ -159,19 +159,13 @@
                         </constraints>
                     </view>
                     <navigationItem key="navigationItem" largeTitleDisplayMode="always" id="PRW-dq-S61">
-                        <rightBarButtonItems>
-                            <barButtonItem style="plain" systemItem="search" id="f1o-R7-bs7"/>
-                            <barButtonItem style="plain" systemItem="add" id="Agk-V0-Wuc">
-                                <connections>
-                                    <segue destination="d2E-aU-lJC" kind="presentation" identifier="addFilmSegue" id="eJo-Hh-gu6"/>
-                                </connections>
-                            </barButtonItem>
-                        </rightBarButtonItems>
+                        <barButtonItem key="rightBarButtonItem" style="plain" systemItem="search" id="f1o-R7-bs7"/>
                     </navigationItem>
                     <connections>
                         <outlet property="FilmsPageTitleLabel" destination="Y3n-Yl-agu" id="Bvr-g1-MTi"/>
                         <outlet property="collectionView" destination="X85-hE-StN" id="g2o-QM-jdC"/>
                         <segue destination="ZKF-im-qT0" kind="show" identifier="myFilmSegue" id="bUG-mf-0uq"/>
+                        <segue destination="d2E-aU-lJC" kind="presentation" identifier="addFilmSegue" id="9f1-Oc-zFO"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
