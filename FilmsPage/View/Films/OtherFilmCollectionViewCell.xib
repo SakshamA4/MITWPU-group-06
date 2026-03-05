@@ -31,6 +31,21 @@
                                 <color key="textColor" red="1" green="1" blue="1" alpha="1" colorSpace="calibratedRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
+                            <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gch-0J-dZb">
+                                <rect key="frame" x="170" y="205" width="34" height="34"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="gray" image="book.pages" catalog="system" cornerStyle="capsule">
+                                    <color key="baseForegroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                </buttonConfiguration>
+                            </button>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="iTq-G7-eiM">
+                                <rect key="frame" x="14" y="218" width="42" height="21"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" red="0.1019897461" green="0.1019897461" blue="0.1600341797" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                         <constraints>
@@ -53,10 +68,15 @@
             </constraints>
             <size key="customSize" width="212" height="246"/>
             <connections>
+                <outlet property="createdDateLabel" destination="iTq-G7-eiM" id="o73-Vk-zHG"/>
                 <outlet property="imageView" destination="OCU-Mb-fFe" id="B4O-Gx-J0N"/>
+                <outlet property="seeNotesButton" destination="gch-0J-dZb" id="M7i-nq-ecd"/>
                 <outlet property="titleLabel" destination="yGx-oQ-Dtn" id="gHh-ew-R24"/>
             </connections>
             <point key="canvasLocation" x="197.5609756097561" y="203.38983050847457"/>
         </collectionViewCell>
     </objects>
+    <resources>
+        <image name="book.pages" catalog="system" width="107" height="128"/>
+    </resources>
 </document>

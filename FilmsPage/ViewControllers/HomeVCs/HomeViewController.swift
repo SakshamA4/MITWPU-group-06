@@ -86,13 +86,12 @@ extension HomeViewController: UICollectionViewDataSource {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as! TemplatesCollectionViewCell
             let item = templates[indexPath.row]
             cell.templateLabel.text = item.name
-            cell.templatesImageView.image = UIImage(named: item.image ?? "Image")
+            cell.templatesImageView.setFilmImage(named: item.image ?? "Image")
             return cell
         } else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as! RecentScenesCollectionViewCell
             let item = recentScenes[indexPath.row]
-            cell.recentLabel.text = item.name
-            cell.recentImageView.image = UIImage(named: item.image ?? "Image")
+            cell.configure(with: item)
             return cell
         }
     }

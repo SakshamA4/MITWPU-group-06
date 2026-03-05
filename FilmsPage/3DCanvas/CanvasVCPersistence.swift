@@ -38,9 +38,6 @@ extension CanvasViewController {
         present(alert, animated: true)
     }
 
-    // MARK: - Private helpers
-
-    /// Snapshots the RealityKit scene on the main thread, then writes JSON in background.
     private func saveAndExit() {
         guard let id = currentSceneID else {
             commitExit()
@@ -88,18 +85,3 @@ extension CanvasViewController {
         dismiss(animated: true)
     }
 }
-
-/*
- ──────────────────────────────────────────────────────────────
- MANUAL HOOKS — 2 changes to CanvasViewController.swift
- ──────────────────────────────────────────────────────────────
-
- 1. End of viewDidLoad():
-        loadSceneIfSaved()
-
- 2. Replace entire body of backButtonTapped() with:
-        promptSaveAndExit()
-
- Remove viewDidAppear (startAutoSave) if still present.
- ──────────────────────────────────────────────────────────────
-*/

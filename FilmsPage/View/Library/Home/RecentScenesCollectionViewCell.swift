@@ -16,6 +16,7 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
         super.awakeFromNib()
 
         // Image view
+
         recentImageView.contentMode = .scaleAspectFill
         recentImageView.layer.cornerRadius = 16
         recentImageView.clipsToBounds = true
@@ -34,6 +35,11 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
 
         // Bring label above gradient
         contentView.bringSubviewToFront(recentLabel)
+    }
+    
+    func configure(with item: ScenesModel) {
+        recentImageView.setFilmImage(named: item.image ?? "Image")
+        recentLabel.text = item.name
     }
 
     private func setupGradient() {
