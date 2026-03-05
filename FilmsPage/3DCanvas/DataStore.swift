@@ -20,7 +20,7 @@ struct CategoryComponent: Component {
 }
 
 enum ToolType: CaseIterable {
-    case character, prop, camera, light, background, wall
+    case character, prop, camera, light, background, wall, sky
 
     var title: String {
         switch self {
@@ -30,6 +30,7 @@ enum ToolType: CaseIterable {
         case .light: return "Light"
         case .background: return "Background"
         case .wall: return "Wall"
+        case .sky: return "Sky"
         }
     }
     
@@ -41,6 +42,7 @@ enum ToolType: CaseIterable {
         case .light: return "lightbulb.fill"
         case .background: return "photo.fill"
         case .wall: return "square.split.2x2"
+        case .sky: return "cloud.sun.fill"
         }
     }
 
@@ -95,6 +97,32 @@ enum ToolType: CaseIterable {
                 )
 
             ]
+            
+        case .sky:
+            return [
+                SpawnItem(
+                    title: "Daylight Sky",
+                    imageName: "cloud.sun",
+                    modelFileName: "sky_day"
+                ),
+                SpawnItem(
+                    title: "Sunset Sky",
+                    imageName: "sunset",
+                    modelFileName: "sky_sunset"
+                ),
+                SpawnItem(
+                    title: "Midnight Sky",
+                    imageName: "moon.stars",
+                    modelFileName: "sky_night"
+                ),
+                SpawnItem(
+                    title: "Real Clouds",
+                    imageName: "sky_image_1",
+                    modelFileName: "sky_image_1"
+                )
+
+            ]
+            
         }
     }
 }
@@ -108,6 +136,7 @@ extension ToolType {
         case .light: return "Lighting"
         case .background: return "Background"
         case .wall: return "Wall"
+        case .sky: return "Sky"
         }
     }
 }
