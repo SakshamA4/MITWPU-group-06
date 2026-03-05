@@ -2,49 +2,52 @@
 //  OtherFilmCollectionViewCell.swift
 //  FilmsPage
 //
-//  Created by SDC-USER on 24/11/25.
-//
 
 import UIKit
-
-protocol OtherFilmDelegate {
-    func setFavFilm(film: Film)
-}
 
 class OtherFilmCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var imageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
-    @IBOutlet weak var FavButton: UIButton!
-    
-    @IBOutlet weak var view: UIView!
-    
-    var delegate: OtherFilmDelegate?
-    var film: Film?
-    
+
+    // NOTE: FavButton IBOutlet/IBAction and OtherFilmDelegate have been removed.
+    // If you have a FavButton in your .xib, you can delete it or leave it
+    // disconnected — it won't cause a crash unless it still has an IBAction wired up.
+
+    private var film: Film?
+
     override func awakeFromNib() {
         super.awakeFromNib()
-        
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
         contentView.layer.borderWidth = 0.7
         contentView.layer.borderColor = UIColor.gray.cgColor
-        // Round the imageView
+    }
 
-        // Initialization code
-    }
-    
-    @IBAction func onFavClick(_ sender: Any) {
-        delegate?.setFavFilm(film: film!)
-        
-    }
     func configureCell(film: Film) {
-        if !film.image.isEmpty {
-            imageView.image = UIImage(named: film.image)
-        } else {
-            imageView.image = nil // or set a placeholder: UIImage(named: "placeholder")
-        }
         self.film = film
+        imageView.setFilmImage(named: film.image)
         titleLabel.text = film.name.capitalized
+    }
+}
+
+extension UIImageView {
+    func setFilmImage(named name: String) {
+        // 1. Try asset catalogue (default "Image", template names)
+        if let asset = UIImage(named: name) {
+            self.image = asset
+            return
+        }
+        // 2. Try documents directory (user-picked photos saved to disk)
+        let url = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        if let data = try? Data(contentsOf: url),
+           let image = UIImage(data: data) {
+            self.image = image
+            return
+        }
+        // 3. Fallback
+        self.image = UIImage(named: "Image")
     }
 }

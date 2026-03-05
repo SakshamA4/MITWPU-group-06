@@ -31,41 +31,20 @@ class SceneCollectionViewCell: UICollectionViewCell {
         updateGradientFrame()
     }
 
-//    func configureCell(scene: Scene) {
-//
-//        if let image = UIImage(named: scene.image) {
-//            imageView.image = image
-//            
-//            if let color = image.dominantColor() {
-//                applyGradientBehindLabel(using: color)
-//            }
-//
-//        } else {
-//            imageView.image = nil
-//        }
-//
-//        titleLabel.text = scene.name.capitalized
-//    }
+
     func configureCell(scene: Scene) {
-        // 1. Safe Unwrapping: Use optional binding to extract the string
-        if let imageString = scene.image, let image = UIImage(named: imageString) {
-            imageView.image = image
-            
-            // 2. Dominant Color Logic: Use the extension method you defined
-            // 📍 Note: Change dominantColor() to SceneCelldominantColor() to match your extension name
-            if let color = image.SceneCelldominantColor() {
-                applyGradientBehindLabel(using: color)
-            }
+        let imageName = scene.image ?? "Image"
+        imageView.setFilmImage(named: imageName)
+
+        if let image = imageView.image, let color = image.SceneCelldominantColor() {
+            applyGradientBehindLabel(using: color)
         } else {
-            // Fallback: If no image found, show nil or a placeholder
-            imageView.image = nil
             gradientLayer?.removeFromSuperlayer()
         }
 
         titleLabel.text = scene.name.capitalized
     }
     
-    // MARK: - GRADIENT BEHIND LABEL
     func applyGradientBehindLabel(using color: UIColor) {
         
         gradientLayer?.removeFromSuperlayer()

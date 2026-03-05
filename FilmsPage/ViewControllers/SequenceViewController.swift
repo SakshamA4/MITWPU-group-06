@@ -128,6 +128,7 @@ extension SequenceViewController: UICollectionViewDelegate,
         let selectedScene = scene[indexPath.item]
         let vc = CanvasViewController()
         vc.currentSceneObject = selectedScene
+        vc.currentSceneID = selectedScene.id
         
         vc.sceneName = selectedScene.name
         vc.sequenceName = self.sequence?.name

@@ -64,16 +64,12 @@ class SequencesCollectionViewCell: UICollectionViewCell {
     }
 
     func configureCell(sequence: Sequence) {
-
-        if let image = UIImage(named: sequence.image) {
-            imageView.image = image
-            
-            if let color = image.dominantColor() {
-                applyGradientBehindLabel(using: color)
-            }
-
+        imageView.setFilmImage(named: sequence.image)
+        
+        if let image = imageView.image, let color = image.dominantColor() {
+            applyGradientBehindLabel(using: color)
         } else {
-            imageView.image = nil
+            gradientLayer?.removeFromSuperlayer()
         }
 
         titleLabel.text = sequence.name.capitalized

@@ -20,7 +20,7 @@ class LibrarySceneCollectionViewCell: UICollectionViewCell {
            super.awakeFromNib()
            
            setupUI()
-//           setupGradient()
+
        }
        
        override func layoutSubviews() {
@@ -28,47 +28,25 @@ class LibrarySceneCollectionViewCell: UICollectionViewCell {
            gradientLayer.frame = sceneImageView.bounds
        }
        
-//       func configure(with item: ScenesModel) {
-//           sceneImageView.image = UIImage(named: item.image)
-//           titleLabel.text = item.name
-//       }
+
     func configure(with item: ScenesModel) {
-        
-        if let imageName = item.image {
-            sceneImageView.image = UIImage(named: imageName)
-        } else {
-            // Fallback to a system placeholder if the string is nil
-            sceneImageView.image = UIImage(systemName: "photo.on.rectangle")
-        }
-        
+        let imageName = item.image ?? "Image"
+        sceneImageView.setFilmImage(named: imageName)
         titleLabel.text = item.name
     }
    }
 
    // MARK: - Setup
-   private extension LibrarySceneCollectionViewCell {
-       
-       func setupUI() {
-           contentView.layer.cornerRadius = 12
-           contentView.layer.masksToBounds = true
-           contentView.backgroundColor = UIColor(hex: "#1A1A1A")
-           
-           sceneImageView.contentMode = .scaleAspectFill
-           sceneImageView.clipsToBounds = true
-           
-//           titleLabel.textColor = .white
-//           titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-           titleLabel.numberOfLines = 2
-       }
-       
-//       func setupGradient() {
-//           gradientLayer.colors = [
-//               UIColor(hex: "#00000000").cgColor, // transparent top
-//               UIColor(hex: "#00000099").cgColor  // black 60% bottom
-//           ]
-//           gradientLayer.locations = [0.0, 1.0]
-//           gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
-//           gradientLayer.endPoint = CGPoint(x: 0.0, y: 1.0)
-//           sceneImageView.layer.addSublayer(gradientLayer)
-//       }
-   }
+private extension LibrarySceneCollectionViewCell {
+    
+    func setupUI() {
+        contentView.layer.cornerRadius = 12
+        contentView.layer.masksToBounds = true
+        contentView.backgroundColor = UIColor(hex: "#1A1A1A")
+        
+        sceneImageView.contentMode = .scaleAspectFill
+        sceneImageView.clipsToBounds = true
+        
+        titleLabel.numberOfLines = 2
+    }
+}
