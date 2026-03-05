@@ -26,7 +26,28 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
 
     func configureCell(film: Film) {
         self.film = film
-        imageView.image = film.image.isEmpty ? nil : UIImage(named: film.image)
+        imageView.setFilmImage(named: film.image)
         titleLabel.text = film.name.capitalized
+    }
+}
+
+extension UIImageView {
+    func setFilmImage(named name: String) {
+        // 1. Try asset catalogue (default "Image", template names)
+        if let asset = UIImage(named: name) {
+            self.image = asset
+            return
+        }
+        // 2. Try documents directory (user-picked photos saved to disk)
+        let url = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        if let data = try? Data(contentsOf: url),
+           let image = UIImage(data: data) {
+            self.image = image
+            return
+        }
+        // 3. Fallback
+        self.image = UIImage(named: "Image")
     }
 }
