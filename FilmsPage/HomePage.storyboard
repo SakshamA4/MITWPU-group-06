@@ -804,7 +804,6 @@
                                     <color key="baseForegroundColor" red="0.99999600649999998" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 </buttonConfiguration>
                                 <connections>
-                                    <action selector="addButtonTapped:" destination="Hdn-cf-EUe" eventType="touchUpInside" id="Syw-8U-JSQ"/>
                                     <action selector="saveButtonTapped:" destination="Hdn-cf-EUe" eventType="touchUpInside" id="Vw9-DO-LMK"/>
                                 </connections>
                             </button>
@@ -892,9 +891,7 @@
                     </view>
                     <connections>
                         <outlet property="addImageButton" destination="wkj-vO-yPU" id="A8y-gC-CBc"/>
-                        <outlet property="newSceneView" destination="ZO3-ed-Fuy" id="7yV-O9-NQ4"/>
                         <outlet property="sceneImageView" destination="W1Y-t2-VNk" id="uye-iY-cZ6"/>
-                        <outlet property="sceneName" destination="Hr2-3w-Rhb" id="tKL-59-gJq"/>
                         <outlet property="sceneNameTextField" destination="Hr2-3w-Rhb" id="EqR-WS-1aA"/>
                         <outlet property="sceneNotes" destination="mau-nE-eE2" id="LNc-u3-yAL"/>
                         <outlet property="sceneView" destination="ZO3-ed-Fuy" id="eOM-Yj-YMI"/>

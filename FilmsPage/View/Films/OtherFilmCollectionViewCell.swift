@@ -10,6 +10,10 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
     @IBOutlet weak var imageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
 
+    @IBOutlet weak var seeNotesButton: UIButton!
+    
+    @IBOutlet weak var createdDateLabel: UILabel!
+    
     // NOTE: FavButton IBOutlet/IBAction and OtherFilmDelegate have been removed.
     // If you have a FavButton in your .xib, you can delete it or leave it
     // disconnected — it won't cause a crash unless it still has an IBAction wired up.
