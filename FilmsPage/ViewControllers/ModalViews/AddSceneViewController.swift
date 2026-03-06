@@ -48,6 +48,18 @@ class AddSceneViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(presentImageSourceOptions))
         sceneImageView.addGestureRecognizer(tap)
+        sceneNotes.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        sceneNotes.layer.borderWidth = 1.0
+        sceneName.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        sceneName.layer.borderWidth = 1.0
+        sceneNotes.layer.cornerRadius = 12
+        sceneName.layer.cornerRadius = 10
+        sceneName.attributedPlaceholder = NSAttributedString(
+            string: "Add Name",
+            attributes: [.foregroundColor: UIColor.systemGray]
+        )
+        sceneNotes.text = "Add Notes"
+        sceneNotes.textColor = UIColor.systemGray
     }
 
     private func styleAddImageButton() {
@@ -208,5 +220,20 @@ extension AddSceneViewController: UIImagePickerControllerDelegate, UINavigationC
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
+    }
+}
+extension AddSceneViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        if textView.textColor == UIColor.systemGray {
+            textView.text = nil
+            textView.textColor = .white // or whatever your normal text colour is
+        }
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if textView.text.isEmpty {
+            textView.text = "Add Notes"
+            textView.textColor = UIColor.systemGray
+        }
     }
 }
