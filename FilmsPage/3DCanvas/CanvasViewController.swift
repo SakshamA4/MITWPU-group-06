@@ -261,7 +261,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var sceneImageName: String?
     var currentSceneID: UUID?
 
-    private lazy var sceneNameLabel: UILabel = {
+    lazy var sceneNameLabel: UILabel = {
         let label = UILabel()
         // Accessing the instance property here
         label.text = self.sceneName.uppercased()
@@ -311,7 +311,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var activeGizmoPart: GizmoPart = .none
 
     // Movement mode toggle button (declared here, configured in setupUI)
-    private lazy var movementToggleButton: UIButton = {
+    lazy var movementToggleButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setImage(UIImage(systemName: "arrow.left.and.right"), for: .normal)
         btn.tintColor = .white
@@ -355,7 +355,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var cameraCollectionView: UICollectionView!
 
     // MARK: - Top Right UI Components
-    private let shotBreakdownBtn: UIButton = {
+    let shotBreakdownBtn: UIButton = {
         let btn = UIButton(type: .system)
         var config = UIButton.Configuration.filled()
 
@@ -389,7 +389,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     //  PLACE THIS AT CLASS LEVEL (NOT INSIDE ANOTHER FUNC)
 
 //    // 5. The Application Function (Receives the Struct)
-    private func applySnapshot(_ snapshot: SceneSnapshot) {
+     func applySnapshot(_ snapshot: SceneSnapshot) {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
         let currentEntities = anchor.children
         
@@ -420,11 +420,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
     //Scene Hierarchy properties starts
     
-    private let sidebarWidth: CGFloat = 210
-    private var isSidebarVisible = false
-    private var sidebarLeadingConstraint: NSLayoutConstraint!
+    let sidebarWidth: CGFloat = 210
+    var isSidebarVisible = false
+    var sidebarLeadingConstraint: NSLayoutConstraint!
     
-    private let sidebarView: UIView = {
+    let sidebarView: UIView = {
         let view = UIView()
         view.backgroundColor = .systemGray5
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -434,7 +434,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         return view
     }()
     
-    private let hierarchyStackView: UIStackView = {
+    let hierarchyStackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .vertical
         stack.spacing = 8
@@ -560,7 +560,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             return true
         }
     
-    @objc private func backButtonTapped() {
+    @objc func backButtonTapped() {
         let currentID =
             self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
 
@@ -770,7 +770,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
     //Gestures
 
-    @objc private func handlePathLongPress(
+    @objc func handlePathLongPress(
         _ gesture: UILongPressGestureRecognizer
     ) {
         guard gesture.state == .began else { return }
@@ -1602,13 +1602,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
 }
 
-}
-}
-}
+
 
 extension SIMD4 where Scalar == Float {
     var xyz: SIMD3<Float> {
         return SIMD3<Float>(x, y, z)
     }
 }
-

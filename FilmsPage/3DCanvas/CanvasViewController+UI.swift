@@ -57,7 +57,7 @@ extension CanvasViewController {
     
     
     
-    private func setupNavigationBar() {
+    func setupNavigationBar() {
 
         self.navigationItem.title = self.sceneName
 
@@ -298,35 +298,7 @@ extension CanvasViewController {
         applyOpacity(to: entity)
     }
 
-    func setLockTitle(isLocked: Bool) {
-        // This finds the button labeled "Lock" or "Unlock" and updates it
-        stackView.arrangedSubviews.compactMap { $0 as? UIButton }.forEach {
-            btn in
-            if btn.currentTitle == "Lock" || btn.currentTitle == "Unlock" {
-                btn.setTitle(isLocked ? "Unlock" : "Lock", for: .normal)
-            }
-        }
-    }
 
-
-    private func addMenuButton(
-        title: String,
-        action: ActionType,
-        isDestructive: Bool = false
-    ) {
-        let btn = UIButton(type: .system)
-        btn.setTitle(title, for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 17, weight: .regular)
-        btn.tintColor =
-            isDestructive
-            ? UIColor(red: 169 / 255, green: 32 / 255, blue: 57 / 255, alpha: 1)
-            : .label
-        btn.addAction(
-            UIAction { [weak self] _ in self?.onAction?(action) },
-            for: .touchUpInside
-        )
-        stackView.addArrangedSubview(btn)
-    }
 
 
     @objc func didTapLayersButton() {
@@ -814,30 +786,16 @@ extension CanvasViewController {
     }
 
 
-
-    private func setupUI() {
-        backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-        layer.cornerRadius = 28
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.15
-        layer.shadowRadius = 12
-
-        addSubview(stackView)
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-        ])
-
-        addMenuButton(title: "Move", action: .move)
-        addSeparator()
-        addMenuButton(title: "Rotate", action: .rotate)
-        addSeparator()
-        addMenuButton(title: "Lock", action: .lock)
-        addSeparator()
-        addMenuButton(title: "Delete", action: .delete, isDestructive: true)
+    @objc func shotBreakdownTapped() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        print("🎬 Shot Breakdown Tapped")
     }
 
+
+}
+
+// MARK: - UICollectionView DataSource + Delegate
+extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+    // Implementations are in CanvasViewController+Camera.swift
 }

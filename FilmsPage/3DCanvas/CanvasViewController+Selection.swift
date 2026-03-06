@@ -73,7 +73,7 @@ extension CanvasViewController {
 
 
     
-    private func selectEntityFromSidebar(named name: String) {
+    func selectEntityFromSidebar(named name: String) {
         
         guard let entity = arView.scene.findEntity(named: name) else { return }
         

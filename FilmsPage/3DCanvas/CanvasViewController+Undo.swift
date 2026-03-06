@@ -50,7 +50,7 @@ extension CanvasViewController {
 //    }
 
     
-    private func restoreEntity(named name: String, with transform: Transform) {
+    func restoreEntity(named name: String, with transform: Transform) {
         // 1. Detect category for all toolbar items based on your naming conventions
         let toolType: ToolType
         if name.contains("SceneCamera") {

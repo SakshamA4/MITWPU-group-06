@@ -4,6 +4,9 @@ import RealityKit
 import UIKit
 import ARKit
 
+// MARK: - CanvasViewController + CharacterDetailDelegate
+extension CanvasViewController: CharacterDetailDelegate {}
+
 extension CanvasViewController {
 
 
