@@ -66,6 +66,10 @@ class SequenceViewController: UIViewController {
             UINib(nibName: "SceneCollectionViewCell", bundle: nil),
             forCellWithReuseIdentifier: "scene_cell"
         )
+        collectionView.register(
+            UINib(nibName: "PlaceholderCollectionViewCell", bundle: nil),
+            forCellWithReuseIdentifier: "placeholder_cell"
+        )
     }
 
     private func updateTitle() {
@@ -75,20 +79,28 @@ class SequenceViewController: UIViewController {
 }
 
 extension SequenceViewController: UICollectionViewDataSource {
-    func collectionView(
-        _ collectionView: UICollectionView,
-        cellForItemAt indexPath: IndexPath
-    ) -> UICollectionViewCell {
-        guard
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: sceneCellId,
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        
+        // Index 0 → placeholder cell
+        if indexPath.item == 0 {
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: "placeholder_cell",
                 for: indexPath
-            ) as? SceneCollectionViewCell
-        else {
-            return UICollectionViewCell()
+            ) as? PlaceholderCollectionViewCell else { return UICollectionViewCell() }
+            
+            cell.onPlusButtonTapped = { [weak self] in
+                self?.performSegue(withIdentifier: "addSceneSegue", sender: nil)
+            }
+            return cell
         }
-        let scene = scene[indexPath.item]
-        cell.configureCell(scene: scene)
+        
+        // Index 1+ → scene cells
+        guard let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: sceneCellId,
+            for: indexPath
+        ) as? SceneCollectionViewCell else { return UICollectionViewCell() }
+        
+        cell.configureCell(scene: scene[indexPath.item - 1])  // -1 to offset placeholder
         return cell
     }
 
@@ -96,7 +108,7 @@ extension SequenceViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        return scene.count
+        return scene.count + 1
     }
 }
 
@@ -124,16 +136,16 @@ extension SequenceViewController: UICollectionViewDelegate,
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // 1. Get the specific scene the user tapped on
-        let selectedScene = scene[indexPath.item]
+        guard indexPath.item != 0 else { return }  // ignore placeholder tap
+        
+        let selectedScene = scene[indexPath.item - 1]  // -1 offset
         let vc = CanvasViewController()
         vc.currentSceneObject = selectedScene
         vc.currentSceneID = selectedScene.id
-        
         vc.sceneName = selectedScene.name
         vc.sequenceName = self.sequence?.name
         vc.filmName = self.filmName
-     
+        
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
@@ -153,6 +165,7 @@ extension SequenceViewController {
     
     // MARK: - Context Menu (Long Press)
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+        guard indexPath.item != 0 else { return nil }
         
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
             

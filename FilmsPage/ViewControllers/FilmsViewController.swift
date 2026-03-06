@@ -196,6 +196,11 @@ class FilmsViewController: UIViewController {
            let vc = segue.destination as? MyFilmViewController {
             vc.film = film
         }
+        if segue.identifier == "displayNotesSegue",
+           let film = sender as? Film,
+           let vc = segue.destination as? FilmNotesViewController {
+            vc.film = film
+        }
     }
 }
 
@@ -231,6 +236,10 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
         ) as? OtherFilmCollectionViewCell else { return UICollectionViewCell() }
 
         cell.configureCell(film: allFilms[indexPath.item - 1])
+        let tappedFilm = allFilms[indexPath.item - 1]
+        cell.onSeeNotesTapped = { [weak self] in
+            self?.performSegue(withIdentifier: "displayNotesSegue", sender: tappedFilm)
+        }
         return cell
     }
 

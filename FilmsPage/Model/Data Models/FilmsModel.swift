@@ -19,6 +19,7 @@ struct Film: Codable {
     var props: Int = 0
     var image : String
     var notes: String = ""
+    let createdDate: Date 
 }
 
 

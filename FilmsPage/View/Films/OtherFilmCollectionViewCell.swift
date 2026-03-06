@@ -14,6 +14,8 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
     
     @IBOutlet weak var createdDateLabel: UILabel!
     
+    var onSeeNotesTapped: (() -> Void)?
+    
     // NOTE: FavButton IBOutlet/IBAction and OtherFilmDelegate have been removed.
     // If you have a FavButton in your .xib, you can delete it or leave it
     // disconnected — it won't cause a crash unless it still has an IBAction wired up.
@@ -26,14 +28,26 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
         contentView.layer.masksToBounds = true
         contentView.layer.borderWidth = 0.7
         contentView.layer.borderColor = UIColor.gray.cgColor
+        imageView.layer.cornerRadius = 16
+        imageView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        imageView.clipsToBounds = true
     }
 
+    @IBAction func seeNotesTapped(_ sender: Any) {
+        onSeeNotesTapped?()
+    }
+    
     func configureCell(film: Film) {
         self.film = film
         imageView.setFilmImage(named: film.image)
         titleLabel.text = film.name.capitalized
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd/MM/yy, hh:mm a"
+        createdDateLabel.text = "\(formatter.string(from: film.createdDate))"
     }
 }
+
+
 
 extension UIImageView {
     func setFilmImage(named name: String) {
