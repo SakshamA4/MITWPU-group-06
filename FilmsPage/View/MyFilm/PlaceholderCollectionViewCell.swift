@@ -27,6 +27,8 @@ class PlaceholderCollectionViewCell: UICollectionViewCell {
             bgView.layer.cornerCurve = .continuous
             bgView.layer.masksToBounds = true
             bgView.backgroundColor = UIColor.white.withAlphaComponent(0.05)
+            bgView.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+            bgView.layer.borderWidth = 1.0
         }
 
 

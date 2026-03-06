@@ -23,7 +23,8 @@ class AddFilmViewController: UIViewController {
         mainView.layer.cornerRadius = 16
         mainView.clipsToBounds = true
         setupImageView()
-        styleAddImageButton() 
+        styleAddImageButton()
+        notesTextField.delegate = self
     }
 
     private func styleAddImageButton() {
@@ -34,6 +35,18 @@ class AddFilmViewController: UIViewController {
         config.cornerStyle = .capsule
         config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 24, bottom: 10, trailing: 24)
         addImageButton.configuration = config
+        notesTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        notesTextField.layer.borderWidth = 1.0
+        nameTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        nameTextField.layer.borderWidth = 1.0
+        notesTextField.layer.cornerRadius = 12
+        nameTextField.layer.cornerRadius = 10
+        nameTextField.attributedPlaceholder = NSAttributedString(
+            string: "Add Name",
+            attributes: [.foregroundColor: UIColor.systemGray]
+        )
+        notesTextField.text = "Add Notes"
+        notesTextField.textColor = UIColor.systemGray
     }
 
     // MARK: - Image View Setup
@@ -119,6 +132,11 @@ class AddFilmViewController: UIViewController {
             return
         }
 
+        // ← ADD THIS BLOCK
+        let notesText = (notesTextField.text == "Add Notes" || notesTextField.text.isEmpty)
+            ? ""
+            : notesTextField.text ?? ""
+
         let imageNameToStore: String
         if let pickedImage = selectedImage {
             imageNameToStore = saveImageToDisk(pickedImage) ?? "Image"
@@ -133,7 +151,9 @@ class AddFilmViewController: UIViewController {
             scenes: 0,
             time: "",
             characters: 0,
-            image: imageNameToStore
+            image: imageNameToStore,
+            notes: notesText,   // ← ADD THIS LINE
+            createdDate: Date()
         )
 
         FilmService.shared.addFilm(film)
@@ -199,5 +219,21 @@ extension AddFilmViewController: UIImagePickerControllerDelegate, UINavigationCo
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
+    }
+}
+
+extension AddFilmViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        if textView.textColor == UIColor.systemGray {
+            textView.text = nil
+            textView.textColor = .white // or whatever your normal text colour is
+        }
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if textView.text.isEmpty {
+            textView.text = "Add Notes"
+            textView.textColor = UIColor.systemGray
+        }
     }
 }

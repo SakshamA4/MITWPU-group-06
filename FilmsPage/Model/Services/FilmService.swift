@@ -126,7 +126,8 @@ class FilmService {
                     time: "0",
                     characters: 0,
                     props: 3,
-                    image: "Image"
+                    image: "Image",
+                    createdDate: Date()
                 ),
                 Film(
                     id: UUID(),
@@ -135,7 +136,8 @@ class FilmService {
                     scenes: 0,
                     time: "0",
                     characters: 0,
-                    image: "Image"
+                    image: "Image",
+                    createdDate: Date()
                 )
             ]
         }

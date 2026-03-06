@@ -46,6 +46,19 @@ class AddSequenceViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(presentImageSourceOptions))
         sequenceImageView.addGestureRecognizer(tap)
+        
+        notesTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        notesTextField.layer.borderWidth = 1.0
+        nameTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
+        nameTextField.layer.borderWidth = 1.0
+        notesTextField.layer.cornerRadius = 12
+        nameTextField.layer.cornerRadius = 10
+        nameTextField.attributedPlaceholder = NSAttributedString(
+            string: "Add Name",
+            attributes: [.foregroundColor: UIColor.systemGray]
+        )
+        notesTextField.text = "Add Notes"
+        notesTextField.textColor = UIColor.systemGray
     }
 
     private func styleAddImageButton() {
@@ -206,5 +219,20 @@ extension AddSequenceViewController: UIImagePickerControllerDelegate, UINavigati
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
+    }
+}
+extension AddSequenceViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        if textView.textColor == UIColor.systemGray {
+            textView.text = nil
+            textView.textColor = .white // or whatever your normal text colour is
+        }
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if textView.text.isEmpty {
+            textView.text = "Add Notes"
+            textView.textColor = UIColor.systemGray
+        }
     }
 }
