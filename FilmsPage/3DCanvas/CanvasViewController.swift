@@ -9,7 +9,7 @@ import Combine
 import PhotosUI
 import RealityKit
 import UIKit
-
+import ARKit
 struct SceneSnapshot {
     var entityTransforms: [String: Transform]
 }
@@ -238,9 +238,13 @@ func applyEasing(_ t: Float, easing: EasingType) -> Float {
 }
 
 class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
-    
+
+    // MARK: - AR Mode
+    var isARModeActive: Bool = false
+    weak var arModeButton: UIButton?
+
     // MARK: - NEW Properties
-    
+
     //Ata
     var activeRotationAxis: SIMD3<Float>?
     var lastPanLocation: CGPoint = .zero
@@ -1955,6 +1959,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     func setupARView() {
         arView = ARView(frame: view.bounds)
         arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Stop RealityKit auto-starting its own AR session (prevents background grid artefact)
+        arView.automaticallyConfigureSession = false
+        // Disable post-processing so editor stays crisp and AR has no blurry-wave ghosting
+        arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
+        arView.debugOptions = []
         arView.environment.background = .color(.white)
         view.addSubview(arView)
     }
@@ -1963,7 +1972,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         let anchor = AnchorEntity(world: .zero)
         anchor.name = "MainAnchor"
         
-        anchor.addChild(makeGrid(size: 100, spacing: 0.2))
+        let editorGrid = makeGrid(size: 100, spacing: 0.2)
+        editorGrid.name = "Grid"
+        anchor.addChild(editorGrid)
         
         editorCamera = PerspectiveCamera()
         editorCamera.name = "EditorCamera"
@@ -2963,18 +2974,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     
     @objc func handleCameraPan(_ gesture: UIPanGestureRecognizer) {
+        // In AR mode the physical device IS the camera — editor orbit does nothing useful
+        guard !isARModeActive else { return }
+
         let translation = gesture.translation(in: arView)
-        
+
         // Sensitivity: how fast the camera turns
         let sensitivity: Float = 0.005
-        
+
         // Update yaw (horizontal) and pitch (vertical)
         yaw -= Float(translation.x) * sensitivity
         pitch += Float(translation.y) * sensitivity
-        
+
         // Constraint: Prevent the camera from flipping upside down
         pitch = max(min(pitch, 1.5), -1.5)
-        
+
         gesture.setTranslation(.zero, in: arView)
         updateEditorCamera()
     }
@@ -2982,41 +2996,28 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard let entity = selectedEntity else { return }
         guard editorMode == .edit else { return }
-        
+
         // LOCK CHECK
         let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
         if isLocked { return }
-        
-        if gesture.state == .began {
-            saveCurrentStateToUndo()
-        }
-        
-        let snapAngle: Float = .pi / 6
-        let rotationSpeed: Float = 0.001
-        
+
         switch gesture.state {
         case .began:
+            saveCurrentStateToUndo()
             initialRotation = entity.orientation
-            lastGestureRotation = 0
-            
+
         case .changed:
+            // Direct 1:1 mapping — gesture.rotation is accumulated radians since .began
             let totalGestureRotation = Float(gesture.rotation)
-            let smoothedRotation = totalGestureRotation * rotationSpeed
-            let snappedRotation =
-            round(smoothedRotation / snapAngle) * snapAngle
-            
             if let startRotation = initialRotation {
-                let rotationQuaternion = simd_quatf(
-                    angle: -snappedRotation,
-                    axis: [0, 1, 0]
-                )
+                let rotationQuaternion = simd_quatf(angle: -totalGestureRotation, axis: [0, 1, 0])
                 entity.orientation = rotationQuaternion * startRotation
                 cameraCollectionView?.reloadData()
             }
-            
+
         case .ended, .cancelled:
             initialRotation = nil
-            
+
         default:
             break
         }
@@ -3059,6 +3060,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     }
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
+
+        // In AR mode: tap to place / reposition the entire scene on the real floor
+        if isARModeActive {
+            placeSceneOnRealSurface(at: location)
+            return
+        }
+
         pathEditToolbar?.removeFromSuperview()
         pathEditToolbar = nil
 
@@ -4378,6 +4386,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
     // MARK: - Camera
     func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
+        // In AR mode the real device camera moves — no editor orbit needed
+        if isARModeActive { return }
         if selectedEntity != nil { return }
         let translation = gesture.translation(in: arView)
         
@@ -4396,6 +4406,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         guard editorMode == .edit else { return }
         
         guard let entity = selectedEntity else {
+            // In AR mode the real camera handles zoom — don't shift editor distance
+            guard !isARModeActive else {
+                gesture.scale = 1.0
+                return
+            }
             distance /= Float(gesture.scale)
             distance = max(1.5, min(15, distance))
             updateEditorCamera()
@@ -4707,10 +4722,27 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         //                view.addSubview(redoBtn)
       
         
+        // AR MODE BUTTON
+        let arButton = UIButton(type: .system)
+        let arIconCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        arButton.setImage(UIImage(systemName: "arkit", withConfiguration: arIconCfg), for: .normal)
+        arButton.tintColor = .systemGreen
+        arButton.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        arButton.layer.cornerRadius = 16
+        arButton.clipsToBounds = true
+        arButton.translatesAutoresizingMaskIntoConstraints = false
+        self.arModeButton = arButton
+        arButton.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            self.isARModeActive.toggle()
+            self.toggleARMode(isOn: self.isARModeActive)
+        }, for: .touchUpInside)
+
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
+        view.addSubview(arButton)
 
         
         //undo redo
@@ -4760,7 +4792,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             ),
             viewModeControl.heightAnchor.constraint(equalToConstant: 32),
             viewModeControl.widthAnchor.constraint(equalToConstant: 120),
-            
+
+            // AR Button (bottom-right, left of 2D/3D control)
+            arButton.trailingAnchor.constraint(equalTo: viewModeControl.leadingAnchor, constant: -12),
+            arButton.centerYAnchor.constraint(equalTo: viewModeControl.centerYAnchor),
+            arButton.widthAnchor.constraint(equalToConstant: 44),
+            arButton.heightAnchor.constraint(equalToConstant: 44),
+
             // Rotate Button (Bottom Left)
             rotateBtn.leadingAnchor.constraint(
                 equalTo: view.leadingAnchor,
@@ -5488,5 +5526,80 @@ class EntityActionMenu: UIView {
 extension SIMD4 where Scalar == Float {
     var xyz: SIMD3<Float> {
         return SIMD3<Float>(x, y, z)
+    }
+}
+
+// MARK: - AR Mode Implementation
+extension CanvasViewController {
+
+    func toggleARMode(isOn: Bool) {
+        if isOn {
+            // 1. Hide editor grid (real ModelEntity — debugOptions won't touch it)
+            arView.scene.findEntity(named: "Grid")?.isEnabled = false
+
+            // 2. Dismiss gizmos and floating menus so they don't hover over camera feed
+            hideGizmo()
+            hideRotationGizmo()
+            currentActionMenu?.removeFromSuperview()
+            currentActionMenu = nil
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity = nil
+
+            // 3. Open real device camera as ARView background
+            arView.environment.background = .cameraFeed()
+            arView.isOpaque = false
+            arView.backgroundColor = .clear
+
+            // 4. Kill post-processing — eliminates motion blur / blurry-wave artefacts
+            arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
+
+            // 5. Clear debug overlays
+            arView.debugOptions = []
+            arView.environment.sceneUnderstanding.options = []
+
+            // 6. Start AR world-tracking (no .removeExistingAnchors — that wipes scene entities)
+            let config = ARWorldTrackingConfiguration()
+            config.planeDetection = [.horizontal]
+            arView.session.run(config, options: [.resetTracking])
+
+            // 7. Update button appearance to "active"
+            arModeButton?.tintColor = .white
+            arModeButton?.backgroundColor = UIColor(red: 0/255, green: 100/255, blue: 220/255, alpha: 1)
+
+        } else {
+            // Return to editor mode
+            arView.session.pause()
+
+            // Restore editor grid
+            arView.scene.findEntity(named: "Grid")?.isEnabled = true
+
+            arView.environment.background = .color(.white)
+            arView.isOpaque = true
+            arView.backgroundColor = .white
+
+            // Keep blur/HDR off — editor looks better without them too
+            arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
+
+            // Update button back to inactive appearance
+            arModeButton?.tintColor = .systemGreen
+            arModeButton?.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        }
+    }
+
+    // Called when user taps in AR mode — anchors the entire scene to that real-world floor point
+    func placeSceneOnRealSurface(at screenPoint: CGPoint) {
+        let results = arView.raycast(
+            from: screenPoint,
+            allowing: .estimatedPlane,
+            alignment: .horizontal
+        )
+        guard let result = results.first else { return }
+
+        guard let mainAnchor = arView.scene.anchors.first(where: { $0.name == "MainAnchor" })
+        else { return }
+
+        // Reposition MainAnchor to the tapped real-world location
+        // Moving the anchor is safer than re-parenting individual entities
+        mainAnchor.transform = Transform(matrix: result.worldTransform)
     }
 }
