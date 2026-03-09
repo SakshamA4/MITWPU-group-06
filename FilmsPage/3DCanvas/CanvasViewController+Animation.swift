@@ -82,39 +82,40 @@ extension CanvasViewController {
     func presentAnimationPrompt(type: AnimationType) {
         guard editorMode == .edit else { return }
         guard let entity = selectedEntity else { return }
-        
+
         let title = "Add \(type.rawValue.capitalized) Animation"
-        
         let alert = UIAlertController(
             title: title,
-            message: "Enter start time and duration (seconds)",
+            message: "Enter animation parameters",
             preferredStyle: .alert
         )
-        
+
         alert.addTextField { field in
             field.placeholder = "Start Time (e.g. 0.0)"
             field.keyboardType = .decimalPad
             field.text = "0.0"
         }
-        
         alert.addTextField { field in
             field.placeholder = "Duration (e.g. 1.0)"
             field.keyboardType = .decimalPad
-            field.text = "0.5"
+            field.text = "1.0"
         }
-        
+
+        // For rotate: add a rotation amount field in degrees
+        if type == .rotate {
+            alert.addTextField { field in
+                field.placeholder = "Rotation Amount in degrees (e.g. 90)"
+                field.keyboardType = .decimalPad
+                field.text = "90"
+            }
+        }
+
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
         alert.addAction(
-            UIAlertAction(title: "Add to Timeline", style: .default) { _ in
-                self.handleAnimationPromptConfirm(
-                    type: type,
-                    entity: entity,
-                    alert: alert
-                )
+            UIAlertAction(title: "Add to Timeline", style: .default) { [weak self] _ in
+                self?.handleAnimationPromptConfirm(type: type, entity: entity, alert: alert)
             }
         )
-        
         present(alert, animated: true)
     }
 
@@ -126,79 +127,82 @@ extension CanvasViewController {
         alert: UIAlertController
     ) {
         guard
-            let startText = alert.textFields?[0].text,
+            let startText    = alert.textFields?[0].text,
             let durationText = alert.textFields?[1].text,
-            let startTime = Float(startText),
-            let duration = Float(durationText),
+            let startTime    = Float(startText),
+            let duration     = Float(durationText),
             duration > 0
-        else {
-            return
+        else { return }
+
+        // Read optional rotation degrees from third field (rotate type only)
+        let rotationDegrees: Float
+        if type == .rotate,
+           let degText = alert.textFields?[2].text,
+           let deg = Float(degText) {
+            rotationDegrees = deg
+        } else {
+            rotationDegrees = 90
         }
-        
+
         let easing: EasingType = .easeInOut
-        
-        var track: AnimationTrack
+        var track:      AnimationTrack
         var fromValue = SIMD3<Float>.zero
-        var toValue = SIMD3<Float>.zero
+        var toValue   = SIMD3<Float>.zero
         var motionPath: BezierMotionPath? = nil
-        
+
         switch type {
-            
-            // MOVE
+
         case .move:
             track = .position
-            
             if baseTransforms[entity.name] == nil {
                 baseTransforms[entity.name] = entity.transform
             }
-            
-            let evaluatedTransform = evaluateEntityTransform(
-                entityName: entity.name,
-                at: startTime
-            )
-            
+            let evaluatedTransform = evaluateEntityTransform(entityName: entity.name, at: startTime)
             let start = evaluatedTransform.translation
-            
-            let end = start + SIMD3<Float>(2, 0, 0)
-            
+            let end   = start + SIMD3<Float>(2, 0, 0)
             motionPath = BezierMotionPath(
-                start: start,
+                start:    start,
                 control1: start + SIMD3<Float>(0.5, 0, 0),
                 control2: start + SIMD3<Float>(1.5, 0, 0),
-                end: end
+                end:      end
             )
-            
+
         case .rotate:
-            track = .rotation
+            track     = .rotation
+            // fromValue.y = 0 (start at current orientation)
+            // toValue.y   = the requested rotation angle in radians
             fromValue = SIMD3<Float>(0, 0, 0)
-            toValue = SIMD3<Float>(0, .pi / 2, 0)
+            toValue   = SIMD3<Float>(0, rotationDegrees * (.pi / 180), 0)
         }
-        
-        // ✅ Store base transform once per entity
+
         if baseTransforms[entity.name] == nil {
             baseTransforms[entity.name] = entity.transform
         }
-        
+
         let clip = AnimationClip(
             entityName: entity.name,
-            type: type,
-            track: track,
-            easing: easing,
-            startTime: startTime,
-            duration: duration,
-            fromValue: fromValue,
-            toValue: toValue,
+            type:       type,
+            track:      track,
+            easing:     easing,
+            startTime:  startTime,
+            duration:   duration,
+            fromValue:  fromValue,
+            toValue:    toValue,
             motionPath: motionPath
         )
-        
+
         timeline.addClip(clip)
-        
+
         if clip.motionPath != nil {
             showMotionPath(for: clip)
         }
-        
+
+        // Show rotation arc for any rotation clip (camera or regular entity)
+        if clip.track == .rotation {
+            showRotationArc(for: clip, on: entity)
+        }
+
         debugPrintTimeline()
-        
     }
 
 }

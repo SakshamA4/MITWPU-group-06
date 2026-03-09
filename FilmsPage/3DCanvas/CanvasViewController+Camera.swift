@@ -120,11 +120,89 @@ extension CanvasViewController {
         let y = distance * sin(pitch)
         let z = distance * cos(pitch) * cos(yaw)
         
-        // Apply position relative to the center (cameraTarget)
+        // Apply position relative to the orbit pivot (cameraTarget)
         camera.position = [x, y, z] + cameraTarget
         
-        // Look at the center of the grid
+        // Always look at the current pivot point
         camera.look(at: cameraTarget, from: camera.position, relativeTo: nil)
+    }
+
+    // MARK: - Camera Pivot: Orbit Around Selected Entity
+    //
+    // Called from handleTap() whenever a scene entity is selected.
+    // Moves the orbit pivot to the entity's world position so the camera
+    // naturally orbits around the object the user just tapped.
+    func pivotCameraToEntity(_ entity: Entity) {
+        guard !isARModeActive else { return }
+        // World-space position becomes the new orbit center
+        cameraTarget = entity.position(relativeTo: nil)
+        updateEditorCamera()
+    }
+
+    // MARK: - Camera Pivot: Orbit Around Path Handle
+    //
+    // Called from handleTap() whenever a motion path handle is selected.
+    // Moves the orbit pivot to the handle so fine-grained path editing
+    // doesn't fight a distant orbit center.
+    func pivotCameraToHandle(_ handle: Entity) {
+        guard !isARModeActive else { return }
+        cameraTarget = handle.position(relativeTo: nil)
+        updateEditorCamera()
+    }
+
+    // MARK: - Frame Entity (Focus / 'F' key equivalent)
+    //
+    // Centers the view on an entity and pulls the camera back to a distance
+    // proportional to the object's bounding box — like Blender's numpad period.
+    func frameEntity(_ entity: Entity) {
+        guard !isARModeActive else { return }
+
+        // 1. Compute the world-space bounding box
+        let bounds = entity.visualBounds(relativeTo: nil)
+
+        // 2. Center of the bounding box becomes the new orbit pivot
+        let center = (bounds.min + bounds.max) * 0.5
+        cameraTarget = center
+
+        // 3. Pull camera back based on object size.
+        //    maxDimension * 3 gives comfortable framing; clamp to editor limits.
+        let maxDimension = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+        distance = max(1.5, min(15.0, maxDimension * 3.0))
+
+        updateEditorCamera()
+    }
+
+    // MARK: - Camera Panning (Two-finger slide moves the orbit pivot)
+    //
+    // Translates cameraTarget along the camera's right and up axes so the
+    // scene slides in the direction of the gesture — identical feel to
+    // middle-mouse-drag in Maya / Blender.
+    //
+    // Scale is proportional to `distance` so panning near large scenes
+    // moves further per pixel than panning close to a small object.
+    func panCameraTarget(translation: CGPoint) {
+        guard !isARModeActive else { return }
+
+        // Camera right vector derived from yaw only — no pitch component —
+        // so horizontal panning stays level and doesn't drift up/down.
+        let cameraRight = SIMD3<Float>(
+             cos(yaw),   // x
+             0,          // y — intentionally zero to keep right vector horizontal
+            -sin(yaw)    // z
+        )
+
+        // World up is always +Y: vertical panning moves the pivot up/down.
+        let worldUp = SIMD3<Float>(0, 1, 0)
+
+        // Scale panning speed with current zoom distance so it feels consistent
+        // whether the user is zoomed in tight or pulled back far.
+        let scale: Float = distance * 0.0015
+
+        // Screen +X → world right;  screen +Y → world down (invert Y for UIKit coords)
+        cameraTarget += cameraRight  *  Float(translation.x) * scale
+        cameraTarget += worldUp      * -Float(translation.y) * scale
+
+        updateEditorCamera()
     }
 
     
@@ -169,7 +247,10 @@ extension CanvasViewController {
         cameraRoot.addChild(visual)
         cameraRoot.addChild(camera)
         
-        cameraRoot.position = [0, 1, -1.0]
+        // Spawn at a random XZ position so multiple cameras don't overlap
+        let randomX = Float.random(in: -2...2)
+        let randomZ = Float.random(in: -2...2)
+        cameraRoot.position = [randomX, 1, randomZ]
         anchor.addChild(cameraRoot)
         
         sceneCameras.append(camera)

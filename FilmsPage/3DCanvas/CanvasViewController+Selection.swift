@@ -26,6 +26,9 @@ extension CanvasViewController {
             // Remove path visuals
             activeMotionPaths[clipID]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clipID)
+
+            // Remove rotation arc if this was a rotation clip
+            hideRotationArc(for: clipID)
             
             // Remove ONLY this clip
             timeline.clips.remove(at: clipIndex)
@@ -51,10 +54,11 @@ extension CanvasViewController {
         
         let entityName = entity.name
         
-        // Remove all motion path visuals
+        // Remove all motion path visuals and rotation arcs
         for clip in timeline.clips where clip.entityName == entityName {
             activeMotionPaths[clip.id]?.root.removeFromParent()
             activeMotionPaths.removeValue(forKey: clip.id)
+            hideRotationArc(for: clip.id)
         }
         
         // Remove all clips for this entity

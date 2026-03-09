@@ -103,6 +103,32 @@ extension CanvasViewController {
         pathEditToolbar = nil
 
         // ─────────────────────────────
+        // 0️⃣ ROTATION ARC HANDLE SELECTION
+        // Checked first so arc handles take priority over general hit-testing.
+        // ─────────────────────────────
+        if let hit = arView.entity(at: location),
+           let arcComp = hit.components[RotationArcComponent.self]
+        {
+            // Select this arc — store the draggable handle and its clip
+            activeArcHandle  = hit
+            activeArcClipID  = arcComp.clipID
+
+            // Compute the handle's current angle so dragging starts correctly
+            let arcRoot = activeRotationArcs[arcComp.clipID]?.root
+            if let handlePos = arcRoot.map({ hit.position(relativeTo: $0) }) {
+                arcDragStartAngle = atan2(handlePos.x, handlePos.z)
+            }
+
+            // Clear any entity selection — arc editing mode
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity   = nil
+            activeHandleEntity = nil
+            hideGizmo()
+            hideRotationGizmo()
+            return
+        }
+
+        // ─────────────────────────────
         // 1️⃣ MOTION PATH HANDLE SELECTION
         // ─────────────────────────────
         if let hit = arView.entity(at: location),
@@ -188,86 +214,112 @@ extension CanvasViewController {
 
 
     func showActionMenu(at point: CGPoint) {
-        
+
         guard let entity = selectedEntity else { return }
-        
-        let menu = EntityActionMenu()
-        
+
         let isCurrentlyLocked = entity.components[LockComponent.self]?.isLocked ?? false
-        menu.setLockTitle(isLocked: isCurrentlyLocked)
-        
+
+        // ── Determine camera vs standard entity ────────────────────────────
+        // Camera roots are named "SceneCamera_N" and carry CategoryComponent(.camera).
+        let isCamera = entity.name.lowercased().contains("scenecamera")
+            || entity.components[CategoryComponent.self]?.toolType == .camera
+
+        let menu = EntityActionMenu()
+
+        // ⚠️  configure() MUST be called before addSubview.
+        //     It calls buildButtons() which reads mode — if you addSubview first
+        //     the view is already in the hierarchy with no buttons built yet.
+        menu.configure(
+            mode: isCamera ? .camera : .standard,
+            isLocked: isCurrentlyLocked
+        )
+
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
-        
+
         NSLayoutConstraint.activate([
             menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
-            menu.bottomAnchor.constraint(equalTo: view.topAnchor, constant: point.y - 40)
+            menu.bottomAnchor.constraint(equalTo: view.topAnchor,      constant: point.y - 40),
         ])
-        
-        menu.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(menu)
-        
-        NSLayoutConstraint.activate([
-            menu.centerXAnchor.constraint(
-                equalTo: view.leadingAnchor,
-                constant: point.x
-            ),
-            menu.bottomAnchor.constraint(
-                equalTo: view.topAnchor,
-                constant: point.y - 40
-            ),
-        ])
-        
+
         menu.onAction = { [weak self] action in
             guard let self = self else { return }
-            
+
             switch action {
+
+            // ── Standard entity actions ─────────────────────────────────────
             case .move:
-                if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                    self.interactionMode = .move
-                    self.presentAnimationPrompt(type: .move)
-                }
+                guard !(entity.components[LockComponent.self]?.isLocked ?? false) else { return }
                 menu.removeFromSuperview()
-                
+                self.interactionMode = .move
+                self.presentAnimationPrompt(type: .move)
+
             case .rotate:
-                if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                    self.interactionMode = .rotate
-                    self.presentAnimationPrompt(type: .rotate)
-                }
+                guard !(entity.components[LockComponent.self]?.isLocked ?? false) else { return }
                 menu.removeFromSuperview()
-                
+                self.interactionMode = .rotate
+                self.presentAnimationPrompt(type: .rotate)
+
+            case .addMovement:
+                // Presents a simple alert letting the user choose Move or Rotate animation.
+                // Each choice goes through the existing presentAnimationPrompt() pipeline
+                // so timing, path creation, and showMotionPath() all work automatically.
+                menu.removeFromSuperview()
+                self.presentAddMovementPicker(for: entity)
+
+            // ── Camera entity actions ───────────────────────────────────────
+            case .addShot:
+                // Opens the full shot-picker sheet (camera movements + static shots).
+                menu.removeFromSuperview()
+                self.presentShotPicker(for: entity)
+
+            // ── Shared actions ──────────────────────────────────────────────
             case .lock:
                 let newState = !isCurrentlyLocked
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
                 lockComp.isLocked = newState
                 entity.components.set(lockComp)
-
                 if newState {
-                    // Locking: hide everything, reset transparency
                     self.interactionMode = .move
                     self.setEntityTransparency(entity, alpha: 1.0)
                     self.hideGizmo()
                     self.hideRotationGizmo()
                 } else {
-                    // Unlocking: restore transparency, show correct gizmo for current mode
                     self.setEntityTransparency(entity, alpha: 0.7)
                     self.updateGizmoMode()
                 }
                 menu.removeFromSuperview()
-                
+
             case .delete:
-                // 1. Reset transparency so the "ghost" version isn't saved in Undo/Redo
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
-                
-                // 2. Perform deletion
                 self.deleteSelected()
-                
-                // 3. Cleanup UI
                 self.hideGizmo()
                 menu.removeFromSuperview()
             }
         }
+
         self.currentActionMenu = menu
+    }
+
+    // ── Add Movement picker (non-camera entities) ──────────────────────────
+    // Simple action sheet: "Move" or "Rotate" — feeds into the standard
+    // presentAnimationPrompt() path so timing/path creation are unchanged.
+    func presentAddMovementPicker(for entity: Entity) {
+        let alert = UIAlertController(
+            title: "Add Movement",
+            message: "Choose the type of animation to add",
+            preferredStyle: .actionSheet
+        )
+        alert.addAction(UIAlertAction(title: "Move (Position Path)", style: .default) { [weak self] _ in
+            self?.interactionMode = .move
+            self?.presentAnimationPrompt(type: .move)
+        })
+        alert.addAction(UIAlertAction(title: "Rotate", style: .default) { [weak self] _ in
+            self?.interactionMode = .rotate
+            self?.presentAnimationPrompt(type: .rotate)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
     }
 
     
@@ -531,4 +583,3 @@ extension CanvasViewController {
     }
 
 }
-
