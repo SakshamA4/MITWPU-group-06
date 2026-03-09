@@ -334,6 +334,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var activeCamera: PerspectiveCamera!
     
     var sceneCameras: [PerspectiveCamera] = []
+    var cameraPreviewTimer: Timer?
     var cameraToVisualMap: [PerspectiveCamera: Entity] = [:]
     
     var lastGestureRotation: Float = 0
@@ -385,7 +386,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
         return btn
     }()
-
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopCameraPreviewUpdates()
+    }
     //  PLACE THIS AT CLASS LEVEL (NOT INSIDE ANOTHER FUNC)
 
 //    // 5. The Application Function (Receives the Struct)
