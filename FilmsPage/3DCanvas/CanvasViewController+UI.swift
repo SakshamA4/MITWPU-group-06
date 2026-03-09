@@ -786,10 +786,18 @@ extension CanvasViewController {
     }
 
 
-    @objc func shotBreakdownTapped() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        print("🎬 Shot Breakdown Tapped")
+//    @objc func shotBreakdownTapped() {
+//        let generator = UIImpactFeedbackGenerator(style: .medium)
+//        generator.impactOccurred()
+//        print("🎬 Shot Breakdown Tapped")
+//    }
+    // In CanvasViewController, inside shotBreakdownTapped()
+    @objc private func shotBreakdownTapped() {
+        let vc = ShotBreakdownViewController()
+        vc.sceneName    = self.sceneName
+        vc.timeline     = self.timeline
+        vc.cameraNames  = self.sceneCameraItems.map { $0.cameraRoot.name }
+        navigationController?.pushViewController(vc, animated: true)
     }
 
 
