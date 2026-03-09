@@ -648,15 +648,6 @@ extension CanvasViewController {
         cameraPanel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(cameraPanel)
 
-        // Chevron toggle button at top of panel
-        let toggleBtn = UIButton(type: .system)
-        toggleBtn.tag = 8801
-        toggleBtn.setImage(UIImage(systemName: "chevron.up"), for: .normal)
-        toggleBtn.tintColor = .white
-        toggleBtn.translatesAutoresizingMaskIntoConstraints = false
-        toggleBtn.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
-        cameraPanel.addSubview(toggleBtn)
-
         // Collection view with top spacing via sectionInset
         let camLayout = UICollectionViewFlowLayout()
         camLayout.scrollDirection = .vertical
@@ -684,17 +675,35 @@ extension CanvasViewController {
             cameraPanel.widthAnchor.constraint(equalToConstant: 200),   // wider panel
             panelHeightConstraint,
 
-            toggleBtn.topAnchor.constraint(equalTo: cameraPanel.topAnchor, constant: 6),
-            toggleBtn.centerXAnchor.constraint(equalTo: cameraPanel.centerXAnchor),
-            toggleBtn.heightAnchor.constraint(equalToConstant: 24),
-
-            cameraCollectionView.topAnchor.constraint(equalTo: toggleBtn.bottomAnchor, constant: 4),
+            cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
             cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
             cameraCollectionView.trailingAnchor.constraint(equalTo: cameraPanel.trailingAnchor),
             cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
         ])
 
         cameraPanel.alpha = 0.0  // hidden until first camera is added
+
+        // Pull-tab button — lives on the main view so it is never clipped by the panel.
+        // It sticks out from the panel's left edge and is always reachable.
+        let pullTab = UIButton(type: .system)
+        pullTab.tag = 8803
+        let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        pullTab.setImage(UIImage(systemName: "chevron.right", withConfiguration: tabCfg), for: .normal)
+        pullTab.tintColor = .white
+        pullTab.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        pullTab.layer.cornerRadius = 10
+        pullTab.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        pullTab.translatesAutoresizingMaskIntoConstraints = false
+        pullTab.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
+        pullTab.alpha = 0.0  // hidden until first camera is added
+        view.addSubview(pullTab)
+
+        NSLayoutConstraint.activate([
+            pullTab.trailingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            pullTab.centerYAnchor.constraint(equalTo: cameraPanel.centerYAnchor),
+            pullTab.widthAnchor.constraint(equalToConstant: 20),
+            pullTab.heightAnchor.constraint(equalToConstant: 44),
+        ])
         
         // 9. SIDEBAR & HIERARCHY
         view.addSubview(sidebarView)
@@ -823,6 +832,6 @@ extension CanvasViewController {
 }
 
 // MARK: - UICollectionView DataSource + Delegate
-extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     // Implementations are in CanvasViewController+Camera.swift
 }

@@ -307,12 +307,12 @@ extension CanvasViewController {
         }
     }
 
-//    func collectionView(_ collectionView: UICollectionView,
-//        layout collectionViewLayout: UICollectionViewLayout,
-//        sizeForItemAt indexPath: IndexPath) -> CGSize {
-//        let width = collectionView.bounds.width - 16   // full panel width minus padding
-//        return CGSize(width: width, height: width * 0.75 + 24)  // preview + label room
-//    }
+    func collectionView(_ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let width = collectionView.bounds.width - 16   // full panel width minus padding
+        return CGSize(width: width, height: width * 0.75 + 24)  // preview + label room
+    }
     
     
     func activateEditorCamera() {
@@ -436,11 +436,9 @@ extension CanvasViewController {
 
     // AFTER:
     func setCameraPanelExpanded(_ expanded: Bool, animated: Bool) {
-        guard let panel = view.viewWithTag(8800),
-              let toggleBtn = panel.viewWithTag(8801) as? UIButton else { return }
+        guard let panel = view.viewWithTag(8800) else { return }
 
         let targetHeight: CGFloat = expanded ? 520 : 44
-        let chevronName = expanded ? "chevron.up" : "chevron.down"
 
         // Height constraint lives on the PANEL itself, not the parent view
         for constraint in panel.constraints {
@@ -449,12 +447,20 @@ extension CanvasViewController {
             }
         }
 
-        toggleBtn.setImage(UIImage(systemName: chevronName), for: .normal)
+        // Update pull-tab chevron: left arrow when expanded (tap to collapse), right when collapsed (tap to expand)
+        let pullTab = view.viewWithTag(8803) as? UIButton
+        let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        pullTab?.setImage(
+            UIImage(systemName: expanded ? "chevron.left" : "chevron.right", withConfiguration: tabCfg),
+            for: .normal
+        )
+
         let collectionView = panel.viewWithTag(8802)
 
         let block = {
             panel.alpha = expanded ? 1.0 : 0.6
             collectionView?.alpha = expanded ? 1.0 : 0.0
+            pullTab?.alpha = 1.0  // always visible once a camera exists
             self.view.layoutIfNeeded()
         }
 
