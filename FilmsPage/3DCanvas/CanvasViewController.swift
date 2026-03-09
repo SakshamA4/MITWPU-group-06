@@ -515,6 +515,16 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var initialHandleOffset: SIMD3<Float> = .zero
     
     var activeMotionPaths: [UUID: MotionPathVisual] = [:]
+
+    // Stores the rotation arc Entity for each rotation AnimationClip.
+    // Keyed by clip UUID — mirrors the activeMotionPaths pattern.
+    var activeRotationArcs: [UUID: RotationArcVisual] = [:]
+
+    // Arc handle drag state — mirrors activeHandleEntity / dragStartPosition pattern
+    // for motion path handles.
+    var activeArcHandle: Entity?          // the handle entity currently being dragged
+    var activeArcClipID: UUID?            // which clip the dragging arc belongs to
+    var arcDragStartAngle: Float = 0      // the angle (radians) when drag began
     
     // MARK: - Editor Mode
     var editorMode: EditorMode = .edit
@@ -1301,7 +1311,98 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
         
         let location = gesture.location(in: arView)
-        
+
+        // ──────────────────────────────────────────────
+        // STEP 1 — ROTATION ARC HANDLE DRAGGING
+        // Mirrors the motion path handle drag pattern exactly:
+        //   .began  → confirm the drag started on an arc handle tip
+        //   .changed → compute new angle from drag delta, update clip + rebuild arc
+        //   .ended  → clear arc drag state
+        // ──────────────────────────────────────────────
+
+        // If we already locked onto an arc handle, keep routing here until .ended
+        if activeArcHandle != nil {
+            switch gesture.state {
+            case .changed:
+                guard
+                    let handle  = activeArcHandle,
+                    let clipID  = activeArcClipID,
+                    let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
+                    let visual  = activeRotationArcs[clipID]
+                else { break }
+
+                // Convert screen drag to an angle delta on the XZ plane.
+                // Horizontal drag → rotate; one full screen width ≈ 2π.
+                let dx = Float(gesture.translation(in: arView).x)
+                let angleDelta = dx * 0.01   // radians per point
+
+                let isEndHandle = handle.name == "arcHandle.end"
+                var clip = timeline.clips[clipIdx]
+
+                if isEndHandle {
+                    let newToAngle = arcDragStartAngle + angleDelta
+                    timeline.clips[clipIdx] = AnimationClip(
+                        entityName: clip.entityName,
+                        type:       clip.type,
+                        track:      clip.track,
+                        easing:     clip.easing,
+                        startTime:  clip.startTime,
+                        duration:   clip.duration,
+                        fromValue:  clip.fromValue,
+                        toValue:    SIMD3<Float>(0, newToAngle, 0),
+                        motionPath: clip.motionPath
+                    )
+                } else {
+                    // start handle — shift fromValue
+                    let newFromAngle = arcDragStartAngle + angleDelta
+                    timeline.clips[clipIdx] = AnimationClip(
+                        entityName: clip.entityName,
+                        type:       clip.type,
+                        track:      clip.track,
+                        easing:     clip.easing,
+                        startTime:  clip.startTime,
+                        duration:   clip.duration,
+                        fromValue:  SIMD3<Float>(0, newFromAngle, 0),
+                        toValue:    clip.toValue,
+                        motionPath: clip.motionPath
+                    )
+                }
+
+                // Rebuild the arc visual with updated angles
+                clip = timeline.clips[clipIdx]
+                if let entity = arView.scene.findEntity(named: clip.entityName) {
+                    RotationArcRenderer.update(visual: visual, clip: clip, entity: entity)
+                }
+
+            case .ended, .cancelled:
+                activeArcHandle    = nil
+                activeArcClipID    = nil
+                arcDragStartAngle  = 0
+
+            default: break
+            }
+            return  // consumed — don't fall through to gizmo/camera handling
+        }
+
+        // On .began, check if this touch starts on an arc handle tip
+        if gesture.state == .began,
+           let hit = arView.entity(at: location),
+           let arcComp = hit.components[RotationArcComponent.self]
+        {
+            activeArcHandle   = hit
+            activeArcClipID   = arcComp.clipID
+            // Record the handle's current angle as the drag baseline
+            if let visual = activeRotationArcs[arcComp.clipID] {
+                let isEnd = hit.name == "arcHandle.end"
+                if let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }) {
+                    arcDragStartAngle = isEnd
+                        ? timeline.clips[clipIdx].toValue.y
+                        : timeline.clips[clipIdx].fromValue.y
+                }
+            }
+            saveCurrentStateToUndo()
+            return
+        }
 
         // ──────────────────────────────────────────────
         // STEP 2 — GIZMO DRAGGING (move gizmo + rotation rings)
