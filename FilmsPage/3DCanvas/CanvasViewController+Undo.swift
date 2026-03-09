@@ -6,18 +6,38 @@ import ARKit
 
 extension CanvasViewController {
 
+//    func saveCurrentStateToUndo() {
+//        let allEntities = arView.scene.anchors.flatMap { $0.children }
+//        var snapshotDict: [String: Transform] = [:]
+//        
+//        for entity in allEntities {
+//            snapshotDict[entity.name] = entity.transform
+//        }
+//        
+//        let snapshot = SceneSnapshot(entityTransforms: snapshotDict)
+//        
+//        undoStack.append(snapshot)
+//        redoStack.removeAll()
+//    }
     func saveCurrentStateToUndo() {
-        let allEntities = arView.scene.anchors.flatMap { $0.children }
+        let anchor = arView.scene.findEntity(named: "MainAnchor")
         var snapshotDict: [String: Transform] = [:]
-        
-        for entity in allEntities {
+
+        anchor?.children.forEach { entity in
+            // Skip the grid (40,401 entities) and editor camera — they never need undo
+            guard entity.name != "Grid",
+                  entity.name != "EditorCamera"
+            else { return }
             snapshotDict[entity.name] = entity.transform
         }
-        
-        let snapshot = SceneSnapshot(entityTransforms: snapshotDict)
-        
-        undoStack.append(snapshot)
+
+        undoStack.append(SceneSnapshot(entityTransforms: snapshotDict))
         redoStack.removeAll()
+
+        // Cap the stack so memory doesn't grow forever
+        if undoStack.count > 30 {
+            undoStack.removeFirst()
+        }
     }
 
     
