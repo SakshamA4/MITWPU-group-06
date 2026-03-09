@@ -210,8 +210,7 @@ extension HomeViewController {
     // MARK: - Helper Functions
     
     private func deleteRecentScene(_ sceneModel: ScenesModel) {
-        SceneService.shared.deleteScene(by: sceneModel.id)
-        // No need to reload manually; the NotificationCenter observer in viewDidLoad handles it.
+        ScenesDataStore.shared.deleteScene(by: sceneModel.id)
     }
     
     private func presentRenameAlert(for sceneModel: ScenesModel) {
@@ -222,20 +221,13 @@ extension HomeViewController {
             tf.placeholder = "Scene Name"
             tf.autocapitalizationType = .words
         }
-        
-        // FIX 2: Removed [weak self]
-        // You are using SceneService.shared (Singleton), so you don't need 'self' here.
-        // This fixes the "Variable 'self' was written to, but never read" error.
+    
         let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
             guard let newName = alert.textFields?.first?.text, !newName.isEmpty else { return }
+            var updatedScene = sceneModel
+            updatedScene.name = newName
+            ScenesDataStore.shared.updateScene(updatedScene)
             
-            // Fetch and Update using the Service directly
-            if let originalScene = SceneService.shared.getScene(by: sceneModel.id) {
-                var updatedScene = sceneModel
-                updatedScene.name = newName
-                
-                ScenesDataStore.shared.updateScene(updatedScene)
-            }
         }
         
         alert.addAction(saveAction)
