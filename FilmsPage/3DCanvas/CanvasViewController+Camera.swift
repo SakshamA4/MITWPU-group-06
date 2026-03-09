@@ -236,11 +236,44 @@ extension CanvasViewController {
         
         cameraCollectionView?.reloadData()
         startCameraPreviewUpdates()
+        setCameraPanelExpanded(true, animated: true)
+        setupCameraPanelSwipeGestures()
     }
 
-    
-    /// Call this whenever a camera's cameraRoot entity is deleted from the scene.
-    /// Cleans up sceneCameras, sceneCameraItems, cameraToVisualMap, and refreshes the collection view.
+    func setupCameraPanelSwipeGestures() {
+        guard let panel = view.viewWithTag(8800) else { return }
+        
+        // Only add once
+        if panel.gestureRecognizers?.contains(where: { $0 is UISwipeGestureRecognizer }) == true { return }
+
+        // Swipe LEFT on panel → collapse
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handlePanelSwipe(_:)))
+        swipeLeft.direction = .right  // swiping right = toward the right edge = collapse
+        panel.addGestureRecognizer(swipeLeft)
+
+        // Swipe RIGHT from right edge of screen → expand
+        // We attach this to the main view so it catches the swipe even when panel is thin
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handlePanelSwipe(_:)))
+        swipeRight.direction = .left  // swiping left = pulling out from right edge = expand
+        view.addGestureRecognizer(swipeRight)
+    }
+
+    @objc private func handlePanelSwipe(_ gesture: UISwipeGestureRecognizer) {
+        guard view.viewWithTag(8800) != nil else { return }
+        
+        if gesture.direction == .right {
+            // Swiped right on the panel → collapse it
+            setCameraPanelExpanded(false, animated: true)
+        } else if gesture.direction == .left {
+            // Swiped left anywhere → only expand if swipe originated near the right edge
+            let location = gesture.location(in: view)
+            let rightEdgeZone = view.bounds.width - 60  // within 60pt of right edge
+            if location.x >= rightEdgeZone || !isCameraPanelExpanded {
+                setCameraPanelExpanded(true, animated: true)
+            }
+        }
+    }
+
     func deleteSceneCamera(cameraRoot: Entity) {
         // Find the matching item by cameraRoot reference
         guard let index = sceneCameraItems.firstIndex(where: { $0.cameraRoot === cameraRoot }) else {
@@ -268,12 +301,19 @@ extension CanvasViewController {
             cameraCollectionView?.deleteItems(at: [indexPath])
         }, completion: nil)
 
-        // Stop the timer if no cameras remain
         if sceneCameraItems.isEmpty {
             stopCameraPreviewUpdates()
+            setCameraPanelExpanded(false, animated: true)  // ← add this
         }
     }
 
+//    func collectionView(_ collectionView: UICollectionView,
+//        layout collectionViewLayout: UICollectionViewLayout,
+//        sizeForItemAt indexPath: IndexPath) -> CGSize {
+//        let width = collectionView.bounds.width - 16   // full panel width minus padding
+//        return CGSize(width: width, height: width * 0.75 + 24)  // preview + label room
+//    }
+    
     
     func activateEditorCamera() {
         for cam in sceneCameras { cam.isEnabled = false }
@@ -390,7 +430,46 @@ extension CanvasViewController {
         }
     }
 
+    @objc func toggleCameraPanelTapped() {
+        setCameraPanelExpanded(!isCameraPanelExpanded, animated: true)
+    }
 
+    // AFTER:
+    func setCameraPanelExpanded(_ expanded: Bool, animated: Bool) {
+        guard let panel = view.viewWithTag(8800),
+              let toggleBtn = panel.viewWithTag(8801) as? UIButton else { return }
+
+        let targetHeight: CGFloat = expanded ? 520 : 44
+        let chevronName = expanded ? "chevron.up" : "chevron.down"
+
+        // Height constraint lives on the PANEL itself, not the parent view
+        for constraint in panel.constraints {
+            if constraint.firstAttribute == .height {
+                constraint.constant = targetHeight
+            }
+        }
+
+        toggleBtn.setImage(UIImage(systemName: chevronName), for: .normal)
+        let collectionView = panel.viewWithTag(8802)
+
+        let block = {
+            panel.alpha = expanded ? 1.0 : 0.6
+            collectionView?.alpha = expanded ? 1.0 : 0.0
+            self.view.layoutIfNeeded()
+        }
+
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0,
+                           usingSpringWithDamping: 0.8,
+                           initialSpringVelocity: 0.3,
+                           options: .curveEaseInOut,
+                           animations: block)
+        } else {
+            block()
+        }
+        
+        isCameraPanelExpanded = expanded
+    }
     // MARK: - Exit Camera Button
 
     func showExitCameraButton() {
@@ -459,7 +538,10 @@ extension CanvasViewController {
 
 }
 
+
+
 // MARK: - Storage key for the off-screen preview ARView
 private enum PreviewARViewKey {
     static var key = "previewARView"
 }
+

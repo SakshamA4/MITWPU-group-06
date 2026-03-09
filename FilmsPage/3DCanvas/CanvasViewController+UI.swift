@@ -638,44 +638,63 @@ extension CanvasViewController {
             
         ])
         
-        // 8. CAMERA COLLECTION VIEW (Right Side)
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .vertical
-        layout.itemSize = CGSize(width: 120, height: 120)
-        layout.minimumLineSpacing = 10
-        
-        cameraCollectionView = UICollectionView(
-            frame: .zero,
-            collectionViewLayout: layout
-        )
-        
-        cameraCollectionView.register(
-            CameraPreviewCell.self,
-            forCellWithReuseIdentifier: CameraPreviewCell.reuseID
-        )
-        
-        cameraCollectionView.backgroundColor = UIColor.black.withAlphaComponent(
-            0.85
-        )
-        cameraCollectionView.layer.cornerRadius = 14
+        // REPLACE WITH THIS:
+        // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
+        let cameraPanel = UIView()
+        cameraPanel.tag = 8800
+        cameraPanel.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        cameraPanel.layer.cornerRadius = 16
+        cameraPanel.clipsToBounds = true
+        cameraPanel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cameraPanel)
+
+        // Chevron toggle button at top of panel
+        let toggleBtn = UIButton(type: .system)
+        toggleBtn.tag = 8801
+        toggleBtn.setImage(UIImage(systemName: "chevron.up"), for: .normal)
+        toggleBtn.tintColor = .white
+        toggleBtn.translatesAutoresizingMaskIntoConstraints = false
+        toggleBtn.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
+        cameraPanel.addSubview(toggleBtn)
+
+        // Collection view with top spacing via sectionInset
+        let camLayout = UICollectionViewFlowLayout()
+        camLayout.scrollDirection = .vertical
+        camLayout.minimumLineSpacing = 12
+        camLayout.sectionInset = UIEdgeInsets(top: 16, left: 8, bottom: 12, right: 8)
+
+        cameraCollectionView = UICollectionView(frame: .zero, collectionViewLayout: camLayout)
+        cameraCollectionView.tag = 8802
+        cameraCollectionView.register(CameraPreviewCell.self, forCellWithReuseIdentifier: CameraPreviewCell.reuseID)
+        cameraCollectionView.backgroundColor = .clear
+        cameraCollectionView.showsVerticalScrollIndicator = false
         cameraCollectionView.translatesAutoresizingMaskIntoConstraints = false
-        
         cameraCollectionView.dataSource = self
         cameraCollectionView.delegate = self
-        
-        view.addSubview(cameraCollectionView)
-        
+        cameraPanel.addSubview(cameraCollectionView)
+
+        // Panel constraints — starts collapsed (height 36) until a camera is spawned
+        let panelHeightConstraint = cameraPanel.heightAnchor.constraint(equalToConstant: 44)
+        panelHeightConstraint.identifier = "panelHeight"
+
         NSLayoutConstraint.activate([
-            cameraCollectionView.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor,
-                constant: -16
-            ),
-            cameraCollectionView.centerYAnchor.constraint(
-                equalTo: view.centerYAnchor
-            ),
-            cameraCollectionView.widthAnchor.constraint(equalToConstant: 140),
-            cameraCollectionView.heightAnchor.constraint(equalToConstant: 320),
+            cameraPanel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+            cameraPanel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            // AFTER:
+            cameraPanel.widthAnchor.constraint(equalToConstant: 200),   // wider panel
+            panelHeightConstraint,
+
+            toggleBtn.topAnchor.constraint(equalTo: cameraPanel.topAnchor, constant: 6),
+            toggleBtn.centerXAnchor.constraint(equalTo: cameraPanel.centerXAnchor),
+            toggleBtn.heightAnchor.constraint(equalToConstant: 24),
+
+            cameraCollectionView.topAnchor.constraint(equalTo: toggleBtn.bottomAnchor, constant: 4),
+            cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            cameraCollectionView.trailingAnchor.constraint(equalTo: cameraPanel.trailingAnchor),
+            cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
         ])
+
+        cameraPanel.alpha = 0.0  // hidden until first camera is added
         
         // 9. SIDEBAR & HIERARCHY
         view.addSubview(sidebarView)

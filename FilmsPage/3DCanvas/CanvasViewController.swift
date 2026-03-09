@@ -335,6 +335,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
     var sceneCameras: [PerspectiveCamera] = []
     var cameraPreviewTimer: Timer?
+    var isCameraPanelExpanded: Bool = false
     var cameraToVisualMap: [PerspectiveCamera: Entity] = [:]
     
     var lastGestureRotation: Float = 0
