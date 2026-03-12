@@ -250,7 +250,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var lastDragPoint: SIMD3<Float>?
     /// Non-nil when the gizmo is sitting on a path handle instead of a scene entity
     var activeHandleEntity: Entity?
-    
+    var lastUndoTime: CFTimeInterval = 0
+    var pathRebuildFrameCount: Int = 0
     
     var currentSceneObject: Scene?
     var sceneName: String = "Untitled Scene"
