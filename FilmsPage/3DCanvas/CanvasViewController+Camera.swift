@@ -62,6 +62,7 @@ extension CanvasViewController {
                     depth: 0.05
                 )
                 modelEntity.model?.mesh = newMesh
+                modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(wall)
             }
             
@@ -89,6 +90,7 @@ extension CanvasViewController {
                     depth: ground.depth
                 )
                 modelEntity.model?.mesh = newMesh
+                modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(ground)
             }
             gesture.scale = 1.0
@@ -311,7 +313,7 @@ extension CanvasViewController {
         layout collectionViewLayout: UICollectionViewLayout,
         sizeForItemAt indexPath: IndexPath) -> CGSize {
         let width = collectionView.bounds.width - 16   // full panel width minus padding
-        return CGSize(width: width, height: width * 0.75 + 24)  // preview + label room
+        return CGSize(width: width, height: width * 0.75)  // 4:3 aspect, no extra label row
     }
     
     
@@ -438,27 +440,28 @@ extension CanvasViewController {
     func setCameraPanelExpanded(_ expanded: Bool, animated: Bool) {
         guard let panel = view.viewWithTag(8800) else { return }
 
-        let targetHeight: CGFloat = expanded ? 520 : 44
+        let panelWidth: CGFloat = 200
+        // Slide the panel: trailing = -8 → fully visible; trailing = +panelWidth → off-screen right
+        let targetTrailing: CGFloat = expanded ? -8 : panelWidth
 
-        // Height constraint lives on the PANEL itself, not the parent view
-        for constraint in panel.constraints {
-            if constraint.firstAttribute == .height {
-                constraint.constant = targetHeight
+        // Find the trailing constraint by identifier on the parent view
+        for constraint in view.constraints {
+            if constraint.identifier == "panelTrailing" {
+                constraint.constant = targetTrailing
             }
         }
 
-        // Update pull-tab chevron: left arrow when expanded (tap to collapse), right when collapsed (tap to expand)
+        // Update pull-tab chevron: right when expanded (panel visible, tap to collapse), left when collapsed (tap to expand)
         let pullTab = view.viewWithTag(8803) as? UIButton
         let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         pullTab?.setImage(
-            UIImage(systemName: expanded ? "chevron.left" : "chevron.right", withConfiguration: tabCfg),
+            UIImage(systemName: expanded ? "chevron.right" : "chevron.left", withConfiguration: tabCfg),
             for: .normal
         )
 
         let collectionView = panel.viewWithTag(8802)
 
         let block = {
-            panel.alpha = expanded ? 1.0 : 0.6
             collectionView?.alpha = expanded ? 1.0 : 0.0
             pullTab?.alpha = 1.0  // always visible once a camera exists
             self.view.layoutIfNeeded()
@@ -466,7 +469,7 @@ extension CanvasViewController {
 
         if animated {
             UIView.animate(withDuration: 0.3, delay: 0,
-                           usingSpringWithDamping: 0.8,
+                           usingSpringWithDamping: 0.85,
                            initialSpringVelocity: 0.3,
                            options: .curveEaseInOut,
                            animations: block)

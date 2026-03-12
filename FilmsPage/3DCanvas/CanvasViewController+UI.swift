@@ -664,16 +664,20 @@ extension CanvasViewController {
         cameraCollectionView.delegate = self
         cameraPanel.addSubview(cameraCollectionView)
 
-        // Panel constraints — starts collapsed (height 36) until a camera is spawned
-        let panelHeightConstraint = cameraPanel.heightAnchor.constraint(equalToConstant: 44)
-        panelHeightConstraint.identifier = "panelHeight"
+        // Panel constraints — slides in/out from the right edge.
+        // trailingOffset = -8 → fully visible; trailingOffset = +panelWidth → fully off-screen right.
+        let panelWidth: CGFloat = 200
+        let panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+            constant: panelWidth  // start fully off-screen (collapsed)
+        )
+        panelTrailingConstraint.identifier = "panelTrailing"
 
         NSLayoutConstraint.activate([
-            cameraPanel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+            panelTrailingConstraint,
             cameraPanel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            // AFTER:
-            cameraPanel.widthAnchor.constraint(equalToConstant: 200),   // wider panel
-            panelHeightConstraint,
+            cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth),
+            cameraPanel.heightAnchor.constraint(equalToConstant: 520),
 
             cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
             cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
@@ -681,7 +685,7 @@ extension CanvasViewController {
             cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
         ])
 
-        cameraPanel.alpha = 0.0  // hidden until first camera is added
+        cameraPanel.alpha = 1.0  // always opaque; visibility controlled by slide position
 
         // Pull-tab button — lives on the main view so it is never clipped by the panel.
         // It sticks out from the panel's left edge and is always reachable.

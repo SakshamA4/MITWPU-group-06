@@ -24,33 +24,47 @@ class CameraPreviewCell: UICollectionViewCell {
 
     let label = UILabel()
 
+    // Gradient overlay so the label is always legible on top of the image
+    private let gradientLayer = CAGradientLayer()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textAlignment = .center
-        label.textColor = .white
+        contentView.backgroundColor = UIColor(white: 0.15, alpha: 1)
+        contentView.layer.cornerRadius = 10
+        contentView.clipsToBounds = true
 
+        // Image fills the entire cell
         contentView.addSubview(previewImageView)
-        contentView.addSubview(label)
-
-        label.translatesAutoresizingMaskIntoConstraints = false
-
         NSLayoutConstraint.activate([
             previewImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             previewImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             previewImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            previewImageView.heightAnchor.constraint(equalToConstant: 90),
-
-            label.topAnchor.constraint(equalTo: previewImageView.bottomAnchor, constant: 4),
-            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            previewImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
 
-        contentView.backgroundColor = .darkGray
-        contentView.layer.cornerRadius = 10
-        contentView.clipsToBounds = true
+        // Dark gradient at the bottom so the label is readable
+        gradientLayer.colors = [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.65).cgColor]
+        gradientLayer.locations = [0.55, 1.0]
+        contentView.layer.addSublayer(gradientLayer)
+
+        // Label overlaid at the bottom
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textAlignment = .center
+        label.textColor = .white
+        label.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
+            label.heightAnchor.constraint(equalToConstant: 18),
+        ])
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradientLayer.frame = contentView.bounds
     }
 
     /// Called by the timer in CanvasViewController to push a fresh snapshot into this cell

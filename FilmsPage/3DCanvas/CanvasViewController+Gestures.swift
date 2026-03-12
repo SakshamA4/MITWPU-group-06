@@ -32,7 +32,13 @@ extension CanvasViewController {
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         arView.addGestureRecognizer(pinch)
 
-        // 6. Rotation (Existing)
+        // 6. Non-uniform axis resize (2-finger drag on Wall / Ground)
+        let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+        twoFingerPan.minimumNumberOfTouches = 2
+        twoFingerPan.maximumNumberOfTouches = 2
+        arView.addGestureRecognizer(twoFingerPan)
+
+        // 7. Rotation (Existing)
         let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
         arView.addGestureRecognizer(rotation)
     }
@@ -580,6 +586,76 @@ extension CanvasViewController {
             break
         }
         
+    }
+
+    // MARK: - Non-Uniform Scaling (Two-Finger Drag)
+
+    /// Two-finger drag resizes Wall and Ground along individual axes:
+    ///   • Horizontal drag  → width
+    ///   • Vertical drag    → height (Wall) / depth (Ground)
+    /// When no entity is selected the gesture is silently ignored so the
+    /// existing 2-finger camera-orbit gesture continues to work.
+    @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+        guard editorMode == .edit,
+              let entity = selectedEntity as? ModelEntity else { return }
+
+        let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
+        guard !isLocked else { return }
+
+        switch gesture.state {
+        case .began:
+            saveCurrentStateToUndo()
+
+        case .changed:
+            let translation = gesture.translation(in: arView)
+            let dx = Float(translation.x)
+            let dy = Float(translation.y)
+
+            // Use whichever axis is dominant to drive the resize.
+            let horizontal = abs(dx) >= abs(dy)
+
+            let sensitivity: Float = 0.002   // metres per point
+
+            // --- WallComponent ---
+            if var wall = entity.components[WallComponent.self] {
+                if horizontal {
+                    wall.width += dx * sensitivity
+                } else {
+                    wall.height -= dy * sensitivity   // drag down → smaller
+                }
+                wall.width  = max(0.3, min(wall.width,  10))
+                wall.height = max(0.3, min(wall.height,  6))
+                entity.model?.mesh = MeshResource.generateBox(
+                    width: wall.width,
+                    height: wall.height,
+                    depth: 0.05
+                )
+                entity.generateCollisionShapes(recursive: true)
+                entity.components.set(wall)
+                gesture.setTranslation(.zero, in: arView)
+            }
+
+            // --- GroundComponent ---
+            if var ground = entity.components[GroundComponent.self] {
+                if horizontal {
+                    ground.width += dx * sensitivity
+                } else {
+                    ground.depth -= dy * sensitivity   // drag down → shallower
+                }
+                ground.width = max(0.5, min(ground.width, 20))
+                ground.depth = max(0.5, min(ground.depth, 20))
+                entity.model?.mesh = MeshResource.generatePlane(
+                    width: ground.width,
+                    depth: ground.depth
+                )
+                entity.generateCollisionShapes(recursive: true)
+                entity.components.set(ground)
+                gesture.setTranslation(.zero, in: arView)
+            }
+
+        default:
+            break
+        }
     }
 
 }

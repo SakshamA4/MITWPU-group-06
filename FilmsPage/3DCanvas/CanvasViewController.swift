@@ -1686,7 +1686,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     }
                 }
             } else {
-                target.position = newPos
+                target.position = clampPositionAvoidingOverlap(entity: target, proposedPosition: newPos)
                 updateGizmoPosition()
             }
 
@@ -1710,6 +1710,79 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 }
 
 
+
+// MARK: - Collision Prevention Helper
+
+extension CanvasViewController {
+
+    /// Returns the closest position to `proposedPosition` at which `entity`'s
+    /// axis-aligned bounding box does not overlap any sibling entity under
+    /// "MainAnchor".  The pushed-back direction preserves the axis of travel:
+    /// • When dragging on the XZ plane (Y unchanged) only X/Z are clamped.
+    /// • When dragging on the Y axis only Y is clamped.
+    func clampPositionAvoidingOverlap(
+        entity: Entity,
+        proposedPosition: SIMD3<Float>
+    ) -> SIMD3<Float> {
+
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else {
+            return proposedPosition
+        }
+
+        // Temporarily move the entity to the proposed position so we can
+        // query its visual bounds there.
+        let originalPosition = entity.position
+        entity.position = proposedPosition
+
+        let selfBounds = entity.visualBounds(relativeTo: nil)
+
+        // Restore immediately — we only needed the bounds query.
+        entity.position = originalPosition
+
+        var resolved = proposedPosition
+
+        for sibling in anchor.children {
+            // Skip self, gizmo root, and entities without visible geometry.
+            guard sibling !== entity,
+                  sibling.name != "GizmoRoot",
+                  !sibling.children.isEmpty || sibling is ModelEntity
+            else { continue }
+
+            let otherBounds = sibling.visualBounds(relativeTo: nil)
+
+            // Quick AABB overlap test.
+            let overlapX = selfBounds.max.x > otherBounds.min.x && selfBounds.min.x < otherBounds.max.x
+            let overlapY = selfBounds.max.y > otherBounds.min.y && selfBounds.min.y < otherBounds.max.y
+            let overlapZ = selfBounds.max.z > otherBounds.min.z && selfBounds.min.z < otherBounds.max.z
+
+            guard overlapX && overlapY && overlapZ else { continue }
+
+            // Compute penetration depth on each axis.
+            let penRight  =  selfBounds.max.x - otherBounds.min.x   // push left
+            let penLeft   =  otherBounds.max.x - selfBounds.min.x   // push right
+            let penTop    =  selfBounds.max.y - otherBounds.min.y   // push down
+            let penBottom =  otherBounds.max.y - selfBounds.min.y   // push up
+            let penFront  =  selfBounds.max.z - otherBounds.min.z   // push back
+            let penBack   =  otherBounds.max.z - selfBounds.min.z   // push forward
+
+            // Choose the minimum-penetration axis to resolve on (MTV).
+            let minPen = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
+
+            switch minPen {
+            case penRight:  resolved.x -= penRight
+            case penLeft:   resolved.x += penLeft
+            case penTop:    resolved.y -= penTop
+            case penBottom: resolved.y += penBottom
+            case penFront:  resolved.z -= penFront
+            default:        resolved.z += penBack
+            }
+        }
+
+        return resolved
+    }
+}
+
+// MARK: -
 
 extension SIMD4 where Scalar == Float {
     var xyz: SIMD3<Float> {
