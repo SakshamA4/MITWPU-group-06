@@ -250,7 +250,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var lastDragPoint: SIMD3<Float>?
     /// Non-nil when the gizmo is sitting on a path handle instead of a scene entity
     var activeHandleEntity: Entity?
-    
+    var lastUndoTime: CFTimeInterval = 0
+    var pathRebuildFrameCount: Int = 0
     
     var currentSceneObject: Scene?
     var sceneName: String = "Untitled Scene"
@@ -569,6 +570,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             }
         }
         self.sceneNameLabel.text = self.sceneName
+        setupAnimationPanel()
+        loadSceneIfSaved()
     }
 
         // Add this method anywhere inside the CanvasViewController class
@@ -576,36 +579,39 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             return true
         }
     
+//    @objc func backButtonTapped() {
+//        let currentID =
+//            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
+//
+//        // Handle Template check as you currently do
+//        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
+//            $0.id == currentID
+//        }
+//
+//        if isTemplate {
+//            ScenesDataStore.shared.saveTemplateNote(
+//                id: currentID,
+//                notes: self.sceneNotes
+//            )
+//        } else {
+//            // 1. Update Recent Scenes (Global)
+//            let updatedRecent = ScenesModel(
+//                id: currentID,
+//                name: self.sceneName,
+//                image: self.sceneImageName ?? "Image",
+//                notes: self.sceneNotes
+//            )
+//            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
+//
+//            if var projectScene = self.currentSceneObject {
+//                projectScene.name = self.sceneName
+//            }
+//        }
+//
+//        self.dismiss(animated: true)
+//    }
     @objc func backButtonTapped() {
-        let currentID =
-            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
-
-        // Handle Template check as you currently do
-        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
-            $0.id == currentID
-        }
-
-        if isTemplate {
-            ScenesDataStore.shared.saveTemplateNote(
-                id: currentID,
-                notes: self.sceneNotes
-            )
-        } else {
-            // 1. Update Recent Scenes (Global)
-            let updatedRecent = ScenesModel(
-                id: currentID,
-                name: self.sceneName,
-                image: self.sceneImageName ?? "Image",
-                notes: self.sceneNotes
-            )
-            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
-
-            if var projectScene = self.currentSceneObject {
-                projectScene.name = self.sceneName
-            }
-        }
-
-        self.dismiss(animated: true)
+        promptSaveAndExit()
     }
     
     //Setup

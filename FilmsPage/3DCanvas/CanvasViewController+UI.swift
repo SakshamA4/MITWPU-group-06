@@ -824,13 +824,17 @@ extension CanvasViewController {
 //        print("🎬 Shot Breakdown Tapped")
 //    }
     // In CanvasViewController, inside shotBreakdownTapped()
-    @objc private func shotBreakdownTapped() {
-        let vc = ShotBreakdownViewController()
-        vc.sceneName    = self.sceneName
-        vc.timeline     = self.timeline
-        vc.cameraNames  = self.sceneCameraItems.map { $0.cameraRoot.name }
-        navigationController?.pushViewController(vc, animated: true)
-    }
+//    @objc private func shotBreakdownTapped() {
+//        let vc = ShotBreakdownViewController()
+//        vc.sceneName        = self.sceneName
+//        vc.timeline         = self.timeline
+//        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
+//        vc.arView           = self.arView                    // ← new
+//        vc.evaluateTimeline = { [weak self] t in             // ← new
+//            self?.evaluateTimeline(at: t)
+//        }
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
 
 
 }

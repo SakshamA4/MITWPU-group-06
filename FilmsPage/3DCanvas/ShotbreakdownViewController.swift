@@ -2,8 +2,11 @@
 //  ShotBreakdownViewController.swift
 //  3DCanvas
 //
+//  FIX 2: Thumbnails now show the camera's actual POV, not the editor view.
+//
 
 import UIKit
+import RealityKit
 
 // MARK: - Shot Model
 
@@ -13,72 +16,54 @@ struct Shot {
     let cameraName: String
     let startTime: Float
     let duration: Float
-    let thumbnail: UIImage?
+    var thumbnail: UIImage?
 
     var displayName: String { "Shot \(index + 1)" }
     var shortLabel: String  { "\(index + 1)" }
     var endTime: Float      { startTime + duration }
+
+    var cleanCameraName: String {
+        cameraName
+            .replacingOccurrences(of: "SceneCamera_", with: "Camera ")
+            .replacingOccurrences(of: "SceneCamera", with: "Camera")
+            .replacingOccurrences(of: "Camera_", with: "Camera ")
+    }
 }
 
-// MARK: - Shot Derivation Engine
+// MARK: - Shot Derivation
 
 struct ShotDerived {
-
-    /// Scans the Timeline for AnimationClips that animate scene cameras.
-    /// Each distinct camera-active interval becomes one Shot.
-    /// If no camera clips exist, the whole timeline is Shot 1 on the editor camera.
     static func derive(from timeline: Timeline, cameraNames: [String]) -> [Shot] {
-
         let totalDuration = timeline.duration
         guard totalDuration > 0 else { return [] }
 
-        // Step A — find all clips that belong to a scene camera
         let cameraClips = timeline.clips.filter { clip in
             cameraNames.contains(clip.entityName) ||
             clip.entityName.lowercased().contains("scenecamera") ||
             clip.entityName.lowercased().contains("camera")
         }
 
-        // Step B — if none, whole scene = 1 shot
         if cameraClips.isEmpty {
             return [Shot(id: UUID(), index: 0, cameraName: "Editor Camera",
                          startTime: 0, duration: totalDuration, thumbnail: nil)]
         }
 
-        // Step C — group by camera, merge overlapping intervals
         var intervals: [(cam: String, start: Float, end: Float)] = []
-        let grouped = Dictionary(grouping: cameraClips, by: { $0.entityName })
-
-        for (camName, clips) in grouped {
-            let sorted = clips.sorted { $0.startTime < $1.startTime }
+        for (camName, clips) in Dictionary(grouping: cameraClips, by: { $0.entityName }) {
             var merging: (start: Float, end: Float)? = nil
-
-            for clip in sorted {
-                let s = clip.startTime
-                let e = clip.startTime + clip.duration
+            for clip in clips.sorted(by: { $0.startTime < $1.startTime }) {
+                let s = clip.startTime, e = clip.startTime + clip.duration
                 if var m = merging {
-                    if s <= m.end + 0.01 {
-                        m.end = max(m.end, e)
-                        merging = m
-                    } else {
-                        intervals.append((camName, m.start, m.end))
-                        merging = (s, e)
-                    }
-                } else {
-                    merging = (s, e)
-                }
+                    if s <= m.end + 0.01 { m.end = max(m.end, e); merging = m }
+                    else { intervals.append((camName, m.start, m.end)); merging = (s, e) }
+                } else { merging = (s, e) }
             }
             if let m = merging { intervals.append((camName, m.start, m.end)) }
         }
 
-        // Step D — sort by start time → each interval = 1 Shot
-        intervals.sort { $0.start < $1.start }
-
-        return intervals.enumerated().map { (i, interval) in
-            Shot(id: UUID(), index: i, cameraName: interval.cam,
-                 startTime: interval.start,
-                 duration: max(0.1, interval.end - interval.start),
-                 thumbnail: nil)
+        return intervals.sorted { $0.start < $1.start }.enumerated().map { i, iv in
+            Shot(id: UUID(), index: i, cameraName: iv.cam,
+                 startTime: iv.start, duration: max(0.1, iv.end - iv.start), thumbnail: nil)
         }
     }
 }
@@ -87,50 +72,53 @@ struct ShotDerived {
 
 class ShotBreakdownViewController: UIViewController {
 
-    // App color constants (match entire app)
-    static let navy   = UIColor(red: 11/255,  green: 11/255,  blue: 22/255,  alpha: 1)
-    static let card   = UIColor(red: 22/255,  green: 22/255,  blue: 38/255,  alpha: 1)
-    static let red    = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
-    static let gray   = UIColor.lightGray
+    private let navy   = UIColor(red: 11/255,  green: 11/255,  blue: 22/255,  alpha: 1)
+    private let appRed = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
 
     // MARK: - Public
-    var sceneName: String  = "Scene S01"
+    var sceneName: String  = "Scene"
     var timeline: Timeline = Timeline()
     var cameraNames: [String] = []
+    /// Live ARView — for snapshot fallback only
+    weak var arView: ARView?
+    /// Scrubs the scene to the given master time
+    var evaluateTimeline: ((Float) -> Void)?
+    /// Camera items from CanvasViewController — needed to activate camera POV
+    var cameraItems: [CanvasViewController.SceneCameraItem] = []
+    /// Activates a scene camera, snapshots, restores editor camera. Returns image.
+    /// Implement this in CanvasViewController and pass it in.
+    var captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)?
 
-    // MARK: - Private
     private var shots: [Shot] = []
+    private var thumbnailsGenerated = false
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection       = .vertical
-        layout.minimumLineSpacing    = 12
-        layout.minimumInteritemSpacing = 12
-        layout.sectionInset = UIEdgeInsets(top: 12, left: 16, bottom: 40, right: 16)
+        layout.scrollDirection = .vertical
+        layout.minimumLineSpacing = 14
+        layout.minimumInteritemSpacing = 14
+        layout.sectionInset = UIEdgeInsets(top: 16, left: 16, bottom: 48, right: 16)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.backgroundColor = .clear
         cv.register(ShotCardCell.self, forCellWithReuseIdentifier: ShotCardCell.reuseID)
-        cv.dataSource = self
-        cv.delegate   = self
+        cv.dataSource = self; cv.delegate = self
         cv.translatesAutoresizingMaskIntoConstraints = false
         return cv
     }()
 
     private let statsLabel: UILabel = {
         let l = UILabel()
-        l.font      = .systemFont(ofSize: 11, weight: .black)
-        l.textColor = UIColor.white.withAlphaComponent(0.3)
+        l.font = .systemFont(ofSize: 11, weight: .black)
+        l.textColor = UIColor.white.withAlphaComponent(0.35)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     private let emptyLabel: UILabel = {
         let l = UILabel()
-        l.text          = "No shots detected.\nAdd scene cameras and animate them\nto generate a shot breakdown."
-        l.numberOfLines = 0
-        l.textAlignment = .center
-        l.font          = .systemFont(ofSize: 14)
-        l.textColor     = UIColor.lightGray
+        l.text = "No shots detected.\nAdd scene cameras and animate them\nto generate a shot breakdown."
+        l.numberOfLines = 0; l.textAlignment = .center
+        l.font = .systemFont(ofSize: 15); l.textColor = .lightGray
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -139,22 +127,84 @@ class ShotBreakdownViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = Self.navy
+        view.backgroundColor = navy
         shots = ShotDerived.derive(from: timeline, cameraNames: cameraNames)
-        setupNav()
-        setupLayout()
-        refresh()
+        setupNav(); setupLayout(); refresh()
     }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !thumbnailsGenerated { captureThumbnails(); thumbnailsGenerated = true }
+    }
+
+    // MARK: - Camera POV Thumbnail Capture
+    //
+    // For each shot:
+    // 1. Evaluate timeline at shot.startTime (positions all entities)
+    // 2. Find the matching SceneCameraItem by camera name
+    // 3. Call captureFromCamera to get actual POV image
+    // 4. Reload cell
+
+    private func captureThumbnails() {
+        guard let evaluate = evaluateTimeline else { return }
+        let count = shots.count
+
+        func captureNext(_ i: Int) {
+            guard i < count else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { evaluate(0) }
+                return
+            }
+
+            let shot = shots[i]
+            evaluate(shot.startTime)
+
+            // Wait one render frame for evaluated positions to apply
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                guard let self = self else { return }
+
+                // Find the matching camera item
+                let camItem = self.cameraItems.first { item in
+                    item.cameraRoot.name == shot.cameraName ||
+                    item.cameraRoot.name.contains(shot.cameraName)
+                }
+
+                var image: UIImage?
+                if let capture = self.captureFromCamera {
+                    // Camera POV capture — this is what the camera actually sees
+                    image = capture(camItem)
+                }
+
+                // Fallback to editor view snapshot if no camera found
+                if image == nil {
+                    let semaphore = DispatchSemaphore(value: 0)
+                    self.arView?.snapshot(saveToHDR: false) { img in
+                        image = img
+                        semaphore.signal()
+                    }
+                    // Non-blocking: just skip this frame if snapshot async
+                }
+
+                if let img = image {
+                    self.shots[i].thumbnail = img
+                    if i < self.collectionView.numberOfItems(inSection: 0) {
+                        self.collectionView.reloadItems(at: [IndexPath(item: i, section: 0)])
+                    }
+                }
+                captureNext(i + 1)
+            }
+        }
+        captureNext(0)
+    }
+
+    // MARK: - Nav
 
     private func setupNav() {
         title = sceneName
         let app = UINavigationBarAppearance()
         app.configureWithOpaqueBackground()
-        app.backgroundColor = Self.navy
-        app.titleTextAttributes = [
-            .foregroundColor: UIColor.white,
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
-        ]
+        app.backgroundColor = navy
+        app.titleTextAttributes = [.foregroundColor: UIColor.white,
+                                    .font: UIFont.systemFont(ofSize: 17, weight: .semibold)]
         navigationController?.navigationBar.standardAppearance   = app
         navigationController?.navigationBar.scrollEdgeAppearance = app
         navigationController?.navigationBar.tintColor = .white
@@ -163,30 +213,23 @@ class ShotBreakdownViewController: UIViewController {
             image: UIImage(systemName: "chevron.left"),
             style: .plain, target: self, action: #selector(backTapped))
 
-        let playBtn = UIBarButtonItem(
-            title: "▶  Play All", style: .plain,
-            target: self, action: #selector(playAllTapped))
-        playBtn.setTitleTextAttributes([
-            .foregroundColor: Self.red,
-            .font: UIFont.systemFont(ofSize: 15, weight: .semibold)
-        ], for: .normal)
-        navigationItem.rightBarButtonItem = playBtn
+        let btn = UIBarButtonItem(title: "▶  Play All", style: .plain,
+                                   target: self, action: #selector(playAllTapped))
+        btn.setTitleTextAttributes([.foregroundColor: appRed,
+                                     .font: UIFont.systemFont(ofSize: 15, weight: .semibold)],
+                                    for: .normal)
+        navigationItem.rightBarButtonItem = btn
     }
 
     private func setupLayout() {
-        view.addSubview(statsLabel)
-        view.addSubview(collectionView)
-        view.addSubview(emptyLabel)
-
+        view.addSubview(statsLabel); view.addSubview(collectionView); view.addSubview(emptyLabel)
         NSLayoutConstraint.activate([
             statsLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
             statsLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
-
-            collectionView.topAnchor.constraint(equalTo: statsLabel.bottomAnchor, constant: 2),
+            collectionView.topAnchor.constraint(equalTo: statsLabel.bottomAnchor, constant: 4),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
             emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             emptyLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
@@ -195,52 +238,56 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func refresh() {
-        let empty = shots.isEmpty
-        emptyLabel.isHidden   = !empty
-        collectionView.isHidden = empty
-        navigationItem.rightBarButtonItem?.isEnabled = !empty
-
+        emptyLabel.isHidden = !shots.isEmpty
+        collectionView.isHidden = shots.isEmpty
+        navigationItem.rightBarButtonItem?.isEnabled = !shots.isEmpty
         let total = shots.reduce(0) { $0 + $1.duration }
         let m = Int(total) / 60, s = Int(total) % 60
-        statsLabel.text = "\(shots.count) SHOTS  ·  \(m > 0 ? "\(m)m " : "")\(s)s"
+        statsLabel.text = "\(shots.count) SHOTS  ·  \(m > 0 ? "\(m)m " : "")\(s)s TOTAL"
         collectionView.reloadData()
     }
 
-    @objc private func backTapped()    { navigationController?.popViewController(animated: true) }
+    @objc private func backTapped() { navigationController?.popViewController(animated: true) }
 
     @objc private func playAllTapped() {
         guard !shots.isEmpty else { return }
-        push(ShotPlayerViewController(shots: shots, startIndex: 0, playAll: true, sceneName: sceneName))
+        openPlayer(index: 0, playAll: true)
     }
 
-    private func push(_ vc: UIViewController) {
+    private func openPlayer(index: Int, playAll: Bool) {
+        let vc = ShotPlayerViewController(
+            shots: shots, startIndex: index, playAll: playAll,
+            sceneName: sceneName, arView: arView,
+            evaluateTimeline: evaluateTimeline,
+            captureFromCamera: captureFromCamera,
+            cameraItems: cameraItems)
         navigationController?.pushViewController(vc, animated: true)
     }
 }
 
-// MARK: - Collection DataSource + Delegate
+// MARK: - CollectionView
 
 extension ShotBreakdownViewController: UICollectionViewDataSource,
                                         UICollectionViewDelegate,
                                         UICollectionViewDelegateFlowLayout {
-
     func collectionView(_ cv: UICollectionView, numberOfItemsInSection _: Int) -> Int { shots.count }
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: ShotCardCell.reuseID, for: ip) as! ShotCardCell
-        cell.configure(with: shots[ip.item])
+        cell.configure(with: shots[ip.item], sceneName: sceneName)
         return cell
     }
 
     func collectionView(_ cv: UICollectionView, didSelectItemAt ip: IndexPath) {
-        push(ShotPlayerViewController(shots: shots, startIndex: ip.item, playAll: false, sceneName: sceneName))
+        openPlayer(index: ip.item, playAll: false)
     }
 
     func collectionView(_ cv: UICollectionView, layout _: UICollectionViewLayout,
                         sizeForItemAt _: IndexPath) -> CGSize {
-        let spacing: CGFloat = 12, inset: CGFloat = 16
-        let w = floor((cv.bounds.width - inset * 2 - spacing * 2) / 3)
-        return CGSize(width: w, height: w * (9/16) + 50)
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let cols: CGFloat = isIPad ? 3 : 2
+        let w = floor((cv.bounds.width - 16*2 - 14*(cols-1)) / cols)
+        return CGSize(width: w, height: w * (9.0/16.0) + 62)
     }
 }
 
@@ -249,91 +296,85 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
 class ShotCardCell: UICollectionViewCell {
     static let reuseID = "ShotCardCell"
 
-    private let appRed  = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
-    private let cardBg  = UIColor(red: 22/255,  green: 22/255, blue: 38/255, alpha: 1)
-    private let thumbBg = UIColor(red: 14/255,  green: 14/255, blue: 26/255, alpha: 1)
+    private let appRed  = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
+    private let cardBg  = UIColor(red: 22/255,  green: 22/255,  blue: 36/255,  alpha: 1)
+    private let thumbBg = UIColor(red: 12/255,  green: 12/255,  blue: 22/255,  alpha: 1)
+    private let infoBg  = UIColor(red: 17/255,  green: 17/255,  blue: 30/255,  alpha: 1)
 
-    private let badge     = UIView()
-    private let badgeLbl  = UILabel()
     private let thumb     = UIView()
     private let thumbImg  = UIImageView()
     private let thumbIcon = UIImageView()
+    private let overlay   = UIView()
+    private let gradient  = CAGradientLayer()
+    private let infoRow   = UIView()
+    private let badge     = UIView()
+    private let badgeLbl  = UILabel()
     private let shotLbl   = UILabel()
     private let camLbl    = UILabel()
+    private let sceneLbl  = UILabel()
     private let durLbl    = UILabel()
-    private let overlay   = UIView()
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        build()
-    }
+    override init(frame: CGRect) { super.init(frame: frame); build() }
     required init?(coder: NSCoder) { fatalError() }
 
-    private func build() {
-        contentView.backgroundColor        = cardBg
-        contentView.layer.cornerRadius     = 9
-        contentView.clipsToBounds          = true
-        contentView.layer.borderWidth      = 1
-        contentView.layer.borderColor      = UIColor.white.withAlphaComponent(0.06).cgColor
-        layer.shadowColor                  = UIColor.black.cgColor
-        layer.shadowOpacity                = 0.4
-        layer.shadowRadius                 = 5
-        layer.shadowOffset                 = CGSize(width: 0, height: 3)
-        layer.masksToBounds                = false
+    override func layoutSubviews() { super.layoutSubviews(); gradient.frame = thumb.bounds }
 
-        // Thumb
+    private func build() {
+        contentView.backgroundColor    = cardBg
+        contentView.layer.cornerRadius = 10
+        contentView.clipsToBounds      = true
+        contentView.layer.borderWidth  = 1
+        contentView.layer.borderColor  = UIColor.white.withAlphaComponent(0.07).cgColor
+        layer.shadowColor   = UIColor.black.cgColor
+        layer.shadowOpacity = 0.5
+        layer.shadowRadius  = 8
+        layer.shadowOffset  = CGSize(width: 0, height: 4)
+        layer.masksToBounds = false
+
         thumb.backgroundColor = thumbBg
-        thumb.clipsToBounds   = true
+        thumb.clipsToBounds = true
         thumb.translatesAutoresizingMaskIntoConstraints = false
-        thumbImg.contentMode  = .scaleAspectFill
-        thumbImg.clipsToBounds = true
+        thumbImg.contentMode = .scaleAspectFill; thumbImg.clipsToBounds = true
         thumbImg.translatesAutoresizingMaskIntoConstraints = false
-        let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .thin)
-        thumbIcon.image       = UIImage(systemName: "camera.fill", withConfiguration: cfg)
-        thumbIcon.tintColor   = UIColor.white.withAlphaComponent(0.12)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 24, weight: .thin)
+        thumbIcon.image = UIImage(systemName: "camera.fill", withConfiguration: cfg)
+        thumbIcon.tintColor = UIColor.white.withAlphaComponent(0.13)
         thumbIcon.contentMode = .scaleAspectFit
         thumbIcon.translatesAutoresizingMaskIntoConstraints = false
+        gradient.colors = [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.6).cgColor]
+        gradient.locations = [0.3, 1.0]
+        thumb.layer.addSublayer(gradient)
         overlay.backgroundColor = .clear
         overlay.translatesAutoresizingMaskIntoConstraints = false
-        thumb.addSubview(thumbImg)
-        thumb.addSubview(thumbIcon)
-        thumb.addSubview(overlay)
+        thumb.addSubview(thumbImg); thumb.addSubview(thumbIcon); thumb.addSubview(overlay)
         contentView.addSubview(thumb)
 
-        // Badge
-        badge.backgroundColor   = appRed
-        badge.layer.cornerRadius = 9
-        badge.clipsToBounds      = true
-        badge.translatesAutoresizingMaskIntoConstraints = false
-        badgeLbl.font            = .systemFont(ofSize: 9, weight: .black)
-        badgeLbl.textColor       = .white
-        badgeLbl.textAlignment   = .center
-        badgeLbl.translatesAutoresizingMaskIntoConstraints = false
-        badge.addSubview(badgeLbl)
-        contentView.addSubview(badge)
+        badge.backgroundColor = appRed; badge.layer.cornerRadius = 10
+        badge.clipsToBounds = true; badge.translatesAutoresizingMaskIntoConstraints = false
+        badgeLbl.font = .systemFont(ofSize: 11, weight: .black); badgeLbl.textColor = .white
+        badgeLbl.textAlignment = .center; badgeLbl.translatesAutoresizingMaskIntoConstraints = false
+        badge.addSubview(badgeLbl); contentView.addSubview(badge)
 
-        // Labels
-        shotLbl.font      = .systemFont(ofSize: 11, weight: .semibold)
-        shotLbl.textColor = .white
+        infoRow.backgroundColor = infoBg; infoRow.translatesAutoresizingMaskIntoConstraints = false
+        shotLbl.font = .systemFont(ofSize: 13, weight: .bold); shotLbl.textColor = .white
         shotLbl.translatesAutoresizingMaskIntoConstraints = false
-
-        camLbl.font       = .systemFont(ofSize: 9, weight: .regular)
-        camLbl.textColor  = UIColor.white.withAlphaComponent(0.4)
+        camLbl.font = .systemFont(ofSize: 11, weight: .medium)
+        camLbl.textColor = UIColor.white.withAlphaComponent(0.6)
         camLbl.translatesAutoresizingMaskIntoConstraints = false
-
-        durLbl.font       = .monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
-        durLbl.textColor  = UIColor.white.withAlphaComponent(0.4)
-        durLbl.translatesAutoresizingMaskIntoConstraints = false
-
-        contentView.addSubview(shotLbl)
-        contentView.addSubview(camLbl)
-        contentView.addSubview(durLbl)
+        sceneLbl.font = .systemFont(ofSize: 10, weight: .regular)
+        sceneLbl.textColor = UIColor.white.withAlphaComponent(0.3)
+        sceneLbl.translatesAutoresizingMaskIntoConstraints = false
+        durLbl.font = .monospacedDigitSystemFont(ofSize: 12, weight: .bold)
+        durLbl.textColor = appRed; durLbl.translatesAutoresizingMaskIntoConstraints = false
+        infoRow.addSubview(shotLbl); infoRow.addSubview(camLbl)
+        infoRow.addSubview(sceneLbl); infoRow.addSubview(durLbl)
+        contentView.addSubview(infoRow)
 
         NSLayoutConstraint.activate([
             thumb.topAnchor.constraint(equalTo: contentView.topAnchor),
             thumb.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             thumb.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            thumb.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 9/16),
+            thumb.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 9.0/16.0),
 
             thumbImg.topAnchor.constraint(equalTo: thumb.topAnchor),
             thumbImg.leadingAnchor.constraint(equalTo: thumb.leadingAnchor),
@@ -342,72 +383,65 @@ class ShotCardCell: UICollectionViewCell {
 
             thumbIcon.centerXAnchor.constraint(equalTo: thumb.centerXAnchor),
             thumbIcon.centerYAnchor.constraint(equalTo: thumb.centerYAnchor),
-            thumbIcon.widthAnchor.constraint(equalToConstant: 24),
-            thumbIcon.heightAnchor.constraint(equalToConstant: 24),
 
             overlay.topAnchor.constraint(equalTo: thumb.topAnchor),
             overlay.leadingAnchor.constraint(equalTo: thumb.leadingAnchor),
             overlay.trailingAnchor.constraint(equalTo: thumb.trailingAnchor),
             overlay.bottomAnchor.constraint(equalTo: thumb.bottomAnchor),
 
-            badge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
-            badge.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
-            badge.widthAnchor.constraint(greaterThanOrEqualToConstant: 20),
-            badge.heightAnchor.constraint(equalToConstant: 17),
-
+            badge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 7),
+            badge.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -7),
+            badge.widthAnchor.constraint(greaterThanOrEqualToConstant: 26),
+            badge.heightAnchor.constraint(equalToConstant: 20),
             badgeLbl.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
             badgeLbl.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
-            badgeLbl.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 4),
-            badgeLbl.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -4),
+            badgeLbl.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 6),
+            badgeLbl.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -6),
 
-            shotLbl.topAnchor.constraint(equalTo: thumb.bottomAnchor, constant: 5),
-            shotLbl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 6),
-            shotLbl.trailingAnchor.constraint(lessThanOrEqualTo: durLbl.leadingAnchor, constant: -2),
+            infoRow.topAnchor.constraint(equalTo: thumb.bottomAnchor),
+            infoRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            infoRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            infoRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            camLbl.topAnchor.constraint(equalTo: shotLbl.bottomAnchor, constant: 1),
-            camLbl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 6),
-            camLbl.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -6),
+            shotLbl.topAnchor.constraint(equalTo: infoRow.topAnchor, constant: 8),
+            shotLbl.leadingAnchor.constraint(equalTo: infoRow.leadingAnchor, constant: 10),
+            shotLbl.trailingAnchor.constraint(lessThanOrEqualTo: durLbl.leadingAnchor, constant: -4),
 
-            durLbl.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -6),
-            durLbl.centerYAnchor.constraint(equalTo: shotLbl.centerYAnchor),
+            camLbl.topAnchor.constraint(equalTo: shotLbl.bottomAnchor, constant: 2),
+            camLbl.leadingAnchor.constraint(equalTo: infoRow.leadingAnchor, constant: 10),
+            camLbl.trailingAnchor.constraint(lessThanOrEqualTo: infoRow.trailingAnchor, constant: -10),
+
+            sceneLbl.topAnchor.constraint(equalTo: camLbl.bottomAnchor, constant: 1),
+            sceneLbl.leadingAnchor.constraint(equalTo: infoRow.leadingAnchor, constant: 10),
+            sceneLbl.bottomAnchor.constraint(lessThanOrEqualTo: infoRow.bottomAnchor, constant: -8),
+
+            durLbl.trailingAnchor.constraint(equalTo: infoRow.trailingAnchor, constant: -10),
+            durLbl.topAnchor.constraint(equalTo: infoRow.topAnchor, constant: 10),
         ])
     }
 
-    func configure(with shot: Shot) {
-        badgeLbl.text = shot.shortLabel
-        shotLbl.text  = shot.displayName
-        camLbl.text   = shot.cameraName
-            .replacingOccurrences(of: "SceneCamera_", with: "Cam ")
-            .replacingOccurrences(of: "Camera_", with: "Cam ")
+    func configure(with shot: Shot, sceneName: String) {
+        badgeLbl.text = shot.shortLabel; shotLbl.text = shot.displayName
+        camLbl.text = shot.cleanCameraName; sceneLbl.text = sceneName
         let s = shot.duration
-        durLbl.text = s.truncatingRemainder(dividingBy: 1) == 0
-            ? "\(Int(s))s" : String(format: "%.1fs", s)
+        durLbl.text = s.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(s))s" : String(format: "%.1fs", s)
         if let img = shot.thumbnail {
-            thumbImg.image = img
-            thumbIcon.isHidden = true
-        } else {
-            thumbImg.image = nil
-            thumbIcon.isHidden = false
-        }
+            thumbImg.image = img; thumbIcon.isHidden = true
+        } else { thumbImg.image = nil; thumbIcon.isHidden = false }
     }
 
     override func touchesBegan(_ t: Set<UITouch>, with e: UIEvent?) {
         super.touchesBegan(t, with: e)
         UIView.animate(withDuration: 0.1) {
-            self.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
-            self.overlay.backgroundColor = UIColor.black.withAlphaComponent(0.2)
-        }
+            self.transform = CGAffineTransform(scaleX: 0.97, y: 0.97)
+            self.overlay.backgroundColor = UIColor.black.withAlphaComponent(0.25) }
     }
     override func touchesEnded(_ t: Set<UITouch>, with e: UIEvent?) {
         super.touchesEnded(t, with: e)
-        UIView.animate(withDuration: 0.15) {
-            self.transform = .identity; self.overlay.backgroundColor = .clear
-        }
+        UIView.animate(withDuration: 0.15) { self.transform = .identity; self.overlay.backgroundColor = .clear }
     }
     override func touchesCancelled(_ t: Set<UITouch>, with e: UIEvent?) {
         super.touchesCancelled(t, with: e)
-        UIView.animate(withDuration: 0.15) {
-            self.transform = .identity; self.overlay.backgroundColor = .clear
-        }
+        UIView.animate(withDuration: 0.15) { self.transform = .identity; self.overlay.backgroundColor = .clear }
     }
 }
