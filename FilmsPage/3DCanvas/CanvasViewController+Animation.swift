@@ -202,6 +202,10 @@ extension CanvasViewController {
             showRotationArc(for: clip, on: entity)
         }
 
+        // Always return to move mode after adding any animation clip so
+        // rotation rings don't auto-appear on the next entity tap.
+        interactionMode = .move
+
         debugPrintTimeline()
     }
 

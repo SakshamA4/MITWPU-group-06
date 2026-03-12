@@ -104,24 +104,15 @@ extension CanvasViewController {
 
         // ─────────────────────────────
         // 0️⃣ ROTATION ARC HANDLE SELECTION
-        // Checked first so arc handles take priority over general hit-testing.
+        // Tap just records which arc is selected for context menus.
+        // Actual drag is handled entirely in handlePan (self-contained).
         // ─────────────────────────────
         if let hit = arView.entity(at: location),
            let arcComp = hit.components[RotationArcComponent.self]
         {
-            // Select this arc — store the draggable handle and its clip
-            activeArcHandle  = hit
-            activeArcClipID  = arcComp.clipID
-
-            // Compute the handle's current angle so dragging starts correctly
-            let arcRoot = activeRotationArcs[arcComp.clipID]?.root
-            if let handlePos = arcRoot.map({ hit.position(relativeTo: $0) }) {
-                arcDragStartAngle = atan2(handlePos.x, handlePos.z)
-            }
-
-            // Clear any entity selection — arc editing mode
+            selectedArcClipID = arcComp.clipID
             setEntityTransparency(selectedEntity, alpha: 1.0)
-            selectedEntity   = nil
+            selectedEntity    = nil
             activeHandleEntity = nil
             hideGizmo()
             hideRotationGizmo()
@@ -156,11 +147,25 @@ extension CanvasViewController {
         // 1. Perform Hit Test
         let hits = arView.hitTest(location)
         
-        // 2. Filter hits: Find object root, ignoring Gizmo
+        // 2. Filter hits: ignore Gizmo, motion path, and arc entities
         let objectHit = hits.first { hit in
             var current: Entity? = hit.entity
             while let checkEntity = current {
                 if checkEntity.name == "GizmoRoot" || checkEntity.name.contains("Gizmo") {
+                    return false
+                }
+                if checkEntity.name == "MotionPath" || checkEntity.name.hasPrefix("PathRoot_")
+                    || checkEntity.name.hasPrefix("path.") {
+                    return false
+                }
+                if checkEntity.name.hasPrefix("RotationArc_")
+                    || checkEntity.name == "startLine" || checkEntity.name == "endLine"
+                    || checkEntity.name == "arcCurve"
+                    || checkEntity.name.hasPrefix("arcHandle.") {
+                    return false
+                }
+                if checkEntity.components[MotionPathHandleComponent.self] != nil
+                    || checkEntity.components[RotationArcComponent.self] != nil {
                     return false
                 }
                 if checkEntity.name == "MainAnchor" { break }
@@ -454,27 +459,31 @@ extension CanvasViewController {
 
     
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer is UIPanGestureRecognizer else { return true }
 
-    
-    guard gestureRecognizer is UIPanGestureRecognizer,
-          interactionMode == .rotate else {
-        return true
-    }
+        let location = gestureRecognizer.location(in: arView)
 
-    let location = gestureRecognizer.location(in: arView)
-    let hits = arView.hitTest(location)
-
-    // Only allow rotation pan if touching a ring
-    for hit in hits {
-        let name = hit.entity.name
-        if name == "xRing" || name == "yRing" || name == "zRing" {
+        // Always allow pans that start on an arc handle tip
+        if let hit = arView.entity(at: location),
+           hit.components[RotationArcComponent.self] != nil {
             return true
         }
-    }
 
-    // Otherwise block this pan so old gizmo works
-    return false
+        // Allow gizmo and ring hits
+        let hits = arView.hitTest(location)
+        for hit in hits {
+            let name = hit.entity.name
+            if name.contains("Gizmo") || name == "xRing" || name == "yRing" || name == "zRing" {
+                return true
+            }
+        }
 
+        // In rotate mode: only allow if an entity is selected
+        if interactionMode == .rotate {
+            return selectedEntity != nil || activeHandleEntity != nil
+        }
+
+        return true
     }
 
 

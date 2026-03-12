@@ -511,16 +511,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     
     var activeMotionPaths: [UUID: MotionPathVisual] = [:]
 
-    // Stores the rotation arc Entity for each rotation AnimationClip.
-    // Keyed by clip UUID — mirrors the activeMotionPaths pattern.
+    // Rotation arc visuals — keyed by clip UUID, mirrors activeMotionPaths.
     var activeRotationArcs: [UUID: RotationArcVisual] = [:]
 
-    // Arc handle drag state — mirrors activeHandleEntity / dragStartPosition pattern
-    // for motion path handles.
-    var activeArcHandle: Entity?          // the handle entity currently being dragged
-    var activeArcClipID: UUID?            // which clip the dragging arc belongs to
-    var arcDragStartAngle: Float = 0      // the angle (radians) when drag began
-    
+    // Which rotation arc clip is currently selected (for long-press context menu).
+    var selectedArcClipID: UUID?
+
+    // Arc handle drag state — self-contained, bypasses gizmo system.
+    var draggingArcHandle:  Entity?
+    var draggingArcClipID:  UUID?
+    var draggingArcRole:    RotationArcComponent.Role?
+    var arcDragLastAngle:   Float = 0
+    var arcDragCentre:      SIMD3<Float>?
+
     // MARK: - Editor Mode
     var editorMode: EditorMode = .edit
     
@@ -784,34 +787,45 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         _ gesture: UILongPressGestureRecognizer
     ) {
         guard gesture.state == .began else { return }
-        
         let location = gesture.location(in: arView)
-        
         guard let hit = arView.entity(at: location) else { return }
-        
-        // Case 1: Long-press on a path HANDLE
-        if let handle = hit.components[MotionPathHandleComponent.self],
-            let pathRoot = hit.parent
+
+        // Case 0a: arc handle tip
+        if let arcComp = hit.components[RotationArcComponent.self],
+           let arcRoot = activeRotationArcs[arcComp.clipID]?.root
         {
-            showPathContextMenu(
-                clipID: handle.clipID,
-                pathRoot: pathRoot
-            )
+            showRotationArcContextMenu(clipID: arcComp.clipID, arcRoot: arcRoot)
             return
         }
-        
-        // Case 2: Long-press on the PATH CURVE itself
-        if hit.name == "MotionPath",
-            let pathRoot = hit.parent,
-            let handle = pathRoot
-                .children
-                .compactMap({ $0.components[MotionPathHandleComponent.self] })
-                .first
+
+        // Case 0b: arc curve / shaft — walk up to arcRoot
+        var walkArc: Entity? = hit
+        while let e = walkArc {
+            if e.name.hasPrefix("RotationArc_") {
+                let uuidStr = e.name.replacingOccurrences(of: "RotationArc_", with: "")
+                if let clipID = UUID(uuidString: uuidStr) {
+                    showRotationArcContextMenu(clipID: clipID, arcRoot: e)
+                }
+                return
+            }
+            walkArc = e.parent
+        }
+
+        // Case 1: motion path handle
+        if let handle = hit.components[MotionPathHandleComponent.self],
+           let pathRoot = hit.parent
         {
-            showPathContextMenu(
-                clipID: handle.clipID,
-                pathRoot: pathRoot
-            )
+            showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
+            return
+        }
+
+        // Case 2: motion path curve
+        if hit.name == "MotionPath",
+           let pathRoot = hit.parent,
+           let handle = pathRoot.children
+               .compactMap({ $0.components[MotionPathHandleComponent.self] }).first
+        {
+            showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
             return
         }
     }
@@ -1307,95 +1321,96 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         let location = gesture.location(in: arView)
 
-        // ──────────────────────────────────────────────
-        // STEP 1 — ROTATION ARC HANDLE DRAGGING
-        // Mirrors the motion path handle drag pattern exactly:
-        //   .began  → confirm the drag started on an arc handle tip
-        //   .changed → compute new angle from drag delta, update clip + rebuild arc
-        //   .ended  → clear arc drag state
-        // ──────────────────────────────────────────────
+        // ──────────────────────────────────────────────────────────────────
+        // ARC HANDLE DRAG — self-contained, bypasses gizmo/camera systems.
+        // Tip sphere is child of lineRoot at local (0,0,arcRadius).
+        // Rotating lineRoot around Y moves the tip automatically.
+        // Uses ray-plane intersection on XZ plane — works from any camera angle.
+        // ──────────────────────────────────────────────────────────────────
 
-        // If we already locked onto an arc handle, keep routing here until .ended
-        if activeArcHandle != nil {
-            switch gesture.state {
-            case .changed:
-                guard
-                    let handle  = activeArcHandle,
-                    let clipID  = activeArcClipID,
-                    let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
-                    let visual  = activeRotationArcs[clipID]
-                else { break }
-
-                // Convert screen drag to an angle delta on the XZ plane.
-                // Horizontal drag → rotate; one full screen width ≈ 2π.
-                let dx = Float(gesture.translation(in: arView).x)
-                let angleDelta = dx * 0.01   // radians per point
-
-                let isEndHandle = handle.name == "arcHandle.end"
-                var clip = timeline.clips[clipIdx]
-
-                if isEndHandle {
-                    let newToAngle = arcDragStartAngle + angleDelta
-                    timeline.clips[clipIdx] = AnimationClip(
-                        entityName: clip.entityName,
-                        type:       clip.type,
-                        track:      clip.track,
-                        easing:     clip.easing,
-                        startTime:  clip.startTime,
-                        duration:   clip.duration,
-                        fromValue:  clip.fromValue,
-                        toValue:    SIMD3<Float>(0, newToAngle, 0),
-                        motionPath: clip.motionPath
-                    )
-                } else {
-                    // start handle — shift fromValue
-                    let newFromAngle = arcDragStartAngle + angleDelta
-                    timeline.clips[clipIdx] = AnimationClip(
-                        entityName: clip.entityName,
-                        type:       clip.type,
-                        track:      clip.track,
-                        easing:     clip.easing,
-                        startTime:  clip.startTime,
-                        duration:   clip.duration,
-                        fromValue:  SIMD3<Float>(0, newFromAngle, 0),
-                        toValue:    clip.toValue,
-                        motionPath: clip.motionPath
-                    )
-                }
-
-                // Rebuild the arc visual with updated angles
-                clip = timeline.clips[clipIdx]
-                if let entity = arView.scene.findEntity(named: clip.entityName) {
-                    RotationArcRenderer.update(visual: visual, clip: clip, entity: entity)
-                }
-
-            case .ended, .cancelled:
-                activeArcHandle    = nil
-                activeArcClipID    = nil
-                arcDragStartAngle  = 0
-
-            default: break
-            }
-            return  // consumed — don't fall through to gizmo/camera handling
+        // .began — detect arc tip, store state, return early
+        if gesture.state == .began,
+           let hit     = arView.entity(at: location),
+           let arcComp = hit.components[RotationArcComponent.self],
+           let anchor  = arView.scene.findEntity(named: "MainAnchor"),
+           let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }),
+           let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
+        {
+            saveCurrentStateToUndo()
+            draggingArcHandle = hit
+            draggingArcClipID = arcComp.clipID
+            draggingArcRole   = arcComp.role
+            arcDragCentre = entity.position(relativeTo: anchor)
+            arcDragLastAngle  = arcComp.role == .end
+                ? timeline.clips[clipIdx].toValue.y
+                : timeline.clips[clipIdx].fromValue.y
+            return
         }
 
-        // On .began, check if this touch starts on an arc handle tip
-        if gesture.state == .began,
-           let hit = arView.entity(at: location),
-           let arcComp = hit.components[RotationArcComponent.self]
+        // .changed — rotate arm, update clip angle, rebuild arc curve
+        if gesture.state == .changed,
+           draggingArcHandle != nil,
+           let clipID  = draggingArcClipID,
+           let role    = draggingArcRole,
+           let centre  = arcDragCentre,
+           let visual  = activeRotationArcs[clipID],
+           let anchor  = arView.scene.findEntity(named: "MainAnchor"),
+           let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
+           let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
         {
-            activeArcHandle   = hit
-            activeArcClipID   = arcComp.clipID
-            // Record the handle's current angle as the drag baseline
-            if let visual = activeRotationArcs[arcComp.clipID] {
-                let isEnd = hit.name == "arcHandle.end"
-                if let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }) {
-                    arcDragStartAngle = isEnd
-                        ? timeline.clips[clipIdx].toValue.y
-                        : timeline.clips[clipIdx].fromValue.y
-                }
+            // Ray through touch onto horizontal XZ plane at entity's Y height
+            guard let ray = arView.ray(through: location) else { return }
+            let planePoint  = entity.position(relativeTo: nil)   // world space Y
+            let planeNormal = SIMD3<Float>(0, 1, 0)
+
+            guard let hitWorld = rayPlaneIntersection(
+                rayOrigin: ray.origin, rayDirection: ray.direction,
+                planePoint: planePoint, planeNormal: planeNormal
+            ) else { return }
+
+            // hitWorld is world-space; convert to anchor-local then offset from entity centre
+            let anchorWP = anchor.position(relativeTo: nil)
+            let hitLocal = hitWorld - anchorWP
+            let offset   = SIMD3<Float>(hitLocal.x - centre.x, 0, hitLocal.z - centre.z)
+            guard simd_length(offset) > 0.001 else { return }
+            let newAngle = atan2(offset.x, offset.z)
+
+            // 1. Rotate the arm — tip follows as its child (shaft stays connected)
+            let lineName = role == .end ? "endLine" : "startLine"
+            if let lineRoot = visual.root.findEntity(named: lineName) {
+                lineRoot.orientation = simd_quatf(angle: newAngle, axis: [0, 1, 0])
             }
-            saveCurrentStateToUndo()
+
+            // 2. Write new angle into timeline clip
+            let old = timeline.clips[clipIdx]
+            timeline.clips[clipIdx] = AnimationClip(
+                entityName: old.entityName, type: old.type, track: old.track,
+                easing: old.easing, startTime: old.startTime, duration: old.duration,
+                fromValue: role == .end ? old.fromValue : SIMD3<Float>(0, newAngle, 0),
+                toValue:   role == .end ? SIMD3<Float>(0, newAngle, 0) : old.toValue,
+                motionPath: old.motionPath
+            )
+
+            // 3. Rebuild only the arc curve (arms already rotated above)
+            let updated = timeline.clips[clipIdx]
+            RotationPathRenderer.updateArcCurveOnly(
+                visual: visual,
+                fromAngle: updated.fromValue.y,
+                toAngle:   updated.toValue.y)
+
+            arcDragLastAngle = newAngle
+            return
+        }
+
+        // .ended / .cancelled — clear arc state
+        if (gesture.state == .ended || gesture.state == .cancelled),
+           draggingArcHandle != nil
+        {
+            draggingArcHandle = nil
+            draggingArcClipID = nil
+            draggingArcRole   = nil
+            arcDragCentre = nil
+            arcDragLastAngle  = 0
             return
         }
 

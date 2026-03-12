@@ -96,11 +96,7 @@ class EntityActionMenu: UIView {
         switch mode {
 
         case .standard:
-            // Move | Rotate | Add Movement | Lock | Delete
-            addMenuButton(title: "Move",         action: .move)
-            addSeparator()
-            addMenuButton(title: "Rotate",       action: .rotate)
-            addSeparator()
+            // Add Movement | Lock | Delete
             addMenuButton(title: "Add Movement", action: .addMovement)
             addSeparator()
             addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
