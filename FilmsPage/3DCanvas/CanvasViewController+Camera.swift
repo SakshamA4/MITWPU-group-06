@@ -23,12 +23,11 @@ extension CanvasViewController {
     
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
         if gesture.state == .began {
-                saveCurrentStateToUndo()
-            }
+            saveCurrentStateToUndo()
+        }
         guard editorMode == .edit else { return }
         
         guard let entity = selectedEntity else {
-            // In AR mode the real camera handles zoom — don't shift editor distance
             guard !isARModeActive else {
                 gesture.scale = 1.0
                 return
@@ -57,38 +56,27 @@ extension CanvasViewController {
                 wall.height *= scaleFactor
                 wall.width = max(0.3, min(wall.width, 10))
                 wall.height = max(0.3, min(wall.height, 6))
-                
                 let newMesh = MeshResource.generateBox(
                     width: wall.width,
                     height: wall.height,
                     depth: 0.05
                 )
                 modelEntity.model?.mesh = newMesh
+                modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(wall)
             }
             
             if var bg = modelEntity.components[BackgroundComponent.self] {
-                // 1. Update the component values
                 bg.width *= scaleFactor
                 bg.height *= scaleFactor
-                
-                // 2. Clamp values so it doesn't disappear or get too huge
                 bg.width = max(0.5, min(bg.width, 15))
                 bg.height = max(0.5, min(bg.height, 10))
-                
-                // 3. REGENERATE THE MESH (The most important step)
-                // This builds a new box with a thickness of 0.05
                 modelEntity.model?.mesh = MeshResource.generateBox(
                     width: bg.width,
                     height: bg.height,
                     depth: 0.05
                 )
-                
-                // 4. REFRESH COLLISION
-                // This ensures you can still grab the background after it grows
                 modelEntity.generateCollisionShapes(recursive: true)
-                
-                // 5. Save the updated component back to the entity
                 modelEntity.components.set(bg)
             }
             
@@ -97,12 +85,12 @@ extension CanvasViewController {
                 ground.depth *= scaleFactor
                 ground.width = max(0.5, min(ground.width, 20))
                 ground.depth = max(0.5, min(ground.depth, 20))
-                
                 let newMesh = MeshResource.generatePlane(
                     width: ground.width,
                     depth: ground.depth
                 )
                 modelEntity.model?.mesh = newMesh
+                modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(ground)
             }
             gesture.scale = 1.0
@@ -114,8 +102,6 @@ extension CanvasViewController {
     
     func updateEditorCamera() {
         guard let camera = editorCamera else { return }
-        
-        // Convert yaw, pitch, and distance into X, Y, Z coordinates
         let x = distance * cos(pitch) * sin(yaw)
         let y = distance * sin(pitch)
         let z = distance * cos(pitch) * cos(yaw)
@@ -211,37 +197,30 @@ extension CanvasViewController {
             mesh: .generateBox(size: [0.2, 0.12, 0.1]),
             materials: [SimpleMaterial(color: .darkGray, isMetallic: true)]
         )
-        
         let lens = ModelEntity(
             mesh: .generateCylinder(height: 0.08, radius: 0.03),
             materials: [SimpleMaterial(color: .black, isMetallic: true)]
         )
         lens.position.z = 0.08
-        
         body.addChild(lens)
         return body
     }
 
     
     func spawnSceneCamera() {
-        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else {
-            return
-        }
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
         
+        let index = sceneCameras.count
         let cameraRoot = Entity()
-        cameraRoot.name = "SceneCamera_\(sceneCameras.count)"
+        cameraRoot.name = "SceneCameraRoot_\(index)"
+        cameraRoot.components.set(CategoryComponent(toolType: .camera))
         
-        cameraRoot.components.set(
-            CategoryComponent(toolType: .camera)
-        )
-        
-        // Camera visual
         let visual = makeCameraVisual()
         visual.generateCollisionShapes(recursive: true)
         visual.components.set(InputTargetComponent())
         
-        // Perspective camera
         let camera = PerspectiveCamera()
+        camera.name = "SceneCamera_\(index)"
         camera.isEnabled = false
         
         cameraRoot.addChild(visual)
@@ -255,36 +234,105 @@ extension CanvasViewController {
         
         sceneCameras.append(camera)
         cameraToVisualMap[camera] = cameraRoot
-        
-        sceneCameraItems.append(
-            SceneCameraItem(camera: camera, cameraRoot: cameraRoot)
-        )
+        sceneCameraItems.append(SceneCameraItem(camera: camera, cameraRoot: cameraRoot))
         
         cameraCollectionView?.reloadData()
-        
+        startCameraPreviewUpdates()
+        setCameraPanelExpanded(true, animated: true)
+        setupCameraPanelSwipeGestures()
     }
 
+    func setupCameraPanelSwipeGestures() {
+        guard let panel = view.viewWithTag(8800) else { return }
+        
+        // Only add once
+        if panel.gestureRecognizers?.contains(where: { $0 is UISwipeGestureRecognizer }) == true { return }
+
+        // Swipe LEFT on panel → collapse
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handlePanelSwipe(_:)))
+        swipeLeft.direction = .right  // swiping right = toward the right edge = collapse
+        panel.addGestureRecognizer(swipeLeft)
+
+        // Swipe RIGHT from right edge of screen → expand
+        // We attach this to the main view so it catches the swipe even when panel is thin
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handlePanelSwipe(_:)))
+        swipeRight.direction = .left  // swiping left = pulling out from right edge = expand
+        view.addGestureRecognizer(swipeRight)
+    }
+
+    @objc private func handlePanelSwipe(_ gesture: UISwipeGestureRecognizer) {
+        guard view.viewWithTag(8800) != nil else { return }
+        
+        if gesture.direction == .right {
+            // Swiped right on the panel → collapse it
+            setCameraPanelExpanded(false, animated: true)
+        } else if gesture.direction == .left {
+            // Swiped left anywhere → only expand if swipe originated near the right edge
+            let location = gesture.location(in: view)
+            let rightEdgeZone = view.bounds.width - 60  // within 60pt of right edge
+            if location.x >= rightEdgeZone || !isCameraPanelExpanded {
+                setCameraPanelExpanded(true, animated: true)
+            }
+        }
+    }
+
+    func deleteSceneCamera(cameraRoot: Entity) {
+        // Find the matching item by cameraRoot reference
+        guard let index = sceneCameraItems.firstIndex(where: { $0.cameraRoot === cameraRoot }) else {
+            return
+        }
+
+        let item = sceneCameraItems[index]
+
+        // If this camera was the active camera, switch back to editor camera first
+        if activeCamera === item.camera {
+            activateEditorCamera()
+        }
+
+        // Remove from all tracking arrays
+        sceneCameras.removeAll { $0 === item.camera }
+        cameraToVisualMap.removeValue(forKey: item.camera)
+        sceneCameraItems.remove(at: index)
+
+        // Remove the entity from the scene
+        cameraRoot.removeFromParent()
+
+        // Animate the cell out and reload
+        let indexPath = IndexPath(item: index, section: 0)
+        cameraCollectionView?.performBatchUpdates({
+            cameraCollectionView?.deleteItems(at: [indexPath])
+        }, completion: nil)
+
+        if sceneCameraItems.isEmpty {
+            stopCameraPreviewUpdates()
+            setCameraPanelExpanded(false, animated: true)  // ← add this
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let width = collectionView.bounds.width - 16   // full panel width minus padding
+        return CGSize(width: width, height: width * 0.75)  // 4:3 aspect, no extra label row
+    }
+    
     
     func activateEditorCamera() {
-        for cam in sceneCameras {
-            cam.isEnabled = false
-        }
-        
+        for cam in sceneCameras { cam.isEnabled = false }
         editorCamera.isEnabled = true
         activeCamera = editorCamera
         showAllMotionPaths()
+        hideExitCameraButton()
     }
 
     
     func setActiveCamera(_ camera: PerspectiveCamera) {
-        for cam in sceneCameras {
-            cam.isEnabled = false
-        }
-        
+        for cam in sceneCameras { cam.isEnabled = false }
         editorCamera.isEnabled = false
         camera.isEnabled = true
         activeCamera = camera
         hideAllMotionPaths()
+        showExitCameraButton()
     }
 
     
@@ -305,29 +353,168 @@ extension CanvasViewController {
     }
 
 
-    func setupCameraPreview(
-        arView: ARView,
-        cameraItem: SceneCameraItem
-    ) {
+    // MARK: - Live Camera Preview
+    // Uses a dedicated off-screen ARView that is NEVER added to the view hierarchy.
+    // The main arView's camera is never switched — zero flicker.
 
-        arView.scene.anchors.removeAll()
+    /// A single hidden ARView used only for rendering preview snapshots.
+    var previewARView: ARView {
+        if let existing = objc_getAssociatedObject(self, &PreviewARViewKey.key) as? ARView {
+            return existing
+        }
+        let offscreen = ARView(frame: CGRect(x: 0, y: 0, width: 200, height: 150))
+        offscreen.automaticallyConfigureSession = false
+        offscreen.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
+        offscreen.environment.background = .color(.white)
+        offscreen.cameraMode = .nonAR
+        // Never added to any view hierarchy — purely off-screen
+        objc_setAssociatedObject(self, &PreviewARViewKey.key, offscreen, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        return offscreen
+    }
 
-        let previewAnchor = AnchorEntity(world: .zero)
+    func startCameraPreviewUpdates() {
+        stopCameraPreviewUpdates()
+        // 3fps thumbnail refresh — lightweight, still feels live
+        cameraPreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.33, repeats: true) { [weak self] _ in
+            self?.updateAllCameraPreviews()
+        }
+    }
 
-        if let mainAnchor = arView.scene.findEntity(named: "MainAnchor") {
-            let clone = mainAnchor.clone(recursive: true)
-            previewAnchor.addChild(clone)
+    func stopCameraPreviewUpdates() {
+        cameraPreviewTimer?.invalidate()
+        cameraPreviewTimer = nil
+    }
+
+    private func updateAllCameraPreviews() {
+        guard !sceneCameraItems.isEmpty else { return }
+        snapshotPreviewCamera(at: 0)
+    }
+
+    /// Processes each scene camera serially to avoid overlapping snapshot calls.
+    private func snapshotPreviewCamera(at index: Int) {
+        guard index < sceneCameraItems.count else { return }
+
+        let item = sceneCameraItems[index]
+        let indexPath = IndexPath(item: index, section: 0)
+        let offscreen = previewARView
+
+        // 1. Clone the live main scene into the off-screen ARView
+        offscreen.scene.anchors.removeAll()
+        guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else { return }
+        let clonedAnchor = mainAnchor.clone(recursive: true)
+        offscreen.scene.addAnchor(clonedAnchor)
+
+        // 2. Disable all cameras in clone, then enable only the target one
+        clonedAnchor.forEachDescendant { entity in
+            if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
         }
 
-        let previewCamera = PerspectiveCamera()
-        previewCamera.transform = cameraItem.camera.transform
-        previewCamera.isEnabled = true
+        if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
+            targetCam.isEnabled = true
+        } else {
+            // Fallback: attach a camera at the same world transform
+            let fallback = PerspectiveCamera()
+            fallback.transform = item.camera.transform
+            fallback.isEnabled = true
+            clonedAnchor.addChild(fallback)
+        }
 
-        previewAnchor.addChild(previewCamera)
-        arView.scene.addAnchor(previewAnchor)
+        // 3. Snapshot the off-screen view — main arView is completely untouched
+        offscreen.snapshot(saveToHDR: false) { [weak self] image in
+            guard let self = self, let image = image else { return }
+            DispatchQueue.main.async {
+                if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
+                    cell.updatePreview(image: image, name: "Camera \(index + 1)")
+                }
+                // Chain to next camera
+                self.snapshotPreviewCamera(at: index + 1)
+            }
+        }
+    }
+
+    @objc func toggleCameraPanelTapped() {
+        setCameraPanelExpanded(!isCameraPanelExpanded, animated: true)
+    }
+
+    // AFTER:
+    func setCameraPanelExpanded(_ expanded: Bool, animated: Bool) {
+        guard let panel = view.viewWithTag(8800) else { return }
+
+        let panelWidth: CGFloat = 200
+        // Slide the panel: trailing = -8 → fully visible; trailing = +panelWidth → off-screen right
+        let targetTrailing: CGFloat = expanded ? -8 : panelWidth
+
+        // Find the trailing constraint by identifier on the parent view
+        for constraint in view.constraints {
+            if constraint.identifier == "panelTrailing" {
+                constraint.constant = targetTrailing
+            }
+        }
+
+        // Update pull-tab chevron: right when expanded (panel visible, tap to collapse), left when collapsed (tap to expand)
+        let pullTab = view.viewWithTag(8803) as? UIButton
+        let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        pullTab?.setImage(
+            UIImage(systemName: expanded ? "chevron.right" : "chevron.left", withConfiguration: tabCfg),
+            for: .normal
+        )
+
+        let collectionView = panel.viewWithTag(8802)
+
+        let block = {
+            collectionView?.alpha = expanded ? 1.0 : 0.0
+            pullTab?.alpha = 1.0  // always visible once a camera exists
+            self.view.layoutIfNeeded()
+        }
+
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0,
+                           usingSpringWithDamping: 0.85,
+                           initialSpringVelocity: 0.3,
+                           options: .curveEaseInOut,
+                           animations: block)
+        } else {
+            block()
+        }
+        
+        isCameraPanelExpanded = expanded
+    }
+    // MARK: - Exit Camera Button
+
+    func showExitCameraButton() {
+        if view.viewWithTag(9001) != nil { return }
+
+        let btn = UIButton(type: .system)
+        btn.tag = 9001
+        btn.setTitle("Exit Camera", for: .normal)
+        btn.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        btn.tintColor = .white
+        btn.backgroundColor = UIColor(red: 0.9, green: 0.3, blue: 0.3, alpha: 0.92)
+        btn.layer.cornerRadius = 18
+        btn.clipsToBounds = true
+        btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.addTarget(self, action: #selector(exitCameraViewTapped), for: .touchUpInside)
+
+        view.addSubview(btn)
+        NSLayoutConstraint.activate([
+            btn.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            btn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+            btn.heightAnchor.constraint(equalToConstant: 36)
+        ])
+    }
+
+    func hideExitCameraButton() {
+        view.viewWithTag(9001)?.removeFromSuperview()
+    }
+
+    @objc private func exitCameraViewTapped() {
+        activateEditorCamera()
+        cameraCollectionView?.reloadData()
     }
 
 
+    // MARK: - Collection View (Camera Panel)
 
     func collectionView(
         _ collectionView: UICollectionView,
@@ -335,8 +522,6 @@ extension CanvasViewController {
     ) -> Int {
         sceneCameraItems.count
     }
-
-
 
     func collectionView(
         _ collectionView: UICollectionView,
@@ -348,24 +533,9 @@ extension CanvasViewController {
         ) as? CameraPreviewCell else {
             return UICollectionViewCell()
         }
-
-        let cameraItem = sceneCameraItems[indexPath.item]
-
-        guard
-            let mainAnchor =
-                arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity
-        else { return cell }
-
-        cell.configure(
-            sourceAnchor: mainAnchor,
-            sourceCamera: cameraItem.camera,
-            name: "Camera \(indexPath.item + 1)"
-        )
-
+        cell.label.text = "Camera \(indexPath.item + 1)"
         return cell
     }
-
-
 
     func collectionView(
         _ collectionView: UICollectionView,
@@ -376,3 +546,11 @@ extension CanvasViewController {
     }
 
 }
+
+
+
+// MARK: - Storage key for the off-screen preview ARView
+private enum PreviewARViewKey {
+    static var key = "previewARView"
+}
+

@@ -638,43 +638,75 @@ extension CanvasViewController {
             
         ])
         
-        // 8. CAMERA COLLECTION VIEW (Right Side)
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .vertical
-        layout.itemSize = CGSize(width: 120, height: 120)
-        layout.minimumLineSpacing = 10
-        
-        cameraCollectionView = UICollectionView(
-            frame: .zero,
-            collectionViewLayout: layout
-        )
-        
-        cameraCollectionView.register(
-            CameraPreviewCell.self,
-            forCellWithReuseIdentifier: CameraPreviewCell.reuseID
-        )
-        
-        cameraCollectionView.backgroundColor = UIColor.black.withAlphaComponent(
-            0.85
-        )
-        cameraCollectionView.layer.cornerRadius = 14
+        // REPLACE WITH THIS:
+        // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
+        let cameraPanel = UIView()
+        cameraPanel.tag = 8800
+        cameraPanel.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        cameraPanel.layer.cornerRadius = 16
+        cameraPanel.clipsToBounds = true
+        cameraPanel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cameraPanel)
+
+        // Collection view with top spacing via sectionInset
+        let camLayout = UICollectionViewFlowLayout()
+        camLayout.scrollDirection = .vertical
+        camLayout.minimumLineSpacing = 12
+        camLayout.sectionInset = UIEdgeInsets(top: 16, left: 8, bottom: 12, right: 8)
+
+        cameraCollectionView = UICollectionView(frame: .zero, collectionViewLayout: camLayout)
+        cameraCollectionView.tag = 8802
+        cameraCollectionView.register(CameraPreviewCell.self, forCellWithReuseIdentifier: CameraPreviewCell.reuseID)
+        cameraCollectionView.backgroundColor = .clear
+        cameraCollectionView.showsVerticalScrollIndicator = false
         cameraCollectionView.translatesAutoresizingMaskIntoConstraints = false
-        
         cameraCollectionView.dataSource = self
         cameraCollectionView.delegate = self
-        
-        view.addSubview(cameraCollectionView)
-        
+        cameraPanel.addSubview(cameraCollectionView)
+
+        // Panel constraints — slides in/out from the right edge.
+        // trailingOffset = -8 → fully visible; trailingOffset = +panelWidth → fully off-screen right.
+        let panelWidth: CGFloat = 200
+        let panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+            constant: panelWidth  // start fully off-screen (collapsed)
+        )
+        panelTrailingConstraint.identifier = "panelTrailing"
+
         NSLayoutConstraint.activate([
-            cameraCollectionView.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor,
-                constant: -16
-            ),
-            cameraCollectionView.centerYAnchor.constraint(
-                equalTo: view.centerYAnchor
-            ),
-            cameraCollectionView.widthAnchor.constraint(equalToConstant: 140),
-            cameraCollectionView.heightAnchor.constraint(equalToConstant: 320),
+            panelTrailingConstraint,
+            cameraPanel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth),
+            cameraPanel.heightAnchor.constraint(equalToConstant: 520),
+
+            cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
+            cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            cameraCollectionView.trailingAnchor.constraint(equalTo: cameraPanel.trailingAnchor),
+            cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
+        ])
+
+        cameraPanel.alpha = 1.0  // always opaque; visibility controlled by slide position
+
+        // Pull-tab button — lives on the main view so it is never clipped by the panel.
+        // It sticks out from the panel's left edge and is always reachable.
+        let pullTab = UIButton(type: .system)
+        pullTab.tag = 8803
+        let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        pullTab.setImage(UIImage(systemName: "chevron.right", withConfiguration: tabCfg), for: .normal)
+        pullTab.tintColor = .white
+        pullTab.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        pullTab.layer.cornerRadius = 10
+        pullTab.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        pullTab.translatesAutoresizingMaskIntoConstraints = false
+        pullTab.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
+        pullTab.alpha = 0.0  // hidden until first camera is added
+        view.addSubview(pullTab)
+
+        NSLayoutConstraint.activate([
+            pullTab.trailingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            pullTab.centerYAnchor.constraint(equalTo: cameraPanel.centerYAnchor),
+            pullTab.widthAnchor.constraint(equalToConstant: 20),
+            pullTab.heightAnchor.constraint(equalToConstant: 44),
         ])
         
         // 9. SIDEBAR & HIERARCHY
@@ -792,18 +824,22 @@ extension CanvasViewController {
 //        print("🎬 Shot Breakdown Tapped")
 //    }
     // In CanvasViewController, inside shotBreakdownTapped()
-    @objc private func shotBreakdownTapped() {
-        let vc = ShotBreakdownViewController()
-        vc.sceneName    = self.sceneName
-        vc.timeline     = self.timeline
-        vc.cameraNames  = self.sceneCameraItems.map { $0.cameraRoot.name }
-        navigationController?.pushViewController(vc, animated: true)
-    }
+//    @objc private func shotBreakdownTapped() {
+//        let vc = ShotBreakdownViewController()
+//        vc.sceneName        = self.sceneName
+//        vc.timeline         = self.timeline
+//        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
+//        vc.arView           = self.arView                    // ← new
+//        vc.evaluateTimeline = { [weak self] t in             // ← new
+//            self?.evaluateTimeline(at: t)
+//        }
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
 
 
 }
 
 // MARK: - UICollectionView DataSource + Delegate
-extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     // Implementations are in CanvasViewController+Camera.swift
 }

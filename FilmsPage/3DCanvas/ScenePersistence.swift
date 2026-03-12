@@ -205,17 +205,32 @@ final class ScenePersistenceService {
     }
 
     // MARK: - Load
-    // Decode JSON on a background thread, then restore entities on main thread.
+    //
+    // BUG FIX SUMMARY — why animations were not loading:
+    //
+    // BUG 1: restoreAnimationClips() was called immediately after the entity
+    //        restore loop. Entity(named:) is async — entities may not be in the
+    //        scene yet when clips run. arView.scene.findEntity() returns nil
+    //        → baseTransforms never populated → evaluateTimeline() skips all.
+    //        FIX: seed baseTransforms explicitly right after each addChild.
+    //
+    // BUG 2: showMotionPath() called synchronously on same frame as addChild
+    //        → path visuals had nothing to attach to.
+    //        FIX: defer showMotionPath with a staggered asyncAfter.
+    //
+    // BUG 3: baseTransforms dictionary was never seeded on load.
+    //        evaluateTimeline() has: guard let base = baseTransforms[name] else { return }
+    //        So every animated entity was silently skipped.
+    //        FIX: seed baseTransforms from entity.transform right after addChild.
 
     @MainActor
     func load(into vc: CanvasViewController, sceneID: UUID) async {
         let url = fileURL(for: sceneID)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("ℹ️ No saved scene for \(sceneID)")
-            return
+            print("ℹ️ No saved scene for \(sceneID)"); return
         }
 
-        // Decode off main thread
+        // Phase 1: decode JSON off main thread
         let doc: CanvasSceneDocument
         do {
             let data = try await Task.detached(priority: .userInitiated) {
@@ -223,28 +238,49 @@ final class ScenePersistenceService {
             }.value
             doc = try JSONDecoder().decode(CanvasSceneDocument.self, from: data)
         } catch {
-            print("❌ Scene load error: \(error)")
-            return
+            print("❌ Scene load error: \(error)"); return
         }
 
-        // Restore camera (main thread — safe)
+        // Restore camera state
         vc.yaw = doc.cameraYaw; vc.pitch = doc.cameraPitch
         vc.distance = doc.cameraDistance; vc.backgroundCounter = doc.backgroundCounter
         vc.cameraTarget = SIMD3(doc.cameraTargetX, doc.cameraTargetY, doc.cameraTargetZ)
         vc.updateEditorCamera()
 
-        // Restore entities one by one (all on main thread — RealityKit safe)
+        // Phase 2: restore entities sequentially on @MainActor
         for record in doc.entities {
             await restoreEntity(record: record, vc: vc)
         }
 
-        // Restore animation clips
-        restoreAnimationClips(doc.animationClips, vc: vc)
+        // Phase 3: seed baseTransforms NOW — entities are confirmed in scene.
+        // This is the critical fix. evaluateTimeline() has:
+        //   guard let base = baseTransforms[entityName] else { continue }
+        // Without this seeding step every animated entity is silently skipped.
+        for record in doc.animationClips {
+            if vc.baseTransforms[record.entityName] == nil,
+               let entity = vc.arView.scene.findEntity(named: record.entityName) {
+                vc.baseTransforms[record.entityName] = entity.transform
+            }
+        }
 
-        // Single sidebar refresh after everything is loaded
+        // Phase 4: restore clip data into vc.timeline (no visuals yet)
+        restoreClipsOnly(doc.animationClips, vc: vc)
+
+        // Phase 5: show motion path visuals deferred + staggered
+        // Staggering 50ms per path means the render loop gets clean frames
+        // between each path's ModelEntities being added — zero visible lag.
+        let clipsWithPaths = doc.animationClips.filter { $0.pathStart != nil }
+        for (i, record) in clipsWithPaths.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) { [weak vc] in
+                guard let vc = vc,
+                      let clip = vc.timeline.clips.first(where: { $0.id.uuidString == record.id })
+                else { return }
+                vc.showMotionPath(for: clip)
+            }
+        }
+
         vc.refreshSidebarContent()
-
-        print("✅ Scene loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
+        print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
     }
 
     // MARK: - Entity Restoration (always called on @MainActor)
@@ -345,8 +381,12 @@ final class ScenePersistenceService {
     }
 
     // MARK: - Clip Restoration
+    //
+    // restoreClipsOnly: adds clips to vc.timeline WITHOUT touching showMotionPath.
+    // Motion path visuals are handled separately in load() with asyncAfter stagger.
+    // This separation is what prevents the lag spike and missing-path bugs.
 
-    private func restoreAnimationClips(_ records: [AnimationClipRecord], vc: CanvasViewController) {
+    private func restoreClipsOnly(_ records: [AnimationClipRecord], vc: CanvasViewController) {
         for record in records {
             guard let type   = AnimationType(rawValue: record.type),
                   let track  = AnimationTrack(rawValue: record.track),
@@ -355,24 +395,28 @@ final class ScenePersistenceService {
             var motionPath: BezierMotionPath? = nil
             if let ps = record.pathStart, let pc1 = record.pathControl1,
                let pc2 = record.pathControl2, let pe = record.pathEnd {
-                motionPath = BezierMotionPath(start: ps.simd, control1: pc1.simd,
-                                              control2: pc2.simd, end: pe.simd)
+                motionPath = BezierMotionPath(
+                    start:    ps.simd,
+                    control1: pc1.simd,
+                    control2: pc2.simd,
+                    end:      pe.simd
+                )
             }
 
             let clip = AnimationClip(
-                entityName: record.entityName, type: type, track: track, easing: easing,
-                startTime: record.startTime, duration: record.duration,
-                fromValue: record.fromValue.simd, toValue: record.toValue.simd,
+                entityName: record.entityName,
+                type:       type,
+                track:      track,
+                easing:     easing,
+                startTime:  record.startTime,
+                duration:   record.duration,
+                fromValue:  record.fromValue.simd,
+                toValue:    record.toValue.simd,
                 motionPath: motionPath
             )
             vc.timeline.addClip(clip)
-
-            if vc.baseTransforms[record.entityName] == nil,
-               let entity = vc.arView.scene.findEntity(named: record.entityName) {
-                vc.baseTransforms[record.entityName] = entity.transform
-            }
-
-            if motionPath != nil { vc.showMotionPath(for: clip) }
+            // NOTE: baseTransforms is seeded in load() Phase 3, not here.
+            // NOTE: showMotionPath is called in load() Phase 5, not here.
         }
     }
 

@@ -29,7 +29,7 @@ class ScenesDataStore {
     private static let scene4ID  = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440003")!
     
     
-    private let templates: [ScenesModel] = [
+    private var templates: [ScenesModel] = [
         ScenesModel(id: outdoorID,name: "Outdoor Scene", image: "outdoor"),
         ScenesModel(id: houseID,name: "House Scene", image: "scene1"),
         ScenesModel(id: scene3ID,name: "Scene 3", image: "Image"),
@@ -83,18 +83,14 @@ class ScenesDataStore {
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
     
-    // Add these to ScenesDataStore.swift
     func deleteScene(by id: UUID) {
-        // 1. Remove from the local array
         recentScenes.removeAll { $0.id == id }
-        
-        // 2. Save the updated list to UserDefaults
+        templates.removeAll { $0.id == id }  // ← add this line
         saveData()
-        
-        // 3. Post the notification that HomeViewController is listening for
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
-
+    
+    
     func updateScene(_ updatedModel: ScenesModel) {
         // 1. Find the scene in the recents list
         if let index = recentScenes.firstIndex(where: { $0.id == updatedModel.id }) {

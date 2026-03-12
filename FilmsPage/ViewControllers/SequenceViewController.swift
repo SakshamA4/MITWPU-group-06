@@ -187,14 +187,12 @@ extension SequenceViewController {
     // MARK: - Helper Functions
     
     private func deleteScene(at indexPath: IndexPath) {
-        let sceneToDelete = scene[indexPath.item]
-        
+        let sceneToDelete = scene[indexPath.item - 1]  // -1 to offset placeholder at index 0
         sceneService.deleteScene(by: sceneToDelete.id)
- 
     }
     
     private func presentEditAlert(at indexPath: IndexPath) {
-            let currentScene = scene[indexPath.item]
+            let currentScene = scene[indexPath.item - 1]
             
             let alert = UIAlertController(title: "Edit Scene", message: "Enter a new name for this scene", preferredStyle: .alert)
             
@@ -214,7 +212,7 @@ extension SequenceViewController {
 
                 self.sceneService.updateScene(updatedScene)
                 
-                self.scene[indexPath.item] = updatedScene
+                self.scene[indexPath.item - 1] = updatedScene
                 
                 self.collectionView.reloadItems(at: [indexPath])
             }
