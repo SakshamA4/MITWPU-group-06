@@ -504,6 +504,7 @@ extension CanvasViewController {
     func hideAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = false
+            visual.startHandle?.isEnabled = false   // start handle is on entity, hide separately
         }
     }
 
@@ -511,6 +512,7 @@ extension CanvasViewController {
     func showAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = true
+            visual.startHandle?.isEnabled = true    // start handle is on entity, show separately
         }
     }
 
@@ -533,11 +535,15 @@ extension CanvasViewController {
     
     func exitTimelineMode() {
         editorMode = .edit
-        showAllMotionPaths()
+        // Only re-show motion paths if the editor camera is active.
+        // If a scene camera is selected, paths must stay hidden.
+        if activeCamera === editorCamera {
+            showAllMotionPaths()
+            hideAllRotationArcs()   // arcs also stay hidden during playback
+        }
         for (name, transform) in baseTransforms {
             arView.scene.findEntity(named: name)?.transform = transform
         }
-        
         baseTransforms.removeAll()
     }
 
