@@ -3,6 +3,29 @@ import PhotosUI
 import RealityKit
 import UIKit
 import ARKit
+import ObjectiveC.runtime
+
+// MARK: - Stored properties for ring gesture (via ObjC associated objects)
+// Swift extensions cannot store properties directly; associated objects are
+// the standard pattern for adding stored state in an extension.
+private var _ringPanGRKey:     UInt8 = 0
+private var _ringDragActiveKey: UInt8 = 0
+
+extension CanvasViewController {
+
+    /// The dedicated UIPanGestureRecognizer for the outer ring.
+    /// Stored here so gestureRecognizerShouldBegin can identify it by ===.
+    var ringPanGestureRecognizer: UIPanGestureRecognizer? {
+        get { objc_getAssociatedObject(self, &_ringPanGRKey) as? UIPanGestureRecognizer }
+        set { objc_setAssociatedObject(self, &_ringPanGRKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+
+    /// True while a ring-drag gesture is in progress.
+    var ringDragActive: Bool {
+        get { (objc_getAssociatedObject(self, &_ringDragActiveKey) as? Bool) ?? false }
+        set { objc_setAssociatedObject(self, &_ringDragActiveKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+}
 
 extension CanvasViewController {
 
@@ -16,7 +39,17 @@ extension CanvasViewController {
         cameraPan.minimumNumberOfTouches = 2
         arView.addGestureRecognizer(cameraPan)
 
-        // 3. Object/Gizmo Interaction (1-Finger Pan) — handles move gizmo AND rotation rings
+        // 3a. Ring drag pan — registered FIRST so it captures ring touches before handlePan.
+        //     Stored in ringPanGestureRecognizer so gestureRecognizerShouldBegin can
+        //     identify it by reference and only allow it when Gizmo_Ring_XZ is hit.
+        let ringPan = UIPanGestureRecognizer(target: self, action: #selector(handleRingPan(_:)))
+        ringPan.maximumNumberOfTouches = 1
+        // No delegate — handleRingPan guards itself by checking the ring hit in .began.
+        // Keeping it out of shouldBegin means it won't interfere with handlePan's touches.
+        arView.addGestureRecognizer(ringPan)
+        ringPanGestureRecognizer = ringPan
+
+        // 3b. Object/Gizmo Interaction (1-Finger Pan)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.delegate = self
@@ -184,8 +217,7 @@ extension CanvasViewController {
             selectedEntity = root
 
             activeHandleEntity = nil          // no longer editing a path handle
-            // Apply transparency so gizmo/rings are visible
-            setEntityTransparency(root, alpha: 0.7)
+            // Do NOT make the object transparent — gizmo renders on top via UnlitMaterial
             
             // 🔥 This decides whether we show move gizmo OR rotation rings
             updateGizmoMode()
@@ -285,7 +317,7 @@ extension CanvasViewController {
                     self.hideGizmo()
                     self.hideRotationGizmo()
                 } else {
-                    self.setEntityTransparency(entity, alpha: 0.7)
+                    // No transparency on unlock — gizmo renders on top via UnlitMaterial
                     self.updateGizmoMode()
                 }
                 menu.removeFromSuperview()
@@ -328,7 +360,16 @@ extension CanvasViewController {
 
     
     func handleBodyDrag(_ gesture: UIPanGestureRecognizer, entity: Entity) {
+        // If dragStartPosition wasn't set in .began (e.g. touch landed on the
+        // object body / foot rather than a named gizmo part), bootstrap it now
+        // from the entity's current world position so the drag still works.
+        if dragStartPosition == nil {
+            dragStartPosition = entity.position
+            gesture.setTranslation(.zero, in: arView)
+            return
+        }
         guard let startPos = dragStartPosition else { return }
+
         let translation = gesture.translation(in: arView)
         let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
         
@@ -339,14 +380,14 @@ extension CanvasViewController {
         
         if currentDragMode == .ground {
             let camOri = arView.cameraTransform.rotation
-            let right = camOri.act([1, 0, 0])
+            let right   = camOri.act([1, 0, 0])
             let forward = camOri.act([0, 0, -1])
             
             let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
+            let flatRight   = simd_normalize(SIMD3<Float>(right.x,   0, right.z))
             
             newPosition += (flatRight * dx) + (flatForward * dy)
-            newPosition.y = startPos.y
+            newPosition.y = startPos.y          // lock Y — XZ plane only
         } else {
             newPosition.y = startPos.y + (dy * 2.0)
         }
@@ -455,131 +496,180 @@ extension CanvasViewController {
     
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
 
-    
-    guard gestureRecognizer is UIPanGestureRecognizer,
-          interactionMode == .rotate else {
+        guard gestureRecognizer is UIPanGestureRecognizer else { return true }
+
+        // ringPan has no delegate — this method is never called for it.
+        // Only handlePan (and cameraPan) reach this point.
+
+        let location = gestureRecognizer.location(in: arView)
+        let hits     = arView.hitTest(location)
+        let hitNames = Set(hits.map { $0.entity.name })
+
+        // If the touch started on the outer ring, ringPan owns it exclusively.
+        // Block handlePan so it doesn't also fire.
+        if hitNames.contains("Gizmo_Ring_XZ") {
+            return false
+        }
+
+        // In ROTATE mode: only allow handlePan on the 3-ring rotation gizmo
+        if interactionMode == .rotate {
+            let ringNames: Set<String> = ["xRing", "yRing", "zRing"]
+            return !hitNames.isDisjoint(with: ringNames)
+        }
+
+        // Move mode / no mode: always allow — handlePan routes arrow/dot/body internally
         return true
     }
 
-    let location = gestureRecognizer.location(in: arView)
-    let hits = arView.hitTest(location)
 
-    // Only allow rotation pan if touching a ring
-    for hit in hits {
-        let name = hit.entity.name
-        if name == "xRing" || name == "yRing" || name == "zRing" {
-            return true
+    
+    // ─────────────────────────────────────────────────────────────────────────
+    // MARK: - handleRingPan
+    //
+    // Dedicated 1-finger pan recognizer registered BEFORE handlePan so it
+    // gets first priority on touches that start on the outer ring collider
+    // ("Gizmo_Ring_XZ").
+    //
+    // Behaviour: dragging along the ring rotates the selected entity around
+    // its own world-space Y axis.  Works in any interactionMode — the ring is
+    // always part of the move gizmo.
+    //
+    // gestureRecognizerShouldBegin returns false when the touch did NOT start
+    // on the ring, so handlePan fires normally for all other touches.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Returns true only when the touch begins on "Gizmo_Ring_XZ".
+    /// Because this recognizer is registered first it wins priority; handlePan
+    /// falls through for every other touch location.
+    func ringPanShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+        let location = gesture.location(in: arView)
+        let hits     = arView.hitTest(location)
+        return hits.contains { $0.entity.name == "Gizmo_Ring_XZ" }
+    }
+
+    @objc func handleRingPan(_ gesture: UIPanGestureRecognizer) {
+
+        // Only act when there is a selected, unlocked entity
+        guard let selected = selectedEntity else { return }
+        let isLocked = selected.components[LockComponent.self]?.isLocked ?? false
+        guard !isLocked else { return }
+
+        let location = gesture.location(in: arView)
+
+        switch gesture.state {
+
+        case .began:
+            // Confirm the touch really started on the ring collider
+            let hits = arView.hitTest(location)
+            guard hits.contains(where: { $0.entity.name == "Gizmo_Ring_XZ" }) else {
+                return
+            }
+            saveCurrentStateToUndo()
+            ringDragActive  = true
+            lastPanLocation = location
+            highlightGizmoPart(.rotateY)
+
+        case .changed:
+            guard ringDragActive else { return }
+
+            let dx   = Float(location.x - lastPanLocation.x)
+            let dy   = Float(location.y - lastPanLocation.y)
+            // Map horizontal screen drag → Y-axis rotation angle.
+            // Negate dx: positive dx (drag right) → negative angle → clockwise
+            // rotation when viewed from above (right-hand rule around +Y).
+            let angle: Float = -dx * 0.012
+            guard angle.isFinite, angle != 0 else {
+                lastPanLocation = location
+                return
+            }
+
+            // Rotate around the WORLD Y axis so the object spins in place
+            // regardless of its current orientation.
+            var t      = selected.transform
+            let rot    = simd_quatf(angle: angle, axis: SIMD3<Float>(0, 1, 0))
+            t.rotation = simd_normalize(rot * t.rotation)
+            selected.transform = t
+
+            // Gizmo follows the entity
+            updateGizmoPosition()
+            lastPanLocation = location
+
+        case .ended, .cancelled:
+            ringDragActive = false
+            resetGizmoColors()
+
+        default:
+            break
         }
     }
 
-    // Otherwise block this pan so old gizmo works
-    return false
-
-    }
-
-
-    
+    // ─────────────────────────────────────────────────────────────────────────
+    // MARK: - handleRotationPan  (3-ring rotation gizmo — .rotate mode only)
+    // ─────────────────────────────────────────────────────────────────────────
     @objc func handleRotationPan(_ gesture: UIPanGestureRecognizer) {
-        
-        
-        // Only run in rotation mode
+
+        // Only run in rotation mode — the 3-ring gizmo is only shown then
         guard interactionMode == .rotate else { return }
-        
+
         let location = gesture.location(in: arView)
-        
+
         switch gesture.state {
-            
+
         case .began:
-            saveCurrentStateToUndo()
             let hits = arView.hitTest(location)
-            
-            // 1. Reset selection state for this touch
             activeRotationAxis = nil
-            activeGizmoPart = .none
-            
-            // 2. Priority: Check if we hit a GIZMO part
-            if let gizmoHit = hits.first(where: { $0.entity.name.contains("Ring") || $0.entity.name.contains("Arrow") || $0.entity.name.contains("Plane") }) {
-                let name = gizmoHit.entity.name
-                
-                // Handle Movement Parts
-                if name.contains("Arrow_Y") {
-                    activeGizmoPart = .arrowY
-                } else if name.contains("Plane_XZ") {
-                    activeGizmoPart = .planeXZ
+            activeGizmoPart    = .none
+
+            if let hit = hits.first(where: {
+                ["xRing","yRing","zRing"].contains($0.entity.name)
+            }) {
+                switch hit.entity.name {
+                case "xRing": activeRotationAxis = [1,0,0]; activeGizmoPart = .rotateX
+                case "yRing": activeRotationAxis = [0,1,0]; activeGizmoPart = .rotateY
+                default:      activeRotationAxis = [0,0,1]; activeGizmoPart = .rotateZ
                 }
-                // Handle Rotation Rings
-                else if name == "xRing" {
-                    activeRotationAxis = [1, 0, 0]
-                    activeGizmoPart = .rotateX
-                } else if name == "yRing" {
-                    activeRotationAxis = [0, 1, 0]
-                    activeGizmoPart = .rotateY
-                } else if name == "zRing" {
-                    activeRotationAxis = [0, 0, 1]
-                    activeGizmoPart = .rotateZ
-                }
-                
+                saveCurrentStateToUndo()
                 highlightGizmoPart(activeGizmoPart)
                 lastPanLocation = location
-                return // Stop here if we touched the gizmo
+                return
             }
 
-            // 3. Secondary: Check if we hit an OBJECT
+            // Object selection in rotate mode
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
-
                 if root?.name.contains("Gizmo") == false {
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
-                    setEntityTransparency(root, alpha: 0.7)
-                    updateGizmoMode()   // spawns rings immediately on the new entity
+                    updateGizmoMode()
                 }
             } else {
-                // 4. Final: Hit BLANK SPACE -> Deselect and Hide
                 setEntityTransparency(selectedEntity, alpha: 1.0)
                 selectedEntity = nil
                 hideGizmo()
                 hideRotationGizmo()
             }
+
         case .changed:
-            
-            
-            guard let axis = activeRotationAxis,
+            guard let axis     = activeRotationAxis,
                   let selected = selectedEntity else { return }
-            
-            let dx = Float(location.x - lastPanLocation.x)
-            let dy = Float(location.y - lastPanLocation.y)
-            
-            let drag = abs(dx) > abs(dy) ? dx : -dy
-            let angle = drag * 0.005
-            
-            // Safety check — prevent NaN rotations
+            let dx    = Float(location.x - lastPanLocation.x)
+            let dy    = Float(location.y - lastPanLocation.y)
+            let drag  = abs(dx) > abs(dy) ? dx : -dy
+            let angle = drag * 0.006
             guard angle.isFinite else { return }
-            
-            let rotation = simd_quatf(angle: angle, axis: axis)
-            
-            var transform = selected.transform
-            
-            // Stable incremental rotation
-            transform.rotation = rotation * transform.rotation
-            
-            // Safety normalize quaternion
-            transform.rotation = simd_normalize(transform.rotation)
-            
-            selected.transform = transform
-            
-            lastPanLocation = location
-            
-            
+            var t      = selected.transform
+            t.rotation = simd_normalize(simd_quatf(angle: angle, axis: axis) * t.rotation)
+            selected.transform = t
+            lastPanLocation    = location
+
         case .ended, .cancelled:
-            
             activeRotationAxis = nil
-            
+            resetGizmoColors()
+
         default:
             break
         }
-        
     }
 
 }

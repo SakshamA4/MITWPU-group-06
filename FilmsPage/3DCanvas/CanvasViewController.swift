@@ -565,10 +565,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         self.sceneNameLabel.text = self.sceneName
     }
 
-        // Add this method anywhere inside the CanvasViewController class
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            return true
-        }
     
     @objc func backButtonTapped() {
         let currentID =
@@ -1457,16 +1453,32 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 return
             }
 
-            // 3. STANDARD OBJECT SELECTION (no body drag)
+            // 3. OBJECT BODY TOUCH
+            // • Already selected + unlocked → start XZ drag immediately.
+            // • Unselected / different object → select it; drag begins next pan.
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" {
                     root = parent
                 }
-                if root?.name != "GizmoRoot" {
-                    selectedEntity = root
+                guard let root = root,
+                      root.name != "GizmoRoot",
+                      !root.name.contains("Gizmo") else { break }
+
+                let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+
+                if let already = selectedEntity, already === root, !isLocked {
+                    // Entity is already selected — begin XZ plane drag
+                    activeGizmoPart   = .planeXZ
+                    dragStartPosition = root.position
+                    isDraggingObject  = true
+                    highlightGizmoPart(.planeXZ)
+                } else {
+                    // Different or unselected — just select, no drag yet
+                    selectedEntity  = root
+                    activeGizmoPart = .none
+                    updateGizmoMode()
                 }
-                activeGizmoPart = .none
             }
 
         case .changed:
