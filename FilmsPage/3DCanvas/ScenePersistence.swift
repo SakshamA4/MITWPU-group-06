@@ -40,7 +40,7 @@ struct CodableSIMD3: Codable {
     var simd: SIMD3<Float> { SIMD3(x, y, z) }
 }
 
-// MARK: - Serialisable Records (pure value types, no RealityKit refs)
+
 
 struct EntityRecord: Codable {
     let name: String
@@ -204,24 +204,7 @@ final class ScenePersistenceService {
         }
     }
 
-    // MARK: - Load
-    //
-    // BUG FIX SUMMARY — why animations were not loading:
-    //
-    // BUG 1: restoreAnimationClips() was called immediately after the entity
-    //        restore loop. Entity(named:) is async — entities may not be in the
-    //        scene yet when clips run. arView.scene.findEntity() returns nil
-    //        → baseTransforms never populated → evaluateTimeline() skips all.
-    //        FIX: seed baseTransforms explicitly right after each addChild.
-    //
-    // BUG 2: showMotionPath() called synchronously on same frame as addChild
-    //        → path visuals had nothing to attach to.
-    //        FIX: defer showMotionPath with a staggered asyncAfter.
-    //
-    // BUG 3: baseTransforms dictionary was never seeded on load.
-    //        evaluateTimeline() has: guard let base = baseTransforms[name] else { return }
-    //        So every animated entity was silently skipped.
-    //        FIX: seed baseTransforms from entity.transform right after addChild.
+
 
     @MainActor
     func load(into vc: CanvasViewController, sceneID: UUID) async {

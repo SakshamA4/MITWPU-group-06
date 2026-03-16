@@ -764,19 +764,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         var height: Float
     }
     
-    //Export logic starts
-    // STEP 1: Implement the logic to capture the 3D ARView
-    
-    // STEP 2: Update your button tap to show the Project's ExportVC
-    
-    //export logic ends
-    
-    //light part starts here
-    
-    //light part end
-    
-    //new: scene hierarchy starts
-    
     var pathEditToolbar: UIView?
     
     struct WallComponent: Component {
@@ -1329,12 +1316,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         
         let location = gesture.location(in: arView)
 
-        // ──────────────────────────────────────────────────────────────────
-        // ARC HANDLE DRAG — self-contained, bypasses gizmo/camera systems.
-        // Tip sphere is child of lineRoot at local (0,0,arcRadius).
-        // Rotating lineRoot around Y moves the tip automatically.
-        // Uses ray-plane intersection on XZ plane — works from any camera angle.
-        // ──────────────────────────────────────────────────────────────────
+
 
         // .began — detect arc tip, store state, return early
         if gesture.state == .began,
