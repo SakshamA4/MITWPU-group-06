@@ -517,6 +517,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // Camera preview panel — snapshots keyed by camera ObjectIdentifier
     var cameraPreviewSnapshots: [ObjectIdentifier: UIImage] = [:]
     var cameraPreviewTimer: Timer?
+    // Tracks whether the slide-out camera panel (tag 8800) is currently visible
+    var isCameraPanelExpanded: Bool = false
 
     // Which rotation arc clip is currently selected (for long-press context menu).
     var selectedArcClipID: UUID?

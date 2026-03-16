@@ -553,4 +553,3 @@ extension CanvasViewController {
 private enum PreviewARViewKey {
     static var key = "previewARView"
 }
-
