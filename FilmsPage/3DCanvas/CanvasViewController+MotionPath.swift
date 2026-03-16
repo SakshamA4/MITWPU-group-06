@@ -23,12 +23,11 @@ extension CanvasViewController {
 
         activeMotionPaths[clip.id]?.root.removeFromParent()
 
-        guard let anchor  = arView.scene.findEntity(named: "MainAnchor"),
-              let entity  = arView.scene.findEntity(named: clip.entityName)
-        else { return }
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 
         let pathRoot = Entity()
-        pathRoot.name = "PathRoot_\(clip.id)"
+        pathRoot.name     = "PathRoot_\(clip.id)"
+        pathRoot.position = path.start
         pathRoot.components.set(LockComponent(isLocked: false))
 
         let showStartHandle = shouldShowStartHandle(for: clip)
@@ -42,12 +41,10 @@ extension CanvasViewController {
 
         var startHandle: ModelEntity? = nil
         if showStartHandle {
-            // Start handle parented to the ENTITY (not pathRoot) so it follows
-            // the entity when dragged. Position is always .zero in entity-local space.
             let start = makePathHandle(color: .gray, name: "path.start")
             start.components.set(MotionPathHandleComponent(clipID: clip.id))
             start.position = .zero
-            entity.addChild(start)
+            pathRoot.addChild(start)
             startHandle = start
         }
 
@@ -66,9 +63,6 @@ extension CanvasViewController {
         end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
         pathRoot.addChild(end)
 
-        // pathRoot is parented to MainAnchor at path.start world position.
-        // The start handle is separately parented to the entity so it follows drags.
-        pathRoot.position = path.start - anchor.position(relativeTo: nil)
         anchor.addChild(pathRoot)
 
         activeMotionPaths[clip.id] = MotionPathVisual(
@@ -137,7 +131,9 @@ extension CanvasViewController {
             else { return }
 
             let oldClip = self.timeline.clips[clipIndex]
-            self.timeline.clips[clipIndex] = AnimationClip(
+
+            // Build a candidate clip with the new timing (not yet committed)
+            let candidateClip = AnimationClip(
                 entityName: oldClip.entityName,
                 type:       oldClip.type,
                 track:      oldClip.track,
@@ -149,17 +145,27 @@ extension CanvasViewController {
                 motionPath: oldClip.motionPath
             )
 
-            let newClipID = self.timeline.clips[clipIndex].id
-            if let visual = self.activeMotionPaths.removeValue(forKey: oldClip.id) {
-                self.activeMotionPaths[newClipID] = visual
-                let newComp = MotionPathHandleComponent(clipID: newClipID)
-                visual.startHandle?.components.set(newComp)
-                visual.control1Handle.components.set(newComp)
-                visual.control2Handle.components.set(newComp)
-                visual.endHandle.components.set(newComp)
-                if self.selectedPathClipID == oldClip.id {
-                    self.selectedPathClipID = newClipID
-                }
+            // Check for conflicts before committing
+            if let conflictingClip = self.detectClipConflict(
+                editedClip: candidateClip,
+                replacingID: oldClip.id
+            ) {
+                self.pathEditToolbar?.removeFromSuperview()
+                self.presentClipConflictResolution(
+                    editedClip:      candidateClip,
+                    replacingID:     oldClip.id,
+                    conflicting:     conflictingClip,
+                    clipIndex:       clipIndex,
+                    originalEndTime: oldClip.startTime + oldClip.duration
+                )
+            } else {
+                // No conflict — commit directly
+                self.commitClipTimingChange(
+                    newClip:    candidateClip,
+                    oldClipID:  oldClip.id,
+                    clipIndex:  clipIndex
+                )
+                self.pathEditToolbar?.removeFromSuperview()
             }
         }, for: .touchUpInside)
 
@@ -215,43 +221,4 @@ extension CanvasViewController {
             entity.transform = evaluateEntityTransform(entityName: entityName, at: lastTime)
         }
     }
-    /// Called whenever an entity is dragged via the gizmo.
-    /// Updates path.start (and shifts control points / end by the same delta)
-    /// and repositions pathRoot so the whole path stays attached.
-    func updateMotionPathStartForEntity(named entityName: String, newPosition: SIMD3<Float>) {
-        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-
-        for (clipID, visual) in activeMotionPaths {
-            guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
-                  timeline.clips[clipIdx].entityName == entityName,
-                  var path = timeline.clips[clipIdx].motionPath
-            else { continue }
-
-            // newPosition is the entity's position in anchor-local space.
-            // Shift the entire path by the delta so path.start tracks the entity.
-            let delta = newPosition - path.start
-            guard simd_length(delta) > 0.0001 else { continue }
-
-            path.start    += delta
-            path.control1 += delta
-            path.control2 += delta
-            path.end      += delta
-            path.rebuildArcLengthTable()
-            timeline.clips[clipIdx].motionPath = path
-
-            // Reposition pathRoot to new path.start
-            visual.root.position = path.start
-
-            // Update handle positions relative to pathRoot
-            visual.startHandle?.position = .zero          // entity-local — always zero
-            visual.control1Handle.position = path.control1 - path.start
-            visual.control2Handle.position = path.control2 - path.start
-            visual.endHandle.position = path.end - path.start
-
-            if let pathMesh = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
-                MotionPathRenderer.updatePathMesh(entity: pathMesh, path: path)
-            }
-        }
-    }
-
 }
