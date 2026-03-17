@@ -1,4 +1,3 @@
-import Combine
 import PhotosUI
 import RealityKit
 import UIKit
@@ -375,186 +374,122 @@ extension CanvasViewController {
     }
 
 
-    // MARK: - Camera Preview (on-demand, no timer)
+    // MARK: - Camera Preview (off-screen ARView, timer-driven)
     //
-    // Previews are stale thumbnails stored in SceneCameraItem.previewImage.
-    // A capture is triggered only at specific moments (camera spawn, exit camera view)
-    // so there is NO repeating timer and the editor camera is NEVER disabled except
-    // for the single frame during the actual snapshot.
+    // A dedicated off-screen ARView (`previewARView`) is created once and never added
+    // to the view hierarchy, so the main viewport never flickers.
     //
-    // Capture flow:
-    //   1. Remember the currently active camera.
-    //   2. Enable the target scene camera; disable everything else.
-    //   3. Call arView.snapshot() — captures the *next rendered frame*.
-    //   4. In the snapshot callback, immediately restore the previous camera state.
-    //   5. Store the image in sceneCameraItems[index].previewImage and reload the cell.
+    // A 3fps repeating Timer (`cameraPreviewTimer`) calls `updateAllCameraPreviews()`
+    // which drives `snapshotPreviewCamera(at:)` — a serial chain that:
+    //   1. Clones `mainAnchor` into the off-screen ARView.
+    //   2. Disables all cameras in the clone; enables only the target camera by name.
+    //   3. Snapshots the off-screen view.
+    //   4. Stores the image in `sceneCameraItems[index].previewImage`, reloads the cell.
+    //   5. Chains to the next index.
     //
-    // Because the restore happens inside the snapshot callback (which fires on the main
-    // thread after the frame is written to the framebuffer), the live viewport is
-    // affected for exactly one frame — not perceptibly visible to the user.
+    // The main `arView` and its active camera are NEVER touched — zero flicker.
 
-    /// Capture a one-shot preview for the camera at `index` and store it in sceneCameraItems.
-    /// Safe to call at any time; does nothing if index is out of range or a capture is already running.
-    func capturePreview(forCameraAt index: Int) {
+    // MARK: Off-screen ARView (lazy, associated object so it can live on the extension)
+
+    private enum PreviewARViewKey { static var key = "previewARView" }
+
+    /// A dedicated off-screen ARView used exclusively for camera thumbnails.
+    /// Never added to any view hierarchy; created once and reused.
+    var previewARView: ARView {
+        if let existing = objc_getAssociatedObject(self, &PreviewARViewKey.key) as? ARView {
+            return existing
+        }
+        let av = ARView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        av.cameraMode = .nonAR
+        av.environment.background = .color(.black)
+        objc_setAssociatedObject(self, &PreviewARViewKey.key, av, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        return av
+    }
+
+    // MARK: Timer lifecycle
+
+    func startCameraPreviewUpdates() {
+        guard cameraPreviewTimer == nil else { return }
+        cameraPreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.33, repeats: true) { [weak self] _ in
+            self?.updateAllCameraPreviews()
+        }
+    }
+
+    func stopCameraPreviewUpdates() {
+        cameraPreviewTimer?.invalidate()
+        cameraPreviewTimer = nil
+    }
+
+    // MARK: Timer callback — kick off serial snapshot chain
+
+    private func updateAllCameraPreviews() {
+        guard !sceneCameraItems.isEmpty else { return }
+        snapshotPreviewCamera(at: 0)
+    }
+
+    // MARK: Serial snapshot chain
+
+    private func snapshotPreviewCamera(at index: Int) {
         guard index < sceneCameraItems.count else { return }
-
-        // Global guard: only one capture in flight at a time across all cameras.
-        guard !isCapturingPreview else { return }
+        guard let anchor = mainAnchor else { return }
 
         let item = sceneCameraItems[index]
-        guard !item.isCapturing else { return }
+        let targetCameraName = item.camera.name   // e.g. "PerspCam_<UUID>"
 
-        isCapturingPreview = true
-        sceneCameraItems[index].isCapturing = true
+        let pv = previewARView
 
-        // Save which camera was active before we touch anything.
-        let previousCamera = activeCamera
-        let wasEditorCamera = (previousCamera === editorCamera)
+        // Remove any previous anchor from the off-screen scene so we start clean.
+        for existing in pv.scene.anchors { pv.scene.removeAnchor(existing) }
 
-        // Hide the live viewport so the single-frame camera swap is invisible to the user.
-        arView.alpha = 0
+        // Clone the full scene anchor into the off-screen ARView.
+        let clonedAnchor = anchor.clone(recursive: true)
+        pv.scene.addAnchor(clonedAnchor)
 
-        // Activate the target camera.
-        for cam in sceneCameras { cam.isEnabled = false }
-        editorCamera?.isEnabled = false
-        item.camera.isEnabled = true
-
-        // Wait for RealityKit to render exactly ONE frame with the new camera active,
-        // then snapshot. Without this the snapshot captures the previous frame (old POV).
-        var token: AnyCancellable?
-        token = arView.scene.publisher(for: SceneEvents.Update.self)
-            .first()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                token?.cancel()
-                token = nil
-
-                self.arView.snapshot(saveToHDR: false) { [weak self] image in
-                    guard let self = self else { return }
-
-                    // Restore previous camera state.
-                    for cam in self.sceneCameras { cam.isEnabled = false }
-                    self.editorCamera?.isEnabled = false
-                    if wasEditorCamera {
-                        self.editorCamera?.isEnabled = true
-                        self.activeCamera = self.editorCamera
-                        // Snap editor camera back to its correct orbit position so
-                        // RealityKit doesn't interpolate from a stale transform.
-                        self.updateEditorCamera()
-                    } else if let prev = previousCamera as? PerspectiveCamera,
-                              prev !== self.editorCamera {
-                        prev.isEnabled = true
-                        self.activeCamera = prev
-                    } else {
-                        self.editorCamera?.isEnabled = true
-                        self.activeCamera = self.editorCamera
-                        self.updateEditorCamera()
-                    }
-
-                    // Fade the viewport back in.
-                    UIView.animate(withDuration: 0.15) { self.arView.alpha = 1 }
-
-                    // Store result and refresh the cell.
-                    guard index < self.sceneCameraItems.count else {
-                        self.isCapturingPreview = false
-                        return
-                    }
-                    self.sceneCameraItems[index].isCapturing = false
-                    self.isCapturingPreview = false
-                    if let image = image {
-                        self.sceneCameraItems[index].previewImage = image
-                        let ip = IndexPath(item: index, section: 0)
-                        self.cameraCollectionView?.reloadItems(at: [ip])
-                    }
-                }
+        // Walk the clone: disable all PerspectiveCameras, then enable the target one.
+        var found = false
+        func configureCameras(in entity: Entity) {
+            if let cam = entity as? PerspectiveCamera {
+                cam.isEnabled = (entity.name == targetCameraName)
+                if cam.isEnabled { found = true }
             }
-        if let t = token { previewCancellables.insert(t) }
+            for child in entity.children { configureCameras(in: child) }
+        }
+        configureCameras(in: clonedAnchor)
+
+        guard found else {
+            // Camera not found in clone — skip to next index.
+            snapshotPreviewCamera(at: index + 1)
+            return
+        }
+
+        pv.snapshot(saveToHDR: false) { [weak self] image in
+            guard let self = self else { return }
+
+            if let image = image, index < self.sceneCameraItems.count {
+                self.sceneCameraItems[index].previewImage = image
+                let ip = IndexPath(item: index, section: 0)
+                self.cameraCollectionView?.reloadItems(at: [ip])
+            }
+
+            // Chain to the next camera after a small yield so the run loop can breathe.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                self?.snapshotPreviewCamera(at: index + 1)
+            }
+        }
     }
 
-    /// Capture preview thumbnails for every scene camera, serially.
-    /// Called once after a scene is loaded so all cells get an initial thumbnail.
+    // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
+    //
+    // The timer already handles continuous updates, so these just ensure the timer
+    // is running. Individual-index refresh is a no-op since the timer covers all cameras.
+
+    func capturePreview(forCameraAt index: Int) {
+        startCameraPreviewUpdates()
+    }
+
     func captureAllPreviews() {
-        capturePreviewSerially(at: 0)
+        startCameraPreviewUpdates()
     }
-
-    private func capturePreviewSerially(at index: Int) {
-        guard index < sceneCameraItems.count else {
-            // Serial chain complete — restore viewport and clear flag.
-            UIView.animate(withDuration: 0.15) { self.arView.alpha = 1 }
-            isCapturingPreview = false
-            return
-        }
-        let item = sceneCameraItems[index]
-        guard !item.isCapturing else {
-            capturePreviewSerially(at: index + 1)
-            return
-        }
-        sceneCameraItems[index].isCapturing = true
-        isCapturingPreview = true
-
-        let previousCamera = activeCamera
-        let wasEditorCamera = (previousCamera === editorCamera)
-
-        // Hide the live viewport so the single-frame camera swap is invisible to the user.
-        arView.alpha = 0
-
-        for cam in sceneCameras { cam.isEnabled = false }
-        editorCamera?.isEnabled = false
-        item.camera.isEnabled = true
-
-        // Wait for RealityKit to render ONE frame with the new camera before snapshotting.
-        var token: AnyCancellable?
-        token = arView.scene.publisher(for: SceneEvents.Update.self)
-            .first()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                token?.cancel()
-                token = nil
-
-                self.arView.snapshot(saveToHDR: false) { [weak self] image in
-                    guard let self = self else { return }
-
-                    // Restore previous camera state.
-                    for cam in self.sceneCameras { cam.isEnabled = false }
-                    self.editorCamera?.isEnabled = false
-                    if wasEditorCamera {
-                        self.editorCamera?.isEnabled = true
-                        self.activeCamera = self.editorCamera
-                        self.updateEditorCamera()
-                    } else if let prev = previousCamera as? PerspectiveCamera,
-                              prev !== self.editorCamera {
-                        prev.isEnabled = true
-                        self.activeCamera = prev
-                    } else {
-                        self.editorCamera?.isEnabled = true
-                        self.activeCamera = self.editorCamera
-                        self.updateEditorCamera()
-                    }
-
-                    if index < self.sceneCameraItems.count {
-                        self.sceneCameraItems[index].isCapturing = false
-                        if let image = image {
-                            self.sceneCameraItems[index].previewImage = image
-                            let ip = IndexPath(item: index, section: 0)
-                            self.cameraCollectionView?.reloadItems(at: [ip])
-                        }
-                    }
-
-                    // Chain to next camera after a short delay.
-                    self.isCapturingPreview = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                        self?.capturePreviewSerially(at: index + 1)
-                    }
-                }
-            }
-        if let t = token { previewCancellables.insert(t) }
-    }
-
-    // Kept as no-ops for any call sites that still reference the old timer API.
-    func startCameraPreviewUpdates() {}
-    func stopCameraPreviewUpdates() {}
 
     @objc func toggleCameraPanelTapped() {
         setCameraPanelExpanded(!isCameraPanelExpanded, animated: true)

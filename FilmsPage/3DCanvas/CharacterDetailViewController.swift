@@ -190,6 +190,14 @@ class CharacterDetailViewController: UIViewController {
             posesCollectionView.selectItem(at: IndexPath(item: 0, section: 0), animated: false, scrollPosition: .left)
         }
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.posesCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
     
     // MARK: - Setup UI
     private func setupUI() {

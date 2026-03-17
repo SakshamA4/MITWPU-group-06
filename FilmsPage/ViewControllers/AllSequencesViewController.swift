@@ -36,6 +36,14 @@ class AllSequencesViewController: UIViewController , UICollectionViewDataSource 
         collectionView.delegate = self
         // Do any additional setup after loading the view.
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return sequence.count

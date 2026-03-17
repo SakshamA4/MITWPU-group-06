@@ -33,6 +33,14 @@ class LibraryCharactersViewController: UIViewController {
             super.viewDidLayoutSubviews()
             configureLayout()
         }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.charactersCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
     private func configureLayout() {
         guard let layout = charactersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
             let newLayout = UICollectionViewFlowLayout()

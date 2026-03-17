@@ -31,6 +31,13 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         // 📍 THE FIX: Refresh data from the store to show updated notes/scenes
         refreshData()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
     // MARK: - Setup
     private func setupCollectionView() {
         // Ensure you register your NIBs/Classes here if not done in Storyboard

@@ -23,6 +23,13 @@ class CameraViewController: UIViewController {
           cameraCollectionView.setCollectionViewLayout(createLayout(), animated: false)
       }
 
+      override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+          super.viewWillTransition(to: size, with: coordinator)
+          coordinator.animate(alongsideTransition: { _ in
+              self.cameraCollectionView.collectionViewLayout.invalidateLayout()
+          })
+      }
+
       private func registerCells() {
           cameraCollectionView.register(
               UINib(nibName: "CameraCollectionViewCell", bundle: nil),

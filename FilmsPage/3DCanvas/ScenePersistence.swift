@@ -594,13 +594,8 @@ final class ScenePersistenceService {
         // Clear background image cache — each scene manages its own images.
         vc.backgroundImageCache.removeAll()
 
-        // Cancel any in-flight one-shot preview capture subscriptions so they
-        // don't fire against a torn-down scene graph.
-        vc.previewCancellables.removeAll()
-        vc.isCapturingPreview = false
-
-        // Ensure the viewport is fully visible in case a capture was interrupted mid-flight.
-        vc.arView.alpha = 1
+        // Stop the camera preview timer so it doesn't fire against a torn-down scene graph.
+        vc.stopCameraPreviewUpdates()
 
         // FIX A: Re-enable the editor camera after clearing scene state.
         // If a scene camera was active when the user left, setActiveCamera() may have

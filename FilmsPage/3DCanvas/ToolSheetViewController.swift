@@ -43,6 +43,14 @@ class ToolSheetViewController: UIViewController {
         }
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     func setupTitle() {
         titleLabel.text = tool.title
         titleLabel.font = .systemFont(ofSize: 24, weight: .bold)

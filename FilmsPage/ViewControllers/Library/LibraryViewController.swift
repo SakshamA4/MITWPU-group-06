@@ -23,6 +23,14 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
                 libraryCollectionView.setCollectionViewLayout(generateLayout(), animated: false)
             }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.libraryCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
         // Do any additional setup after loading the view.
     
     func collectionView(_ collectionView: UICollectionView,

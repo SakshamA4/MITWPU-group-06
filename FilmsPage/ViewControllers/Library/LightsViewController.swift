@@ -31,6 +31,14 @@ class LightsViewController: UIViewController {
             configureLayout()
         }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.lightsCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     private func configureLayout() {
         guard let layout = lightsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
             let newLayout = UICollectionViewFlowLayout()

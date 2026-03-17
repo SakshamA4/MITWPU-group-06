@@ -236,6 +236,14 @@ class ShotPlayerViewController: UIViewController {
         evaluateTimeline?(0)
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.strip.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     // MARK: - Nav
 
     private func setupNav() {

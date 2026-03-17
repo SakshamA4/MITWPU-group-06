@@ -57,6 +57,14 @@ class SceneViewController: UIViewController {
         super.viewDidLayoutSubviews()
         configureFlowLayout()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.SceneCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
 }
 
 private func deleteScene(_ model: ScenesModel) {

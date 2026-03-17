@@ -323,7 +323,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         let camera: PerspectiveCamera
         let cameraRoot: Entity
         var previewImage: UIImage?   // snapshot taken from this camera's POV; nil until first capture
-        var isCapturing: Bool = false // true while a snapshot is in-flight for this camera
     }
 
     var sceneCameraItems: [SceneCameraItem] = []
@@ -406,14 +405,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // FIX: displayLink is tracked as a property so it can be reliably invalidated on teardown.
     var displayLink: CADisplayLink?
 
-    /// Bag for one-shot Combine tokens used by camera preview capture.
-    /// Each token cancels itself after the first SceneEvents.Update fires.
-    var previewCancellables: Set<AnyCancellable> = []
+    /// Repeating 3fps timer that drives the off-screen camera preview snapshots.
+    var cameraPreviewTimer: Timer?
 
-    /// True while any preview snapshot is in flight.
-    /// Used to prevent concurrent captures and to abort a capture if the
-    /// user starts orbiting the editor camera mid-capture.
-    var isCapturingPreview: Bool = false
     var playbackStartTime: CFTimeInterval = 0
     var currentTimelineTime: Float = 0
 
@@ -545,6 +539,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         displayLink?.invalidate()
         displayLink = nil
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.cameraCollectionView.collectionViewLayout.invalidateLayout()
+        })
+    }
+
 
     deinit {
         // Safety net: ensure the display link is gone even if viewWillDisappear was skipped.
