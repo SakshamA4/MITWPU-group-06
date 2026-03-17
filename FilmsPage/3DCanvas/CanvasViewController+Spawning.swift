@@ -132,53 +132,53 @@ extension CanvasViewController {
     }
 
     
-    func applySky(type: String) {
-        // 1. Remove existing sky
-        if let existingSky = arView.scene.findEntity(named: "ProceduralSky") {
-            existingSky.removeFromParent()
-        }
-        
-        var skyMaterial = UnlitMaterial()
-        var topColor: UIColor = .systemBlue
-        
-        // 2. Load Texture or Color
-        if type == "sky_image_1" {
-            if let texture = try? TextureResource.load(named: type) {
-                skyMaterial.color.texture = .init(texture)
-                arView.environment.background = .color(.black)
-            } else {
-                topColor = .systemGray
-                skyMaterial.color.tint = topColor
-                arView.environment.background = .color(topColor)
-            }
-        } else {
-            switch type {
-            case "sky_sunset": topColor = .orange
-            case "sky_night": topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
-            default: topColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
-            }
-            skyMaterial.color.tint = topColor
-            arView.environment.background = .color(topColor)
-        }
-        
-        // 3. Create Sphere
-        let skyMesh = MeshResource.generateSphere(radius: 50)
-        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
-//        skyEntity.name = "ProceduralSky"
-        skyEntity.name = "ProceduralSky_\(type)"
-        // 4. THE FIX FOR INVERSION:
-        // Instead of just flipping scale, we also apply a 180-degree rotation
-        // around the X-axis to fix the "upside down" issue.
-        skyEntity.scale *= -1
-        skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
-        
-        // 5. Final Setup
-        skyEntity.components.set(CategoryComponent(toolType: .sky))
-        
-        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
-            anchor.addChild(skyEntity)
-        }
-    }
+//    func applySky(type: String) {
+//        // 1. Remove existing sky
+//        if let existingSky = arView.scene.findEntity(named: "ProceduralSky") {
+//            existingSky.removeFromParent()
+//        }
+//        
+//        var skyMaterial = UnlitMaterial()
+//        var topColor: UIColor = .systemBlue
+//        
+//        // 2. Load Texture or Color
+//        if type == "sky_image_1" {
+//            if let texture = try? TextureResource.load(named: type) {
+//                skyMaterial.color.texture = .init(texture)
+//                arView.environment.background = .color(.black)
+//            } else {
+//                topColor = .systemGray
+//                skyMaterial.color.tint = topColor
+//                arView.environment.background = .color(topColor)
+//            }
+//        } else {
+//            switch type {
+//            case "sky_sunset": topColor = .orange
+//            case "sky_night": topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
+//            default: topColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
+//            }
+//            skyMaterial.color.tint = topColor
+//            arView.environment.background = .color(topColor)
+//        }
+//        
+//        // 3. Create Sphere
+//        let skyMesh = MeshResource.generateSphere(radius: 50)
+//        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
+////        skyEntity.name = "ProceduralSky"
+//        skyEntity.name = "ProceduralSky_\(type)"
+//        // 4. THE FIX FOR INVERSION:
+//        // Instead of just flipping scale, we also apply a 180-degree rotation
+//        // around the X-axis to fix the "upside down" issue.
+//        skyEntity.scale *= -1
+//        skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
+//        
+//        // 5. Final Setup
+//        skyEntity.components.set(CategoryComponent(toolType: .sky))
+//        
+//        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
+//            anchor.addChild(skyEntity)
+//        }
+//    }
 
     
     func applyBackgroundImage(_ image: UIImage) {

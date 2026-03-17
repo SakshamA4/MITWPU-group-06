@@ -119,6 +119,11 @@ enum ToolType: CaseIterable {
                     title: "Real Clouds",
                     imageName: "sky_image_1",
                     modelFileName: "sky_image_1"
+                ),
+                SpawnItem(
+                    title: "No Sky",
+                    imageName: "xmark.circle",
+                    modelFileName: "none"
                 )
 
             ]

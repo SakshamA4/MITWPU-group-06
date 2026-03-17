@@ -86,6 +86,7 @@ struct CanvasSceneDocument: Codable {
     var cameraTargetZ: Float
     // nil = no sky; "sky_day" / "sky_sunset" / "sky_night" / "sky_image_1"
     var skyType: String?
+    var baseTransforms: [String: CodableTransform]
 }
 
 // MARK: - ScenePersistenceService
@@ -116,7 +117,9 @@ final class ScenePersistenceService {
     func save(canvas vc: CanvasViewController, sceneID: UUID, completion: ((Bool) -> Void)? = nil) {
         // ── STEP 1: Read everything from RealityKit on main thread ──
         assert(Thread.isMainThread, "save() must be called from the main thread")
-
+        // Reset all entities to rest pose before saving transforms
+        let savedBaseTransforms = vc.baseTransforms.mapValues { CodableTransform($0) }
+        vc.evaluateTimeline(at: 0)
         guard let anchor = vc.arView.scene.findEntity(named: "MainAnchor") else {
             completion?(false)
             return
@@ -141,6 +144,7 @@ final class ScenePersistenceService {
         for entity in anchor.children {
             let eName = entity.name
             guard !skipNames.contains(eName),
+                  !eName.hasPrefix("ProceduralSky"),
                   !eName.isEmpty,
                   !eName.hasPrefix("PathRoot_"),
                   !eName.hasPrefix("Gizmo_"),
@@ -225,7 +229,8 @@ final class ScenePersistenceService {
             cameraTargetX: vc.cameraTarget.x,
             cameraTargetY: vc.cameraTarget.y,
             cameraTargetZ: vc.cameraTarget.z,
-            skyType: savedSkyType
+            skyType: savedSkyType,
+            baseTransforms: vc.baseTransforms.mapValues { CodableTransform($0) }
         )
 
         let url = fileURL(for: sceneID)
@@ -298,11 +303,9 @@ final class ScenePersistenceService {
         // This is the critical fix. evaluateTimeline() has:
         //   guard let base = baseTransforms[entityName] else { continue }
         // Without this seeding step every animated entity is silently skipped.
-        for record in doc.animationClips {
-            if vc.baseTransforms[record.entityName] == nil,
-               let entity = vc.arView.scene.findEntity(named: record.entityName) {
-                vc.baseTransforms[record.entityName] = entity.transform
-            }
+        // Replace Phase 3 with:
+        for (name, t) in doc.baseTransforms {
+            vc.baseTransforms[name] = t.transform
         }
 
         // Phase 4: restore clip data into vc.timeline (no visuals yet)
