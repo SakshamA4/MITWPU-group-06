@@ -87,7 +87,7 @@ class ShotBreakdownViewController: UIViewController {
     var cameraItems: [CanvasViewController.SceneCameraItem] = []
     /// Activates a scene camera, snapshots, restores editor camera. Returns image.
     /// Implement this in CanvasViewController and pass it in.
-    var captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)?
+    var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
 
     private var shots: [Shot] = []
     private var thumbnailsGenerated = false
@@ -168,29 +168,25 @@ class ShotBreakdownViewController: UIViewController {
                     item.cameraRoot.name.contains(shot.cameraName)
                 }
 
-                var image: UIImage?
-                if let capture = self.captureFromCamera {
-                    // Camera POV capture — this is what the camera actually sees
-                    image = capture(camItem)
-                }
-
-                // Fallback to editor view snapshot if no camera found
-                if image == nil {
-                    let semaphore = DispatchSemaphore(value: 0)
-                    self.arView?.snapshot(saveToHDR: false) { img in
-                        image = img
-                        semaphore.signal()
-                    }
-                    // Non-blocking: just skip this frame if snapshot async
-                }
-
-                if let img = image {
-                    self.shots[i].thumbnail = img
-                    if i < self.collectionView.numberOfItems(inSection: 0) {
-                        self.collectionView.reloadItems(at: [IndexPath(item: i, section: 0)])
+                // Use async capture (no semaphore = no deadlock)
+                let doCapture = self.captureFrameAsync ?? { _, cb in
+                    // Fallback: snapshot editor view
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                        self.arView?.snapshot(saveToHDR: false, completion: cb)
                     }
                 }
-                captureNext(i + 1)
+                doCapture(camItem) { [weak self] img in
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        if let img = img {
+                            self.shots[i].thumbnail = img
+                            if i < self.collectionView.numberOfItems(inSection: 0) {
+                                self.collectionView.reloadItems(at: [IndexPath(item: i, section: 0)])
+                            }
+                        }
+                        captureNext(i + 1)
+                    }
+                }
             }
         }
         captureNext(0)
@@ -259,7 +255,7 @@ class ShotBreakdownViewController: UIViewController {
             shots: shots, startIndex: index, playAll: playAll,
             sceneName: sceneName, arView: arView,
             evaluateTimeline: evaluateTimeline,
-            captureFromCamera: captureFromCamera,
+            captureFrameAsync: captureFrameAsync,
             cameraItems: cameraItems)
         navigationController?.pushViewController(vc, animated: true)
     }

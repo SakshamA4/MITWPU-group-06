@@ -58,13 +58,16 @@ extension CanvasViewController {
             skyMaterial.color.tint = topColor
             arView.environment.background = .color(topColor)
         }
-
-        let skyEntity = ModelEntity(
-            mesh:      MeshResource.generateSphere(radius: 50),
-            materials: [skyMaterial]
-        )
-        skyEntity.name        = "ProceduralSky"
-        skyEntity.scale      *= -1
+        
+        // 3. Create Sphere
+        let skyMesh = MeshResource.generateSphere(radius: 50)
+        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
+//        skyEntity.name = "ProceduralSky"
+        skyEntity.name = "ProceduralSky_\(type)"
+        // 4. THE FIX FOR INVERSION:
+        // Instead of just flipping scale, we also apply a 180-degree rotation
+        // around the X-axis to fix the "upside down" issue.
+        skyEntity.scale *= -1
         skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
         skyEntity.components.set(CategoryComponent(toolType: .sky))
 

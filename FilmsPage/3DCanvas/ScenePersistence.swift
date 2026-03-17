@@ -98,6 +98,8 @@ struct CanvasSceneDocument: Codable {
     var cameraTargetX: Float
     var cameraTargetY: Float
     var cameraTargetZ: Float
+    // nil = no sky; "sky_day" / "sky_sunset" / "sky_night" / "sky_image_1"
+    var skyType: String?
 }
 
 // MARK: - ScenePersistenceService
@@ -191,20 +193,32 @@ final class ScenePersistenceService {
             return
         }
 
-        // FIX 6: Add "PathContainer" to skipNames so it is never serialised.
-        // PathRoot_ entities inside it are already excluded by the prefix check below.
-        let skipNames: Set<String> = ["Grid", "EditorCamera", "MainAnchor", "PathContainer"]
+        // Skip all internal/runtime entities that cannot be saved as records.
+        // GizmoRoot and ring entities are runtime UI only.
+        // Light group children are re-attached by addRealLightToModel/addLEDPanel/addLantern on load.
+        // ProceduralSky is re-applied via applySky on load (not stored here).
+        let skipNames: Set<String> = [
+            "Grid", "EditorCamera", "MainAnchor",
+            "GizmoRoot",
+            "xRing", "yRing", "zRing",
+            "Gizmo_Arrow_Y", "PlaneHandle", "Gizmo_Plane_XZ",
+            "LED_Guts_Group", "Lantern_Guts_Group",
+            "DynamicPointLight", "LanternInternalLight",
+            "ProceduralSky"
+        ]
 
         var entityRecords:   [EntityRecord] = []
         var bgImagePayloads: [(filename: String, data: Data)] = []
 
         for entity in anchor.children {
-            guard
-                !skipNames.contains(entity.name),
-                !entity.name.isEmpty,
-                !entity.name.hasPrefix("PathRoot_"),
-                !entity.name.hasPrefix("RotationArc_"),
-                entity.name != "MotionPath"
+            let eName = entity.name
+            guard !skipNames.contains(eName),
+                  !eName.isEmpty,
+                  !eName.hasPrefix("PathRoot_"),
+                  !eName.hasPrefix("Gizmo_"),
+                  !eName.contains("Ring"),
+                  !eName.contains("Guts"),
+                  eName != "MotionPath"
             else { continue }
 
             let toolTypeTitle = entity.components[CategoryComponent.self]?.toolType.title ?? "Prop"
@@ -311,6 +325,29 @@ final class ScenePersistenceService {
                 pathControl2: pc2, pathEnd:      pe
             )
         }
+
+        // Detect sky type directly from the scene — no extra property needed on CanvasViewController.
+        // applySky(type:) names the entity "ProceduralSky_<type>" (e.g. "ProceduralSky_sky_day").
+        // If it finds a plain "ProceduralSky" entity we can't recover the type, so we store nil
+        // and the sky won't be re-applied on load (acceptable — user can re-select it).
+        let savedSkyType: String? = {
+            // Look for entity named "ProceduralSky_<type>"
+            for child in anchor.children {
+                if child.name.hasPrefix("ProceduralSky_") {
+                    let type = String(child.name.dropFirst("ProceduralSky_".count))
+                    return type.isEmpty ? nil : type
+                }
+            }
+            // Fallback: check CategoryComponent on any sky entity
+            for child in anchor.children {
+                if child.components[CategoryComponent.self]?.toolType == .sky,
+                   child.name != "Grid" {
+                    // We can't recover the exact type string without extra metadata
+                    return nil
+                }
+            }
+            return nil
+        }()
 
         let doc = CanvasSceneDocument(
             sceneID:           sceneID.uuidString,
@@ -473,6 +510,12 @@ final class ScenePersistenceService {
 
         // Phase 9 – single sidebar refresh
         vc.isBatchLoading = false   // FIX 8: re-enable before the final refresh
+        // Phase 6: restore sky if one was saved
+        if let skyType = doc.skyType {
+            vc.applySky(type: skyType)
+            // skyType is encoded in the entity name by applySky — no extra property needed
+        }
+
         vc.refreshSidebarContent()
         print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
 
@@ -829,7 +872,11 @@ final class ScenePersistenceService {
     ///   "Wall"          → "Wall"
     private func resolveModelFileName(entity: Entity) -> String {
         let name = entity.name
-        // Match a trailing underscore + one-or-more digits at the end of the string.
+        // Never strip the suffix from camera roots — they don't load from .usdz files.
+        // The restore path handles them by name-prefix matching, not by loading a model.
+        if name.lowercased().contains("scenecamera") { return name }
+        // For regular props, strip trailing instance suffix (_2, _3, etc.)
+        // so we can reload the base .usdz from the app bundle.
         if let range = name.range(of: #"_\d+$"#, options: .regularExpression) {
             return String(name[name.startIndex..<range.lowerBound])
         }

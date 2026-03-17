@@ -11,7 +11,7 @@
 
 import UIKit
 import RealityKit
-import ReplayKit
+import AVFoundation
 
 class ShotPlayerViewController: UIViewController {
 
@@ -30,7 +30,7 @@ class ShotPlayerViewController: UIViewController {
          sceneName: String,
          arView: ARView?,
          evaluateTimeline: ((Float) -> Void)?,
-         captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)? = nil,
+         captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)? = nil,
          cameraItems: [CanvasViewController.SceneCameraItem] = []) {
         self.shots             = shots
         self.currentIndex      = startIndex
@@ -38,7 +38,7 @@ class ShotPlayerViewController: UIViewController {
         self.sceneName         = sceneName
         self.arView            = arView
         self.evaluateTimeline  = evaluateTimeline
-        self.captureFromCamera = captureFromCamera
+        self.captureFrameAsync = captureFrameAsync
         self.cameraItems       = cameraItems
         super.init(nibName: nil, bundle: nil)
     }
@@ -51,10 +51,11 @@ class ShotPlayerViewController: UIViewController {
     var sceneName: String
     weak var arView: ARView?
     var evaluateTimeline: ((Float) -> Void)?
-    var captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)?
+    var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
 
-    private var isPlaying   = false
+    private var isPlaying        = false
+    private var pendingSnapshot  = false  // prevents stacked snapshot calls
     private var displayLink: CADisplayLink?
     private var playStart:   CFTimeInterval = 0
     private var currentTime: Float = 0
@@ -392,40 +393,53 @@ class ShotPlayerViewController: UIViewController {
     //    which activates that camera, snapshots, then restores editor camera
     // 3. Display the result in frameImageView
 
-    private func updateFrameImage(at masterTime: Float) {
-        guard let evaluate = evaluateTimeline else {
-            placeholderIcon.isHidden = false; return
+    // Async frame update.
+    //
+    // PLAYBACK STRATEGY:
+    // arView.snapshot() takes ~100-200ms. At 60fps the tick fires every 16ms.
+    // If we snapshot every tick, pendingSnapshot stays true forever and NO frames
+    // ever update. Instead: during playback we rate-limit snapshots to one every
+    // 100ms (10fps preview), while still evaluating the timeline at 60fps so
+    // entity positions are always correct when the snapshot fires.
+    //
+    // During scrub (isScrubbing=true) we always fire a snapshot immediately.
+
+    private var lastSnapshotTime: CFTimeInterval = 0
+
+    private func updateFrameImage(at masterTime: Float, force: Bool = false) {
+        // Always evaluate entity positions (cheap, just sets transforms)
+        evaluateTimeline?(masterTime)
+
+        // Rate-limit snapshots during playback
+        let now = CACurrentMediaTime()
+        let minInterval: CFTimeInterval = isPlaying ? 0.1 : 0.0  // 10fps during play, instant on scrub
+        guard force || !pendingSnapshot && (now - lastSnapshotTime) >= minInterval else { return }
+
+        pendingSnapshot    = true
+        lastSnapshotTime   = now
+
+        let camItem = cameraItems.first {
+            $0.cameraRoot.name == currentShot.cameraName ||
+            $0.cameraRoot.name.contains(currentShot.cameraName)
         }
 
-        // Evaluate scene positions
-        evaluate(masterTime)
-
-        // Find the camera item for the current shot
-        let camItem = cameraItems.first { item in
-            item.cameraRoot.name == currentShot.cameraName ||
-            item.cameraRoot.name.contains(currentShot.cameraName)
-        }
-
-        if let capture = captureFromCamera {
-            // Use camera POV capture
-            if let img = capture(camItem) {
-                frameImageView.image = img
-                placeholderIcon.isHidden = true
-            } else {
-                // Fallback to direct snapshot
-                fallbackSnapshot()
-            }
+        let doCapture: (@escaping (UIImage?) -> Void) -> Void
+        if let capture = captureFrameAsync {
+            doCapture = { cb in capture(camItem, cb) }
         } else {
-            fallbackSnapshot()
+            doCapture = { [weak self] cb in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                    self?.arView?.snapshot(saveToHDR: false, completion: cb)
+                }
+            }
         }
-    }
 
-    private func fallbackSnapshot() {
-        arView?.snapshot(saveToHDR: false) { [weak self] image in
-            guard let self = self, let image = image else { return }
+        doCapture { [weak self] img in
             DispatchQueue.main.async {
-                self.frameImageView.image = image
-                self.placeholderIcon.isHidden = true
+                self?.pendingSnapshot = false
+                guard let img = img else { return }
+                self?.frameImageView.image = img
+                self?.placeholderIcon.isHidden = true
             }
         }
     }
@@ -452,7 +466,7 @@ class ShotPlayerViewController: UIViewController {
                                at: .centeredHorizontally, animated: true)
         }
 
-        updateFrameImage(at: shot.startTime)
+        updateFrameImage(at: shot.startTime, force: true)
     }
 
     private func fmt(_ s: Float) -> String {
@@ -521,75 +535,215 @@ class ShotPlayerViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
 
-    // FIX 3: MP4 Export via ReplayKit screen recording
-    @objc private func exportTapped() {
-        let alert = UIAlertController(title: "Export Shot",
-                                       message: "\(currentShot.displayName)  ·  \(currentShot.cleanCameraName)",
-                                       preferredStyle: .actionSheet)
+    // MARK: - Export (JPEG / PNG / MP4 via AVAssetWriter + UIActivityViewController)
+    //
+    // MP4 process:
+    //  1. For each frame at 24fps: evaluateTimeline → captureFrameAsync (camera POV) → UIImage
+    //  2. UIImage → CVPixelBuffer → AVAssetWriterInputPixelBufferAdaptor.append()
+    //  3. finishWriting() → temp .mp4 URL
+    //  4. UIActivityViewController(activityItems: [url])
+    //     → user sees: AirDrop, Save to Files, Messages, Mail, etc.
 
-        alert.addAction(UIAlertAction(title: "📹 Record MP4 (Screen Recording)", style: .default) { [weak self] _ in
-            self?.startMP4Recording()
+    @objc private func exportTapped() {
+        let shot = currentShot
+        let alert = UIAlertController(
+            title: "Export \(shot.displayName)",
+            message: shot.cleanCameraName,
+            preferredStyle: .actionSheet
+        )
+        alert.addAction(UIAlertAction(title: "📹 Export as MP4", style: .default) { [weak self] _ in
+            self?.renderAndExportMP4()
         })
-        alert.addAction(UIAlertAction(title: "🖼 Export Frame as JPEG", style: .default) { [weak self] _ in
-            self?.exportCurrentFrame(asPNG: false)
+        alert.addAction(UIAlertAction(title: "🖼 Export Frame — JPEG", style: .default) { [weak self] _ in
+            self?.exportFrame(png: false)
         })
-        alert.addAction(UIAlertAction(title: "🖼 Export Frame as PNG", style: .default) { [weak self] _ in
-            self?.exportCurrentFrame(asPNG: true)
+        alert.addAction(UIAlertAction(title: "🖼 Export Frame — PNG", style: .default) { [weak self] _ in
+            self?.exportFrame(png: true)
         })
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
         if let pop = alert.popoverPresentationController {
             pop.barButtonItem = navigationItem.rightBarButtonItem
         }
         present(alert, animated: true)
     }
 
-    // ── MP4: use ReplayKit to record screen while playing the shot ────────────
-    private func startMP4Recording() {
-        let recorder = RPScreenRecorder.shared()
-        guard recorder.isAvailable else {
-            showAlert("Screen recording not available on this device.")
+    private func exportFrame(png: Bool) {
+        guard let img = frameImageView.image else {
+            showAlert("No frame captured. Scrub to a position first."); return
+        }
+        let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
+        guard let d = data, let out = UIImage(data: d) else { return }
+        presentShareSheet([out])
+    }
+
+    // MARK: - MP4 Render
+
+    // Export progress overlay (shown during render)
+    private lazy var exportOverlay: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+        v.isHidden = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    private let exportLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 14, weight: .semibold)
+        l.textColor = .white; l.textAlignment = .center; l.numberOfLines = 2
+        l.translatesAutoresizingMaskIntoConstraints = false; return l
+    }()
+    private let exportProgressBar: UIProgressView = {
+        let p = UIProgressView(progressViewStyle: .default)
+        p.progressTintColor = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
+        p.trackTintColor = UIColor.white.withAlphaComponent(0.15)
+        p.translatesAutoresizingMaskIntoConstraints = false; return p
+    }()
+    private var exportOverlayAdded = false
+
+    private func ensureExportOverlay() {
+        guard !exportOverlayAdded else { return }
+        exportOverlayAdded = true
+        // Add overlay on top of frameView (the first subview of view that's a UIView)
+        view.addSubview(exportOverlay)
+        exportOverlay.addSubview(exportLabel)
+        exportOverlay.addSubview(exportProgressBar)
+        NSLayoutConstraint.activate([
+            exportOverlay.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            exportOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            exportOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            exportOverlay.heightAnchor.constraint(equalTo: view.widthAnchor, multiplier: 9.0/16.0),
+            exportLabel.centerXAnchor.constraint(equalTo: exportOverlay.centerXAnchor),
+            exportLabel.centerYAnchor.constraint(equalTo: exportOverlay.centerYAnchor, constant: -16),
+            exportProgressBar.topAnchor.constraint(equalTo: exportLabel.bottomAnchor, constant: 14),
+            exportProgressBar.leadingAnchor.constraint(equalTo: exportOverlay.leadingAnchor, constant: 40),
+            exportProgressBar.trailingAnchor.constraint(equalTo: exportOverlay.trailingAnchor, constant: -40),
+        ])
+    }
+
+    private func setExportProgress(visible: Bool, text: String = "", progress: Float = 0) {
+        ensureExportOverlay()
+        exportOverlay.isHidden = !visible
+        exportLabel.text = text
+        exportProgressBar.progress = progress
+    }
+
+    private func renderAndExportMP4() {
+        stopPlayback()
+        let shot = currentShot
+        let fps: Int32 = 24
+        let totalFrames = max(1, Int(ceil(shot.duration * Float(fps))))
+
+        // Build temp file URL
+        let outURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Shot\(shot.index + 1)_\(Int(Date().timeIntervalSince1970)).mp4")
+        try? FileManager.default.removeItem(at: outURL)
+
+        // Use current frame size, fallback to 1280×720
+        let size = frameImageView.image.map { $0.size } ?? CGSize(width: 1280, height: 720)
+
+        guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: .mp4) else {
+            showAlert("Could not create video writer."); return
+        }
+
+        let videoInput = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey:  AVVideoCodecType.h264,
+                AVVideoWidthKey:  size.width,
+                AVVideoHeightKey: size.height,
+            ])
+        videoInput.expectsMediaDataInRealTime = false
+
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                kCVPixelBufferWidthKey as String:           size.width,
+                kCVPixelBufferHeightKey as String:          size.height,
+            ])
+
+        writer.add(videoInput)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+
+        setExportProgress(visible: true, text: "Preparing…", progress: 0)
+        renderNextFrame(index: 0, total: totalFrames, fps: fps,
+                         shot: shot, writer: writer,
+                         input: videoInput, adaptor: adaptor,
+                         size: size, outURL: outURL)
+    }
+
+    private func renderNextFrame(index: Int, total: Int, fps: Int32,
+                                  shot: Shot, writer: AVAssetWriter,
+                                  input: AVAssetWriterInput,
+                                  adaptor: AVAssetWriterInputPixelBufferAdaptor,
+                                  size: CGSize, outURL: URL) {
+        guard index < total else {
+            // All frames written — finish
+            input.markAsFinished()
+            writer.finishWriting { [weak self] in
+                DispatchQueue.main.async {
+                    self?.setExportProgress(visible: false)
+                    if writer.status == .completed {
+                        self?.presentShareSheet([outURL])
+                    } else {
+                        self?.showAlert("MP4 export failed: \(writer.error?.localizedDescription ?? "unknown")")
+                    }
+                }
+            }
             return
         }
 
-        recorder.startRecording { [weak self] error in
-            guard let self = self else { return }
-            if let error = error {
-                DispatchQueue.main.async { self.showAlert("Recording failed: \(error.localizedDescription)") }
-                return
-            }
-            DispatchQueue.main.async {
-                // Play the shot — recording captures exactly what's on screen
-                self.currentTime = 0
-                self.scrubber.value = 0
-                self.startPlayback()
+        let progress = Float(index) / Float(total)
+        setExportProgress(visible: true,
+                           text: "Rendering \(shot.displayName)… \(index + 1)/\(total)",
+                           progress: progress)
 
-                // Stop recording after shot duration + small buffer
-                let duration = Double(self.currentShot.duration) + 0.3
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                    self.stopPlayback()
-                    recorder.stopRecording { previewVC, error in
-                        DispatchQueue.main.async {
-                            if let previewVC = previewVC {
-                                previewVC.previewControllerDelegate = self
-                                self.present(previewVC, animated: true)
-                            } else if let error = error {
-                                self.showAlert("Could not finish recording: \(error.localizedDescription)")
-                            }
-                        }
-                    }
+        // Scrub scene to this frame's time
+        let masterTime = shot.startTime + Float(index) / Float(fps)
+        evaluateTimeline?(masterTime)
+
+        // Find matching camera item
+        let camItem = cameraItems.first {
+            $0.cameraRoot.name == shot.cameraName ||
+            $0.cameraRoot.name.contains(shot.cameraName)
+        }
+
+        // Capture — async, waits for RealityKit to render
+        let doCapture: (@escaping (UIImage?) -> Void) -> Void
+        if let capture = captureFrameAsync {
+            doCapture = { cb in capture(camItem, cb) }
+        } else {
+            doCapture = { [weak self] cb in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                    self?.arView?.snapshot(saveToHDR: false, completion: cb)
                 }
+            }
+        }
+
+        doCapture { [weak self] image in
+            guard let self = self else { return }
+
+            if let img = image,
+               let pb = img.toPixelBuffer(size: size) {
+                while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
+                let time = CMTime(value: CMTimeValue(index), timescale: fps)
+                adaptor.append(pb, withPresentationTime: time)
+            }
+
+            DispatchQueue.main.async {
+                self.renderNextFrame(index: index + 1, total: total, fps: fps,
+                                      shot: shot, writer: writer,
+                                      input: input, adaptor: adaptor,
+                                      size: size, outURL: outURL)
             }
         }
     }
 
-    private func exportCurrentFrame(asPNG: Bool) {
-        guard let img = frameImageView.image else {
-            showAlert("No frame to export. Play the shot first."); return
-        }
-        let data = asPNG ? img.pngData() : img.jpegData(compressionQuality: 0.92)
-        guard let d = data, let exportImg = UIImage(data: d) else { return }
-        let vc = UIActivityViewController(activityItems: [exportImg], applicationActivities: nil)
+    // MARK: - Share Sheet (AirDrop, Save to Files, Messages, Mail, Photos…)
+
+    private func presentShareSheet(_ items: [Any]) {
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
         if let pop = vc.popoverPresentationController {
             pop.barButtonItem = navigationItem.rightBarButtonItem
         }
@@ -601,28 +755,44 @@ class ShotPlayerViewController: UIViewController {
         a.addAction(UIAlertAction(title: "OK", style: .default))
         present(a, animated: true)
     }
+    // MARK: - Scrubber Actions
+
+    @objc private func scrubChanged(_ s: UISlider) {
+        currentTime = s.value * currentShot.duration
+        startTimeLbl.text  = fmt(currentTime)
+        hudTimeLabel.text  = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
+        if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
+        updateFrameImage(at: currentShot.startTime + currentTime, force: true)
+    }
+
+    @objc private func scrubTouchDown() { stopPlayback() }
+
+    @objc private func scrubTouchUp() { startPlayback() }
+
+    // MARK: - Button Actions
 
     @objc private func btnTapped(_ sender: UIButton) {
         if sender == playBtn {
-            isPlaying ? stopPlayback() : startPlayback()
+            if isPlaying {
+                stopPlayback()
+            } else {
+                if currentTime >= currentShot.duration {
+                    currentTime = 0; scrubber.value = 0; startTimeLbl.text = "00:00"
+                }
+                startPlayback()
+            }
         } else if sender == prevBtn {
-            stopPlayback(); guard currentIndex > 0 else { return }
+            stopPlayback()
+            guard currentIndex > 0 else { return }
             currentIndex -= 1; currentTime = 0; sync()
         } else if sender == nextBtn {
-            stopPlayback(); guard currentIndex < shots.count - 1 else { return }
+            stopPlayback()
+            guard currentIndex < shots.count - 1 else { return }
             currentIndex += 1; currentTime = 0; sync()
         }
     }
 
-    @objc private func scrubChanged(_ s: UISlider) {
-        currentTime = s.value * currentShot.duration
-        startTimeLbl.text = fmt(currentTime)
-        hudTimeLabel.text = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
-        if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
-        updateFrameImage(at: currentShot.startTime + currentTime)
-    }
-    @objc private func scrubTouchDown() { stopPlayback() }
-    @objc private func scrubTouchUp()   { startPlayback() }
+    // MARK: - Button Factory
 
     private func makeBtn(icon: String, size: CGFloat) -> UIButton {
         let btn = UIButton(type: .system)
@@ -635,12 +805,16 @@ class ShotPlayerViewController: UIViewController {
         btn.addTarget(self, action: #selector(btnTapped(_:)), for: .touchUpInside)
         return btn
     }
-}
 
-// MARK: - Strip DataSource
+} // end ShotPlayerViewController
+
+// MARK: - CollectionView DataSource + Delegate
 
 extension ShotPlayerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
-    func collectionView(_ cv: UICollectionView, numberOfItemsInSection _: Int) -> Int { shots.count }
+
+    func collectionView(_ cv: UICollectionView, numberOfItemsInSection _: Int) -> Int {
+        shots.count
+    }
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: StripCell.reuseID, for: ip) as! StripCell
@@ -653,13 +827,6 @@ extension ShotPlayerViewController: UICollectionViewDataSource, UICollectionView
     }
 }
 
-// MARK: - ReplayKit Preview Delegate
-
-extension ShotPlayerViewController: RPPreviewViewControllerDelegate {
-    func previewControllerDidFinish(_ previewController: RPPreviewViewController) {
-        previewController.dismiss(animated: true)
-    }
-}
 
 // MARK: - Strip Cell
 
@@ -717,5 +884,28 @@ class StripCell: UICollectionViewCell {
         bg.layer.borderColor = appRed.cgColor
         bar.backgroundColor  = isActive ? appRed : .clear
         lbl.textColor = isActive ? .white : UIColor.white.withAlphaComponent(0.3)
+    }
+}
+
+// MARK: - UIImage → CVPixelBuffer (for AVAssetWriter)
+
+extension UIImage {
+    func toPixelBuffer(size: CGSize) -> CVPixelBuffer? {
+        var pb: CVPixelBuffer?
+        CVPixelBufferCreate(kCFAllocatorDefault, Int(size.width), Int(size.height),
+                            kCVPixelFormatType_32ARGB,
+                            [kCVPixelBufferCGImageCompatibilityKey: true,
+                             kCVPixelBufferCGBitmapContextCompatibilityKey: true] as CFDictionary, &pb)
+        guard let buf = pb else { return nil }
+        CVPixelBufferLockBaseAddress(buf, [])
+        let ctx = CGContext(data: CVPixelBufferGetBaseAddress(buf),
+                            width: Int(size.width), height: Int(size.height),
+                            bitsPerComponent: 8,
+                            bytesPerRow: CVPixelBufferGetBytesPerRow(buf),
+                            space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+        if let cg = cgImage { ctx?.draw(cg, in: CGRect(origin: .zero, size: size)) }
+        CVPixelBufferUnlockBaseAddress(buf, [])
+        return buf
     }
 }
