@@ -2,10 +2,8 @@
 //  CanvasViewController+ShotBreakdownWiring.swift
 //  3DCanvas
 //
-//  Drop this file in. It provides:
-//  1. captureFromCamera — activates a scene camera, snapshots, restores.
-//     This is what gives the shot cards their actual camera POV thumbnails.
-//  2. shotBreakdownTapped — opens the Shot Breakdown screen correctly wired.
+//  Delete or comment out the @objc private func shotBreakdownTapped() in
+//  CanvasViewController_UI.swift — this file replaces it.
 //
 
 import UIKit
@@ -13,75 +11,60 @@ import RealityKit
 
 extension CanvasViewController {
 
-    // MARK: - Camera POV Capture
+    // MARK: - Async Camera POV Capture
     //
-    // Temporarily activates the given camera, takes a snapshot of what it sees,
-    // then restores the previously active camera. Safe to call on main thread.
+    // 1. setActiveCamera — switches RealityKit to the camera's POV
+    // 2. asyncAfter(50ms) — one render tick for the new frame to appear
+    // 3. arView.snapshot() — captures it
+    // 4. activateEditorCamera() — restore
+    // 5. completion(image)
 
-    func captureSnapshotFromCamera(_ item: SceneCameraItem?) -> UIImage? {
-        // If no specific camera, snapshot the current editor view
+    func captureFrameFromCamera(
+        _ item: SceneCameraItem?,
+        completion: @escaping (UIImage?) -> Void
+    ) {
         guard let item = item else {
-            var result: UIImage?
-            let sema = DispatchSemaphore(value: 0)
-            arView.snapshot(saveToHDR: false) { img in
-                result = img; sema.signal()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
+                self?.arView.snapshot(saveToHDR: false, completion: completion)
             }
-            // Wait max 0.5s for snapshot — avoids blocking forever
-            _ = sema.wait(timeout: .now() + 0.5)
-            return result
+            return
         }
 
-        // 1. Remember who's active
-        let wasActive = activeCamera
-        let wasEditorActive = editorCamera.isEnabled
-
-        // 2. Activate the scene camera
         setActiveCamera(item.camera)
 
-        // 3. Snapshot — synchronous wait (called from already-deferred context)
-        var result: UIImage?
-        let sema = DispatchSemaphore(value: 0)
-        arView.snapshot(saveToHDR: false) { img in
-            result = img; sema.signal()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self = self else { completion(nil); return }
+            self.arView.snapshot(saveToHDR: false) { [weak self] image in
+                DispatchQueue.main.async {
+                    self?.activateEditorCamera()
+                    completion(image)
+                }
+            }
         }
-        _ = sema.wait(timeout: .now() + 0.5)
-
-        // 4. Restore
-        if wasEditorActive {
-            activateEditorCamera()
-        } else if let cam = wasActive as? PerspectiveCamera,
-                  cam !== editorCamera {
-            setActiveCamera(cam)
-        } else {
-            activateEditorCamera()
-        }
-
-        return result
     }
 
-    // MARK: - shotBreakdownTapped
+    // MARK: - Shot Breakdown Entry Point
     //
-    // Replace the existing @objc private func shotBreakdownTapped() in
-    // CanvasViewController+UI.swift with this version.
+    // IMPORTANT: In CanvasViewController_UI.swift, change:
+    //   @objc private func shotBreakdownTapped()
+    // to:
+    //   @objc func shotBreakdownTapped_OLD()   ← rename so this one wins
 
     @objc func shotBreakdownTapped() {
         let vc = ShotBreakdownViewController()
-        vc.sceneName        = self.sceneName
-        vc.timeline         = self.timeline
-        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
-        vc.arView           = self.arView
-        vc.cameraItems      = self.sceneCameraItems
+        vc.sceneName    = self.sceneName
+        vc.timeline     = self.timeline
+        vc.cameraNames  = self.sceneCameraItems.map { $0.cameraRoot.name }
+        vc.arView       = self.arView
+        vc.cameraItems  = self.sceneCameraItems
 
-        // Pass evaluateTimeline — scrubs entity positions to a given time
         vc.evaluateTimeline = { [weak self] t in
-            self?.evaluateTimeline(at: t)
+            self?.evaluateTimeline(at: t)   // now defined in TimelinePlayback file
         }
 
-        // Pass captureFromCamera — gives actual camera POV image
-        vc.captureFromCamera = { [weak self] item in
-            guard let self = self else { return nil }
-            // Must run on main thread — already guaranteed by caller
-            return self.captureSnapshotFromCamera(item)
+        vc.captureFrameAsync = { [weak self] item, completion in
+            guard let self = self else { completion(nil); return }
+            self.captureFrameFromCamera(item, completion: completion)
         }
 
         navigationController?.pushViewController(vc, animated: true)

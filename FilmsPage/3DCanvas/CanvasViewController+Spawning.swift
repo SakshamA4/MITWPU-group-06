@@ -164,8 +164,8 @@ extension CanvasViewController {
         // 3. Create Sphere
         let skyMesh = MeshResource.generateSphere(radius: 50)
         let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
-        skyEntity.name = "ProceduralSky"
-        
+//        skyEntity.name = "ProceduralSky"
+        skyEntity.name = "ProceduralSky_\(type)"
         // 4. THE FIX FOR INVERSION:
         // Instead of just flipping scale, we also apply a 180-degree rotation
         // around the X-axis to fix the "upside down" issue.
