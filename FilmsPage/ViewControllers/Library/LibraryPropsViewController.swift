@@ -18,7 +18,7 @@ class LibraryPropsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         propsCollectionView.dataSource = self
-        propsCollectionView.delegate = self
+//        propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
         props = propService.getProps()
         print(props)
@@ -87,21 +87,21 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
     }
 }
 
-extension LibraryPropsViewController: UICollectionViewDelegate {
-
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
-
-        let selectedProp = props[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
-            withIdentifier: "PropDetailViewController"
-        ) as? PropDetailViewController else {
-            return
-        }
-
-        vc.prop = selectedProp
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+//extension LibraryPropsViewController: UICollectionViewDelegate {
+//
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//
+//        let selectedProp = props[indexPath.item]
+//
+//        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "PropDetailViewController"
+//        ) as? PropDetailViewController else {
+//            return
+//        }
+//
+//        vc.prop = selectedProp
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
+//}

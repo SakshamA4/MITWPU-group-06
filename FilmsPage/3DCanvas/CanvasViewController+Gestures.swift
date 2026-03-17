@@ -85,10 +85,19 @@ extension CanvasViewController {
             if let startRotation = initialRotation {
                 let rotationQuaternion = simd_quatf(angle: -totalGestureRotation, axis: [0, 1, 0])
                 entity.orientation = rotationQuaternion * startRotation
-                cameraCollectionView?.reloadData()
+                // NOTE: cameraCollectionView?.reloadData() intentionally removed.
+                // Rotating a scene entity does not change the camera list, so rebuilding
+                // the collection view at 60 fps here was pure wasted CPU/GPU work.
             }
 
         case .ended, .cancelled:
+            // Refresh camera preview if the user rotated a scene camera.
+            if entity.components[CategoryComponent.self]?.toolType == .camera,
+               let idx = sceneCameraItems.firstIndex(where: { $0.cameraRoot === entity }) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.capturePreview(forCameraAt: idx)
+                }
+            }
             initialRotation = nil
 
         default:
@@ -342,9 +351,13 @@ extension CanvasViewController {
         guard let startPos = dragStartPosition else { return }
         let translation = gesture.translation(in: arView)
         let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
-        
+
         var newPosition = startPos
-        let sensitivity: Float = 0.005
+        // FIX: sensitivity now scales with camera distance, matching panCameraTarget()
+        // which uses distance * 0.0015. At distance=5 this gives 0.0015; at distance=15
+        // it gives 0.0045 — so dragging feels consistent regardless of zoom level.
+        // The old fixed 0.005 was too fast when zoomed in and too slow when zoomed out.
+        let sensitivity: Float = max(0.001, distance * 0.0003)
         let dx = mouseDelta.x * sensitivity
         let dy = -mouseDelta.y * sensitivity
         
@@ -469,14 +482,17 @@ extension CanvasViewController {
 
         let location = gestureRecognizer.location(in: arView)
 
+        // FIX 11: Use a single hitTest for both arc-component check and gizmo check —
+        // previously arView.entity(at:) + arView.hitTest() were both called on the same
+        // location, performing two separate BVH traversals per gesture recognition cycle.
+        let hits = arView.hitTest(location)
+
         // Always allow pans that start on an arc handle tip
-        if let hit = arView.entity(at: location),
-           hit.components[RotationArcComponent.self] != nil {
+        if hits.first(where: { $0.entity.components[RotationArcComponent.self] != nil }) != nil {
             return true
         }
 
         // Allow gizmo and ring hits
-        let hits = arView.hitTest(location)
         for hit in hits {
             let name = hit.entity.name
             if name.contains("Gizmo") || name == "xRing" || name == "yRing" || name == "zRing" {
@@ -505,7 +521,8 @@ extension CanvasViewController {
         switch gesture.state {
             
         case .began:
-            saveCurrentStateToUndo()
+            // FIX 5: Do NOT call saveCurrentStateToUndo() unconditionally.
+            // Camera-orbit / deselect pans mustn't create empty undo entries.
             let hits = arView.hitTest(location)
             
             // 1. Reset selection state for this touch
@@ -514,6 +531,7 @@ extension CanvasViewController {
             
             // 2. Priority: Check if we hit a GIZMO part
             if let gizmoHit = hits.first(where: { $0.entity.name.contains("Ring") || $0.entity.name.contains("Arrow") || $0.entity.name.contains("Plane") }) {
+                saveCurrentStateToUndo()   // FIX 5: only on real gizmo hit
                 let name = gizmoHit.entity.name
                 
                 // Handle Movement Parts
@@ -545,6 +563,7 @@ extension CanvasViewController {
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
 
                 if root?.name.contains("Gizmo") == false {
+                    saveCurrentStateToUndo()   // FIX 5: only when an entity is selected
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
                     setEntityTransparency(root, alpha: 0.7)
@@ -639,7 +658,10 @@ extension CanvasViewController {
                     height: wall.height,
                     depth: 0.05
                 )
-                entity.generateCollisionShapes(recursive: true)
+                // NOTE: generateCollisionShapes is NOT called here — it is expensive
+                // (rebuilds the physics shape) and calling it every .changed frame
+                // (60 fps) was a major cause of the app hanging. It is called once
+                // in .ended below.
                 entity.components.set(wall)
                 gesture.setTranslation(.zero, in: arView)
             }
@@ -657,10 +679,16 @@ extension CanvasViewController {
                     width: ground.width,
                     depth: ground.depth
                 )
-                entity.generateCollisionShapes(recursive: true)
+                // Same rationale: defer to .ended
                 entity.components.set(ground)
                 gesture.setTranslation(.zero, in: arView)
             }
+
+        case .ended, .cancelled:
+            // Rebuild collision shapes once the gesture is complete.
+            // This is the correct time to call this — the mesh has its final size
+            // and we only pay the cost once per drag, not once per frame.
+            entity.generateCollisionShapes(recursive: true)
 
         default:
             break

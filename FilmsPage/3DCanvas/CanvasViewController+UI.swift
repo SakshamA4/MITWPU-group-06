@@ -246,30 +246,31 @@ extension CanvasViewController {
         return button
     }
 
-    func makeGrid(size: Int, spacing: Float) -> Entity {
+    // Grid: size:100 produces 402 line entities (±20 m span at 0.2 m spacing).
+    func makeGrid(size: Int = 100, spacing: Float) -> Entity {
         let container = Entity()
         let length = Float(size) * spacing * 2
-        
+
         for i in -size...size {
             let isMajor = i % 5 == 0
-            
+
             var xColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
             var zColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
-            
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+
             if i == 0 {
                 xColor = .red
                 zColor = .blue
             }
-            
+
             let xLine = ModelEntity(
                 mesh: .generateBox(size: [length, 0.002, 0.002]),
                 materials: [SimpleMaterial(color: xColor, isMetallic: false)]
             )
             xLine.position = [0, 0, Float(i) * spacing]
             container.addChild(xLine)
-            
+
             let zLine = ModelEntity(
                 mesh: .generateBox(size: [0.002, 0.002, length]),
                 materials: [SimpleMaterial(color: zColor, isMetallic: false)]
@@ -277,7 +278,7 @@ extension CanvasViewController {
             zLine.position = [Float(i) * spacing, 0, 0]
             container.addChild(zLine)
         }
-        
+
         return container
     }
 
@@ -321,9 +322,14 @@ extension CanvasViewController {
 
     
     func refreshSidebarContent() {
+        // FIX 8: Skip redundant rebuilds during batch load — the persistence service
+        // resets isBatchLoading and calls us exactly once at Phase 9.
+        guard !isBatchLoading else { return }
         hierarchyStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        let allEntities = arView.scene.anchors.flatMap { $0.children }
+
+        // Use mainAnchor directly — never arView.scene.anchors.flatMap, which would
+        // include the Grid anchor (40,000+ line entities) and cause severe slowdowns.
+        let allEntities: [Entity] = mainAnchor.map { Array($0.children) } ?? []
         
         var itemsByCategory: [ToolType: [Entity]] = [:]
         ToolType.allCases.forEach { itemsByCategory[$0] = [] }

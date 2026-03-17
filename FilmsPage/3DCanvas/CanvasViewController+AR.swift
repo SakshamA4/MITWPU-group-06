@@ -32,6 +32,11 @@ extension CanvasViewController {
             arView.debugOptions = []
             arView.environment.sceneUnderstanding.options = []
 
+            // FIX B: Switch to AR camera mode BEFORE starting the session.
+            // Running arView.session.run() while cameraMode == .nonAR produces
+            // undefined behaviour and can permanently corrupt the ARView render state.
+            arView.cameraMode = .ar
+
             // 6. Start AR world-tracking (no .removeExistingAnchors — that wipes scene entities)
             let config = ARWorldTrackingConfiguration()
             config.planeDetection = [.horizontal]
@@ -44,6 +49,10 @@ extension CanvasViewController {
         } else {
             // Return to editor mode
             arView.session.pause()
+
+            // FIX B: Restore non-AR camera mode so the PerspectiveCamera nodes
+            // (editorCamera / sceneCameras) drive rendering again.
+            arView.cameraMode = .nonAR
 
             // Restore editor grid
             arView.scene.findEntity(named: "Grid")?.isEnabled = true

@@ -153,8 +153,10 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
         //let selectedSceneModel = allScenes[indexPath.item]
         let selectedModel = allScenes[indexPath.item]
         let vc = CanvasViewController()
+        vc.currentSceneID = selectedModel.id   // FIX: was missing — caused saves to never load from Library
         vc.sceneName = selectedModel.name
         vc.sceneNotes = selectedModel.notes ?? ""
+        vc.sceneImageName = selectedModel.image  
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)

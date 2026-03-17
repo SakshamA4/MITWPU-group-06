@@ -19,26 +19,26 @@ extension CanvasViewController {
 //        undoStack.append(snapshot)
 //        redoStack.removeAll()
 //    }
-    func saveCurrentStateToUndo() {
-        let anchor = arView.scene.findEntity(named: "MainAnchor")
-        var snapshotDict: [String: Transform] = [:]
-
-        anchor?.children.forEach { entity in
-            // Skip the grid (40,401 entities) and editor camera — they never need undo
-            guard entity.name != "Grid",
-                  entity.name != "EditorCamera"
-            else { return }
-            snapshotDict[entity.name] = entity.transform
-        }
-
-        undoStack.append(SceneSnapshot(entityTransforms: snapshotDict))
-        redoStack.removeAll()
-
-        // Cap the stack so memory doesn't grow forever
-        if undoStack.count > 30 {
-            undoStack.removeFirst()
-        }
-    }
+//    func saveCurrentStateToUndo() {
+//        let anchor = arView.scene.findEntity(named: "MainAnchor")
+//        var snapshotDict: [String: Transform] = [:]
+//
+//        anchor?.children.forEach { entity in
+//            // Skip the grid (40,401 entities) and editor camera — they never need undo
+//            guard entity.name != "Grid",
+//                  entity.name != "EditorCamera"
+//            else { return }
+//            snapshotDict[entity.name] = entity.transform
+//        }
+//
+//        undoStack.append(SceneSnapshot(entityTransforms: snapshotDict))
+//        redoStack.removeAll()
+//
+//        // Cap the stack so memory doesn't grow forever
+//        if undoStack.count > 30 {
+//            undoStack.removeFirst()
+//        }
+//    }
 
     
     @objc func undoTapped() {
@@ -109,7 +109,7 @@ extension CanvasViewController {
             // adding the entity to the anchor before applying the transform
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 guard let self = self else { return }
-                if let reSpawned = self.arView.scene.findEntity(named: name) {
+                if let reSpawned = self.mainAnchor?.findEntity(named: name) {
                     reSpawned.transform = transform
                     print("✅ Redo Success: Restored \(name) to previous transform")
                 }
@@ -123,13 +123,14 @@ extension CanvasViewController {
     
     func createCurrentSnapshot() -> SceneSnapshot {
         var snapshotDict: [String: Transform] = [:]
-        let allEntities = arView.scene.anchors.flatMap { $0.children }
-        
-        for entity in allEntities {
-            snapshotDict[entity.name] = entity.transform
-        }
-        
-        // Convert dictionary into a SceneSnapshot struct before returning
+
+        // Snapshot only user entities under MainAnchor — never the Grid (40k+ line entities),
+        // EditorCamera, or PathContainer (motion-path geometry reconstructed from clips).
+        let skipNames: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        mainAnchor?.children
+            .filter { !skipNames.contains($0.name) && !$0.name.isEmpty }
+            .forEach { snapshotDict[$0.name] = $0.transform }
+
         return SceneSnapshot(entityTransforms: snapshotDict)
     }
 

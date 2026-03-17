@@ -65,14 +65,16 @@ class ScenesDataStore {
     
     
     func addToRecent(scene: ScenesModel) {
-        // 1. Template check remains the same
-        let isTemplate = templates.contains { $0.name == scene.name }
+        // Template check: templates must never appear in the recents list.
+        // Check by ID (stable) — not by name, since a user-created scene may
+        // happen to share a template name.
+        let isTemplate = templates.contains { $0.id == scene.id }
         if isTemplate { return }
 
-        // 📍 THE FIX: Remove by ID AND Name to ensure zero duplication
-        recentScenes.removeAll { $0.id == scene.id || $0.name == scene.name }
-        
-        // 2. Insert at index 0 (Top of list)
+        // Deduplicate by ID only — two scenes with the same name are distinct.
+        recentScenes.removeAll { $0.id == scene.id }
+
+        // Insert at top of list.
         recentScenes.insert(scene, at: 0)
 
         if recentScenes.count > 10 {

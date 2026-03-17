@@ -23,7 +23,7 @@ extension CanvasViewController {
 
         activeMotionPaths[clip.id]?.root.removeFromParent()
 
-        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        guard let anchor = mainAnchor else { return }
 
         let pathRoot = Entity()
         pathRoot.name     = "PathRoot_\(clip.id)"
@@ -63,7 +63,9 @@ extension CanvasViewController {
         end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
         pathRoot.addChild(end)
 
-        anchor.addChild(pathRoot)
+        // FIX 6: Add path root to pathAnchor (not mainAnchor) so it is excluded from
+        // sidebar, undo snapshots, and the save document automatically.
+        (pathAnchor ?? anchor).addChild(pathRoot)
 
         activeMotionPaths[clip.id] = MotionPathVisual(
             root:           pathRoot,
@@ -132,6 +134,7 @@ extension CanvasViewController {
 
             let oldClip = self.timeline.clips[clipIndex]
             self.timeline.clips[clipIndex] = AnimationClip(
+                id:         oldClip.id,   // preserve stable UUID — do NOT generate a new one
                 entityName: oldClip.entityName,
                 type:       oldClip.type,
                 track:      oldClip.track,
@@ -143,17 +146,11 @@ extension CanvasViewController {
                 motionPath: oldClip.motionPath
             )
 
+            // The clip ID is unchanged, so the activeMotionPaths entry stays valid.
+            // No re-keying needed. Just refresh the path selection highlight.
             let newClipID = self.timeline.clips[clipIndex].id
-            if let visual = self.activeMotionPaths.removeValue(forKey: oldClip.id) {
-                self.activeMotionPaths[newClipID] = visual
-                let newComp = MotionPathHandleComponent(clipID: newClipID)
-                visual.startHandle?.components.set(newComp)
-                visual.control1Handle.components.set(newComp)
-                visual.control2Handle.components.set(newComp)
-                visual.endHandle.components.set(newComp)
-                if self.selectedPathClipID == oldClip.id {
-                    self.selectedPathClipID = newClipID
-                }
+            if self.activeMotionPaths[newClipID] != nil {
+                self.updatePathSelection()
             }
         }, for: .touchUpInside)
 
@@ -197,7 +194,7 @@ extension CanvasViewController {
         let entities = Set(timeline.clips.map { $0.entityName })
 
         for entityName in entities {
-            guard let entity = arView.scene.findEntity(named: entityName) else { continue }
+            guard let entity = mainAnchor?.findEntity(named: entityName) else { continue }
 
             baseTransforms[entityName] = entity.transform
 

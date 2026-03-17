@@ -11,7 +11,7 @@ import Foundation
 import RealityKit
 import UIKit
 
-// MARK: - Codable Helpers
+// MARK: - Codable helpers
 
 struct CodableTransform: Codable {
     let tx: Float; let ty: Float; let tz: Float
@@ -40,9 +40,15 @@ struct CodableSIMD3: Codable {
     var simd: SIMD3<Float> { SIMD3(x, y, z) }
 }
 
-
+// MARK: - EntityRecord
+//
+// `backgroundImagePath` is the filename (not full path) of the JPEG saved beside
+// the scene JSON. It is nil for all non-background entities.
 
 struct EntityRecord: Codable {
+    /// Stable UUID assigned at spawn, survives save/load cycles.
+    /// nil in pre-fix saves — treated as "no stable ID" on decode.
+    let id: String?
     let name: String
     let modelFileName: String
     let toolType: String
@@ -54,11 +60,19 @@ struct EntityRecord: Codable {
     let groundDepth: Float?
     let bgWidth: Float?
     let bgHeight: Float?
+    let backgroundImagePath: String?
 }
 
+// MARK: - AnimationClipRecord
+//
+// `id` round-trips verbatim so activeMotionPaths / activeRotationArcs stay valid after reload.
+
 struct AnimationClipRecord: Codable {
-    let id: String
-    let entityName: String
+    let id: String           // clip's own UUID — already correct
+    let entityName: String   // name-based entity ref (primary lookup key)
+    /// Stable entity UUID for forward-compat; nil in pre-fix saves.
+    /// Not yet used for runtime lookup — entityName is still the key.
+    let entityID: String?
     let type: String
     let track: String
     let easing: String
@@ -73,7 +87,7 @@ struct AnimationClipRecord: Codable {
 }
 
 struct CanvasSceneDocument: Codable {
-    var version: Int = 1
+    var version: Int = 2
     var sceneID: String
     var entities: [EntityRecord]
     var animationClips: [AnimationClipRecord]
@@ -91,129 +105,276 @@ struct CanvasSceneDocument: Codable {
 final class ScenePersistenceService {
 
     static let shared = ScenePersistenceService()
-    private init() {}
 
-    private func fileURL(for sceneID: UUID) -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs.appendingPathComponent("scene_\(sceneID.uuidString).json")
+    // FIX 4: Cache loaded USDZ Entity prototypes so that repeated loads of the
+    // same model file (e.g. re-opening a scene or undo/redo spawns) reuse one
+    // deserialized copy instead of re-parsing the asset every time.
+    private var modelCache: [String: Entity] = [:]
+
+    @objc private func clearModelCacheOnWarning() {
+        modelCache.removeAll()
+    }
+
+    private init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(clearModelCacheOnWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+    }
+
+    // MARK: - URL helpers
+
+    private var documentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+
+    private func sceneFileURL(for id: UUID) -> URL {
+        documentsDirectory.appendingPathComponent("scene_\(id.uuidString).json")
+    }
+
+    /// Returns only the filename component (not a full path) for a background image.
+    private func bgImageFilename(entityName: String, sceneID: UUID) -> String {
+        let safe = entityName.replacingOccurrences(of: "/", with: "_")
+        return "scene_\(sceneID.uuidString)_bg_\(safe).jpg"
     }
 
     func hasSave(for sceneID: UUID) -> Bool {
-        FileManager.default.fileExists(atPath: fileURL(for: sceneID).path)
+        FileManager.default.fileExists(atPath: sceneFileURL(for: sceneID).path)
     }
 
     func deleteSave(for sceneID: UUID) {
-        try? FileManager.default.removeItem(at: fileURL(for: sceneID))
+        try? FileManager.default.removeItem(at: sceneFileURL(for: sceneID))
+    }
+
+    // MARK: - Thumbnail
+
+    /// Saves a JPEG thumbnail to the Documents directory and returns the filename.
+    /// The returned filename is stored in `ScenesModel.image` so that
+    /// `setFilmImage(named:)` can locate it on disk for display in list views.
+    ///
+    /// - Returns: The filename (not full path) of the written JPEG, or nil if the
+    ///   image or JPEG conversion was nil / the write failed.
+    @discardableResult
+    func saveThumbnail(_ image: UIImage?, sceneID: UUID) -> String? {
+        guard let image = image,
+              let jpegData = image.jpegData(compressionQuality: 0.75) else { return nil }
+        let filename = "thumb_\(sceneID.uuidString).jpg"
+        let url = documentsDirectory.appendingPathComponent(filename)
+        do {
+            try jpegData.write(to: url, options: .atomic)
+            print("✅ Thumbnail saved: \(filename)")
+            return filename
+        } catch {
+            print("❌ Thumbnail save failed: \(error)")
+            return nil
+        }
     }
 
     // MARK: - Save
-    // Step 1: snapshot the RealityKit scene on the MAIN thread → pure value types
-    // Step 2: encode + write JSON on a background thread → no RealityKit access
-    // completion is called on the main thread when done
+    //
+    // Step 1 (main thread)  – snapshot the RealityKit scene into plain value types.
+    //                         Read UIImages from BackgroundComponent.cachedImage.
+    // Step 2 (background)   – encode JSON + write JPEG files to disk.
+    // Completion            – called back on the main thread.
 
-    func save(canvas vc: CanvasViewController, sceneID: UUID, completion: ((Bool) -> Void)? = nil) {
-        // ── STEP 1: Read everything from RealityKit on main thread ──
+    func save(
+        canvas vc: CanvasViewController,
+        sceneID: UUID,
+        completion: ((Bool) -> Void)? = nil
+    ) {
         assert(Thread.isMainThread, "save() must be called from the main thread")
 
-        guard let anchor = vc.arView.scene.findEntity(named: "MainAnchor") else {
+        guard let anchor = vc.mainAnchor else {
             completion?(false)
             return
         }
 
-        let skipNames: Set<String> = ["Grid", "EditorCamera", "MainAnchor"]
+        // FIX 6: Add "PathContainer" to skipNames so it is never serialised.
+        // PathRoot_ entities inside it are already excluded by the prefix check below.
+        let skipNames: Set<String> = ["Grid", "EditorCamera", "MainAnchor", "PathContainer"]
 
-        var entityRecords: [EntityRecord] = []
+        var entityRecords:   [EntityRecord] = []
+        var bgImagePayloads: [(filename: String, data: Data)] = []
 
         for entity in anchor.children {
-            guard !skipNames.contains(entity.name),
-                  !entity.name.isEmpty,
-                  !entity.name.hasPrefix("PathRoot_"),
-                  entity.name != "MotionPath"
+            guard
+                !skipNames.contains(entity.name),
+                !entity.name.isEmpty,
+                !entity.name.hasPrefix("PathRoot_"),
+                !entity.name.hasPrefix("RotationArc_"),
+                entity.name != "MotionPath"
             else { continue }
 
             let toolTypeTitle = entity.components[CategoryComponent.self]?.toolType.title ?? "Prop"
             let isBackground  = entity.components[CategoryComponent.self]?.toolType == .background
             let modelFileName = resolveModelFileName(entity: entity)
 
-            var wallWidth: Float?; var wallHeight: Float?
+            var wallWidth: Float?;   var wallHeight: Float?
             var groundWidth: Float?; var groundDepth: Float?
-            var bgWidth: Float?; var bgHeight: Float?
+            var bgWidth: Float?;     var bgHeight: Float?
+            var backgroundImagePath: String?
 
             if let model = entity as? ModelEntity {
-                if let w  = model.components[CanvasViewController.WallComponent.self]       { wallWidth = w.width;   wallHeight  = w.height }
-                if let g  = model.components[CanvasViewController.GroundComponent.self]     { groundWidth = g.width; groundDepth = g.depth  }
-                if let bg = model.components[CanvasViewController.BackgroundComponent.self]  { bgWidth = bg.width;   bgHeight    = bg.height }
+
+                if let w = model.components[CanvasViewController.WallComponent.self] {
+                    wallWidth = w.width; wallHeight = w.height
+                }
+
+                if let g = model.components[CanvasViewController.GroundComponent.self] {
+                    groundWidth = g.width; groundDepth = g.depth
+                }
+
+                // Background image extraction.
+                //
+                // RealityKit exposes no API to read pixel data back out of a TextureResource,
+                // so we rely on BackgroundComponent.cachedImage — the UIImage stored when
+                // applyBackgroundImage() or restoreEntity() created the entity.
+                if let bg = model.components[CanvasViewController.BackgroundComponent.self] {
+                    bgWidth  = bg.width
+                    bgHeight = bg.height
+
+                    // Prefer the image stored in BackgroundComponent.cachedImage.
+                    // Fall back to vc.backgroundImageCache (keyed by entity name) in case
+                    // cachedImage was lost after a TextureResource upload failure on a
+                    // previous restore — the VC-level cache is populated independently
+                    // and survives texture upload failures.
+                    let imageToSave = bg.cachedImage ?? vc.backgroundImageCache[entity.name]
+
+                    if let image    = imageToSave,
+                       let jpegData = image.jpegData(compressionQuality: 0.9) {
+                        let filename = bgImageFilename(entityName: entity.name, sceneID: sceneID)
+                        bgImagePayloads.append((filename, jpegData))
+                        backgroundImagePath = filename
+
+                        // Keep BackgroundComponent.cachedImage in sync so future paths
+                        // that read the component directly also find the image.
+                        if bg.cachedImage == nil {
+                            var updated = bg
+                            updated.cachedImage = image
+                            model.components.set(updated)
+                        }
+                    } else {
+                        print("⚠️ Save: '\(entity.name)' has no image in cachedImage or backgroundImageCache — texture will not be saved.")
+                    }
+                }
             }
 
             entityRecords.append(EntityRecord(
-                name: entity.name,
-                modelFileName: modelFileName,
-                toolType: toolTypeTitle,
-                isBackground: isBackground,
-                transform: CodableTransform(entity.transform),
-                wallWidth: wallWidth, wallHeight: wallHeight,
-                groundWidth: groundWidth, groundDepth: groundDepth,
-                bgWidth: bgWidth, bgHeight: bgHeight
+                id:                  {
+                    // Read existing stable UUID from component; assign one if missing.
+                    if entity.components[CanvasViewController.EntityIDComponent.self] == nil {
+                        entity.components.set(CanvasViewController.EntityIDComponent(id: UUID()))
+                    }
+                    return entity.components[CanvasViewController.EntityIDComponent.self]!.id.uuidString
+                }(),
+                name:                entity.name,
+                modelFileName:       modelFileName,
+                toolType:            toolTypeTitle,
+                isBackground:        isBackground,
+                transform:           CodableTransform(entity.transform),
+                wallWidth:           wallWidth,   wallHeight:   wallHeight,
+                groundWidth:         groundWidth, groundDepth:  groundDepth,
+                bgWidth:             bgWidth,     bgHeight:     bgHeight,
+                backgroundImagePath: backgroundImagePath
             ))
         }
 
-        // Snapshot animation clips (pure Swift structs — safe to copy)
         let clipRecords: [AnimationClipRecord] = vc.timeline.clips.map { clip in
-            var ps: CodableSIMD3? = nil; var pc1: CodableSIMD3? = nil
-            var pc2: CodableSIMD3? = nil; var pe: CodableSIMD3? = nil
+            var ps:  CodableSIMD3?; var pc1: CodableSIMD3?
+            var pc2: CodableSIMD3?; var pe:  CodableSIMD3?
             if let path = clip.motionPath {
-                ps = CodableSIMD3(path.start); pc1 = CodableSIMD3(path.control1)
-                pc2 = CodableSIMD3(path.control2); pe = CodableSIMD3(path.end)
+                ps  = CodableSIMD3(path.start)
+                pc1 = CodableSIMD3(path.control1)
+                pc2 = CodableSIMD3(path.control2)
+                pe  = CodableSIMD3(path.end)
             }
             return AnimationClipRecord(
-                id: clip.id.uuidString, entityName: clip.entityName,
-                type: clip.type.rawValue, track: clip.track.rawValue,
-                easing: clip.easing.rawValue, startTime: clip.startTime,
-                duration: clip.duration, fromValue: CodableSIMD3(clip.fromValue),
-                toValue: CodableSIMD3(clip.toValue),
-                pathStart: ps, pathControl1: pc1, pathControl2: pc2, pathEnd: pe
+                id:           clip.id.uuidString,
+                entityName:   clip.entityName,
+                entityID:     {
+                    // Persist the entity's stable UUID alongside the name for future use.
+                    if let entity = vc.mainAnchor?.findEntity(named: clip.entityName) {
+                        return entity.components[CanvasViewController.EntityIDComponent.self]?.id.uuidString
+                    }
+                    return nil
+                }(),
+                type:         clip.type.rawValue,
+                track:        clip.track.rawValue,
+                easing:       clip.easing.rawValue,
+                startTime:    clip.startTime,
+                duration:     clip.duration,
+                fromValue:    CodableSIMD3(clip.fromValue),
+                toValue:      CodableSIMD3(clip.toValue),
+                pathStart:    ps,  pathControl1: pc1,
+                pathControl2: pc2, pathEnd:      pe
             )
         }
 
         let doc = CanvasSceneDocument(
-            sceneID: sceneID.uuidString,
-            entities: entityRecords,
-            animationClips: clipRecords,
+            sceneID:           sceneID.uuidString,
+            entities:          entityRecords,
+            animationClips:    clipRecords,
             backgroundCounter: vc.backgroundCounter,
-            cameraYaw: vc.yaw, cameraPitch: vc.pitch, cameraDistance: vc.distance,
-            cameraTargetX: vc.cameraTarget.x,
-            cameraTargetY: vc.cameraTarget.y,
-            cameraTargetZ: vc.cameraTarget.z
+            cameraYaw:         vc.yaw,
+            cameraPitch:       vc.pitch,
+            cameraDistance:    vc.distance,
+            cameraTargetX:     vc.cameraTarget.x,
+            cameraTargetY:     vc.cameraTarget.y,
+            cameraTargetZ:     vc.cameraTarget.z
         )
 
-        let url = fileURL(for: sceneID)
+        let jsonURL = sceneFileURL(for: sceneID)
+        let docsDir = documentsDirectory
 
-        // ── STEP 2: Encode + write on background thread ──
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let data = try encoder.encode(doc)
-                try data.write(to: url, options: .atomic)
-                print("✅ Scene saved: \(url.lastPathComponent)")
+                // FIX 9: Removed .prettyPrinted and .sortedKeys — both options cause
+                // significant overhead on large documents. Compact JSON is ~30% faster
+                // to encode and produces smaller files with no functional difference.
+                try encoder.encode(doc).write(to: jsonURL, options: .atomic)
+
+                for payload in bgImagePayloads {
+                    let imgURL = docsDir.appendingPathComponent(payload.filename)
+                    try payload.data.write(to: imgURL, options: .atomic)
+                }
+
+                print("✅ Saved: \(jsonURL.lastPathComponent), \(bgImagePayloads.count) bg image(s)")
                 DispatchQueue.main.async { completion?(true) }
             } catch {
-                print("❌ Scene save error: \(error)")
+                print("❌ Save error: \(error)")
                 DispatchQueue.main.async { completion?(false) }
             }
         }
     }
 
-
+    // MARK: - Load
+    //
+    // Phase 1  – decode JSON off the main thread.
+    // Phase 2  – clear ALL stale state (no duplicates or memory leaks on repeat loads).
+    // Phase 3  – restore camera state.
+    // Phase 4  – restore entities CONCURRENTLY.
+    //            Multiple Entity(named:) USDZ loads happen in parallel; instant entities
+    //            (walls, grounds, backgrounds, cameras) complete immediately.
+    //            All scene-graph mutations happen on @MainActor.
+    // Phase 5  – reload the camera collection view ONCE after all cameras are appended.
+    //            (Moving this out of restoreEntity fixes the camera sidebar race condition.)
+    // Phase 6  – seed baseTransforms.
+    // Phase 7  – restore animation clips with original stable UUIDs.
+    // Phase 8  – show motion path visuals, one render-frame apart.
+    // Phase 9  – single sidebar refresh.
 
     @MainActor
     func load(into vc: CanvasViewController, sceneID: UUID) async {
-        let url = fileURL(for: sceneID)
+        let url = sceneFileURL(for: sceneID)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("ℹ️ No saved scene for \(sceneID)"); return
+            print("ℹ️ No saved scene for \(sceneID)")
+            return
         }
 
-        // Phase 1: decode JSON off main thread
+        // Phase 1 – decode off main thread
         let doc: CanvasSceneDocument
         do {
             let data = try await Task.detached(priority: .userInitiated) {
@@ -221,163 +382,415 @@ final class ScenePersistenceService {
             }.value
             doc = try JSONDecoder().decode(CanvasSceneDocument.self, from: data)
         } catch {
-            print("❌ Scene load error: \(error)"); return
+            print("❌ Load error: \(error)")
+            return
         }
 
-        // Restore camera state
-        vc.yaw = doc.cameraYaw; vc.pitch = doc.cameraPitch
-        vc.distance = doc.cameraDistance; vc.backgroundCounter = doc.backgroundCounter
-        vc.cameraTarget = SIMD3(doc.cameraTargetX, doc.cameraTargetY, doc.cameraTargetZ)
+        // Phase 2 – clean slate
+        clearSceneState(vc: vc)
+
+        // FIX 8: Suppress intermediate sidebar rebuilds during load.
+        // refreshSidebarContent() is called below at Phase 9 exactly once.
+        vc.isBatchLoading = true
+
+        // FIX C: Pause the display link for the duration of the load.
+        // If playback is running, the display link fires evaluateTimeline(at:) every frame,
+        // which reads vc.timeline.clips while restoreClipsOnly() below is writing them —
+        // a data race that causes clips to vanish or apply to wrong entities.
+        let wasPlaying = vc.playbackState == .playing
+        vc.displayLink?.isPaused = true
+        vc.playbackState = .stopped
+
+        // Phase 3 – camera state
+        vc.yaw            = doc.cameraYaw
+        vc.pitch          = doc.cameraPitch
+        vc.distance       = doc.cameraDistance
+        vc.backgroundCounter = doc.backgroundCounter
+        vc.cameraTarget   = SIMD3(doc.cameraTargetX, doc.cameraTargetY, doc.cameraTargetZ)
         vc.updateEditorCamera()
 
-        // Phase 2: restore entities sequentially on @MainActor
+        // Phase 4 – serial entity restore.
+        //
+        // FIX: replaced concurrent withTaskGroup with a serial for-loop.
+        //
+        // The previous concurrent approach had a race condition: restoreEntity is
+        // @MainActor but contains `await TextureResource(image:options:)` suspension
+        // points. When a task suspends, another task runs. Because `backgroundCounter`
+        // is a plain `var` (no locking) and entity transforms are applied inside async
+        // continuations, multiple concurrent tasks could read-modify-write the counter
+        // simultaneously and apply transforms out of order — causing entities to land
+        // at (0,0,0) instead of their saved positions.
+        //
+        // A serial loop is safe, predictable, and still avoids blocking the main thread
+        // because each `await restoreEntity(...)` suspends cooperatively while GPU
+        // texture uploads (TextureResource) and USDZ decompression (Entity(named:))
+        // run on background executors.
+        //
+        // NOTE: cameraCollectionView.reloadData() is deliberately NOT called inside
+        // restoreEntity. Phase 5 calls reloadData() once after all entities are restored.
         for record in doc.entities {
-            await restoreEntity(record: record, vc: vc)
+            await restoreEntity(record: record, vc: vc, sceneID: sceneID)
         }
 
-        // Phase 3: seed baseTransforms NOW — entities are confirmed in scene.
-        // This is the critical fix. evaluateTimeline() has:
-        //   guard let base = baseTransforms[entityName] else { continue }
-        // Without this seeding step every animated entity is silently skipped.
-        for record in doc.animationClips {
-            if vc.baseTransforms[record.entityName] == nil,
-               let entity = vc.arView.scene.findEntity(named: record.entityName) {
+        // Phase 5 – reload camera collection view once, now that all cameras are appended.
+        vc.cameraCollectionView?.reloadData()
+
+        // Phase 5b – show the camera panel pull-tab and capture previews if cameras were restored.
+        if !vc.sceneCameraItems.isEmpty {
+            vc.view.viewWithTag(8803)?.alpha = 1.0
+            vc.setCameraPanelExpanded(true, animated: false)
+            // FIX 7: Increased delay to 1.5s so RealityKit has time to render
+            // restored entities before capture. Added a guard so capture is skipped
+            // if the user is already interacting or playback is running.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak vc] in
+                guard let vc = vc,
+                      !vc.isDraggingObject,
+                      vc.playbackState == .stopped else { return }
+                vc.captureAllPreviews()
+            }
+        }
+
+        // Phase 6 – seed baseTransforms
+        for record in doc.animationClips where vc.baseTransforms[record.entityName] == nil {
+            if let entity = vc.mainAnchor?.findEntity(named: record.entityName) {
                 vc.baseTransforms[record.entityName] = entity.transform
             }
         }
 
-        // Phase 4: restore clip data into vc.timeline (no visuals yet)
+        // Phase 7 – animation clips
         restoreClipsOnly(doc.animationClips, vc: vc)
 
-        // Phase 5: show motion path visuals deferred + staggered
-        // Staggering 50ms per path means the render loop gets clean frames
-        // between each path's ModelEntities being added — zero visible lag.
-        let clipsWithPaths = doc.animationClips.filter { $0.pathStart != nil }
-        for (i, record) in clipsWithPaths.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) { [weak vc] in
-                guard let vc = vc,
-                      let clip = vc.timeline.clips.first(where: { $0.id.uuidString == record.id })
-                else { return }
-                vc.showMotionPath(for: clip)
+        // Phase 8 – motion path visuals.
+        // No polling needed — entities are in the scene after the Phase 4 group.
+        // Yield one frame between each path to keep the render loop responsive.
+        let clipsWithPaths = vc.timeline.clips.filter { $0.motionPath != nil }
+        for (index, clip) in clipsWithPaths.enumerated() {
+            if index > 0 {
+                try? await Task.sleep(nanoseconds: 16_000_000) // ~1 frame @ 60 fps
+            }
+            vc.showMotionPath(for: clip)
+        }
+
+        // Phase 9 – single sidebar refresh
+        vc.isBatchLoading = false   // FIX 8: re-enable before the final refresh
+        vc.refreshSidebarContent()
+        print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
+
+        // Phase 9.5 – serialised collision shape generation (FIX E).
+        //
+        // Previously each restoreEntity branch launched its own Task { generateCollisionShapes }
+        // which caused all N tasks to run concurrently on the main actor right after load,
+        // stalling the render loop for N × (shape-gen time) ms in rapid succession.
+        //
+        // Instead we walk the anchor children once, generating collision shapes one entity
+        // per frame so the render loop always has a chance to run between them.
+        let skipCollision: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        Task { @MainActor [weak vc] in
+            guard let vc = vc, let anchor = vc.mainAnchor else { return }
+            for child in anchor.children {
+                guard !skipCollision.contains(child.name),
+                      !child.name.hasPrefix("PathRoot_"),
+                      !child.name.hasPrefix("RotationArc_"),
+                      child.name != "MotionPath" else { continue }
+                child.generateCollisionShapes(recursive: true)
+                try? await Task.sleep(nanoseconds: 16_000_000) // ~1 frame @ 60 fps
             }
         }
 
-        vc.refreshSidebarContent()
-        print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
+        // FIX C: Resume the display link now that all state mutations are complete.
+        // Only re-start if it was actually playing before load began (rare but safe).
+        if wasPlaying {
+            vc.displayLink?.isPaused = false
+        }
     }
 
-    // MARK: - Entity Restoration (always called on @MainActor)
+    // MARK: - Clear stale state
 
     @MainActor
-    private func restoreEntity(record: EntityRecord, vc: CanvasViewController) async {
-        guard let anchor = vc.arView.scene.findEntity(named: "MainAnchor") else { return }
+    private func clearSceneState(vc: CanvasViewController) {
+        vc.activeMotionPaths.values.forEach  { $0.root.removeFromParent() }
+        vc.activeMotionPaths.removeAll()
+
+        vc.activeRotationArcs.values.forEach { $0.root.removeFromParent() }
+        vc.activeRotationArcs.removeAll()
+
+        // FIX 2 + FIX 6: Remove recursively bottom-up so nested entities (e.g. camera visuals
+        // with child lights) are detached from their parents before the root is removed.
+        // RealityKit's removeFromParent() only unlinks the immediate parent link; orphaned
+        // sub-trees would linger in memory without explicit recursive removal.
+        // "PathContainer" is kept — its PathRoot_ children are already removed above via
+        // the activeMotionPaths loop, so the container itself is empty after this point.
+        let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        func removeRecursively(_ entity: Entity) {
+            for child in entity.children { removeRecursively(child) }
+            entity.removeFromParent()
+        }
+        vc.mainAnchor?.children
+            .filter { !keep.contains($0.name) }
+            .forEach { removeRecursively($0) }
+
+        vc.timeline.clips.removeAll()
+        vc.baseTransforms.removeAll()
+        vc.undoStack.removeAll()
+        vc.redoStack.removeAll()
+        vc.sceneCameras.removeAll()
+        vc.sceneCameraItems.removeAll()
+        vc.cameraToVisualMap.removeAll()
+        vc.selectedEntity  = nil
+        vc.backgroundPlane = nil
+
+        // FIX A (editorMode): Always reset to .edit so timeline playback guards
+        // don't block animation after the new scene loads. If the previous scene
+        // was in .timeline mode, playTimeline() would silently return early.
+        vc.editorMode = .edit
+
+        // FIX B: Clear the entity lookup cache so evaluateTimeline() doesn't find
+        // stale orphaned entities from the previous session's scene graph.
+        vc.timelineEntityCache.removeAll()
+
+        // Clear background image cache — each scene manages its own images.
+        vc.backgroundImageCache.removeAll()
+
+        // Cancel any in-flight one-shot preview capture subscriptions so they
+        // don't fire against a torn-down scene graph.
+        vc.previewCancellables.removeAll()
+        vc.isCapturingPreview = false
+
+        // Ensure the viewport is fully visible in case a capture was interrupted mid-flight.
+        vc.arView.alpha = 1
+
+        // FIX A: Re-enable the editor camera after clearing scene state.
+        // If a scene camera was active when the user left, setActiveCamera() may have
+        // called editorCamera.isEnabled = false. Without explicitly re-enabling it here,
+        // the subsequent entity restore renders to a black / invisible view.
+        vc.editorCamera?.isEnabled = true
+        vc.activeCamera = vc.editorCamera
+
+        // Reset the collection view after clearing all camera state
+        vc.cameraCollectionView?.reloadData()
+    }
+
+    // MARK: - Entity restoration (always on @MainActor)
+
+    @MainActor
+    private func restoreEntity(
+        record:  EntityRecord,
+        vc:      CanvasViewController,
+        sceneID: UUID
+    ) async {
+        guard let anchor = vc.mainAnchor else { return }
         let t = record.transform.transform
 
-        // Wall
+        // ── Wall ───────────────────────────────────────────────────────────────
         if record.name.lowercased().contains("wall") || record.modelFileName == "cube" {
+            let w = record.wallWidth  ?? 1.5
+            let h = record.wallHeight ?? 1.2
             let e = ModelEntity()
-            e.name = record.name
-            let w = record.wallWidth ?? 1.5; let h = record.wallHeight ?? 1.2
+            e.name  = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
             e.model = ModelComponent(
-                mesh: MeshResource.generateBox(width: w, height: h, depth: 0.05),
+                mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
                 materials: [SimpleMaterial(color: .lightGray, roughness: 0.6, isMetallic: false)]
             )
             e.components.set(CategoryComponent(toolType: .wall))
             e.components.set(CanvasViewController.WallComponent(width: w, height: h))
-            e.generateCollisionShapes(recursive: true)
             e.components.set(InputTargetComponent())
             e.transform = t
             anchor.addChild(e)
             return
         }
 
-        // Ground
+        // ── Ground ─────────────────────────────────────────────────────────────
         if record.name.lowercased().contains("ground") {
+            let w = record.groundWidth ?? 4.0
+            let d = record.groundDepth ?? 4.0
             let e = ModelEntity()
-            e.name = record.name
-            let w = record.groundWidth ?? 4.0; let d = record.groundDepth ?? 4.0
+            e.name  = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
             e.model = ModelComponent(
-                mesh: MeshResource.generatePlane(width: w, depth: d),
+                mesh:      MeshResource.generatePlane(width: w, depth: d),
                 materials: [SimpleMaterial(color: .darkGray, roughness: 1.0, isMetallic: false)]
             )
             e.components.set(CategoryComponent(toolType: .wall))
             e.components.set(CanvasViewController.GroundComponent(width: w, depth: d))
-            e.generateCollisionShapes(recursive: true)
             e.components.set(InputTargetComponent())
             e.transform = t
             anchor.addChild(e)
             return
         }
 
-        // Scene Camera
+        // ── Scene camera ───────────────────────────────────────────────────────
+        //
+        // NOTE: cameraCollectionView.reloadData() is intentionally omitted here.
+        // It is called once in load() Phase 5, after ALL entities (including all cameras)
+        // have been added. Calling it here inside a concurrent TaskGroup would fire
+        // before sibling camera tasks finish, producing an incomplete camera sidebar.
         if record.name.lowercased().contains("scenecamera") {
-            let root = Entity()
+            let root  = Entity()
             root.name = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                root.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
             root.components.set(CategoryComponent(toolType: .camera))
             let visual = vc.makeCameraVisual()
-            visual.generateCollisionShapes(recursive: true)
             visual.components.set(InputTargetComponent())
-            let cam = PerspectiveCamera(); cam.isEnabled = false
-            root.addChild(visual); root.addChild(cam)
+            let cam       = PerspectiveCamera()
+            cam.isEnabled = false
+            root.addChild(visual)
+            root.addChild(cam)
             root.transform = t
             anchor.addChild(root)
             vc.sceneCameras.append(cam)
             vc.cameraToVisualMap[cam] = root
-            vc.sceneCameraItems.append(CanvasViewController.SceneCameraItem(camera: cam, cameraRoot: root))
-            vc.cameraCollectionView?.reloadData()
+            vc.sceneCameraItems.append(
+                CanvasViewController.SceneCameraItem(camera: cam, cameraRoot: root)
+            )
+            // Do NOT call vc.cameraCollectionView?.reloadData() here — see Phase 5 in load().
             return
         }
 
-        // Background
-        if record.isBackground || record.name.lowercased().contains("background") {
-            let w = record.bgWidth ?? 2.0; let h = record.bgHeight ?? 1.5
+        // ── Background ─────────────────────────────────────────────────────────
+        //
+        // Full restore pipeline:
+        //   1. Read backgroundImagePath from the record (the saved JPEG filename).
+        //   2. Load the JPEG from disk into a UIImage.
+        //   3. Store the loaded UIImage immediately in vc.backgroundImageCache so that
+        //      save() can always find it regardless of whether step 4 succeeds.
+        //   4. Convert to a guaranteed-sRGB CGImage via sRGBCGImage().
+        //   5. Await TextureResource(image:options:) — this uploads the texture to the GPU.
+        //   6. Apply it to an UnlitMaterial on the restored ModelEntity.
+        //   7. Store the UIImage back into BackgroundComponent.cachedImage.
+        //
+        if record.isBackground
+            || record.name.lowercased().hasPrefix("background")
+            || record.modelFileName.lowercased().hasPrefix("background") {
+            let w = record.bgWidth  ?? 2.0
+            let h = record.bgHeight ?? 1.5
+
+            var material       = UnlitMaterial()
+            var restoredImage: UIImage?
+
+            // Check backgroundImagePath from the JSON record first,
+            // then fall back to backgroundImageCache (populated by a previous session's
+            // applyBackgroundImage call — covers the case where an old save had no
+            // backgroundImagePath but the VC cache was seeded from a prior load).
+            let loadedFromDisk: UIImage? = {
+                if let filename = record.backgroundImagePath {
+                    let imgURL = documentsDirectory.appendingPathComponent(filename)
+                    return UIImage(contentsOfFile: imgURL.path)
+                }
+                return nil
+            }()
+
+            // Fall back to VC-level cache for entities whose JPEG path was never saved
+            // (pre-fix scenes) but whose image is still in memory from this session.
+            let sourceImage = loadedFromDisk ?? vc.backgroundImageCache[record.name]
+
+            if let image = sourceImage {
+                // Store in VC cache immediately — this survives a texture upload failure
+                // so that save() can still extract the JPEG data on the next save.
+                vc.backgroundImageCache[record.name] = image
+
+                do {
+                    // sRGBCGImage() always re-renders through a Device-RGB context —
+                    // this ensures P3/wide-gamut images from Photos or camera roll are
+                    // safe to pass to TextureResource (which rejects non-sRGB data).
+                    let safeCG = image.sRGBCGImage()
+                    let texture = try await TextureResource(
+                        image:   safeCG,
+                        options: .init(semantic: .color)
+                    )
+                    material.color.texture = .init(texture)
+                    restoredImage = image
+                    print("✅ Background texture restored: \(record.name)")
+                } catch {
+                    // Texture upload failed — show a magenta placeholder so the user
+                    // can see the entity exists and try again.
+                    // The UIImage is still in backgroundImageCache so the next save()
+                    // will re-write the JPEG and next reload will retry the upload.
+                    material.color.tint = UIColor(red: 1.0, green: 0.0, blue: 1.0, alpha: 0.8)
+                    print("❌ Background texture upload failed for '\(record.name)': \(error)")
+                }
+            } else if record.backgroundImagePath != nil {
+                // Path was recorded but the JPEG file is missing from disk.
+                material.color.tint = UIColor(red: 1.0, green: 0.5, blue: 0.0, alpha: 0.8)
+                print("❌ Background JPEG missing on disk for '\(record.name)'")
+            } else {
+                // No image path and no cached image — geometry-only restore.
+                // This happens for old saves created before the image pipeline existed.
+                print("ℹ️ No backgroundImagePath for '\(record.name)' — restoring geometry only.")
+            }
+
             let e = ModelEntity(
-                mesh: MeshResource.generateBox(width: w, height: h, depth: 0.05),
-                materials: [UnlitMaterial()]
+                mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
+                materials: [material]
             )
             e.name = record.name
-            e.components.set(CanvasViewController.BackgroundComponent(width: w, height: h))
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
+            e.components.set(CanvasViewController.BackgroundComponent(
+                width:       w,
+                height:      h,
+                cachedImage: restoredImage   // retained so future save() calls can extract JPEG data
+            ))
             e.components.set(CategoryComponent(toolType: .background))
-            e.generateCollisionShapes(recursive: true)
             e.components.set(InputTargetComponent())
             e.transform = t
             anchor.addChild(e)
             return
         }
 
-        // Regular 3D model — async load is fine here since we're already in an async context
+        // ── Regular 3D model ───────────────────────────────────────────────────
         do {
-            let entity = try await Entity(named: record.modelFileName)
+            // FIX 4: Reuse a cached prototype and clone it — avoids re-parsing
+            // the USDZ asset on every load of the same model.
+            let entity: Entity
+            if let cached = modelCache[record.modelFileName] {
+                entity = cached.clone(recursive: true)
+            } else {
+                let loaded = try await Entity(named: record.modelFileName)
+                modelCache[record.modelFileName] = loaded
+                entity = loaded.clone(recursive: true)
+            }
             entity.name = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                entity.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
             let toolType = ToolType.allCases.first { $0.title == record.toolType } ?? .prop
             entity.components.set(CategoryComponent(toolType: toolType))
-            entity.generateCollisionShapes(recursive: true)
             entity.components.set(InputTargetComponent())
+
             if record.modelFileName == "Spotlight"           { vc.addRealLightToModel(entity) }
             else if record.modelFileName.contains("LED")     { vc.addLEDPanel(to: entity) }
             else if record.modelFileName.contains("Lantern") { vc.addLantern(to: entity) }
-            entity.transform = t   // apply saved transform AFTER load
+
+            entity.transform = t
             anchor.addChild(entity)
         } catch {
-            print("⚠️ Could not restore '\(record.name)': \(error)")
+            print("⚠️ Could not restore '\(record.name)' (\(record.modelFileName)): \(error)")
         }
     }
 
-    // MARK: - Clip Restoration
-    //
-    // restoreClipsOnly: adds clips to vc.timeline WITHOUT touching showMotionPath.
-    // Motion path visuals are handled separately in load() with asyncAfter stagger.
-    // This separation is what prevents the lag spike and missing-path bugs.
+    // MARK: - Clip restoration
 
     private func restoreClipsOnly(_ records: [AnimationClipRecord], vc: CanvasViewController) {
         for record in records {
-            guard let type   = AnimationType(rawValue: record.type),
-                  let track  = AnimationTrack(rawValue: record.track),
-                  let easing = EasingType(rawValue: record.easing) else { continue }
+            guard
+                let type   = AnimationType(rawValue: record.type),
+                let track  = AnimationTrack(rawValue: record.track),
+                let easing = EasingType(rawValue: record.easing)
+            else { continue }
 
-            var motionPath: BezierMotionPath? = nil
-            if let ps = record.pathStart, let pc1 = record.pathControl1,
-               let pc2 = record.pathControl2, let pe = record.pathEnd {
+            var motionPath: BezierMotionPath?
+            if let ps  = record.pathStart,
+               let pc1 = record.pathControl1,
+               let pc2 = record.pathControl2,
+               let pe  = record.pathEnd {
                 motionPath = BezierMotionPath(
                     start:    ps.simd,
                     control1: pc1.simd,
@@ -387,6 +800,7 @@ final class ScenePersistenceService {
             }
 
             let clip = AnimationClip(
+                id:         UUID(uuidString: record.id) ?? UUID(),
                 entityName: record.entityName,
                 type:       type,
                 track:      track,
@@ -398,18 +812,32 @@ final class ScenePersistenceService {
                 motionPath: motionPath
             )
             vc.timeline.addClip(clip)
-            // NOTE: baseTransforms is seeded in load() Phase 3, not here.
-            // NOTE: showMotionPath is called in load() Phase 5, not here.
         }
     }
 
-    // MARK: - Helper
+    // MARK: - resolveModelFileName
 
+    /// Strips the uniquifying suffix from an entity display name so we can
+    /// reload the original asset. Works for both space-separated and
+    /// underscore-separated suffixes.
+    ///
+    /// Examples:
+    ///   "Woman1_2"      → "Woman1"
+    ///   "LED Panel_3"   → "LED Panel"
+    ///   "Background_1"  → "Background"
+    ///   "Wall_2"        → "Wall"
+    ///   "Wall"          → "Wall"
     private func resolveModelFileName(entity: Entity) -> String {
         let name = entity.name
+        // Match a trailing underscore + one-or-more digits at the end of the string.
         if let range = name.range(of: #"_\d+$"#, options: .regularExpression) {
             return String(name[name.startIndex..<range.lowerBound])
         }
         return name
     }
 }
+
+// MARK: - UIImage → sRGB CGImage
+// NOTE: sRGBCGImage() is defined as an internal extension in
+// CanvasViewController+Spawning.swift and is available throughout the module.
+// It is referenced below inside restoreEntity() for background texture loading.

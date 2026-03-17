@@ -194,7 +194,9 @@ extension CanvasViewController {
         timeline.addClip(clip)
 
         if clip.motionPath != nil {
-            showMotionPath(for: clip)
+            // FIX: defer by one frame so the alert dismiss animation gets a clean
+            // render pass before RealityKit builds 32+ mesh entities for the path.
+            showMotionPathDeferred(for: clip)
         }
 
         // Show rotation arc for any rotation clip (camera or regular entity)
