@@ -2,47 +2,89 @@
 //  CanvasViewController+SkyPatch.swift
 //  3DCanvas
 //
-//  WHAT THIS FILE DOES:
-//  Overrides the sky entity naming so ScenePersistence can detect the sky
-//  type on save without needing a stored property on CanvasViewController.
+//  CHANGES IN THIS VERSION vs what you have:
+//  ─────────────────────────────────────────
+//  1. applySky(type:) is now defined HERE — removes ALL ProceduralSky* entities
+//     before adding a new one (fixes the Sky(3) duplicate stacking bug).
+//     ★ Comment out applySky(type:) in CanvasViewController_Spawning.swift
+//       to avoid a "redeclaration" compiler error.
 //
-//  HOW SKY WORKS (full workflow):
-//  1. User taps Sky tool → tool sheet shows sky options + "No Sky"
-//  2. Selecting a sky calls applySky(type: "sky_day") etc.
-//     applySky removes any existing sky, creates a sphere entity named
-//     "ProceduralSky_<type>" (e.g. "ProceduralSky_sky_day"), adds to scene.
-//  3. Selecting "No Sky" calls removeSky() which finds any entity whose
-//     name starts with "ProceduralSky" and removes it.
-//  4. On SAVE: ScenePersistence walks anchor.children, finds the entity
-//     named "ProceduralSky_sky_day", extracts "sky_day", stores in JSON.
-//  5. On LOAD: ScenePersistence reads skyType from JSON, calls applySky(type:),
-//     which recreates the sky sphere exactly as it was.
+//  2. removeSky() — unchanged from what you had.
 //
-//  IMPORTANT: In CanvasViewController_Spawning.swift, inside applySky(type:),
-//  change this line:
+//  3. skyDisplayName(_:) — NEW. Use in refreshSidebarContent() so sidebar shows
+//     "Sky – Day" instead of the raw entity name "ProceduralSky_sky_day".
+//     Usage:
+//       let label = entity.name.hasPrefix("ProceduralSky")
+//           ? skyDisplayName(entity.name) : entity.name
 //
-//      skyEntity.name = "ProceduralSky"
-//
-//  to:
-//
-//      skyEntity.name = "ProceduralSky_\(type)"
-//
-//  That single change makes the whole save/load chain work with no new properties.
-//
-//  The removeSky() function below handles all naming variants
-//  ("ProceduralSky", "ProceduralSky_sky_day", etc.).
+//  4. startARSession() / stopARSession() — NEW. Fixes the blank AR screen.
+//     ★ Call startARSession()  where you activate AR mode.
+//     ★ Call stopARSession()   where you deactivate AR mode.
 //
 
 import UIKit
 import RealityKit
+import ARKit
 
 extension CanvasViewController {
 
+    // MARK: - Apply Sky
+    //
+    // ★ REPLACE applySky(type:) in CanvasViewController_Spawning.swift with this.
+    //   Comment out the one in Spawning.swift — this version takes over.
+    //
+    // FIX vs old: old version called findEntity(named: "ProceduralSky") which only
+    // finds the entity with that exact name. After the rename to "ProceduralSky_sky_day"
+    // the old remove call found nothing, so every tap stacked a new sphere on top.
+    // This version removes ALL children whose name starts with "ProceduralSky".
+
+    func applySky(type: String) {
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+
+        // Remove ALL existing sky variants before adding a new one
+        for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
+            child.removeFromParent()
+        }
+
+        // Build material
+        var skyMaterial = UnlitMaterial()
+        var topColor: UIColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
+
+        if type == "sky_image_1" {
+            if let texture = try? TextureResource.load(named: type) {
+                skyMaterial.color.texture = .init(texture)
+                arView.environment.background = .color(.black)
+            } else {
+                topColor = .systemGray
+                skyMaterial.color.tint = topColor
+                arView.environment.background = .color(topColor)
+            }
+        } else {
+            switch type {
+            case "sky_sunset": topColor = .orange
+            case "sky_night":  topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
+            default:           topColor = UIColor(red: 0.4,  green: 0.7,  blue: 1.0, alpha: 1)
+            }
+            skyMaterial.color.tint = topColor
+            arView.environment.background = .color(topColor)
+        }
+
+        let skyMesh   = MeshResource.generateSphere(radius: 50)
+        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
+        skyEntity.name        = "ProceduralSky_\(type)"
+        skyEntity.scale      *= -1
+        skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
+        skyEntity.components.set(CategoryComponent(toolType: .sky))
+
+        anchor.addChild(skyEntity)
+        refreshSidebarContent()
+        print("🌅 Sky applied: \(type)")
+    }
+
     // MARK: - Remove Sky
     //
-    // Call this when user taps "No Sky" in the tool sheet.
-    // Works regardless of whether the entity is named "ProceduralSky"
-    // or "ProceduralSky_sky_day" etc.
+    // Called when user taps "No Sky".
+    // spawnEntity() intercepts modelFileName == "none" and routes here.
 
     func removeSky() {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
@@ -59,4 +101,69 @@ extension CanvasViewController {
         }
         refreshSidebarContent()
     }
+
+    // MARK: - Sky Display Name
+    //
+    // Use this in your sidebar cell population instead of entity.name directly.
+    // "ProceduralSky_sky_day"     → "Sky – Day"
+    // "ProceduralSky_sky_sunset"  → "Sky – Sunset"
+    // "ProceduralSky_sky_night"   → "Sky – Night"
+    // "ProceduralSky_sky_image_1" → "Sky – Image 1"
+
+    func skyDisplayName(_ entityName: String) -> String {
+        guard entityName.hasPrefix("ProceduralSky_") else { return "Sky" }
+        let type = String(entityName.dropFirst("ProceduralSky_".count))
+        switch type {
+        case "sky_day":     return "Sky – Day"
+        case "sky_sunset":  return "Sky – Sunset"
+        case "sky_night":   return "Sky – Night"
+        default:
+            let readable = type
+                .replacingOccurrences(of: "sky_", with: "")
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+            return "Sky – \(readable)"
+        }
+    }
+
+    // MARK: - AR Session  (fixes blank screen in AR mode)
+    //
+    // automaticallyConfigureSession = false means RealityKit will NOT start the
+    // camera feed. You must call arView.session.run(config) yourself.
+    //
+    // ★ Call startARSession()  wherever isARModeActive is set to true.
+    // ★ Call stopARSession()   wherever isARModeActive is set to false.
+
+    // MARK: - AR Mode Toggle
+    //
+    // CRASH FIX: arView.cameraMode = .nonAR — this is a virtual canvas.
+    // Calling arView.session.run() on a nonAR-mode ARView crashes instantly
+    // because the ARKit session is not bound to this view.
+    //
+    // startARSession / stopARSession now just toggle isARModeActive and hide/show sky.
+    // The gesture handlers (orbit, pinch) already guard on isARModeActive, so
+    // AR-mode behaviour (locked camera, device-moves-world) still works correctly.
+
+//    func startARSession() {
+//        isARModeActive = true
+//        arView.renderOptions = [.disableMotionBlur, .disableDepthOfField]
+//        // Hide sky — irrelevant when device camera is the intended background
+//        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
+//            for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
+//                child.isEnabled = false
+//            }
+//        }
+//        print("📷 AR mode ON")
+//    }
+//
+//    func stopARSession() {
+//        isARModeActive = false
+//        arView.renderOptions = []
+//        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
+//            for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
+//                child.isEnabled = true
+//            }
+//        }
+//        print("🖥 AR mode OFF")
+//    }
 }

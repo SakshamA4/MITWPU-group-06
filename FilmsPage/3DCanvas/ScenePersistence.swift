@@ -100,6 +100,7 @@ struct CanvasSceneDocument: Codable {
     var cameraTargetZ: Float
     // nil = no sky; "sky_day" / "sky_sunset" / "sky_night" / "sky_image_1"
     var skyType: String?
+    var baseTransforms: [String: CodableTransform]
 }
 
 // MARK: - ScenePersistenceService
@@ -187,8 +188,10 @@ final class ScenePersistenceService {
         completion: ((Bool) -> Void)? = nil
     ) {
         assert(Thread.isMainThread, "save() must be called from the main thread")
-
-        guard let anchor = vc.mainAnchor else {
+        // Reset all entities to rest pose before saving transforms
+        let savedBaseTransforms = vc.baseTransforms.mapValues { CodableTransform($0) }
+        vc.evaluateTimeline(at: 0)
+        guard let anchor = vc.arView.scene.findEntity(named: "MainAnchor") else {
             completion?(false)
             return
         }
@@ -213,6 +216,7 @@ final class ScenePersistenceService {
         for entity in anchor.children {
             let eName = entity.name
             guard !skipNames.contains(eName),
+                  !eName.hasPrefix("ProceduralSky"),
                   !eName.isEmpty,
                   !eName.hasPrefix("PathRoot_"),
                   !eName.hasPrefix("Gizmo_"),
@@ -354,12 +358,12 @@ final class ScenePersistenceService {
             entities:          entityRecords,
             animationClips:    clipRecords,
             backgroundCounter: vc.backgroundCounter,
-            cameraYaw:         vc.yaw,
-            cameraPitch:       vc.pitch,
-            cameraDistance:    vc.distance,
-            cameraTargetX:     vc.cameraTarget.x,
-            cameraTargetY:     vc.cameraTarget.y,
-            cameraTargetZ:     vc.cameraTarget.z
+            cameraYaw: vc.yaw, cameraPitch: vc.pitch, cameraDistance: vc.distance,
+            cameraTargetX: vc.cameraTarget.x,
+            cameraTargetY: vc.cameraTarget.y,
+            cameraTargetZ: vc.cameraTarget.z,
+            skyType: savedSkyType,
+            baseTransforms: vc.baseTransforms.mapValues { CodableTransform($0) }
         )
 
         let jsonURL = sceneFileURL(for: sceneID)

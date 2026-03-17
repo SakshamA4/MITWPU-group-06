@@ -649,7 +649,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
 
         if toolType == .sky {
-            applySky(type: item.modelFileName)
+            if item.modelFileName == "none" {
+                removeSky()
+            } else {
+                applySky(type: item.modelFileName)
+            }
             return
         }
 
