@@ -355,6 +355,9 @@ extension CanvasViewController {
         }
         showAllMotionPaths()
         hideExitCameraButton()
+        // Restore gizmos in editor view
+        gizmoRoot?.isEnabled = true
+        rotationGizmo?.isEnabled = true
     }
 
     func setActiveCamera(_ camera: PerspectiveCamera) {
@@ -373,6 +376,9 @@ extension CanvasViewController {
                 if !(child is PerspectiveCamera) { child.isEnabled = false }
             }
         }
+        // Hide gizmos — they obstruct the camera preview
+        gizmoRoot?.isEnabled = false
+        rotationGizmo?.isEnabled = false
         hideAllMotionPaths()
         showExitCameraButton()
     }
@@ -449,12 +455,15 @@ extension CanvasViewController {
         let previewAnchor = AnchorEntity(world: .zero)
         previewAnchor.name = "PreviewAnchor"
 
-        // Copy only non-camera scene entities (props, characters, backgrounds)
+        // Copy only renderable scene entities — exclude everything that is
+        // editor UI (cameras, gizmos, motion paths, rotation arcs, grid)
         if let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
             for child in mainAnchor.children {
-                // Skip camera roots — they contain the USDZ visual that crashes Metal
                 guard child.components[CategoryComponent.self]?.toolType != .camera,
                       !child.name.hasPrefix("SceneCameraRoot_"),
+                      !child.name.hasPrefix("GizmoRoot"),
+                      !child.name.hasPrefix("PathRoot_"),
+                      !child.name.hasPrefix("RotationArc_"),
                       child.name != "Grid",
                       child.name != "EditorCamera" else { continue }
                 previewAnchor.addChild(child.clone(recursive: true))
