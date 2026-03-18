@@ -397,7 +397,7 @@ extension CanvasViewController {
         pathEditToolbar = container
     }
 
-    // ── Rotation editor: axis picker + unbounded degrees ─────────────────────
+    // ── Rotation editor: single card with degrees + axis ─────────────────────
 
     func presentRotationAnglesEditor(clipID: UUID) {
         guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
@@ -405,41 +405,16 @@ extension CanvasViewController {
         let axis     = RotationPathRenderer.axisOf(clip)
         let totalDeg = RotationPathRenderer.totalRadiansOf(clip) * 180 / .pi
 
-        let alert = UIAlertController(
-            title:   "Edit Rotation",
-            message: "Positive = counter-clockwise, negative = clockwise.\nValues beyond ±180° supported (e.g. 540 = 1.5 turns).",
-            preferredStyle: .alert
-        )
-        alert.addTextField { f in
-            f.placeholder  = "Degrees (e.g. 270, -360, 540)"
-            f.keyboardType = .numbersAndPunctuation
-            f.text         = String(format: "%.0f", totalDeg)
+        let card = AnimationInputCard(mode: .editRotate(currentDegrees: totalDeg,
+                                                        currentAxis:    axis))
+        card.onConfirm = { [weak self] _, _, degrees, chosenAxis in
+            guard let self else { return }
+            self.applyRotationEdit(clipIdx:      clipIdx,
+                                   clipID:       clipID,
+                                   axis:         chosenAxis,
+                                   totalRadians: degrees * (.pi / 180))
         }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Choose Axis →", style: .default) { [weak self] _ in
-            guard let self,
-                  let text = alert.textFields?.first?.text,
-                  let deg  = Float(text) else { return }
-            self.presentAxisPicker(clipID: clipID, clipIdx: clipIdx,
-                                   totalRadians: deg * (.pi / 180), currentAxis: axis)
-        })
-        present(alert, animated: true)
-    }
-
-    private func presentAxisPicker(clipID: UUID, clipIdx: Int,
-                                    totalRadians: Float, currentAxis: RotationAxis) {
-        let picker = UIAlertController(title: "Rotation Axis",
-                                       message: "Which axis should the entity rotate around?",
-                                       preferredStyle: .actionSheet)
-        for opt in RotationAxis.allCases {
-            let check = opt == currentAxis ? " ✓" : ""
-            picker.addAction(UIAlertAction(title: "\(opt.rawValue)-axis\(check)", style: .default) { [weak self] _ in
-                self?.applyRotationEdit(clipIdx: clipIdx, clipID: clipID,
-                                        axis: opt, totalRadians: totalRadians)
-            })
-        }
-        picker.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        present(picker, animated: true)
+        present(card, animated: false)
     }
 
     func applyRotationEdit(clipIdx: Int, clipID: UUID,

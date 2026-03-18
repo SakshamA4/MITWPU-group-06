@@ -6,7 +6,6 @@ import ARKit
 
 extension CanvasViewController {
 
-    
     func setupAnimationPanel() {
         animationPanel = UIStackView()
         animationPanel.axis = .horizontal
@@ -15,35 +14,24 @@ extension CanvasViewController {
         animationPanel.distribution = .fillEqually
         animationPanel.translatesAutoresizingMaskIntoConstraints = false
         animationPanel.alpha = 0
-        
-        let moveBtn = makeAnimButton(
-            title: "Move",
-            action: #selector(animateMove)
-        )
-        let rotateBtn = makeAnimButton(
-            title: "Rotate",
-            action: #selector(animateRotate)
-        )
-        
+
+        let moveBtn   = makeAnimButton(title: "Move",   action: #selector(animateMove))
+        let rotateBtn = makeAnimButton(title: "Rotate", action: #selector(animateRotate))
+
         animationPanel.addArrangedSubview(moveBtn)
         animationPanel.addArrangedSubview(rotateBtn)
-        
+
         view.addSubview(animationPanel)
-        
+
         NSLayoutConstraint.activate([
-            animationPanel.centerXAnchor.constraint(
-                equalTo: view.centerXAnchor
-            ),
+            animationPanel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             animationPanel.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -90
-            ),
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -90),
             animationPanel.heightAnchor.constraint(equalToConstant: 44),
             animationPanel.widthAnchor.constraint(equalToConstant: 220),
         ])
     }
 
-    
     func makeAnimButton(title: String, action: Selector) -> UIButton {
         let btn = UIButton(type: .system)
         btn.setTitle(title, for: .normal)
@@ -54,100 +42,56 @@ extension CanvasViewController {
         return btn
     }
 
-    
     func showAnimationPanel() {
-        UIView.animate(withDuration: 0.2) {
-            self.animationPanel.alpha = 1
-        }
+        UIView.animate(withDuration: 0.2) { self.animationPanel.alpha = 1 }
     }
 
-    
     func hideAnimationPanel() {
-        UIView.animate(withDuration: 0.2) {
-            self.animationPanel?.alpha = 0
-        }
+        UIView.animate(withDuration: 0.2) { self.animationPanel?.alpha = 0 }
     }
 
-    
-    @objc func animateMove() {
-        presentAnimationPrompt(type: .move)
-    }
+    @objc func animateMove()   { presentAnimationPrompt(type: .move) }
+    @objc func animateRotate() { presentAnimationPrompt(type: .rotate) }
 
-    
-    @objc func animateRotate() {
-        presentAnimationPrompt(type: .rotate)
-    }
+    // ── Present the input card ────────────────────────────────────────────────
 
-    
     func presentAnimationPrompt(type: AnimationType) {
-        guard editorMode == .edit else { return }
-        guard let entity = selectedEntity else { return }
+        guard editorMode == .edit, let entity = selectedEntity else { return }
 
-        let title = "Add \(type.rawValue.capitalized) Animation"
-        let alert = UIAlertController(
-            title: title,
-            message: "Enter animation parameters",
-            preferredStyle: .alert
-        )
+        let cardMode: AnimationCardMode = type == .move ? .addMove : .addRotate
+        let card = AnimationInputCard(mode: cardMode)
 
-        alert.addTextField { field in
-            field.placeholder = "Start Time (e.g. 0.0)"
-            field.keyboardType = .decimalPad
-            field.text = "0.0"
-        }
-        alert.addTextField { field in
-            field.placeholder = "Duration (e.g. 1.0)"
-            field.keyboardType = .decimalPad
-            field.text = "1.0"
+        card.onConfirm = { [weak self] startTime, duration, degrees, axis in
+            guard let self else { return }
+            self.handleAnimationConfirm(
+                type:      type,
+                entity:    entity,
+                startTime: startTime,
+                duration:  duration,
+                degrees:   degrees,
+                axis:      axis
+            )
         }
 
-        // For rotate: add a rotation amount field in degrees
-        if type == .rotate {
-            alert.addTextField { field in
-                field.placeholder = "Rotation Amount in degrees (e.g. 90)"
-                field.keyboardType = .decimalPad
-                field.text = "90"
-            }
-        }
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(
-            UIAlertAction(title: "Add to Timeline", style: .default) { [weak self] _ in
-                self?.handleAnimationPromptConfirm(type: type, entity: entity, alert: alert)
-            }
-        )
-        present(alert, animated: true)
+        present(card, animated: false)
     }
 
+    // ── Confirm handler ───────────────────────────────────────────────────────
 
-    
-    func handleAnimationPromptConfirm(
-        type: AnimationType,
-        entity: Entity,
-        alert: UIAlertController
+    func handleAnimationConfirm(
+        type:      AnimationType,
+        entity:    Entity,
+        startTime: Float,
+        duration:  Float,
+        degrees:   Float,
+        axis:      RotationAxis
     ) {
-        guard
-            let startText    = alert.textFields?[0].text,
-            let durationText = alert.textFields?[1].text,
-            let startTime    = Float(startText),
-            let duration     = Float(durationText),
-            duration > 0
-        else { return }
-
-        // Read optional rotation degrees from third field (rotate type only)
-        let rotationDegrees: Float
-        if type == .rotate,
-           let degText = alert.textFields?[2].text,
-           let deg = Float(degText) {
-            rotationDegrees = deg
-        } else {
-            rotationDegrees = 90
-        }
+        guard duration > 0 else { return }
 
         let easing: EasingType = .easeInOut
-        var track:      AnimationTrack
-        var fromValue = SIMD3<Float>.zero
-        var toValue   = SIMD3<Float>.zero
+        var track:     AnimationTrack
+        var fromValue  = SIMD3<Float>.zero
+        var toValue    = SIMD3<Float>.zero
         var motionPath: BezierMotionPath? = nil
 
         switch type {
@@ -157,8 +101,8 @@ extension CanvasViewController {
             if baseTransforms[entity.name] == nil {
                 baseTransforms[entity.name] = entity.transform
             }
-            let evaluatedTransform = evaluateEntityTransform(entityName: entity.name, at: startTime)
-            let start = evaluatedTransform.translation
+            let evaluated = evaluateEntityTransform(entityName: entity.name, at: startTime)
+            let start = evaluated.translation
             let end   = start + SIMD3<Float>(2, 0, 0)
             motionPath = BezierMotionPath(
                 start:    start,
@@ -169,10 +113,9 @@ extension CanvasViewController {
 
         case .rotate:
             track     = .rotation
-            // New model: fromValue = rotation axis (unit vector), toValue.x = totalRadians
-            // Default axis is Y; user can change it via long-press → Edit Rotation after clip is added.
-            fromValue = RotationAxis.y.simdAxis                          // axis vector (0,1,0)
-            toValue   = SIMD3<Float>(rotationDegrees * (.pi / 180), 0, 0) // totalRadians in .x
+            // fromValue = normalised rotation axis, toValue.x = total radians (unbounded)
+            fromValue = axis.simdAxis
+            toValue   = SIMD3<Float>(degrees * (.pi / 180), 0, 0)
         }
 
         if baseTransforms[entity.name] == nil {
@@ -196,17 +139,34 @@ extension CanvasViewController {
         if clip.motionPath != nil {
             showMotionPath(for: clip)
         }
-
-        // Show rotation arc for any rotation clip (camera or regular entity)
         if clip.track == .rotation {
             showRotationArc(for: clip, on: entity)
         }
 
-        // Always return to move mode after adding any animation clip so
-        // rotation rings don't auto-appear on the next entity tap.
         interactionMode = .move
-
         debugPrintTimeline()
     }
 
+    // ── Legacy shim — kept for any surviving call sites ───────────────────────
+
+    func handleAnimationPromptConfirm(
+        type:   AnimationType,
+        entity: Entity,
+        alert:  UIAlertController
+    ) {
+        guard
+            let s = alert.textFields?[0].text, let startTime = Float(s),
+            let d = alert.textFields?[1].text, let duration  = Float(d),
+            duration > 0
+        else { return }
+
+        let degrees: Float
+        if type == .rotate,
+           let t = alert.textFields?[2].text, let deg = Float(t) { degrees = deg }
+        else { degrees = 90 }
+
+        handleAnimationConfirm(type: type, entity: entity,
+                                startTime: startTime, duration: duration,
+                                degrees: degrees, axis: .y)
+    }
 }
