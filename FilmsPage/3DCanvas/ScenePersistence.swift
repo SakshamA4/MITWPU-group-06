@@ -262,9 +262,10 @@ final class ScenePersistenceService {
 
                     if let image    = imageToSave,
                        let jpegData = image.jpegData(compressionQuality: 0.9) {
-                        let filename = bgImageFilename(entityName: entity.name, sceneID: sceneID)
-                        bgImagePayloads.append((filename, jpegData))
-                        backgroundImagePath = filename
+                         let filename = bgImageFilename(entityName: entity.name, sceneID: sceneID)
+                         bgImagePayloads.append((filename, jpegData))
+                         backgroundImagePath = filename
+                         print("💾 Saving background image for '\(entity.name)': \(filename) (size: \(jpegData.count) bytes)")
 
                         // Keep BackgroundComponent.cachedImage in sync so future paths
                         // that read the component directly also find the image.
@@ -720,13 +721,21 @@ final class ScenePersistenceService {
             // then fall back to backgroundImageCache (populated by a previous session's
             // applyBackgroundImage call — covers the case where an old save had no
             // backgroundImagePath but the VC cache was seeded from a prior load).
-            let loadedFromDisk: UIImage? = {
-                if let filename = record.backgroundImagePath {
-                    let imgURL = documentsDirectory.appendingPathComponent(filename)
-                    return UIImage(contentsOfFile: imgURL.path)
-                }
-                return nil
-            }()
+             let loadedFromDisk: UIImage? = {
+                 if let filename = record.backgroundImagePath {
+                     let imgURL = documentsDirectory.appendingPathComponent(filename)
+                     print("🔍 Attempting to load background from: \(imgURL.path)")
+                     if let image = UIImage(contentsOfFile: imgURL.path) {
+                         print("✅ Successfully loaded background image from disk: \(filename)")
+                         return image
+                     } else {
+                         print("❌ Failed to load background image from disk: \(filename)")
+                         print("   File exists: \(FileManager.default.fileExists(atPath: imgURL.path))")
+                         return nil
+                     }
+                 }
+                 return nil
+             }()
 
             // Fall back to VC-level cache for entities whose JPEG path was never saved
             // (pre-fix scenes) but whose image is still in memory from this session.
@@ -737,18 +746,19 @@ final class ScenePersistenceService {
                 // so that save() can still extract the JPEG data on the next save.
                 vc.backgroundImageCache[record.name] = image
 
-                do {
-                    // sRGBCGImage() always re-renders through a Device-RGB context —
-                    // this ensures P3/wide-gamut images from Photos or camera roll are
-                    // safe to pass to TextureResource (which rejects non-sRGB data).
-                    let safeCG = image.sRGBCGImage()
-                    let texture = try await TextureResource(
-                        image:   safeCG,
-                        options: .init(semantic: .color)
-                    )
-                    material.color.texture = .init(texture)
-                    restoredImage = image
-                    print("✅ Background texture restored: \(record.name)")
+                 do {
+                     // sRGBCGImage() always re-renders through a Device-RGB context —
+                     // this ensures P3/wide-gamut images from Photos or camera roll are
+                     // safe to pass to TextureResource (which rejects non-sRGB data).
+                     print("🔄 Converting image to sRGB and creating texture for '\(record.name)'...")
+                     let safeCG = image.sRGBCGImage()
+                     let texture = try await TextureResource(
+                         image:   safeCG,
+                         options: .init(semantic: .color)
+                     )
+                     material.color.texture = .init(texture)
+                     restoredImage = image
+                     print("✅ Background texture restored: \(record.name)")
                 } catch {
                     // Texture upload failed — show a magenta placeholder so the user
                     // can see the entity exists and try again.
@@ -782,6 +792,7 @@ final class ScenePersistenceService {
             ))
             e.components.set(CategoryComponent(toolType: .background))
             e.components.set(InputTargetComponent())
+            e.generateCollisionShapes(recursive: true)
             e.transform = t
             anchor.addChild(e)
             return

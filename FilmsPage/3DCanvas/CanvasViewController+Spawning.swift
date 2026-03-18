@@ -126,12 +126,11 @@ extension CanvasViewController {
 
                 plane.generateCollisionShapes(recursive: true)
                 plane.components.set(InputTargetComponent())
-                plane.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
+                plane.orientation = simd_quatf(angle: .pi, axis: [0, 0, 1])  // 180° rotation around Z to flip texture vertically
+                plane.components.set(CategoryComponent(toolType: .background))
 
                 let offset = Float(backgroundCounter) * 0.1
                 plane.position = [offset, height / 2, -2.1 - offset]
-
-                plane.components.set(CategoryComponent(toolType: .background))
 
                 anchor.addChild(plane)
                 backgroundPlane = plane

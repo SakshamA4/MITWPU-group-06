@@ -270,14 +270,18 @@ final class ShotPlayerViewController: UIViewController {
         if playAll { startPlayback() }
     }
 
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        stopPlayback()
-        // BUG FIX: Clean up the offscreen preview clone so it doesn't affect the live scene
-        // Note: arView is weak, so we don't need to nullify it on pop
-        // Reset timeline to t=0 so entities return to initial state
-        evaluateTimeline?(0)
-    }
+     override func viewWillDisappear(_ animated: Bool) {
+         super.viewWillDisappear(animated)
+         stopPlayback()
+         // BUG FIX: Clean up the offscreen preview clone so it doesn't affect the live scene
+         // Note: arView is weak, so we don't need to nullify it on pop
+         // Reset timeline to t=0 so entities return to initial state
+         evaluateTimeline?(0)
+         
+         // Memory cleanup: release cached image to avoid memory pressure
+         frameImageView.image = nil
+         snapshotInFlight = nil
+     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
@@ -374,6 +378,13 @@ final class ShotPlayerViewController: UIViewController {
         fillW.isActive = true
         progressFillWidthConstraint = fillW
 
+        // Determine if iPad or iPhone
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let controlPanelHeight: CGFloat = isIPad ? 100 : 84
+        let buttonSize: CGFloat = isIPad ? 56 : 50
+        let playButtonSize: CGFloat = isIPad ? 62 : 50
+        let buttonSpacing: CGFloat = isIPad ? 36 : 28
+
         NSLayoutConstraint.activate([
 
             // ── Frame view ──────────────────────────────────────────────
@@ -447,21 +458,21 @@ final class ShotPlayerViewController: UIViewController {
             controlsPanel.topAnchor.constraint(equalTo: sep1.bottomAnchor),
             controlsPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlsPanel.heightAnchor.constraint(equalToConstant: 84),
+            controlsPanel.heightAnchor.constraint(equalToConstant: controlPanelHeight),
 
             shotInfoLbl.topAnchor.constraint(equalTo: controlsPanel.topAnchor, constant: 12),
             shotInfoLbl.centerXAnchor.constraint(equalTo: controlsPanel.centerXAnchor),
 
-            btnStack.topAnchor.constraint(equalTo: shotInfoLbl.bottomAnchor, constant: 6),
+            btnStack.topAnchor.constraint(equalTo: shotInfoLbl.bottomAnchor, constant: isIPad ? 10 : 6),
             btnStack.centerXAnchor.constraint(equalTo: controlsPanel.centerXAnchor),
             btnStack.bottomAnchor.constraint(lessThanOrEqualTo: controlsPanel.bottomAnchor, constant: -10),
 
-            prevBtn.widthAnchor.constraint(equalToConstant: 40),
-            prevBtn.heightAnchor.constraint(equalToConstant: 40),
-            playBtn.widthAnchor.constraint(equalToConstant: 50),
-            playBtn.heightAnchor.constraint(equalToConstant: 50),
-            nextBtn.widthAnchor.constraint(equalToConstant: 40),
-            nextBtn.heightAnchor.constraint(equalToConstant: 40),
+            prevBtn.widthAnchor.constraint(equalToConstant: buttonSize),
+            prevBtn.heightAnchor.constraint(equalToConstant: buttonSize),
+            playBtn.widthAnchor.constraint(equalToConstant: playButtonSize),
+            playBtn.heightAnchor.constraint(equalToConstant: playButtonSize),
+            nextBtn.widthAnchor.constraint(equalToConstant: buttonSize),
+            nextBtn.heightAnchor.constraint(equalToConstant: buttonSize),
 
             // ── Separator 2 (controls / strip) ───────────────────────────
             sep2.topAnchor.constraint(equalTo: controlsPanel.bottomAnchor),
@@ -532,70 +543,63 @@ final class ShotPlayerViewController: UIViewController {
     //   3. Calls snapshot() on the offscreen view (live view untouched)
     //   4. Returns the UIImage via completion
 
-     private func captureFrame(at masterTime: Float, force: Bool = false) {
-         // Always scrub scene entities to the correct time
-         evaluateTimeline?(masterTime)
+      private func captureFrame(at masterTime: Float, force: Bool = false) {
+          // Always scrub scene entities to the correct time
+          evaluateTimeline?(masterTime)
 
-         // FIX: Display any snapshot that arrived and clear the flag
-         if let inFlightImage = snapshotInFlight {
-             print("🖼️ displaying captured frame (was waiting)")
-             frameImageView.image = inFlightImage
-             framePlaceholder.isHidden = true
-             snapshotInFlight = nil
-             loadingSpinner.stopAnimating()
-         }
+          // FIX: Display any snapshot that arrived and clear the flag
+          if let inFlightImage = snapshotInFlight {
+              frameImageView.image = inFlightImage
+              framePlaceholder.isHidden = true
+              snapshotInFlight = nil
+              loadingSpinner.stopAnimating()
+          }
 
-         let now = CACurrentMediaTime()
-         // FIX: Rate-limit snapshots to avoid saturating the snapshot queue
-         // During playback: capture at 24fps (1 frame every ~0.04s)
-         // When scrubbing: force=true to capture immediately
-         let minInterval: CFTimeInterval = isPlaying ? 1.0/24.0 : 0.0
-         guard (force || (now - lastSnapshotTime) >= minInterval) else {
-             print("⏭️ skipped frame capture (rate limited)")
-             return
-         }
+          let now = CACurrentMediaTime()
+          // FIX: Rate-limit snapshots to avoid saturating the snapshot queue
+          // During playback: capture at 24fps (1 frame every ~0.04s)
+          // When scrubbing: force=true to capture immediately
+          let minInterval: CFTimeInterval = isPlaying ? 1.0/24.0 : 0.0
+          guard (force || (now - lastSnapshotTime) >= minInterval) else {
+              return
+          }
 
-         // Don't queue another snapshot if one is already pending
-         guard !snapshotPending else {
-             print("⏳ snapshot pending, skipping request")
-             return
-         }
+          // Don't queue another snapshot if one is already pending
+          guard !snapshotPending else {
+              return
+          }
 
-         lastSnapshotTime = now
+          lastSnapshotTime = now
 
-         if !isPlaying { loadingSpinner.startAnimating() }
+          if !isPlaying { loadingSpinner.startAnimating() }
 
-         // Resolve the matching SceneCameraItem for this shot
-         let camItem = cameraItem(for: currentShot)
-         print("📷 captureFrame called: masterTime=\(String(format: "%.2f", masterTime))s, camera=\(currentShot.cameraName), camItemFound=\(camItem != nil)")
+          // Resolve the matching SceneCameraItem for this shot
+          let camItem = cameraItem(for: currentShot)
 
-         snapshotPending = true
+          snapshotPending = true
 
-         let doCapture: (@escaping (UIImage?) -> Void) -> Void
-         if let capture = captureFrameAsync {
-             doCapture = { cb in capture(camItem, cb) }
-         } else {
-             doCapture = { [weak self] cb in
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
-                     self?.arView?.snapshot(saveToHDR: false, completion: cb)
-                 }
-             }
-         }
+          let doCapture: (@escaping (UIImage?) -> Void) -> Void
+          if let capture = captureFrameAsync {
+              doCapture = { cb in capture(camItem, cb) }
+          } else {
+              doCapture = { [weak self] cb in
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                      self?.arView?.snapshot(saveToHDR: false, completion: cb)
+                  }
+              }
+          }
 
-         doCapture { [weak self] img in
-             DispatchQueue.main.async {
-                 guard let self = self else { return }
-                 // FIX: Always store result in snapshotInFlight, never deadlock
-                 if let img = img {
-                     print("✅ snapshot received, size=\(img.size)")
-                     self.snapshotInFlight = img
-                 } else {
-                     print("⚠️ snapshot returned nil")
-                 }
-                 self.snapshotPending = false
-             }
-         }
-     }
+          doCapture { [weak self] img in
+              DispatchQueue.main.async {
+                  guard let self = self else { return }
+                  // FIX: Always store result in snapshotInFlight, never deadlock
+                  if let img = img {
+                      self.snapshotInFlight = img
+                  }
+                  self.snapshotPending = false
+              }
+          }
+      }
 
     /// Resolves the SceneCameraItem for a given Shot using 4-tier fallback.
     /// Tier 1: Exact name match
@@ -618,7 +622,6 @@ final class ShotPlayerViewController: UIViewController {
          stopPlayback()
          isPlaying = true
          playStart = CACurrentMediaTime() - CFTimeInterval(currentTime)
-         print("▶️ playback started: shot=\(currentShot.displayName), startTime=\(String(format: "%.2f", currentShot.startTime))s, currentTime=\(String(format: "%.2f", currentTime))s, playAll=\(playAll)")
          updatePlayIcon()
          displayLink = CADisplayLink(target: self, selector: #selector(tick))
          displayLink?.add(to: .main, forMode: .common)
@@ -642,15 +645,12 @@ final class ShotPlayerViewController: UIViewController {
          currentTime = Float(CACurrentMediaTime() - playStart)
          let duration = currentShot.duration
 
-         print("🎬 tick: currentTime=\(String(format: "%.2f", currentTime))s, shot=\(currentShot.displayName), duration=\(String(format: "%.2f", duration))s, inFlightImage=\(snapshotInFlight != nil)")
-
          if currentTime >= duration {
              if playAll && currentIndex < shots.count - 1 {
                  let fromName = currentShot.displayName
                  currentIndex += 1
                  currentTime  = 0
                  playStart    = CACurrentMediaTime()
-                 print("✂️ cut from \(fromName) to \(currentShot.displayName)")
                  syncToCurrentShot()
                  // Cut flash
                  cutFlashLbl.text = "  \(fromName)  →  \(currentShot.displayName)  "
@@ -660,7 +660,6 @@ final class ShotPlayerViewController: UIViewController {
                  return
              } else {
                  currentTime = duration
-                 print("⏹️ playback ended")
                  stopPlayback()
              }
          }
@@ -685,7 +684,6 @@ final class ShotPlayerViewController: UIViewController {
 
          // Capture camera POV frame for the current shot
          let masterTime = currentShot.startTime + currentTime
-         print("📸 calling captureFrame at masterTime=\(String(format: "%.2f", masterTime))s")
          captureFrame(at: masterTime)
      }
 
