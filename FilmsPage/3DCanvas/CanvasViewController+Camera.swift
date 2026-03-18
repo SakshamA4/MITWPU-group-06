@@ -169,24 +169,25 @@ extension CanvasViewController {
     func panCameraTarget(translation: CGPoint) {
         guard !isARModeActive else { return }
 
-        // Camera right vector derived from yaw only — no pitch component —
-        // so horizontal panning stays level and doesn't drift up/down.
-        let cameraRight = SIMD3<Float>(
-             cos(yaw),   // x
-             0,          // y — intentionally zero to keep right vector horizontal
-            -sin(yaw)    // z
-        )
+        // Camera right vector (horizontal pan axis) — derived from yaw only so it
+        // stays perfectly level regardless of pitch.
+        let cameraRight = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
 
-        // World up is always +Y: vertical panning moves the pivot up/down.
-        let worldUp = SIMD3<Float>(0, 1, 0)
+        // Camera flat-forward (vertical pan axis) — the direction the camera is
+        // looking projected onto the XZ ground plane, so vertical drag moves the
+        // scene toward/away from the camera rather than changing altitude.
+        let cameraForward = simd_normalize(SIMD3<Float>(-sin(yaw), 0, -cos(yaw)))
 
-        // Scale panning speed with current zoom distance so it feels consistent
-        // whether the user is zoomed in tight or pulled back far.
+        // Scale with zoom distance for consistent feel at any distance
         let scale: Float = distance * 0.0015
 
-        // Screen +X → world right;  screen +Y → world down (invert Y for UIKit coords)
-        cameraTarget += cameraRight  *  Float(translation.x) * scale
-        cameraTarget += worldUp      * -Float(translation.y) * scale
+        // Horizontal drag: negate so scene slides in the finger's direction
+        // (positive screen X → scene moves right → target moves left)
+        cameraTarget -= cameraRight   *  Float(translation.x) * scale
+
+        // Vertical drag: positive screen Y (finger moves down) → scene moves
+        // toward the camera (forward), so negate Y to get expected feel
+        cameraTarget -= cameraForward * -Float(translation.y) * scale
 
         updateEditorCamera()
     }
