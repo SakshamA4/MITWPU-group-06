@@ -2,6 +2,7 @@ import PhotosUI
 import RealityKit
 import UIKit
 import ARKit
+import Combine
 
 extension CanvasViewController {
 
@@ -401,7 +402,10 @@ extension CanvasViewController {
         }
         let av = ARView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
         av.cameraMode = .nonAR
-        av.environment.background = .color(.black)
+        // Match the main arView's rendering settings so PBR materials are lit correctly
+        // and the background matches (white, like the main scene).
+        av.environment = arView.environment
+        av.renderOptions = arView.renderOptions
         objc_setAssociatedObject(self, &PreviewARViewKey.key, av, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         return av
     }
@@ -462,20 +466,37 @@ extension CanvasViewController {
             return
         }
 
-        pv.snapshot(saveToHDR: false) { [weak self] image in
-            guard let self = self else { return }
+        // Wait for one RealityKit render frame before snapshotting.
+        // Without this delay the off-screen ARView hasn't rendered any pixels yet
+        // and snapshot() returns a black image.
+        var token: AnyCancellable?
+        token = pv.scene.publisher(for: SceneEvents.Update.self)
+            .first()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                token = nil   // release the subscription
+                guard let self = self else { return }
+                pv.snapshot(saveToHDR: false) { [weak self] image in
+                    guard let self = self else { return }
 
-            if let image = image, index < self.sceneCameraItems.count {
-                self.sceneCameraItems[index].previewImage = image
-                let ip = IndexPath(item: index, section: 0)
-                self.cameraCollectionView?.reloadItems(at: [ip])
-            }
+                    if let image = image, index < self.sceneCameraItems.count {
+                        self.sceneCameraItems[index].previewImage = image
+                        // Update the visible cell directly — never call reloadItems here.
+                        // reloadItems triggers prepareForReuse which sets image = nil,
+                        // causing the cell to flash black on every timer tick.
+                        let ip = IndexPath(item: index, section: 0)
+                        let name = "Camera \(index + 1)"
+                        if let cell = self.cameraCollectionView?.cellForItem(at: ip) as? CameraPreviewCell {
+                            cell.updatePreview(image: image, name: name)
+                        }
+                    }
 
-            // Chain to the next camera after a small yield so the run loop can breathe.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.snapshotPreviewCamera(at: index + 1)
+                    // Chain to the next camera after a small yield so the run loop can breathe.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                        self?.snapshotPreviewCamera(at: index + 1)
+                    }
+                }
             }
-        }
     }
 
     // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
