@@ -80,77 +80,25 @@ extension CanvasViewController {
         guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
         let clip = timeline.clips[clipIndex]
 
-        let container = UIView()
-        container.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
-        container.layer.cornerRadius = 14
-        container.layer.shadowColor   = UIColor.black.cgColor
-        container.layer.shadowOpacity = 0.25
-        container.layer.shadowRadius  = 8
-        container.translatesAutoresizingMaskIntoConstraints = false
+        let card = AnimationInputCard(mode: .editMoveTiming(
+            currentStart:    clip.startTime,
+            currentDuration: clip.duration
+        ))
 
-        let startField = UITextField()
-        startField.borderStyle  = .roundedRect
-        startField.keyboardType = .decimalPad
-        startField.placeholder  = "Start Time"
-        startField.text         = String(format: "%.2f", clip.startTime)
-
-        let durationField = UITextField()
-        durationField.borderStyle  = .roundedRect
-        durationField.keyboardType = .decimalPad
-        durationField.placeholder  = "Duration"
-        durationField.text         = String(format: "%.2f", clip.duration)
-
-        let applyButton = UIButton(type: .system)
-        applyButton.setTitle("Apply", for: .normal)
-        applyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-
-        let stack = UIStackView(arrangedSubviews: [startField, durationField, applyButton])
-        stack.axis    = .vertical
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        container.addSubview(stack)
-        view.addSubview(container)
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
-            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
-            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
-            container.widthAnchor.constraint(equalToConstant: 220),
-        ])
-
-        applyButton.addAction(UIAction { [weak self] _ in
-            guard
-                let self,
-                let newStart    = Float(startField.text ?? ""),
-                let newDuration = Float(durationField.text ?? ""),
-                newDuration > 0
-            else { return }
+        card.onConfirm = { [weak self] newStart, newDuration, _, _ in
+            guard let self, newDuration > 0 else { return }
 
             let oldClip = self.timeline.clips[clipIndex]
-
-            // Build a candidate clip with the new timing (not yet committed)
             let candidateClip = AnimationClip(
-                entityName: oldClip.entityName,
-                type:       oldClip.type,
-                track:      oldClip.track,
-                easing:     oldClip.easing,
-                startTime:  newStart,
-                duration:   newDuration,
-                fromValue:  oldClip.fromValue,
-                toValue:    oldClip.toValue,
-                motionPath: oldClip.motionPath
+                preservingID: oldClip,
+                startTime:    newStart,
+                duration:     newDuration
             )
 
-            // Check for conflicts before committing
             if let conflictingClip = self.detectClipConflict(
-                editedClip: candidateClip,
+                editedClip:  candidateClip,
                 replacingID: oldClip.id
             ) {
-                self.pathEditToolbar?.removeFromSuperview()
                 self.presentClipConflictResolution(
                     editedClip:      candidateClip,
                     replacingID:     oldClip.id,
@@ -159,17 +107,15 @@ extension CanvasViewController {
                     originalEndTime: oldClip.startTime + oldClip.duration
                 )
             } else {
-                // No conflict — commit directly
                 self.commitClipTimingChange(
-                    newClip:    candidateClip,
-                    oldClipID:  oldClip.id,
-                    clipIndex:  clipIndex
+                    newClip:   candidateClip,
+                    oldClipID: oldClip.id,
+                    clipIndex: clipIndex
                 )
-                self.pathEditToolbar?.removeFromSuperview()
             }
-        }, for: .touchUpInside)
+        }
 
-        pathEditToolbar = container
+        present(card, animated: false)
     }
 
     func showPathContextMenu(clipID: UUID, pathRoot: Entity) {

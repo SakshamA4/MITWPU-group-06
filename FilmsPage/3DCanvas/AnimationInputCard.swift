@@ -1,11 +1,3 @@
-//
-//  AnimationCardMode.swift
-//  FilmsPage
-//
-//  Created by SDC-USER on 18/03/26.
-//
-
-
 import UIKit
 import RealityKit
 
@@ -26,7 +18,13 @@ import RealityKit
 enum AnimationCardMode {
     case addMove
     case addRotate
+    /// Degrees + axis only — no timing fields
     case editRotate(currentDegrees: Float, currentAxis: RotationAxis)
+    /// Full rotation clip editor: timing + degrees + axis in one card
+    case editRotateFull(currentStart: Float, currentDuration: Float,
+                        currentDegrees: Float, currentAxis: RotationAxis)
+    /// Edit timing for a move path clip
+    case editMoveTiming(currentStart: Float, currentDuration: Float)
 }
 
 final class AnimationInputCard: UIViewController {
@@ -61,7 +59,8 @@ final class AnimationInputCard: UIViewController {
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overFullScreen
         modalTransitionStyle   = .crossDissolve
-        if case .editRotate(_, let axis) = mode { selectedAxis = axis }
+        if case .editRotate(_, let axis)     = mode { selectedAxis = axis }
+        if case .editRotateFull(_, _, _, let axis) = mode { selectedAxis = axis }
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -233,6 +232,56 @@ final class AnimationInputCard: UIViewController {
             }
             axisPicker = ap
             stack.addArrangedSubview(ap)
+
+        case .editRotateFull(let start, let dur, let deg, let axis):
+            let sf = LabelledField(
+                label: "Start Time",
+                hint:  "seconds — when this rotation begins",
+                icon:  "clock",
+                value: String(format: "%.2f", start),
+                keyboard: .decimalPad)
+            let df = LabelledField(
+                label: "Duration",
+                hint:  "seconds — how long the rotation lasts",
+                icon:  "timer",
+                value: String(format: "%.2f", dur),
+                keyboard: .decimalPad)
+            let rf = LabelledField(
+                label: "Degrees",
+                hint:  "total rotation · positive = CCW · supports >360°",
+                icon:  "arrow.clockwise.circle",
+                value: String(format: "%.0f", deg),
+                keyboard: .numbersAndPunctuation)
+            startField    = sf
+            durationField = df
+            degreesField  = rf
+            selectedAxis  = axis
+            stack.addArrangedSubview(sf)
+            stack.addArrangedSubview(df)
+            stack.addArrangedSubview(rf)
+            let ap = AxisSegmentedControl(selected: axis) { [weak self] ax in
+                self?.selectedAxis = ax
+            }
+            axisPicker = ap
+            stack.addArrangedSubview(ap)
+
+        case .editMoveTiming(let start, let dur):
+            let sf = LabelledField(
+                label: "Start Time",
+                hint:  "seconds — when this move begins",
+                icon:  "clock",
+                value: String(format: "%.2f", start),
+                keyboard: .decimalPad)
+            let df = LabelledField(
+                label: "Duration",
+                hint:  "seconds — how long the move lasts",
+                icon:  "timer",
+                value: String(format: "%.2f", dur),
+                keyboard: .decimalPad)
+            startField    = sf
+            durationField = df
+            stack.addArrangedSubview(sf)
+            stack.addArrangedSubview(df)
         }
 
         // ── Confirm button ───────────────────────────────────────────────────
@@ -256,9 +305,12 @@ final class AnimationInputCard: UIViewController {
         case .addRotate:
             return ("Add Rotation", "rotate.3d.fill",
                     UIColor(red: 0.6, green: 0.4, blue: 1.0, alpha: 1))
-        case .editRotate:
+        case .editRotate, .editRotateFull:
             return ("Edit Rotation", "rotate.3d",
                     UIColor(red: 0.6, green: 0.4, blue: 1.0, alpha: 1))
+        case .editMoveTiming:
+            return ("Edit Move Timing", "clock.arrow.2.circlepath",
+                    UIColor(red: 0.2, green: 0.7, blue: 1.0, alpha: 1))
         }
     }
 
@@ -266,9 +318,11 @@ final class AnimationInputCard: UIViewController {
         let btn = UIButton(type: .system)
         let label: String
         switch mode {
-        case .addMove:    label = "Add Move to Timeline"
-        case .addRotate:  label = "Add Rotation to Timeline"
-        case .editRotate: label = "Apply"
+        case .addMove:         label = "Add Move to Timeline"
+        case .addRotate:       label = "Add Rotation to Timeline"
+        case .editRotate,
+             .editRotateFull,
+             .editMoveTiming:  label = "Apply"
         }
         btn.setTitle(label, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)

@@ -41,11 +41,14 @@ enum RotationAxis: String, CaseIterable {
     }
 
     /// Two vectors spanning the plane perpendicular to this axis.
+    /// The sign of u determines the positive drag direction on the disc.
+    /// v determines where angle=0 sits — pointing v upward makes the start arm
+    /// "stand" vertically, which is more intuitive than lying flat.
     var planeAxes: (u: SIMD3<Float>, v: SIMD3<Float>) {
         switch self {
-        case .x: return (u: [0, 1, 0], v: [0, 0, 1])   // YZ plane
-        case .y: return (u: [1, 0, 0], v: [0, 0, 1])   // XZ plane
-        case .z: return (u: [1, 0, 0], v: [0, 1, 0])   // XY plane
+        case .x: return (u: [0,  0,  1], v: [0,  1,  0])  // YZ plane — v=+Y stands up, u=+Z matches arc direction
+        case .y: return (u: [1,  0,  0], v: [0,  0,  1])  // XZ plane
+        case .z: return (u: [-1, 0,  0], v: [0,  1,  0])  // XY plane — v=+Y so start arm stands up
         }
     }
 
@@ -83,10 +86,12 @@ enum RotationPathRenderer {
     private static let arcTube:    Float = 0.008
     private static let baseSteps:  Int   = 64
 
-    static let startShaftColor:  UIColor = UIColor(red: 0.0, green: 0.85, blue: 0.85, alpha: 1)
-    static let endShaftColor:    UIColor = UIColor(red: 1.0, green: 0.55, blue: 0.0,  alpha: 1)
-    static let startHandleColor: UIColor = UIColor(red: 0.0, green: 0.9,  blue: 0.9,  alpha: 1)
-    static let endHandleColor:   UIColor = UIColor(red: 1.0, green: 0.6,  blue: 0.0,  alpha: 1)
+    // Start = black/dark (fixed reference, not draggable)
+    // End   = orange     (draggable)
+    static let startShaftColor:  UIColor = UIColor(white: 0.25, alpha: 1)
+    static let endShaftColor:    UIColor = UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1)
+    static let startHandleColor: UIColor = UIColor(white: 0.20, alpha: 1)
+    static let endHandleColor:   UIColor = UIColor(red: 1.0, green: 0.6,  blue: 0.0, alpha: 1)
 
     // ── Clip helpers ──────────────────────────────────────────────────────────
 
@@ -114,14 +119,17 @@ enum RotationPathRenderer {
 
     // ── Build ─────────────────────────────────────────────────────────────────
 
-    static func makeArc(clip: AnimationClip, entity: Entity) -> RotationArcVisual {
-        let centre = entity.position(relativeTo: nil)
-        let axis   = axisOf(clip)
-        let total  = totalRadiansOf(clip)
+    static func makeArc(clip: AnimationClip, entity: Entity, anchor: Entity) -> RotationArcVisual {
+        // Position the arc root at the entity's position expressed in anchor-local space.
+        // We must NOT use entity.position(relativeTo: nil) (world) and assign it to a
+        // child of anchor, because if anchor is not at world-origin the arc will be wrong.
+        let centreLocal = entity.position(relativeTo: anchor)
+        let axis        = axisOf(clip)
+        let total       = totalRadiansOf(clip)
 
         let root = Entity()
         root.name     = "RotationArc_\(clip.id)"
-        root.position = centre
+        root.position = centreLocal   // anchor-local
 
         root.addChild(makeShaft(name: "startLine", angle: 0,     axis: axis, color: startShaftColor))
         root.addChild(makeShaft(name: "endLine",   angle: total, axis: axis, color: endShaftColor))
@@ -139,8 +147,9 @@ enum RotationPathRenderer {
 
     // ── Full redraw after programmatic change ─────────────────────────────────
 
-    static func update(visual: RotationArcVisual, clip: AnimationClip, entity: Entity) {
-        visual.root.position = entity.position(relativeTo: nil)
+    static func update(visual: RotationArcVisual, clip: AnimationClip,
+                       entity: Entity, anchor: Entity) {
+        visual.root.position = entity.position(relativeTo: anchor)
         let total = totalRadiansOf(clip)
         applyTotal(visual: visual, totalRadians: total)
     }
@@ -203,7 +212,20 @@ enum RotationPathRenderer {
     }
 
     private static func shaftOrientation(angle: Float, axis: RotationAxis) -> simd_quatf {
-        simd_quatf(angle: angle, axis: axis.simdAxis)
+        // The shaft box geometry lies along local +Z (box centred at (0,0,r/2)).
+        // We need to rotate +Z to point toward circlePoint(angle, axis).
+        // circlePoint = u*sin(angle) + v*cos(angle)  where (u,v) are the plane axes.
+        // At angle=0 the point is along +v.  At angle=π/2 it's along +u.
+        //
+        // Strategy: build the rotation that takes +Z to the target direction.
+        let target = simd_normalize(circlePoint(angle: angle, axis: axis))
+        let from   = SIMD3<Float>(0, 0, 1)   // +Z
+        // If target ≈ +Z already, return identity
+        let dot = simd_dot(from, target)
+        if dot > 0.9999 { return simd_quatf(ix: 0, iy: 0, iz: 0, r: 1) }
+        // If target ≈ −Z, rotate 180° around any perpendicular axis
+        if dot < -0.9999 { return simd_quatf(angle: .pi, axis: [0, 1, 0]) }
+        return simd_quatf(from: from, to: target)
     }
 
     private static func makeShaft(name: String, angle: Float,
@@ -224,14 +246,21 @@ enum RotationPathRenderer {
                                     axis: RotationAxis, color: UIColor,
                                     clipID: UUID, role: RotationArcComponent.Role) -> ModelEntity {
         let mesh   = MeshResource.generateSphere(radius: handleR)
-        let mat    = SimpleMaterial(color: color, roughness: 0.2, isMetallic: true)
+        // Start handle uses a flat/matte material to reinforce "not interactive"
+        let isStart = role == .start
+        let mat: Material = isStart
+            ? UnlitMaterial(color: color)
+            : SimpleMaterial(color: color, roughness: 0.2, isMetallic: true)
         let entity = ModelEntity(mesh: mesh, materials: [mat])
         entity.name     = name
         entity.position = circlePoint(angle: angle, axis: axis)
 
-        entity.components.set(CollisionComponent(shapes: [.generateSphere(radius: hitR)]))
-        entity.components.set(InputTargetComponent())
-        entity.components.set(RotationArcComponent(clipID: clipID, role: role))
+        // Only the end handle is draggable — start handle has no collision or input
+        if !isStart {
+            entity.components.set(CollisionComponent(shapes: [.generateSphere(radius: hitR)]))
+            entity.components.set(InputTargetComponent())
+            entity.components.set(RotationArcComponent(clipID: clipID, role: role))
+        }
         return entity
     }
 
@@ -244,7 +273,6 @@ enum RotationPathRenderer {
         var mat = UnlitMaterial()
         mat.color = .init(tint: UIColor(white: 0.9, alpha: 0.55), texture: nil)
 
-        // Scale step count with total angle so multi-turn arcs are smooth
         let turns = abs(totalRadians) / (2 * .pi)
         let steps = max(baseSteps, Int(turns * Float(baseSteps)))
 
@@ -254,15 +282,31 @@ enum RotationPathRenderer {
             let angle = totalRadians * t
             let p0    = circlePoint(angle: prev,  axis: axis)
             let p1    = circlePoint(angle: angle, axis: axis)
-            let len   = simd_length(p1 - p0)
+            let diff  = p1 - p0
+            let len   = simd_length(diff)
             guard len > 0.0001 else { prev = angle; continue }
 
             let seg = ModelEntity(
                 mesh: .generateCylinder(height: len, radius: arcTube),
                 materials: [mat]
             )
+            // Place at midpoint in parent-local space
             seg.position = (p0 + p1) * 0.5
-            seg.look(at: p1, from: seg.position, relativeTo: nil)
+
+            // Orient the cylinder (default along Y) to point from p0 to p1.
+            // All positions are in arcRoot-local space so we compute the
+            // quaternion purely from the direction vector — no world-space ambiguity.
+            let dir = simd_normalize(diff)
+            let up  = SIMD3<Float>(0, 1, 0)   // cylinder default axis
+            let dot = simd_dot(up, dir)
+            if dot > 0.9999 {
+                seg.orientation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+            } else if dot < -0.9999 {
+                seg.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
+            } else {
+                seg.orientation = simd_quatf(from: up, to: dir)
+            }
+
             container.addChild(seg)
             prev = angle
         }
@@ -275,55 +319,48 @@ enum RotationPathRenderer {
 // ─────────────────────────────────────────────────────────────────────────────
 
 extension CanvasViewController {
-
+    
     func showRotationArc(for clip: AnimationClip, on entity: Entity) {
         guard clip.track == .rotation else { return }
         activeRotationArcs[clip.id]?.root.removeFromParent()
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-        let visual = RotationPathRenderer.makeArc(clip: clip, entity: entity)
+        let visual = RotationPathRenderer.makeArc(clip: clip, entity: entity, anchor: anchor)
         anchor.addChild(visual.root)
         activeRotationArcs[clip.id] = visual
     }
-
+    
     func hideRotationArc(for clipID: UUID) {
         activeRotationArcs[clipID]?.root.removeFromParent()
         activeRotationArcs.removeValue(forKey: clipID)
     }
-
+    
     func hideAllRotationArcs() {
         for (_, visual) in activeRotationArcs { visual.root.isEnabled = false }
     }
-
+    
     func showAllRotationArcs() {
         for (_, visual) in activeRotationArcs { visual.root.isEnabled = true }
     }
-
+    
     // ── Context menu ──────────────────────────────────────────────────────────
-
+    
     func showRotationArcContextMenu(clipID: UUID, arcRoot: Entity) {
         guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
         let alert = UIAlertController(title: "Rotation Animation", message: nil,
                                       preferredStyle: .actionSheet)
-
-        alert.addAction(UIAlertAction(title: "Edit Timing", style: .default) { [weak self] _ in
-            guard let self else { return }
-            self.selectedArcClipID = clipID
-            if let pos = self.arView.project(arcRoot.position(relativeTo: nil)) {
-                self.showRotationTimingToolbar(clipID: clipID, at: pos)
-            }
-        })
-
-        alert.addAction(UIAlertAction(title: "Edit Rotation", style: .default) { [weak self] _ in
+        
+        // Single "Edit Animation" entry opens the full card (timing + degrees + axis)
+        alert.addAction(UIAlertAction(title: "Edit Animation", style: .default) { [weak self] _ in
             self?.presentRotationAnglesEditor(clipID: clipID)
         })
-
+        
         let locked = arcRoot.components[LockComponent.self]?.isLocked ?? false
         alert.addAction(UIAlertAction(title: locked ? "Unlock" : "Lock", style: .default) { _ in
             var lc = arcRoot.components[LockComponent.self] ?? LockComponent(isLocked: false)
             lc.isLocked.toggle()
             arcRoot.components.set(lc)
         })
-
+        
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
             guard let self else { return }
             self.hideRotationArc(for: clipID)
@@ -331,107 +368,67 @@ extension CanvasViewController {
             self.selectedArcClipID = nil
             self.refreshSidebarContent()
         })
-
+        
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }
-
-    // ── Timing toolbar ────────────────────────────────────────────────────────
-
-    func showRotationTimingToolbar(clipID: UUID, at screenPoint: CGPoint) {
-        pathEditToolbar?.removeFromSuperview()
-        guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
-        let clip = timeline.clips[clipIdx]
-
-        let container = UIView()
-        container.backgroundColor     = UIColor.systemBackground.withAlphaComponent(0.95)
-        container.layer.cornerRadius  = 14
-        container.layer.shadowColor   = UIColor.black.cgColor
-        container.layer.shadowOpacity = 0.25
-        container.layer.shadowRadius  = 8
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        func field(_ ph: String, _ v: Float) -> UITextField {
-            let f = UITextField()
-            f.borderStyle = .roundedRect; f.keyboardType = .decimalPad
-            f.placeholder = ph; f.text = String(format: "%.2f", v); return f
-        }
-
-        let startF = field("Start Time", clip.startTime)
-        let durF   = field("Duration",   clip.duration)
-        let applyB = UIButton(type: .system)
-        applyB.setTitle("Apply", for: .normal)
-        applyB.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-
-        let stack = UIStackView(arrangedSubviews: [startF, durF, applyB])
-        stack.axis = .vertical; stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(stack); view.addSubview(container)
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
-            container.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPoint.x),
-            container.bottomAnchor.constraint(equalTo: view.topAnchor, constant: screenPoint.y - 20),
-            container.widthAnchor.constraint(equalToConstant: 220),
-        ])
-
-        applyB.addAction(UIAction { [weak self] _ in
-            guard let self,
-                  let ns = Float(startF.text ?? ""),
-                  let nd = Float(durF.text ?? ""), nd > 0 else { return }
-            let old = self.timeline.clips[clipIdx]
-            let upd = AnimationClip(preservingID: old, startTime: ns, duration: nd)
-            self.timeline.clips[clipIdx] = upd
-            if let vis = self.activeRotationArcs.removeValue(forKey: old.id) {
-                vis.startHandle.components.set(RotationArcComponent(clipID: upd.id, role: .start))
-                vis.endHandle.components.set(RotationArcComponent(clipID: upd.id, role: .end))
-                self.activeRotationArcs[upd.id] = vis
-            }
-            if self.selectedArcClipID == old.id { self.selectedArcClipID = upd.id }
-            self.pathEditToolbar?.removeFromSuperview()
-        }, for: .touchUpInside)
-
-        pathEditToolbar = container
-    }
-
-    // ── Rotation editor: single card with degrees + axis ─────────────────────
-
+    
+    // ── Full rotation editor: timing + degrees + axis in one card ─────────────
+    
     func presentRotationAnglesEditor(clipID: UUID) {
         guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
         let clip     = timeline.clips[clipIdx]
         let axis     = RotationPathRenderer.axisOf(clip)
         let totalDeg = RotationPathRenderer.totalRadiansOf(clip) * 180 / .pi
-
-        let card = AnimationInputCard(mode: .editRotate(currentDegrees: totalDeg,
-                                                        currentAxis:    axis))
-        card.onConfirm = { [weak self] _, _, degrees, chosenAxis in
+        
+        let card = AnimationInputCard(mode: .editRotateFull(
+            currentStart:    clip.startTime,
+            currentDuration: clip.duration,
+            currentDegrees:  totalDeg,
+            currentAxis:     axis
+        ))
+        
+        card.onConfirm = { [weak self] startTime, duration, degrees, chosenAxis in
             guard let self else { return }
-            self.applyRotationEdit(clipIdx:      clipIdx,
-                                   clipID:       clipID,
-                                   axis:         chosenAxis,
-                                   totalRadians: degrees * (.pi / 180))
+            self.applyFullRotationEdit(
+                clipIdx:      clipIdx,
+                clipID:       clipID,
+                startTime:    startTime,
+                duration:     duration,
+                axis:         chosenAxis,
+                totalRadians: degrees * (.pi / 180)
+            )
         }
         present(card, animated: false)
     }
-
-    func applyRotationEdit(clipIdx: Int, clipID: UUID,
-                           axis: RotationAxis, totalRadians: Float) {
+    
+    func applyFullRotationEdit(clipIdx: Int, clipID: UUID,
+                               startTime: Float, duration: Float,
+                               axis: RotationAxis, totalRadians: Float) {
         let old = timeline.clips[clipIdx]
         let upd = AnimationClip(
             preservingID: old,
-            fromValue: axis.simdAxis,
-            toValue:   SIMD3<Float>(totalRadians, 0, 0)
+            fromValue:  axis.simdAxis,
+            toValue:    SIMD3<Float>(totalRadians, 0, 0),
+            startTime:  startTime,
+            duration:   duration
         )
         timeline.clips[clipIdx] = upd
-
-        // Rebuild arc visual for new axis/total
+        
+        // Re-key arc visual handles if clip UUID changed (preservingID keeps it)
+        // Rebuild arc to reflect any axis/angle change
         if let ent = arView.scene.findEntity(named: upd.entityName) {
             activeRotationArcs[clipID]?.root.removeFromParent()
             activeRotationArcs.removeValue(forKey: clipID)
             showRotationArc(for: upd, on: ent)
         }
+    }
+    
+    func applyRotationEdit(clipIdx: Int, clipID: UUID,
+                           axis: RotationAxis, totalRadians: Float) {
+        applyFullRotationEdit(clipIdx: clipIdx, clipID: clipID,
+                              startTime: timeline.clips[clipIdx].startTime,
+                              duration:  timeline.clips[clipIdx].duration,
+                              axis: axis, totalRadians: totalRadians)
     }
 }
