@@ -169,10 +169,10 @@ extension CanvasViewController {
 
         case .rotate:
             track     = .rotation
-            // fromValue.y = 0 (start at current orientation)
-            // toValue.y   = the requested rotation angle in radians
-            fromValue = SIMD3<Float>(0, 0, 0)
-            toValue   = SIMD3<Float>(0, rotationDegrees * (.pi / 180), 0)
+            // New model: fromValue = rotation axis (unit vector), toValue.x = totalRadians
+            // Default axis is Y; user can change it via long-press → Edit Rotation after clip is added.
+            fromValue = RotationAxis.y.simdAxis                          // axis vector (0,1,0)
+            toValue   = SIMD3<Float>(rotationDegrees * (.pi / 180), 0, 0) // totalRadians in .x
         }
 
         if baseTransforms[entity.name] == nil {

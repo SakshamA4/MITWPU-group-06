@@ -1356,70 +1356,72 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 draggingArcClipID = arcComp.clipID
                 draggingArcRole   = arcComp.role
                 arcDragCentre     = entity.position(relativeTo: anchor)
-                arcDragLastAngle  = arcComp.role == .end
-                    ? timeline.clips[clipIdx].toValue.y
-                    : timeline.clips[clipIdx].fromValue.y
+
+                // Compute the raw atan2 angle of the finger on the disc right now.
+                // This becomes the reference; subsequent frames accumulate deltas
+                // so the handle can travel past ±180° without wrapping.
+                let clip   = timeline.clips[clipIdx]
+                let axis   = RotationPathRenderer.axisOf(clip)
+                let arcWorldCentre = visual_arcCentre(clip: clip, entity: entity)
+                guard let ray0 = arView.ray(through: location),
+                      let hw0  = rayPlaneIntersection(
+                          rayOrigin: ray0.origin, rayDirection: ray0.direction,
+                          planePoint: arcWorldCentre, planeNormal: axis.planeNormal
+                      ) else { return }
+                arcDragLastAngle = RotationPathRenderer.angleOnDisc(
+                    worldPoint: hw0, arcCentre: arcWorldCentre, axis: axis)
                 return
             }
         }
 
-        // .changed — rotate arm, snap handle sphere to circle, update clip angle, rebuild arc curve
+        // .changed — accumulated-angle drag: supports >180° and multi-turn
         if gesture.state == .changed,
            draggingArcHandle != nil,
            let clipID  = draggingArcClipID,
            let role    = draggingArcRole,
-           let centre  = arcDragCentre,
            let visual  = activeRotationArcs[clipID],
            let anchor  = arView.scene.findEntity(named: "MainAnchor"),
            let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
            let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
         {
-            // Ray through touch onto horizontal XZ plane at entity's Y height
-            guard let ray = arView.ray(through: location) else { return }
-            let planePoint  = entity.position(relativeTo: nil)   // world space Y
-            let planeNormal = SIMD3<Float>(0, 1, 0)
+            let clip       = timeline.clips[clipIdx]
+            let axis       = RotationPathRenderer.axisOf(clip)
+            let arcCentreW = entity.position(relativeTo: nil)  // world-space arc centre
 
-            guard let hitWorld = rayPlaneIntersection(
-                rayOrigin: ray.origin, rayDirection: ray.direction,
-                planePoint: planePoint, planeNormal: planeNormal
-            ) else { return }
+            // Cast ray onto the arc's plane
+            guard let ray = arView.ray(through: location),
+                  let hitWorld = rayPlaneIntersection(
+                      rayOrigin: ray.origin, rayDirection: ray.direction,
+                      planePoint: arcCentreW, planeNormal: axis.planeNormal
+                  ) else { return }
 
-            // hitWorld is world-space; convert to anchor-local then offset from entity centre
-            let anchorWP = anchor.position(relativeTo: nil)
-            let hitLocal = hitWorld - anchorWP
-            let offset   = SIMD3<Float>(hitLocal.x - centre.x, 0, hitLocal.z - centre.z)
-            guard simd_length(offset) > 0.001 else { return }
-            let newAngle = atan2(offset.x, offset.z)
+            // Raw atan2 angle of finger on disc (-π…+π)
+            let rawAngle = RotationPathRenderer.angleOnDisc(
+                worldPoint: hitWorld, arcCentre: arcCentreW, axis: axis)
 
-            // 1. Rotate the shaft arm (clock-hand motion)
-            let lineName = role == .end ? "endLine" : "startLine"
-            if let lineRoot = visual.root.findEntity(named: lineName) {
-                lineRoot.orientation = simd_quatf(angle: newAngle, axis: [0, 1, 0])
-            }
+            // Compute shortest angular delta from last frame, then accumulate.
+            // This is what allows the total to exceed ±π.
+            var delta = rawAngle - arcDragLastAngle
+            if delta >  .pi { delta -= 2 * .pi }
+            if delta < -.pi { delta += 2 * .pi }
 
-            // 2. Snap the handle sphere exactly onto the circle
-            let handleName = role == .end ? "arcHandle.end" : "arcHandle.start"
-            if let handleEnt = visual.root.findEntity(named: handleName) {
-                handleEnt.position = RotationPathRenderer.circlePoint(angle: newAngle)
-            }
+            // Only end handle is draggable (start is always fixed at 0°)
+            guard role == .end else { return }
 
-            // 3. Write new angle into timeline clip — preserve UUID so
-            //    activeRotationArcs lookup stays valid for the next drag frame
-            let old = timeline.clips[clipIdx]
+            let currentTotal = RotationPathRenderer.totalRadiansOf(clip)
+            let newTotal     = currentTotal + delta
+
+            // Live visual update
+            RotationPathRenderer.updateEndAngle(visual: visual, totalRadians: newTotal)
+
+            // Write back — preserve UUID
             timeline.clips[clipIdx] = AnimationClip(
-                preservingID: old,
-                fromValue: role == .end ? nil        : SIMD3<Float>(0, newAngle, 0),
-                toValue:   role == .end ? SIMD3<Float>(0, newAngle, 0) : nil
+                preservingID: clip,
+                fromValue: axis.simdAxis,
+                toValue:   SIMD3<Float>(newTotal, 0, 0)
             )
 
-            // 4. Rebuild only the arc curve (arms already rotated above)
-            let updated = timeline.clips[clipIdx]
-            RotationPathRenderer.updateArcCurveOnly(
-                visual: visual,
-                fromAngle: updated.fromValue.y,
-                toAngle:   updated.toValue.y)
-
-            arcDragLastAngle = newAngle
+            arcDragLastAngle = rawAngle
             return
         }
 
@@ -1430,7 +1432,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             draggingArcHandle = nil
             draggingArcClipID = nil
             draggingArcRole   = nil
-            arcDragCentre = nil
+            arcDragCentre     = nil
             arcDragLastAngle  = 0
             return
         }
@@ -1773,6 +1775,16 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
 
         //  OLD STEP 2 — NORMAL OBJECT / GIZMO DRAGGING (SAKSHAM)
+
+    /// Returns the world-space centre of the rotation arc for a clip.
+    /// The arc root sits at the entity's world position at clip-creation time.
+    private func visual_arcCentre(clip: AnimationClip, entity: Entity) -> SIMD3<Float> {
+        // If the arc visual already exists, use its root position (most accurate)
+        if let visual = activeRotationArcs[clip.id] {
+            return visual.root.position(relativeTo: nil)
+        }
+        return entity.position(relativeTo: nil)
+    }
 
 }
 

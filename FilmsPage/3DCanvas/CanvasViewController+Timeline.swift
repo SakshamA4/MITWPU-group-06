@@ -354,11 +354,12 @@ extension CanvasViewController {
                     }
                     
                 case .rotation:
-                    let delta = simd_quatf(
-                        angle: value.y,
-                        axis: [0, 1, 0]
-                    )
-                    rotation = delta * rotation
+                    // New model: fromValue = axis, toValue.x = totalRadians (unbounded)
+                    // evaluateTimeline interpolates from 0 to totalRadians * eased
+                    let axis         = RotationPathRenderer.axisOf(clip)
+                    let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
+                    let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
+                    rotation         = delta * rotation
                     
                 case .scale:
                     scale *= value
@@ -424,11 +425,10 @@ extension CanvasViewController {
                 }
                 
             case .rotation:
-                let delta = simd_quatf(
-                    angle: clip.toValue.y * eased,
-                    axis: [0, 1, 0]
-                )
-                rotation = delta * rotation
+                let axis         = RotationPathRenderer.axisOf(clip)
+                let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
+                let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
+                rotation         = delta * rotation
                 
             case .scale:
                 scale *= simd_mix(

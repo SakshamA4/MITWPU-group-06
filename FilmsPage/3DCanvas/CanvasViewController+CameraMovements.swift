@@ -169,13 +169,15 @@ extension CanvasViewController {
 
         switch preset {
         case .pan:
+            // Y-axis rotation (horizontal pan): totalRadians = pi/3 (~60°)
             track     = .rotation
-            fromValue = SIMD3<Float>(0, -.pi / 6, 0)
-            toValue   = SIMD3<Float>(0,  .pi / 6, 0)
+            fromValue = RotationAxis.y.simdAxis
+            toValue   = SIMD3<Float>(.pi / 3, 0, 0)
         case .tilt:
+            // X-axis rotation (vertical tilt): totalRadians = pi/4.5 (~40°)
             track     = .rotation
-            fromValue = SIMD3<Float>(-.pi / 9, 0, 0)
-            toValue   = SIMD3<Float>( .pi / 9, 0, 0)
+            fromValue = RotationAxis.x.simdAxis
+            toValue   = SIMD3<Float>(.pi / 4.5, 0, 0)
         case .dollyIn, .dollyOut, .crane:
             track     = .position
             fromValue = .zero
