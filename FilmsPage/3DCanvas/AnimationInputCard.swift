@@ -25,6 +25,8 @@ enum AnimationCardMode {
                         currentDegrees: Float, currentAxis: RotationAxis)
     /// Edit timing for a move path clip
     case editMoveTiming(currentStart: Float, currentDuration: Float)
+    /// Add a camera shot (movement or static) — shows shot name, start time, duration
+    case addShot(shotName: String, defaultStart: Float)
 }
 
 final class AnimationInputCard: UIViewController {
@@ -282,6 +284,24 @@ final class AnimationInputCard: UIViewController {
             durationField = df
             stack.addArrangedSubview(sf)
             stack.addArrangedSubview(df)
+
+        case .addShot(_, let defaultStart):
+            let sf = LabelledField(
+                label: "Start Time",
+                hint:  "seconds — when this shot begins on the timeline",
+                icon:  "clock",
+                value: String(format: "%.1f", defaultStart),
+                keyboard: .decimalPad)
+            let df = LabelledField(
+                label: "Duration",
+                hint:  "seconds — how long this shot lasts",
+                icon:  "timer",
+                value: "3.0",
+                keyboard: .decimalPad)
+            startField    = sf
+            durationField = df
+            stack.addArrangedSubview(sf)
+            stack.addArrangedSubview(df)
         }
 
         // ── Confirm button ───────────────────────────────────────────────────
@@ -311,6 +331,9 @@ final class AnimationInputCard: UIViewController {
         case .editMoveTiming:
             return ("Edit Move Timing", "clock.arrow.2.circlepath",
                     UIColor(red: 0.2, green: 0.7, blue: 1.0, alpha: 1))
+        case .addShot(let shotName, _):
+            return (shotName, "video.fill",
+                    UIColor(red: 1.0, green: 0.45, blue: 0.2, alpha: 1))
         }
     }
 
@@ -320,6 +343,7 @@ final class AnimationInputCard: UIViewController {
         switch mode {
         case .addMove:         label = "Add Move to Timeline"
         case .addRotate:       label = "Add Rotation to Timeline"
+        case .addShot:         label = "Add Shot to Timeline"
         case .editRotate,
              .editRotateFull,
              .editMoveTiming:  label = "Apply"

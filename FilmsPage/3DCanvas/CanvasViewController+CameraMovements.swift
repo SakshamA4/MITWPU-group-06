@@ -109,7 +109,7 @@ extension CanvasViewController {
         presentShotPicker(for: cameraEntity)
     }
 
-    // ── Shot Settings (start time + duration) presented after picking a shot ──
+    // ── Shot Settings presented after picking a shot ──────────────────────────
     func presentShotSettings(selection: ShotSelection, cameraEntity: Entity) {
         let shotName: String
         switch selection {
@@ -117,27 +117,13 @@ extension CanvasViewController {
         case .static_(let p):  shotName = p.rawValue
         }
 
-        let alert = UIAlertController(
-            title: shotName,
-            message: "Configure shot timing",
-            preferredStyle: .alert
-        )
-        alert.addTextField { f in
-            f.placeholder = "Start Time (e.g. 0.0)"
-            f.keyboardType = .decimalPad
-            f.text = String(format: "%.1f", self.timeline.duration)
-        }
-        alert.addTextField { f in
-            f.placeholder = "Duration (e.g. 3.0)"
-            f.keyboardType = .decimalPad
-            f.text = "3.0"
-        }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Create Shot", style: .default) { [weak self] _ in
-            guard let self = self,
-                  let startText = alert.textFields?[0].text, let startTime = Float(startText),
-                  let durText   = alert.textFields?[1].text, let duration  = Float(durText),
-                  duration > 0 else { return }
+        let card = AnimationInputCard(mode: .addShot(
+            shotName:     shotName,
+            defaultStart: timeline.duration
+        ))
+
+        card.onConfirm = { [weak self] startTime, duration, _, _ in
+            guard let self, duration > 0 else { return }
             switch selection {
             case .movement(let preset):
                 self.applyCameraMovementPreset(preset, to: cameraEntity,
@@ -146,8 +132,17 @@ extension CanvasViewController {
                 self.applyStaticShotPreset(preset, to: cameraEntity,
                                            startTime: startTime, duration: duration)
             }
-        })
-        present(alert, animated: true)
+        }
+
+        // The shot picker sheet is still presented — present the card on top of it
+        // (or dismiss sheet first if it's still visible)
+        if let presented = presentedViewController {
+            presented.dismiss(animated: true) { [weak self] in
+                self?.present(card, animated: false)
+            }
+        } else {
+            present(card, animated: false)
+        }
     }
 
     // ── Camera Movement Application ───────────────────────────────────────────
