@@ -14,17 +14,29 @@
 		19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"3DCanvas/Canvasviewcontroller+archandledrag.swift",
 				Info.plist,
 			);
 			target = 19075A4A2ED4646D00B3A488 /* FilmsPage */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 19075A492ED4646D00B3A488 /* Resources */;
+			membershipExceptions = (
+				"3DCanvas/Canvasviewcontroller+archandledrag.swift",
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		19075A4D2ED4646D00B3A488 /* FilmsPage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */,
+				197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */,
 			);
 			path = FilmsPage;
 			sourceTree = "<group>";

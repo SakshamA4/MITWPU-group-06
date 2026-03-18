@@ -117,6 +117,28 @@ struct AnimationClip: Identifiable, Codable {
         self.toValue = toValue
         self.motionPath = motionPath
     }
+
+    /// UUID-preserving copy — use when mutating angle/timing in-place so that
+    /// activeMotionPaths / activeRotationArcs dictionary lookups keep working.
+    init(
+        preservingID existing: AnimationClip,
+        fromValue: SIMD3<Float>? = nil,
+        toValue: SIMD3<Float>? = nil,
+        startTime: Float? = nil,
+        duration: Float? = nil,
+        motionPath: BezierMotionPath? = nil
+    ) {
+        self.id         = existing.id
+        self.entityName = existing.entityName
+        self.type       = existing.type
+        self.track      = existing.track
+        self.easing     = existing.easing
+        self.startTime  = startTime  ?? existing.startTime
+        self.duration   = duration   ?? existing.duration
+        self.fromValue  = fromValue  ?? existing.fromValue
+        self.toValue    = toValue    ?? existing.toValue
+        self.motionPath = motionPath ?? existing.motionPath
+    }
 }
 struct MotionPathVisual {
 
@@ -333,6 +355,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var editorCamera: PerspectiveCamera!
     var activeCamera: PerspectiveCamera!
     
+    var isCameraPanelExpanded: Bool = false
+    
     var sceneCameras: [PerspectiveCamera] = []
     var cameraToVisualMap: [PerspectiveCamera: Entity] = [:]
     
@@ -517,8 +541,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // Camera preview panel — snapshots keyed by camera ObjectIdentifier
     var cameraPreviewSnapshots: [ObjectIdentifier: UIImage] = [:]
     var cameraPreviewTimer: Timer?
-    // Tracks whether the slide-out camera panel (tag 8800) is currently visible
-    var isCameraPanelExpanded: Bool = false
 
     // Which rotation arc clip is currently selected (for long-press context menu).
     var selectedArcClipID: UUID?
@@ -1320,26 +1342,28 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
 
 
-        // .began — detect arc tip, store state, return early
-        if gesture.state == .began,
-           let hit     = arView.entity(at: location),
-           let arcComp = hit.components[RotationArcComponent.self],
-           let anchor  = arView.scene.findEntity(named: "MainAnchor"),
-           let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }),
-           let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
-        {
-            saveCurrentStateToUndo()
-            draggingArcHandle = hit
-            draggingArcClipID = arcComp.clipID
-            draggingArcRole   = arcComp.role
-            arcDragCentre = entity.position(relativeTo: anchor)
-            arcDragLastAngle  = arcComp.role == .end
-                ? timeline.clips[clipIdx].toValue.y
-                : timeline.clips[clipIdx].fromValue.y
-            return
+        // .began — detect arc tip using hitTest (collision-based, works in non-AR mode)
+        if gesture.state == .began {
+            let hitResults = arView.hitTest(location)
+            if let hit     = hitResults.first(where: { $0.entity.components[RotationArcComponent.self] != nil })?.entity,
+               let arcComp = hit.components[RotationArcComponent.self],
+               let anchor  = arView.scene.findEntity(named: "MainAnchor"),
+               let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }),
+               let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
+            {
+                saveCurrentStateToUndo()
+                draggingArcHandle = hit
+                draggingArcClipID = arcComp.clipID
+                draggingArcRole   = arcComp.role
+                arcDragCentre     = entity.position(relativeTo: anchor)
+                arcDragLastAngle  = arcComp.role == .end
+                    ? timeline.clips[clipIdx].toValue.y
+                    : timeline.clips[clipIdx].fromValue.y
+                return
+            }
         }
 
-        // .changed — rotate arm, update clip angle, rebuild arc curve
+        // .changed — rotate arm, snap handle sphere to circle, update clip angle, rebuild arc curve
         if gesture.state == .changed,
            draggingArcHandle != nil,
            let clipID  = draggingArcClipID,
@@ -1367,23 +1391,28 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             guard simd_length(offset) > 0.001 else { return }
             let newAngle = atan2(offset.x, offset.z)
 
-            // 1. Rotate the arm — tip follows as its child (shaft stays connected)
+            // 1. Rotate the shaft arm (clock-hand motion)
             let lineName = role == .end ? "endLine" : "startLine"
             if let lineRoot = visual.root.findEntity(named: lineName) {
                 lineRoot.orientation = simd_quatf(angle: newAngle, axis: [0, 1, 0])
             }
 
-            // 2. Write new angle into timeline clip
+            // 2. Snap the handle sphere exactly onto the circle
+            let handleName = role == .end ? "arcHandle.end" : "arcHandle.start"
+            if let handleEnt = visual.root.findEntity(named: handleName) {
+                handleEnt.position = RotationPathRenderer.circlePoint(angle: newAngle)
+            }
+
+            // 3. Write new angle into timeline clip — preserve UUID so
+            //    activeRotationArcs lookup stays valid for the next drag frame
             let old = timeline.clips[clipIdx]
             timeline.clips[clipIdx] = AnimationClip(
-                entityName: old.entityName, type: old.type, track: old.track,
-                easing: old.easing, startTime: old.startTime, duration: old.duration,
-                fromValue: role == .end ? old.fromValue : SIMD3<Float>(0, newAngle, 0),
-                toValue:   role == .end ? SIMD3<Float>(0, newAngle, 0) : old.toValue,
-                motionPath: old.motionPath
+                preservingID: old,
+                fromValue: role == .end ? nil        : SIMD3<Float>(0, newAngle, 0),
+                toValue:   role == .end ? SIMD3<Float>(0, newAngle, 0) : nil
             )
 
-            // 3. Rebuild only the arc curve (arms already rotated above)
+            // 4. Rebuild only the arc curve (arms already rotated above)
             let updated = timeline.clips[clipIdx]
             RotationPathRenderer.updateArcCurveOnly(
                 visual: visual,
@@ -1686,6 +1715,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                         MotionPathRenderer.updatePathMesh(entity: pathMesh, path: path)
                     }
                 }
+                // Motion path handle drag is handled above.
+                // Rotation arc handles use direct radial drag (see handlePan .began arc block)
+                // and never reach this isMovingHandle path.
             } else {
                 target.position = newPos
                 updateGizmoPosition()

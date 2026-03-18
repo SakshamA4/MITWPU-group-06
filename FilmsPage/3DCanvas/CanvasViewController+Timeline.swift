@@ -504,7 +504,7 @@ extension CanvasViewController {
     func hideAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = false
-            visual.startHandle?.isEnabled = false   // start handle is on entity, hide separately
+            visual.startHandle?.isEnabled = false
         }
     }
 
@@ -520,6 +520,7 @@ extension CanvasViewController {
     func enterTimelineMode() {
         editorMode = .timeline
         hideAllMotionPaths()
+        hideAllRotationArcs()   // hide arcs during playback; restored in exitTimelineMode
         hideAnimationPanel()
         selectedEntity = nil
         
@@ -535,11 +536,11 @@ extension CanvasViewController {
     
     func exitTimelineMode() {
         editorMode = .edit
-        // Only re-show motion paths if the editor camera is active.
-        // If a scene camera is selected, paths must stay hidden.
+        // Re-show motion paths and rotation arcs when the editor camera is active.
+        // If a scene camera is selected, paths stay hidden.
         if activeCamera === editorCamera {
             showAllMotionPaths()
-            hideAllRotationArcs()   // arcs also stay hidden during playback
+            showAllRotationArcs()   // arcs survive playback — just re-enable them
         }
         for (name, transform) in baseTransforms {
             arView.scene.findEntity(named: name)?.transform = transform
