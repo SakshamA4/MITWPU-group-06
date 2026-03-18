@@ -169,24 +169,18 @@ extension CanvasViewController {
     func panCameraTarget(translation: CGPoint) {
         guard !isARModeActive else { return }
 
-        // Camera right vector (horizontal pan axis) — derived from yaw only so it
-        // stays perfectly level regardless of pitch.
-        let cameraRight = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
+        // Camera right vector — derived from yaw only so it stays level
+        let cameraRight   = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
 
-        // Camera flat-forward (vertical pan axis) — the direction the camera is
-        // looking projected onto the XZ ground plane, so vertical drag moves the
-        // scene toward/away from the camera rather than changing altitude.
+        // Flat-forward vector — camera look direction projected onto XZ plane
+        // so vertical drag moves toward/away from camera, not up/down in world
         let cameraForward = simd_normalize(SIMD3<Float>(-sin(yaw), 0, -cos(yaw)))
 
-        // Scale with zoom distance for consistent feel at any distance
         let scale: Float = distance * 0.0015
 
-        // Horizontal drag: negate so scene slides in the finger's direction
-        // (positive screen X → scene moves right → target moves left)
+        // Negate X so scene slides in the same direction as the finger
         cameraTarget -= cameraRight   *  Float(translation.x) * scale
-
-        // Vertical drag: positive screen Y (finger moves down) → scene moves
-        // toward the camera (forward), so negate Y to get expected feel
+        // Negate forward*(-Y) so dragging down moves scene toward camera
         cameraTarget -= cameraForward * -Float(translation.y) * scale
 
         updateEditorCamera()
@@ -210,37 +204,68 @@ extension CanvasViewController {
     
     func spawnSceneCamera() {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-        
+
         let index = sceneCameras.count
         let cameraRoot = Entity()
         cameraRoot.name = "SceneCameraRoot_\(index)"
         cameraRoot.components.set(CategoryComponent(toolType: .camera))
-        
-        let visual = makeCameraVisual()
-        visual.generateCollisionShapes(recursive: true)
-        visual.components.set(InputTargetComponent())
-        
+
         let camera = PerspectiveCamera()
         camera.name = "SceneCamera_\(index)"
         camera.isEnabled = false
-        
-        cameraRoot.addChild(visual)
-        cameraRoot.addChild(camera)
-        
-        // Spawn at a random XZ position so multiple cameras don't overlap
+        // RealityKit cameras shoot along local -Z. The cam1 model lens faces +Z,
+        // so rotate 180° around Y to make the camera shoot in the +Z direction.
+        camera.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+
         let randomX = Float.random(in: -2...2)
         let randomZ = Float.random(in: -2...2)
         cameraRoot.position = [randomX, 1, randomZ]
+
+        cameraRoot.addChild(camera)
         anchor.addChild(cameraRoot)
-        
+
         sceneCameras.append(camera)
         cameraToVisualMap[camera] = cameraRoot
         sceneCameraItems.append(SceneCameraItem(camera: camera, cameraRoot: cameraRoot))
-        
+
         cameraCollectionView?.reloadData()
         startCameraPreviewUpdates()
         setCameraPanelExpanded(true, animated: true)
         setupCameraPanelSwipeGestures()
+
+        // Load the cam1 model asset asynchronously.
+        // Falls back to the procedural mesh visual if the asset is not found.
+        Task { @MainActor in
+            do {
+                let model = try await Entity(named: "cam1")
+
+                // Add to scene FIRST — collision shape generation needs the
+                // entity in the render graph or Metal validation will abort
+                cameraRoot.addChild(model)
+
+                let bounds = model.visualBounds(relativeTo: nil)
+                let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+                if maxDim > 0.0001 {
+                    model.scale = SIMD3(repeating: 0.2 / maxDim)
+                }
+
+                model.generateCollisionShapes(recursive: true)
+                model.components.set(InputTargetComponent())
+
+                let scaledBounds = model.visualBounds(relativeTo: cameraRoot)
+                camera.position = SIMD3<Float>(
+                    scaledBounds.center.x,
+                    scaledBounds.center.y,
+                    scaledBounds.min.z
+                )
+            } catch {
+                let fallback = self.makeCameraVisual()
+                cameraRoot.addChild(fallback)
+                fallback.generateCollisionShapes(recursive: true)
+                fallback.components.set(InputTargetComponent())
+                camera.position = SIMD3<Float>(0, 0, -0.05)
+            }
+        }
     }
 
     func setupCameraPanelSwipeGestures() {
@@ -322,16 +347,32 @@ extension CanvasViewController {
         for cam in sceneCameras { cam.isEnabled = false }
         editorCamera.isEnabled = true
         activeCamera = editorCamera
+        // Restore all camera model visuals when returning to editor view
+        for (_, cameraRoot) in cameraToVisualMap {
+            cameraRoot.children.forEach { child in
+                if !(child is PerspectiveCamera) { child.isEnabled = true }
+            }
+        }
         showAllMotionPaths()
         hideExitCameraButton()
     }
 
-    
     func setActiveCamera(_ camera: PerspectiveCamera) {
         for cam in sceneCameras { cam.isEnabled = false }
         editorCamera.isEnabled = false
         camera.isEnabled = true
         activeCamera = camera
+        // Restore visuals for all cameras first, then hide only the active one's visual
+        for (_, cameraRoot) in cameraToVisualMap {
+            cameraRoot.children.forEach { child in
+                if !(child is PerspectiveCamera) { child.isEnabled = true }
+            }
+        }
+        if let activeCameraRoot = cameraToVisualMap[camera] {
+            activeCameraRoot.children.forEach { child in
+                if !(child is PerspectiveCamera) { child.isEnabled = false }
+            }
+        }
         hideAllMotionPaths()
         showExitCameraButton()
     }
@@ -399,35 +440,49 @@ extension CanvasViewController {
         let indexPath = IndexPath(item: index, section: 0)
         let offscreen = previewARView
 
-        // 1. Clone the live main scene into the off-screen ARView
+        // 1. Build a minimal preview scene — only non-camera entities + a camera.
+        //    We deliberately do NOT clone the full scene because USDZ camera
+        //    visuals (cam1) contain geometry that triggers Metal validation errors
+        //    in the off-screen ARView's renderer.
         offscreen.scene.anchors.removeAll()
-        guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else { return }
-        let clonedAnchor = mainAnchor.clone(recursive: true)
-        offscreen.scene.addAnchor(clonedAnchor)
 
-        // 2. Disable all cameras in clone, then enable only the target one
-        clonedAnchor.forEachDescendant { entity in
-            if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
+        let previewAnchor = AnchorEntity(world: .zero)
+        previewAnchor.name = "PreviewAnchor"
+
+        // Copy only non-camera scene entities (props, characters, backgrounds)
+        if let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
+            for child in mainAnchor.children {
+                // Skip camera roots — they contain the USDZ visual that crashes Metal
+                guard child.components[CategoryComponent.self]?.toolType != .camera,
+                      !child.name.hasPrefix("SceneCameraRoot_"),
+                      child.name != "Grid",
+                      child.name != "EditorCamera" else { continue }
+                previewAnchor.addChild(child.clone(recursive: true))
+            }
         }
 
-        if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
-            targetCam.isEnabled = true
-        } else {
-            // Fallback: attach a camera at the same world transform
-            let fallback = PerspectiveCamera()
-            fallback.transform = item.camera.transform
-            fallback.isEnabled = true
-            clonedAnchor.addChild(fallback)
+        // 2. Add a camera positioned at the exact world transform of the scene camera
+        let previewCam = PerspectiveCamera()
+        previewCam.transform = item.camera.transform
+        // If camera is nested under cameraRoot, compute world-space transform
+        if let parent = item.camera.parent {
+            let worldPos  = item.camera.position(relativeTo: nil)
+            let worldOri  = item.camera.orientation(relativeTo: nil)
+            previewCam.position    = worldPos
+            previewCam.orientation = worldOri
         }
+        previewCam.isEnabled = true
+        previewAnchor.addChild(previewCam)
 
-        // 3. Snapshot the off-screen view — main arView is completely untouched
+        offscreen.scene.addAnchor(previewAnchor)
+
+        // 3. Snapshot
         offscreen.snapshot(saveToHDR: false) { [weak self] image in
             guard let self = self, let image = image else { return }
             DispatchQueue.main.async {
                 if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
                     cell.updatePreview(image: image, name: "Camera \(index + 1)")
                 }
-                // Chain to next camera
                 self.snapshotPreviewCamera(at: index + 1)
             }
         }
