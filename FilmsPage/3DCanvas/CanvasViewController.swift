@@ -689,12 +689,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     entity.scale   = SIMD3<Float>(repeating: scale)
                 }
 
-                // Position
-                let randomX    = Float.random(in: -1...1)
-                let randomZ    = Float.random(in: -1...1)
+                // Position — AR-aware (see CanvasViewController+ARInteraction.swift)
                 let finalBounds = entity.visualBounds(relativeTo: nil)
                 let liftToGround = -finalBounds.min.y
-                let finalY     = verticalOffset > 0 ? verticalOffset : liftToGround
+                let spawnX: Float
+                let spawnZ: Float
+                let finalY: Float
+
+                if isARModeActive {
+                    let pos = arSpawnPosition(verticalOffset: verticalOffset, liftToGround: liftToGround)
+                    spawnX = pos.x; finalY = pos.y; spawnZ = pos.z
+                } else {
+                    spawnX = Float.random(in: -1...1)
+                    spawnZ = Float.random(in: -1...1)
+                    finalY = verticalOffset > 0 ? verticalOffset : liftToGround
+                }
 
                 // Unique name — FIX: use cached mainAnchor instead of scene DFS
                 let baseName   = customName ?? item.modelFileName
@@ -707,7 +716,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 }()
 
                 entity.name     = uniqueName
-                entity.position = [randomX, finalY, randomZ]
+                entity.position = [spawnX, finalY, spawnZ]
 
                 entity.components.set(CategoryComponent(toolType: toolType))
                 entity.components.set(EntityIDComponent(id: UUID()))

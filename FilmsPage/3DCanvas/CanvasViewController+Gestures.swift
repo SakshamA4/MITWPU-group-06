@@ -108,11 +108,10 @@ extension CanvasViewController {
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
 
-        // In AR mode: tap to place / reposition the entire scene on the real floor
-        if isARModeActive {
-            placeSceneOnRealSurface(at: location)
-            return
-        }
+        // NOTE: In AR mode we no longer return early here.
+        // Entity selection, gizmos, and action menus work normally.
+        // placeSceneOnRealSurface is called only when the user taps empty space
+        // (see the else-branch at the bottom of this method).
 
         pathEditToolbar?.removeFromSuperview()
         pathEditToolbar = nil
@@ -227,6 +226,9 @@ extension CanvasViewController {
             hideGizmo()
             hideRotationGizmo()
             hideAnimationPanel()
+
+            // AR mode: tap empty space → place scene on detected surface
+            arHandleEmptySpaceTap(at: location)
         }
         
         

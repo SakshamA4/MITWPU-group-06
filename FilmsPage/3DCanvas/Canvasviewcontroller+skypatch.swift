@@ -39,6 +39,11 @@ extension CanvasViewController {
     // This version removes ALL children whose name starts with "ProceduralSky".
 
     func applySky(type: String) {
+        // In AR mode the real camera feed IS the background — skyboxes are meaningless
+        if isARModeActive {
+            showARSkySuppressedToast()
+            return
+        }
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 
         // Remove ALL existing sky variants before adding a new one
@@ -87,6 +92,10 @@ extension CanvasViewController {
     // spawnEntity() intercepts modelFileName == "none" and routes here.
 
     func removeSky() {
+        if isARModeActive {
+            showARSkySuppressedToast()
+            return
+        }
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
         var removed = false
         for child in anchor.children {
@@ -140,6 +149,37 @@ extension CanvasViewController {
     // Calling arView.session.run() on a nonAR-mode ARView crashes instantly
     // because the ARKit session is not bound to this view.
     //
+    // MARK: - AR Sky Toast
+    //
+    // Shows a brief auto-dismissing note explaining why Sky is unavailable in AR mode.
+
+    func showARSkySuppressedToast() {
+        let label = UILabel()
+        label.text = "🌤 Sky is disabled in AR mode — the real camera feed is your background."
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textAlignment = .center
+        label.numberOfLines = 2
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+        label.layer.cornerRadius = 12
+        label.clipsToBounds = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
+            label.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40),
+            label.heightAnchor.constraint(equalToConstant: 44),
+        ])
+
+        UIView.animate(withDuration: 0.3, delay: 2.5, options: .curveEaseOut) {
+            label.alpha = 0
+        } completion: { _ in
+            label.removeFromSuperview()
+        }
+    }
+
     // startARSession / stopARSession now just toggle isARModeActive and hide/show sky.
     // The gesture handlers (orbit, pinch) already guard on isARModeActive, so
     // AR-mode behaviour (locked camera, device-moves-world) still works correctly.

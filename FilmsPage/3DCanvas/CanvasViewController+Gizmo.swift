@@ -113,8 +113,8 @@ extension CanvasViewController {
     
     func updateGizmoPosition() {
         guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
-        // Move gizmo with the object
-        gizmo.position = entity.position(relativeTo: nil)
+        // Delegate to ARInteraction helper — keeps coordinate-space logic out of this file
+        gizmo.position = gizmoPositionForEntity(entity)
     }
 
     func getLocalAxis(for part: GizmoPart, from entity: Entity) -> SIMD3<Float> {
