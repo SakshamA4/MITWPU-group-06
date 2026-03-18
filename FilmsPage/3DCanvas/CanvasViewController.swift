@@ -350,6 +350,17 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var pitch: Float = 0.5
     var distance: Float = 5.0
     var cameraTarget = SIMD3<Float>(0, 0, 0)
+    /// Snapshot of yaw at the start of a twist gesture — used for accumulated yaw rotation
+    var initialCameraYaw: Float? = nil
+
+    // ── Camera framing animation state ────────────────────────────────────────
+    var framingDisplayLink: CADisplayLink? = nil
+    var framingStartTarget: SIMD3<Float>   = .zero
+    var framingEndTarget:   SIMD3<Float>   = .zero
+    var framingStartDist:   Float          = 5.0
+    var framingEndDist:     Float          = 5.0
+    var framingStartTime:   CFTimeInterval = 0
+    var framingDuration:    CFTimeInterval = 0.35
     
     //camera system
     var editorCamera: PerspectiveCamera!
@@ -1510,19 +1521,23 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         case .changed:
             guard editorMode == .edit else { return }
 
-            // Lock Check
+            // Lock Check — locked entity: 1-finger drag pans the camera
             if let entity = selectedEntity {
                 let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
                 if isLocked {
-                    handleCameraOrbit(gesture)
+                    let t = gesture.translation(in: arView)
+                    panCameraTarget(translation: t)
+                    gesture.setTranslation(.zero, in: arView)
                     return
                 }
             }
 
-            // Must have a gizmo part grabbed
+            // Must have a gizmo part grabbed — otherwise 1-finger pans the camera
             guard activeGizmoPart != .none,
                   let startPos = dragStartPosition else {
-                handleCameraOrbit(gesture)
+                let t = gesture.translation(in: arView)
+                panCameraTarget(translation: t)
+                gesture.setTranslation(.zero, in: arView)
                 return
             }
 
@@ -1530,7 +1545,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             if activeGizmoPart == .rotateX || activeGizmoPart == .rotateY || activeGizmoPart == .rotateZ {
                 guard let axis = activeRotationAxis,
                       let selected = selectedEntity else {
-                    handleCameraOrbit(gesture)
+                    let t = gesture.translation(in: arView)
+                    panCameraTarget(translation: t)
+                    gesture.setTranslation(.zero, in: arView)
                     return
                 }
                 let dx = Float(location.x - lastPanLocation.x)
