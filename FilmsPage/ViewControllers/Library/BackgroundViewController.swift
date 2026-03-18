@@ -44,7 +44,7 @@ class BackgroundViewController: UIViewController {
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
-            self.backgroundCollectionView.collectionViewLayout.invalidateLayout()
+            self.backgroundCollectionView?.collectionViewLayout.invalidateLayout()
         })
     }
 
