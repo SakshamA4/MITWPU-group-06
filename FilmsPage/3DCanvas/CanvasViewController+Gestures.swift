@@ -90,7 +90,7 @@ extension CanvasViewController {
             initialCameraYaw = yaw
         case .changed:
             guard let startYaw = initialCameraYaw else { return }
-            yaw = startYaw - Float(gesture.rotation)
+            yaw = startYaw + Float(gesture.rotation)
             updateEditorCamera()
         case .ended, .cancelled:
             initialCameraYaw = nil
