@@ -377,10 +377,11 @@ extension CanvasViewController {
                 if !(child is PerspectiveCamera) { child.isEnabled = false }
             }
         }
-        // Hide gizmos — they obstruct the camera preview
+        // Hide gizmos and all editor overlays — they obstruct the camera preview
         gizmoRoot?.isEnabled = false
         rotationGizmo?.isEnabled = false
         hideAllMotionPaths()
+        hideAllRotationArcs()
         showExitCameraButton()
     }
 
