@@ -9,7 +9,6 @@ extension CanvasViewController {
     func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
         // In AR mode the real device camera moves — no editor orbit needed
         if isARModeActive { return }
-        if selectedEntity != nil { return }
         let translation = gesture.translation(in: arView)
         
         yaw -= Float(translation.x) * 0.005
