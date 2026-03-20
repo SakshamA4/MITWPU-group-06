@@ -111,31 +111,76 @@ extension CanvasViewController {
 
     // ── Shot Settings presented after picking a shot ──────────────────────────
     func presentShotSettings(selection: ShotSelection, cameraEntity: Entity) {
+
+        // Determine whether this selection needs rotation controls
+        let isRotation: Bool
+        var presetAxis    = RotationAxis.y
+        var presetDegrees: Float = 60
+
+        if case .movement(let p) = selection {
+            switch p {
+            case .pan:
+                isRotation    = true
+                presetAxis    = .y
+                presetDegrees = 60   // π/3 in degrees
+            case .tilt:
+                isRotation    = true
+                presetAxis    = .x
+                presetDegrees = -40  // −π/4.5 ≈ −40°
+            default:
+                isRotation = false
+            }
+        } else {
+            isRotation = false
+        }
+
         let shotName: String
         switch selection {
         case .movement(let p): shotName = p.rawValue
         case .static_(let p):  shotName = p.rawValue
         }
 
-        let card = AnimationInputCard(mode: .addShot(
-            shotName:     shotName,
-            defaultStart: timeline.duration
-        ))
+        let card: AnimationInputCard
 
-        card.onConfirm = { [weak self] startTime, duration, _, _ in
-            guard let self, duration > 0 else { return }
-            switch selection {
-            case .movement(let preset):
-                self.applyCameraMovementPreset(preset, to: cameraEntity,
+        if isRotation {
+            // Pan / Tilt — show full rotation card so user can tweak axis + degrees
+            card = AnimationInputCard(mode: .editRotateFull(
+                currentStart:    timeline.duration,
+                currentDuration: 3.0,
+                currentDegrees:  presetDegrees,
+                currentAxis:     presetAxis
+            ))
+            card.onConfirm = { [weak self] startTime, duration, degrees, axis in
+                guard let self, duration > 0 else { return }
+                // Override the clip values with what the user chose
+                self.applyCameraRotationShot(
+                    selection:    selection,
+                    cameraEntity: cameraEntity,
+                    startTime:    startTime,
+                    duration:     duration,
+                    degrees:      degrees,
+                    axis:         axis
+                )
+            }
+        } else {
+            // Dolly / Crane / Static — just timing
+            card = AnimationInputCard(mode: .addShot(
+                shotName:     shotName,
+                defaultStart: timeline.duration
+            ))
+            card.onConfirm = { [weak self] startTime, duration, _, _ in
+                guard let self, duration > 0 else { return }
+                switch selection {
+                case .movement(let preset):
+                    self.applyCameraMovementPreset(preset, to: cameraEntity,
+                                                   startTime: startTime, duration: duration)
+                case .static_(let preset):
+                    self.applyStaticShotPreset(preset, to: cameraEntity,
                                                startTime: startTime, duration: duration)
-            case .static_(let preset):
-                self.applyStaticShotPreset(preset, to: cameraEntity,
-                                           startTime: startTime, duration: duration)
+                }
             }
         }
 
-        // The shot picker sheet is still presented — present the card on top of it
-        // (or dismiss sheet first if it's still visible)
         if let presented = presentedViewController {
             presented.dismiss(animated: true) { [weak self] in
                 self?.present(card, animated: false)
@@ -143,6 +188,35 @@ extension CanvasViewController {
         } else {
             present(card, animated: false)
         }
+    }
+
+    /// Applies a pan or tilt with user-specified degrees and axis.
+    private func applyCameraRotationShot(
+        selection:    ShotSelection,
+        cameraEntity: Entity,
+        startTime:    Float,
+        duration:     Float,
+        degrees:      Float,
+        axis:         RotationAxis
+    ) {
+        if baseTransforms[cameraEntity.name] == nil {
+            baseTransforms[cameraEntity.name] = cameraEntity.transform
+        }
+        let clip = AnimationClip(
+            entityName: cameraEntity.name,
+            type:       .rotate,
+            track:      .rotation,
+            easing:     .easeInOut,
+            startTime:  startTime,
+            duration:   duration,
+            fromValue:  axis.simdAxis,
+            toValue:    SIMD3<Float>(degrees * (.pi / 180), 0, 0)
+        )
+        timeline.addClip(clip)
+        if let entity = arView.scene.findEntity(named: cameraEntity.name) {
+            showRotationArc(for: clip, on: entity)
+        }
+        debugPrintTimeline()
     }
 
     // ── Camera Movement Application ───────────────────────────────────────────
@@ -169,10 +243,10 @@ extension CanvasViewController {
             fromValue = RotationAxis.y.simdAxis
             toValue   = SIMD3<Float>(.pi / 3, 0, 0)
         case .tilt:
-            // X-axis rotation (vertical tilt): totalRadians = pi/4.5 (~40°)
+            // X-axis rotation — negative angle tilts down (toward the subject)
             track     = .rotation
             fromValue = RotationAxis.x.simdAxis
-            toValue   = SIMD3<Float>(.pi / 4.5, 0, 0)
+            toValue   = SIMD3<Float>(-.pi / 4.5, 0, 0)
         case .dollyIn, .dollyOut, .crane:
             track     = .position
             fromValue = .zero
@@ -233,9 +307,13 @@ extension CanvasViewController {
         preset: CameraMovementPreset,
         camera: Entity
     ) -> BezierMotionPath? {
-        let origin  = camera.position(relativeTo: nil)
-        let rot     = camera.orientation(relativeTo: nil)
-        let forward = rot.act(SIMD3<Float>( 0,  0, -1))
+        let origin = camera.position(relativeTo: nil)
+        let rot    = camera.orientation(relativeTo: nil)
+
+        // The PerspectiveCamera child is rotated 180° around Y so it shoots
+        // along +Z (toward the lens front). Use +Z as the camera's forward
+        // vector so dolly/crane paths move in the correct direction.
+        let forward = rot.act(SIMD3<Float>( 0,  0,  1))
         let up      = rot.act(SIMD3<Float>( 0,  1,  0))
 
         switch preset {
@@ -249,10 +327,10 @@ extension CanvasViewController {
                 start: origin, control1: origin - forward * 0.5,
                 control2: origin - forward * 1.5, end: origin - forward * 2.0)
         case .crane:
-            let lift = up * 1.5; let nudge = forward * 0.5
+            let lift = up * 1.5
             return BezierMotionPath(
                 start: origin, control1: origin + up * 0.5,
-                control2: origin + lift + forward * 0.3, end: origin + lift + nudge)
+                control2: origin + lift + forward * 0.3, end: origin + lift + forward * 0.5)
         }
     }
 }

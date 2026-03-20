@@ -536,12 +536,10 @@ extension CanvasViewController {
     
     func exitTimelineMode() {
         editorMode = .edit
-        // Re-show motion paths and rotation arcs when the editor camera is active.
-        // If a scene camera is selected, paths stay hidden.
-        if activeCamera === editorCamera {
-            showAllMotionPaths()
-            showAllRotationArcs()   // arcs survive playback — just re-enable them
-        }
+        // Always restore arc and path visibility — setActiveCamera/activateEditorCamera
+        // handles hiding them again if a scene camera is still active.
+        showAllMotionPaths()
+        showAllRotationArcs()
         for (name, transform) in baseTransforms {
             arView.scene.findEntity(named: name)?.transform = transform
         }

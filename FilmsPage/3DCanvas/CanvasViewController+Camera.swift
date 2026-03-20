@@ -354,6 +354,7 @@ extension CanvasViewController {
             }
         }
         showAllMotionPaths()
+        showAllRotationArcs()
         hideExitCameraButton()
         // Restore gizmos in editor view
         gizmoRoot?.isEnabled = true
