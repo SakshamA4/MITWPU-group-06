@@ -652,6 +652,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     func setupARView() {
         arView = ARView(frame: view.bounds)
         arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Use non-AR mode so PerspectiveCamera entities in the scene control
+        // the viewpoint — without this, ARKit owns the camera and
+        // camera.isEnabled = true has no visible effect.
+        arView.cameraMode = .nonAR
         // Stop RealityKit auto-starting its own AR session (prevents background grid artefact)
         arView.automaticallyConfigureSession = false
         // Disable post-processing so editor stays crisp and AR has no blurry-wave ghosting
@@ -1738,31 +1742,29 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // Rotation arc handles use direct radial drag (see handlePan .began arc block)
                 // and never reach this isMovingHandle path.
             } else {
+                // Capture position BEFORE moving so we can compute the true per-frame delta
+                let prevPos = target.position
                 target.position = newPos
                 updateGizmoPosition()
 
-                // Shift all motion paths for this entity by the same delta,
-                // computed once from the FIRST clip so consecutive paths stay connected.
                 let entityName = target.name
+                let frameDelta = newPos - prevPos
+                guard simd_length(frameDelta) > 0.00001 else { break }
+
+                // Shift all motion paths by the per-frame delta
                 let pathClipIndices = timeline.clips.indices.filter {
                     timeline.clips[$0].entityName == entityName &&
                     timeline.clips[$0].motionPath != nil
                 }.sorted { timeline.clips[$0].startTime < timeline.clips[$1].startTime }
 
-                guard let firstIdx = pathClipIndices.first,
-                      let firstPath = timeline.clips[firstIdx].motionPath else { break }
-
-                let entityDelta = newPos - firstPath.start
-                guard simd_length(entityDelta) > 0.00001 else { break }
-
                 for clipIndex in pathClipIndices {
                     guard var path = timeline.clips[clipIndex].motionPath,
                           let visual = activeMotionPaths[timeline.clips[clipIndex].id]
                     else { continue }
-                    path.start    += entityDelta
-                    path.control1 += entityDelta
-                    path.control2 += entityDelta
-                    path.end      += entityDelta
+                    path.start    += frameDelta
+                    path.control1 += frameDelta
+                    path.control2 += frameDelta
+                    path.end      += frameDelta
                     path.rebuildArcLengthTable()
                     timeline.clips[clipIndex].motionPath = path
                     visual.root.position           = path.start
@@ -1773,6 +1775,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     if let pathMesh = visual.root.findEntity(named: "MotionPath") as? ModelEntity {
                         MotionPathRenderer.updatePathMesh(entity: pathMesh, path: path)
                     }
+                }
+
+                // Shift rotation arcs by the same per-frame delta
+                for (clipID, visual) in activeRotationArcs {
+                    guard let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
+                          timeline.clips[clipIdx].entityName == entityName else { continue }
+                    visual.root.position += frameDelta
                 }
             }
 
