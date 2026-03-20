@@ -352,7 +352,16 @@ extension CanvasViewController {
             hierarchyStackView.addArrangedSubview(header)
             
             for entity in entities {
-                let row = createHierarchyItemRow(title: entity.name)
+                // For camera entities, show the human-readable "Camera N" name
+                // instead of the raw internal name (e.g. "SceneCamera_1_<UUID>").
+                let displayTitle: String
+                if tool == .camera,
+                   let cameraItem = sceneCameraItems.first(where: { $0.cameraRoot === entity }) {
+                    displayTitle = cameraItem.displayName
+                } else {
+                    displayTitle = entity.name
+                }
+                let row = createHierarchyItemRow(title: displayTitle, entityName: entity.name)
                 hierarchyStackView.addArrangedSubview(row)
             }
         }
@@ -387,13 +396,15 @@ extension CanvasViewController {
 
 
     
-    private func createHierarchyItemRow(title: String) -> UIView {
+    private func createHierarchyItemRow(title: String, entityName: String? = nil) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
         
         // 2. Set the title and color
         config.title = title
-        let isSelected = selectedEntity?.name == title
+        // Selection highlight uses the actual entity name for the match
+        let nameForSelection = entityName ?? title
+        let isSelected = selectedEntity?.name == nameForSelection
         config.baseForegroundColor = isSelected ? .systemRed : .label
         
         config.contentInsets = NSDirectionalEdgeInsets(
@@ -415,10 +426,10 @@ extension CanvasViewController {
         // Alignment still works on the button property
         button.contentHorizontalAlignment = .leading
         
-        // 6. Add the action
+        // 6. Add the action — select by the real entity name, not the display label
         button.addAction(
             UIAction { [weak self] _ in
-                self?.selectEntityFromSidebar(named: title)
+                self?.selectEntityFromSidebar(named: nameForSelection)
             },
             for: .touchUpInside
         )

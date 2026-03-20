@@ -72,13 +72,21 @@ final class ShotPlayerViewController: UIViewController {
      private var lastSnapshotTime: CFTimeInterval = 0
      private var currentShot: Shot { shots[currentIndex] }
 
+     // MARK: - Layout state
+
+    /// Active portrait/landscape NSLayoutConstraint sets — swapped on rotation.
+    private var portraitConstraints:  [NSLayoutConstraint] = []
+    private var landscapeConstraints: [NSLayoutConstraint] = []
+    private var activeOrientationConstraints: [NSLayoutConstraint] = []
+
     // MARK: - UI: Frame Viewer
 
-    /// Full-width 16:9 frame — shows the shot's camera POV
+    /// Full-bleed frame that shows the shot's camera POV render.
     private lazy var frameView: UIView = {
         let v = UIView()
         v.backgroundColor = thumbBg
         v.clipsToBounds   = true
+        v.layer.cornerRadius = 4
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -93,61 +101,63 @@ final class ShotPlayerViewController: UIViewController {
 
     private let framePlaceholder: UIImageView = {
         let iv = UIImageView()
-        let cfg = UIImage.SymbolConfiguration(pointSize: 40, weight: .ultraLight)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 36, weight: .ultraLight)
         iv.image     = UIImage(systemName: "camera.aperture", withConfiguration: cfg)
-        iv.tintColor = UIColor.white.withAlphaComponent(0.07)
+        iv.tintColor = UIColor.white.withAlphaComponent(0.06)
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
 
-    // Spinner shown while snapshot is in-flight
     private let loadingSpinner: UIActivityIndicatorView = {
         let s = UIActivityIndicatorView(style: .medium)
-        s.color = UIColor.white.withAlphaComponent(0.3)
+        s.color = UIColor.white.withAlphaComponent(0.25)
         s.hidesWhenStopped = true
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
 
-    // MARK: - UI: HUD (overlaid on frame)
+    // MARK: - UI: HUD chips (overlaid on frame corners)
 
+    /// Shot label — top-left chip
     private let hudShotLbl: UILabel = {
         let l = UILabel()
-        l.font            = .systemFont(ofSize: 12, weight: .bold)
+        l.font            = .systemFont(ofSize: 11, weight: .bold)
         l.textColor       = .white
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.48)
-        l.layer.cornerRadius = 5; l.clipsToBounds = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    private let hudCamLbl: UILabel = {
-        let l = UILabel()
-        l.font            = .systemFont(ofSize: 10, weight: .medium)
-        l.textColor       = UIColor.white.withAlphaComponent(0.75)
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.38)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.52)
         l.layer.cornerRadius = 4; l.clipsToBounds = true
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
+    /// Camera name — below shot label
+    private let hudCamLbl: UILabel = {
+        let l = UILabel()
+        l.font            = .systemFont(ofSize: 10, weight: .medium)
+        l.textColor       = UIColor.white.withAlphaComponent(0.70)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.40)
+        l.layer.cornerRadius = 4; l.clipsToBounds = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    /// Timecode — top-right chip
     private let hudTimeLbl: UILabel = {
         let l = UILabel()
         l.font            = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         l.textColor       = .white
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.44)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.50)
         l.layer.cornerRadius = 4; l.clipsToBounds = true
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
-    /// Briefly shown on cut transition
+    /// Cut transition banner — fades in/out at center of frame
     private let cutFlashLbl: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 12, weight: .semibold)
-        l.textColor = UIColor.white.withAlphaComponent(0.75)
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        l.textColor = UIColor.white.withAlphaComponent(0.80)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.60)
         l.layer.cornerRadius = 5; l.clipsToBounds = true
         l.textAlignment = .center
         l.alpha = 0
@@ -155,19 +165,19 @@ final class ShotPlayerViewController: UIViewController {
         return l
     }()
 
-    // MARK: - UI: Progress Bar (slim, overlaid at bottom of frame)
+    // MARK: - UI: Progress / scrubber row (sits below frame)
 
     private lazy var progressBar: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.black.withAlphaComponent(0.60)
+        v.backgroundColor = UIColor.white.withAlphaComponent(0.04)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
 
     private let progressTrack: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.white.withAlphaComponent(0.15)
-        v.layer.cornerRadius = 2
+        v.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        v.layer.cornerRadius = 2.5
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -175,7 +185,7 @@ final class ShotPlayerViewController: UIViewController {
     private lazy var progressFill: UIView = {
         let v = UIView()
         v.backgroundColor = accentRed
-        v.layer.cornerRadius = 2
+        v.layer.cornerRadius = 2.5
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -196,7 +206,7 @@ final class ShotPlayerViewController: UIViewController {
     private let scrubStartLbl: UILabel = {
         let l = UILabel()
         l.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
-        l.textColor = UIColor.white.withAlphaComponent(0.45)
+        l.textColor = UIColor.white.withAlphaComponent(0.40)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -204,30 +214,63 @@ final class ShotPlayerViewController: UIViewController {
     private let scrubEndLbl: UILabel = {
         let l = UILabel()
         l.font = .monospacedDigitSystemFont(ofSize: 10, weight: .medium)
-        l.textColor = UIColor.white.withAlphaComponent(0.45)
+        l.textColor = UIColor.white.withAlphaComponent(0.40)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     private var progressFillWidthConstraint: NSLayoutConstraint?
 
-    // MARK: - UI: Controls Panel
+    // MARK: - UI: Right-side panel (controls + shot list)
 
-    private lazy var controlsPanel: UIView = {
+    /// Dark sidebar container visible in landscape; collapses to a bottom strip in portrait.
+    private lazy var sidePanel: UIView = {
         let v = UIView()
         v.backgroundColor = panelColor
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
 
-    private let shotInfoLbl: UILabel = {
+    // Shot name + camera name stacked above buttons
+    private let shotNameLbl: UILabel = {
         let l = UILabel()
-        l.font = .systemFont(ofSize: 11, weight: .medium)
-        l.textColor = UIColor.white.withAlphaComponent(0.38)
+        l.font = .systemFont(ofSize: 15, weight: .semibold)
+        l.textColor = .white
+        l.textAlignment = .center
+        l.adjustsFontSizeToFitWidth = true
+        l.minimumScaleFactor = 0.75
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let camNameLbl: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 11, weight: .regular)
+        l.textColor = UIColor.white.withAlphaComponent(0.42)
         l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
+
+    // Thin accent line under shot name
+    private lazy var accentBar: UIView = {
+        let v = UIView()
+        v.backgroundColor = accentRed
+        v.layer.cornerRadius = 1
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    // Controls panel (still used for the button row)
+    private lazy var controlsPanel: UIView = {
+        let v = UIView()
+        v.backgroundColor = .clear
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    // The old shotInfoLbl is kept as an alias so syncToCurrentShot() compiles unchanged
+    private var shotInfoLbl: UILabel { camNameLbl }
 
     private lazy var prevBtn  = makeControlBtn(icon: "backward.end.fill",  size: 16)
     private lazy var playBtn  = makeControlBtn(icon: "play.fill",           size: 22)
@@ -237,10 +280,9 @@ final class ShotPlayerViewController: UIViewController {
 
     private lazy var filmStrip: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection     = .horizontal
-        layout.itemSize            = CGSize(width: 64, height: 42)
-        layout.minimumLineSpacing  = 6
-        layout.sectionInset        = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+        layout.scrollDirection    = .horizontal
+        layout.minimumLineSpacing = 8
+        layout.sectionInset       = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.backgroundColor = .clear
         cv.showsHorizontalScrollIndicator = false
@@ -254,12 +296,22 @@ final class ShotPlayerViewController: UIViewController {
         let l = UILabel()
         l.text = "SHOTS"
         l.font = .systemFont(ofSize: 9, weight: .black)
-        l.textColor = UIColor.white.withAlphaComponent(0.18)
+        l.textColor = UIColor.white.withAlphaComponent(0.20)
+        l.letterSpacing(1.5)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     // MARK: - Lifecycle
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Ensure buttons are perfect circles after Auto Layout resolves their sizes
+        for btn in [prevBtn, nextBtn] {
+            btn.layer.cornerRadius = btn.bounds.height / 2
+        }
+        playBtn.layer.cornerRadius = playBtn.bounds.height / 2
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -270,22 +322,20 @@ final class ShotPlayerViewController: UIViewController {
         if playAll { startPlayback() }
     }
 
-     override func viewWillDisappear(_ animated: Bool) {
-         super.viewWillDisappear(animated)
-         stopPlayback()
-         // BUG FIX: Clean up the offscreen preview clone so it doesn't affect the live scene
-         // Note: arView is weak, so we don't need to nullify it on pop
-         // Reset timeline to t=0 so entities return to initial state
-         evaluateTimeline?(0)
-         
-         // Memory cleanup: release cached image to avoid memory pressure
-         frameImageView.image = nil
-         snapshotInFlight = nil
-     }
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopPlayback()
+        evaluateTimeline?(0)
+        frameImageView.image = nil
+        snapshotInFlight = nil
+    }
 
-    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+    override func viewWillTransition(to size: CGSize,
+                                     with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
-        coordinator.animate(alongsideTransition: { _ in
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            guard let self = self else { return }
+            self.applyOrientation(size: size)
             self.filmStrip.collectionViewLayout.invalidateLayout()
         })
     }
@@ -300,7 +350,7 @@ final class ShotPlayerViewController: UIViewController {
             .foregroundColor: UIColor.white,
             .font: UIFont.systemFont(ofSize: 15, weight: .semibold)
         ]
-        appearance.shadowColor = UIColor.white.withAlphaComponent(0.06)
+        appearance.shadowColor = UIColor.white.withAlphaComponent(0.05)
         navigationController?.navigationBar.standardAppearance   = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .white
@@ -319,28 +369,10 @@ final class ShotPlayerViewController: UIViewController {
         navigationItem.rightBarButtonItem = exportItem
     }
 
-    // MARK: - Layout
-    //
-    //  [NavBar]
-    //  ┌───────────────────────────────┐
-    //  │  frameView  (16:9)            │
-    //  │   ├─ frameImageView           │
-    //  │   ├─ framePlaceholder         │
-    //  │   ├─ HUD (shot / cam / time)  │
-    //  │   └─ progressBar (bottom)     │
-    //  │       [start][track/scrub][end]│
-    //  └───────────────────────────────┘
-    //  ┌───────────────────────────────┐
-    //  │  controlsPanel                │
-    //  │   shotInfoLbl (centered)      │
-    //  │   [prev]  [▶]  [next]         │
-    //  └───────────────────────────────┘
-    //   SHOTS label
-    //  ┌─────── filmStrip ─────────────┐
-    //  └───────────────────────────────┘
+
 
     private func buildLayout() {
-        // Frame view
+        // ── Frame internals (image + HUD chips only — NO scrubber inside frame) ─
         frameView.addSubview(frameImageView)
         frameView.addSubview(framePlaceholder)
         frameView.addSubview(loadingSpinner)
@@ -349,94 +381,124 @@ final class ShotPlayerViewController: UIViewController {
         frameView.addSubview(hudTimeLbl)
         frameView.addSubview(cutFlashLbl)
 
-        // Progress bar (bottom of frame)
+
         progressTrack.addSubview(progressFill)
+        progressBar.addSubview(scrubStartLbl)
         progressBar.addSubview(progressTrack)
         progressBar.addSubview(scrubber)
-        progressBar.addSubview(scrubStartLbl)
         progressBar.addSubview(scrubEndLbl)
-        frameView.addSubview(progressBar)
-        view.addSubview(frameView)
 
-        // Controls panel
+        // Shot info row — name left, cam right in landscape; stacked in portrait
+        sidePanel.addSubview(shotNameLbl)
+        sidePanel.addSubview(camNameLbl)
+        sidePanel.addSubview(accentBar)
+
         let btnStack = UIStackView(arrangedSubviews: [prevBtn, playBtn, nextBtn])
-        btnStack.axis = .horizontal; btnStack.spacing = 28; btnStack.alignment = .center
+        btnStack.axis      = .horizontal
+        btnStack.alignment = .center
+        btnStack.spacing   = 28
         btnStack.translatesAutoresizingMaskIntoConstraints = false
-        controlsPanel.addSubview(shotInfoLbl)
         controlsPanel.addSubview(btnStack)
-        view.addSubview(controlsPanel)
 
-        // Film strip
-        view.addSubview(filmStripLabel)
-        view.addSubview(filmStrip)
+        sidePanel.addSubview(controlsPanel)
+        sidePanel.addSubview(progressBar)
+        sidePanel.addSubview(filmStripLabel)
+        sidePanel.addSubview(filmStrip)
 
-        // Separator lines
-        let sep1 = hairline(); view.addSubview(sep1)
-        let sep2 = hairline(); view.addSubview(sep2)
+        // ── Root hierarchy ─────────────────────────────────────────────────────
+        view.addSubview(frameView)
+        view.addSubview(sidePanel)
+        let divider = hairline()
+        view.addSubview(divider)
 
+        // ── Fill-width progress constraint ─────────────────────────────────────
         let fillW = progressFill.widthAnchor.constraint(equalToConstant: 0)
         fillW.isActive = true
         progressFillWidthConstraint = fillW
 
-        // Determine if iPad or iPhone
-        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-        let controlPanelHeight: CGFloat = isIPad ? 100 : 84
-        let buttonSize: CGFloat = isIPad ? 56 : 50
-        let playButtonSize: CGFloat = isIPad ? 62 : 50
-        let buttonSpacing: CGFloat = isIPad ? 36 : 28
+        // ── Adaptive sizing ────────────────────────────────────────────────────
+        let is13inch = UIScreen.main.bounds.width >= 1024 || UIScreen.main.bounds.height >= 1024
+        let btnSize:  CGFloat = is13inch ? 56 : 50
+        let playSize: CGFloat = is13inch ? 62 : 56
+        let sidePanelWidth: CGFloat = is13inch ? 280 : 240
 
+        // ── SHARED constraints (both orientations) ─────────────────────────────
         NSLayoutConstraint.activate([
 
-            // ── Frame view ──────────────────────────────────────────────
-            frameView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            frameView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            frameView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            frameView.heightAnchor.constraint(equalTo: frameView.widthAnchor, multiplier: 9.0/16.0),
-
+            // Frame image fills entire frameView
             frameImageView.topAnchor.constraint(equalTo: frameView.topAnchor),
             frameImageView.leadingAnchor.constraint(equalTo: frameView.leadingAnchor),
             frameImageView.trailingAnchor.constraint(equalTo: frameView.trailingAnchor),
             frameImageView.bottomAnchor.constraint(equalTo: frameView.bottomAnchor),
 
+            // Placeholder icon — centered
             framePlaceholder.centerXAnchor.constraint(equalTo: frameView.centerXAnchor),
             framePlaceholder.centerYAnchor.constraint(equalTo: frameView.centerYAnchor),
-            framePlaceholder.widthAnchor.constraint(equalToConstant: 48),
-            framePlaceholder.heightAnchor.constraint(equalToConstant: 48),
+            framePlaceholder.widthAnchor.constraint(equalToConstant: 44),
+            framePlaceholder.heightAnchor.constraint(equalToConstant: 44),
 
             loadingSpinner.centerXAnchor.constraint(equalTo: frameView.centerXAnchor),
             loadingSpinner.centerYAnchor.constraint(equalTo: frameView.centerYAnchor),
 
-            // ── HUD top-left ─────────────────────────────────────────────
+            // HUD top-left: shot name chip
             hudShotLbl.topAnchor.constraint(equalTo: frameView.topAnchor, constant: 10),
             hudShotLbl.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
-
-            hudCamLbl.topAnchor.constraint(equalTo: hudShotLbl.bottomAnchor, constant: 4),
+            // HUD top-left: camera name chip below shot
+            hudCamLbl.topAnchor.constraint(equalTo: hudShotLbl.bottomAnchor, constant: 3),
             hudCamLbl.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
-
-            // ── HUD bottom-left ─────────────────────────────────────────
-            hudTimeLbl.bottomAnchor.constraint(equalTo: progressBar.topAnchor, constant: -6),
-            hudTimeLbl.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
-
-            // ── Cut flash — bottom center above progress bar ─────────────
-            cutFlashLbl.bottomAnchor.constraint(equalTo: progressBar.topAnchor, constant: -6),
+            // HUD top-right: timecode
+            hudTimeLbl.topAnchor.constraint(equalTo: frameView.topAnchor, constant: 10),
+            hudTimeLbl.trailingAnchor.constraint(equalTo: frameView.trailingAnchor, constant: -10),
+            // Cut flash banner — vertically centred
             cutFlashLbl.centerXAnchor.constraint(equalTo: frameView.centerXAnchor),
+            cutFlashLbl.centerYAnchor.constraint(equalTo: frameView.centerYAnchor),
 
-            // ── Progress bar (pinned to bottom of frame) ──────────────────
-            progressBar.leadingAnchor.constraint(equalTo: frameView.leadingAnchor),
-            progressBar.trailingAnchor.constraint(equalTo: frameView.trailingAnchor),
-            progressBar.bottomAnchor.constraint(equalTo: frameView.bottomAnchor),
-            progressBar.heightAnchor.constraint(equalToConstant: 44),
+            // ── Side panel top info row ────────────────────────────────────────
+            // Shot name — left-aligned, top of panel
+            shotNameLbl.topAnchor.constraint(equalTo: sidePanel.topAnchor, constant: 14),
+            shotNameLbl.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor, constant: 16),
+            // Camera name — right-aligned, vertically centred with shot name
+            camNameLbl.centerYAnchor.constraint(equalTo: shotNameLbl.centerYAnchor),
+            camNameLbl.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor, constant: -16),
+            camNameLbl.leadingAnchor.constraint(greaterThanOrEqualTo: shotNameLbl.trailingAnchor, constant: 8),
+            // Thin accent underline
+            accentBar.topAnchor.constraint(equalTo: shotNameLbl.bottomAnchor, constant: 8),
+            accentBar.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor, constant: 16),
+            accentBar.widthAnchor.constraint(equalToConstant: 28),
+            accentBar.heightAnchor.constraint(equalToConstant: 2),
 
-            scrubStartLbl.leadingAnchor.constraint(equalTo: progressBar.leadingAnchor, constant: 12),
+            // ── Button row (controls panel) ────────────────────────────────────
+            controlsPanel.topAnchor.constraint(equalTo: accentBar.bottomAnchor, constant: 10),
+            controlsPanel.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
+            controlsPanel.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor),
+            controlsPanel.heightAnchor.constraint(equalToConstant: playSize + 16),
+
+            btnStack.centerXAnchor.constraint(equalTo: controlsPanel.centerXAnchor),
+            btnStack.centerYAnchor.constraint(equalTo: controlsPanel.centerYAnchor),
+
+            prevBtn.widthAnchor.constraint(equalToConstant: btnSize),
+            prevBtn.heightAnchor.constraint(equalToConstant: btnSize),
+            playBtn.widthAnchor.constraint(equalToConstant: playSize),
+            playBtn.heightAnchor.constraint(equalToConstant: playSize),
+            nextBtn.widthAnchor.constraint(equalToConstant: btnSize),
+            nextBtn.heightAnchor.constraint(equalToConstant: btnSize),
+
+            // ── Scrubber / timeline row — BELOW buttons ────────────────────────
+            progressBar.topAnchor.constraint(equalTo: controlsPanel.bottomAnchor, constant: 4),
+            progressBar.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
+            progressBar.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor),
+            progressBar.heightAnchor.constraint(equalToConstant: 40),
+
+            scrubStartLbl.leadingAnchor.constraint(equalTo: progressBar.leadingAnchor, constant: 14),
             scrubStartLbl.centerYAnchor.constraint(equalTo: progressBar.centerYAnchor),
-            scrubStartLbl.widthAnchor.constraint(equalToConstant: 40),
+            scrubStartLbl.widthAnchor.constraint(equalToConstant: 38),
 
-            scrubEndLbl.trailingAnchor.constraint(equalTo: progressBar.trailingAnchor, constant: -12),
+            scrubEndLbl.trailingAnchor.constraint(equalTo: progressBar.trailingAnchor, constant: -14),
             scrubEndLbl.centerYAnchor.constraint(equalTo: progressBar.centerYAnchor),
-            scrubEndLbl.widthAnchor.constraint(equalToConstant: 40),
+            scrubEndLbl.widthAnchor.constraint(equalToConstant: 38),
 
-            progressTrack.leadingAnchor.constraint(equalTo: scrubStartLbl.trailingAnchor, constant: 6),
-            progressTrack.trailingAnchor.constraint(equalTo: scrubEndLbl.leadingAnchor, constant: -6),
+            progressTrack.leadingAnchor.constraint(equalTo: scrubStartLbl.trailingAnchor, constant: 8),
+            progressTrack.trailingAnchor.constraint(equalTo: scrubEndLbl.leadingAnchor, constant: -8),
             progressTrack.centerYAnchor.constraint(equalTo: progressBar.centerYAnchor),
             progressTrack.heightAnchor.constraint(equalToConstant: 4),
 
@@ -448,49 +510,78 @@ final class ShotPlayerViewController: UIViewController {
             scrubber.trailingAnchor.constraint(equalTo: progressTrack.trailingAnchor, constant: 12),
             scrubber.centerYAnchor.constraint(equalTo: progressBar.centerYAnchor),
 
-            // ── Separator 1 (frame / controls) ───────────────────────────
-            sep1.topAnchor.constraint(equalTo: frameView.bottomAnchor),
-            sep1.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sep1.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            sep1.heightAnchor.constraint(equalToConstant: 1),
+            // ── Film strip — below scrubber row ───────────────────────────────
+            filmStripLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 10),
+            filmStripLabel.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor, constant: 16),
 
-            // ── Controls panel ────────────────────────────────────────────
-            controlsPanel.topAnchor.constraint(equalTo: sep1.bottomAnchor),
-            controlsPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            controlsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlsPanel.heightAnchor.constraint(equalToConstant: controlPanelHeight),
-
-            shotInfoLbl.topAnchor.constraint(equalTo: controlsPanel.topAnchor, constant: 12),
-            shotInfoLbl.centerXAnchor.constraint(equalTo: controlsPanel.centerXAnchor),
-
-            btnStack.topAnchor.constraint(equalTo: shotInfoLbl.bottomAnchor, constant: isIPad ? 10 : 6),
-            btnStack.centerXAnchor.constraint(equalTo: controlsPanel.centerXAnchor),
-            btnStack.bottomAnchor.constraint(lessThanOrEqualTo: controlsPanel.bottomAnchor, constant: -10),
-
-            prevBtn.widthAnchor.constraint(equalToConstant: buttonSize),
-            prevBtn.heightAnchor.constraint(equalToConstant: buttonSize),
-            playBtn.widthAnchor.constraint(equalToConstant: playButtonSize),
-            playBtn.heightAnchor.constraint(equalToConstant: playButtonSize),
-            nextBtn.widthAnchor.constraint(equalToConstant: buttonSize),
-            nextBtn.heightAnchor.constraint(equalToConstant: buttonSize),
-
-            // ── Separator 2 (controls / strip) ───────────────────────────
-            sep2.topAnchor.constraint(equalTo: controlsPanel.bottomAnchor),
-            sep2.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sep2.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            sep2.heightAnchor.constraint(equalToConstant: 1),
-
-            // ── Film strip header ─────────────────────────────────────────
-            filmStripLabel.topAnchor.constraint(equalTo: sep2.bottomAnchor, constant: 12),
-            filmStripLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-
-            // ── Film strip ────────────────────────────────────────────────
             filmStrip.topAnchor.constraint(equalTo: filmStripLabel.bottomAnchor, constant: 6),
-            filmStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            filmStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            filmStrip.heightAnchor.constraint(equalToConstant: 50),
-            filmStrip.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            filmStrip.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
+            filmStrip.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor),
+            filmStrip.bottomAnchor.constraint(lessThanOrEqualTo: sidePanel.bottomAnchor, constant: -8),
+            filmStrip.heightAnchor.constraint(equalToConstant: is13inch ? 78 : 68),
         ])
+
+        // ── LANDSCAPE: frame left (16:9), side panel right column ─────────────
+        landscapeConstraints = [
+            frameView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            frameView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 10),
+            frameView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            frameView.trailingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
+            frameView.widthAnchor.constraint(equalTo: frameView.heightAnchor, multiplier: 16.0 / 9.0),
+
+            divider.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            divider.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            divider.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
+            divider.widthAnchor.constraint(equalToConstant: 1),
+
+            sidePanel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            sidePanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sidePanel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            sidePanel.widthAnchor.constraint(equalToConstant: sidePanelWidth),
+        ]
+
+        // ── PORTRAIT: frame top (16:9), side panel full-width strip below ──────
+        portraitConstraints = [
+            frameView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            frameView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            frameView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            frameView.heightAnchor.constraint(equalTo: frameView.widthAnchor, multiplier: 9.0 / 16.0),
+
+            divider.topAnchor.constraint(equalTo: frameView.bottomAnchor),
+            divider.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            divider.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            divider.heightAnchor.constraint(equalToConstant: 1),
+
+            sidePanel.topAnchor.constraint(equalTo: divider.bottomAnchor),
+            sidePanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sidePanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sidePanel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ]
+
+        // Activate for whichever orientation we're currently in
+        applyOrientation(size: view.bounds.size)
+    }
+
+    /// Swaps between portrait/landscape constraint sets cleanly — no constraint conflicts.
+    private func applyOrientation(size: CGSize) {
+        let isLandscape = size.width > size.height
+        NSLayoutConstraint.deactivate(activeOrientationConstraints)
+        activeOrientationConstraints = isLandscape ? landscapeConstraints : portraitConstraints
+        NSLayoutConstraint.activate(activeOrientationConstraints)
+
+        // Adjust film strip cell size based on orientation + available panel width
+        let is13inch = UIScreen.main.bounds.width >= 1024 || UIScreen.main.bounds.height >= 1024
+        let cellH: CGFloat = is13inch ? 72 : 64
+        let cellW: CGFloat = isLandscape
+            ? (is13inch ? 100 : 88)   // wider cells in the side panel
+            : (is13inch ? 84 : 74)    // slightly narrower for portrait strip
+
+        if let layout = filmStrip.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.itemSize = CGSize(width: cellW, height: cellH)
+            layout.scrollDirection = isLandscape ? .vertical : .horizontal
+        }
+
+        view.layoutIfNeeded()
     }
 
     private func hairline() -> UIView {
@@ -508,16 +599,21 @@ final class ShotPlayerViewController: UIViewController {
         let accent = stripColors[currentIndex % stripColors.count]
 
         title = "\(sceneName)  ·  \(shot.displayName)"
-        shotInfoLbl.text  = "\(shot.displayName)  ·  \(shot.cleanCameraName)"
-        scrubEndLbl.text  = fmt(shot.duration)
+
+        // Side panel labels
+        shotNameLbl.text  = shot.displayName
+        camNameLbl.text   = shot.cleanCameraName
+        accentBar.backgroundColor = accent
+
+        scrubEndLbl.text   = fmt(shot.duration)
         scrubStartLbl.text = "00:00"
-        scrubber.value    = 0
-        currentTime       = 0
+        scrubber.value     = 0
+        currentTime        = 0
 
         // Progress fill tint matches shot accent
         progressFill.backgroundColor = accent
 
-        // HUD
+        // HUD chips
         hudShotLbl.text = "  \(shot.displayName)  "
         hudCamLbl.text  = "  \(shot.cleanCameraName)  "
         hudTimeLbl.text = "  00:00 / \(fmt(shot.duration))  "
@@ -738,8 +834,11 @@ final class ShotPlayerViewController: UIViewController {
         let cfg = UIImage.SymbolConfiguration(pointSize: size, weight: .medium)
         btn.setImage(UIImage(systemName: icon, withConfiguration: cfg), for: .normal)
         btn.tintColor = .white
-        btn.backgroundColor = UIColor.white.withAlphaComponent(0.08)
-        btn.layer.cornerRadius = size == 22 ? 25 : 20
+        btn.backgroundColor = UIColor.white.withAlphaComponent(0.09)
+        // Corner radius is set dynamically once the button has a frame, but
+        // we pre-set a reasonable value here and override in layoutSubviews via layer.
+        btn.layer.cornerRadius = (size == 22 ? 32 : 26)
+        btn.clipsToBounds = true
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.addTarget(self, action: #selector(controlTapped(_:)), for: .touchUpInside)
         return btn
@@ -1040,6 +1139,20 @@ final class StripCell: UICollectionViewCell {
         bg.layer.borderColor = accentColor.cgColor
         activeBar.backgroundColor = isActive ? accentColor : .clear
         indexLbl.textColor = isActive ? .white : UIColor.white.withAlphaComponent(0.3)
+    }
+}
+
+// MARK: - UILabel letter-spacing helper
+
+private extension UILabel {
+    func letterSpacing(_ spacing: CGFloat) {
+        guard let text = text else { return }
+        let attrs = NSAttributedString(
+            string: text,
+            attributes: [.kern: spacing,
+                         .font: font as Any,
+                         .foregroundColor: textColor as Any])
+        attributedText = attrs
     }
 }
 

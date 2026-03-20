@@ -92,6 +92,11 @@ struct CanvasSceneDocument: Codable {
     var entities: [EntityRecord]
     var animationClips: [AnimationClipRecord]
     var backgroundCounter: Int
+    /// Monotonically increasing camera counter — never reset on delete.
+    /// Restored into vc.cameraCounter so newly spawned cameras after load
+    /// always get a number higher than any previously assigned.
+    /// Optional for backwards-compat with pre-fix saves (nil → treated as 0).
+    var cameraCounter: Int?
     var cameraYaw: Float
     var cameraPitch: Float
     var cameraDistance: Float
@@ -359,6 +364,7 @@ final class ScenePersistenceService {
             entities:          entityRecords,
             animationClips:    clipRecords,
             backgroundCounter: vc.backgroundCounter,
+            cameraCounter:     vc.cameraCounter,
             cameraYaw: vc.yaw, cameraPitch: vc.pitch, cameraDistance: vc.distance,
             cameraTargetX: vc.cameraTarget.x,
             cameraTargetY: vc.cameraTarget.y,
@@ -449,6 +455,12 @@ final class ScenePersistenceService {
         vc.distance       = doc.cameraDistance
         vc.backgroundCounter = doc.backgroundCounter
         vc.cameraTarget   = SIMD3(doc.cameraTargetX, doc.cameraTargetY, doc.cameraTargetZ)
+        // Restore the monotonic camera counter.
+        // For pre-fix saves where cameraCounter was never stored (nil), fall back to
+        // counting the camera entity records so the counter is at least as large as
+        // the number of cameras that are about to be restored — preventing name reuse.
+        vc.cameraCounter = doc.cameraCounter
+            ?? doc.entities.filter { $0.name.lowercased().contains("scenecamera") }.count
         vc.updateEditorCamera()
 
         // Phase 4 – serial entity restore.
@@ -584,6 +596,7 @@ final class ScenePersistenceService {
         vc.sceneCameras.removeAll()
         vc.sceneCameraItems.removeAll()
         vc.cameraToVisualMap.removeAll()
+        vc.cameraCounter   = 0
         vc.selectedEntity  = nil
         vc.backgroundPlane = nil
 
@@ -674,26 +687,53 @@ final class ScenePersistenceService {
         // before sibling camera tasks finish, producing an incomplete camera sidebar.
         if record.name.lowercased().contains("scenecamera") {
             let root  = Entity()
-            root.name = record.name
+            
+            // Extract or generate UUID for this camera
+            let cameraID: UUID
             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                cameraID = uuid
                 root.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            } else {
+                cameraID = UUID()
+                root.components.set(CanvasViewController.EntityIDComponent(id: cameraID))
             }
-            root.components.set(CategoryComponent(toolType: .camera))
-            let visual = vc.makeCameraVisual()
-            visual.components.set(InputTargetComponent())
-            let cam       = PerspectiveCamera()
-            cam.isEnabled = false
-            root.addChild(visual)
-            root.addChild(cam)
-            root.transform = t
-            anchor.addChild(root)
-            vc.sceneCameras.append(cam)
-            vc.cameraToVisualMap[cam] = root
-            vc.sceneCameraItems.append(
-                CanvasViewController.SceneCameraItem(camera: cam, cameraRoot: root)
-            )
-            // Do NOT call vc.cameraCollectionView?.reloadData() here — see Phase 5 in load().
-            return
+
+            // Recover the human-readable display number from the saved entity name.
+            // Format is "SceneCamera_<counter>_<UUID>" — part[1] is the counter.
+            // Fall back to incrementing vc.cameraCounter (covers malformed or legacy names).
+            let displayNumber: Int = {
+                let parts = record.name.split(separator: "_")
+                if parts.count >= 2, let n = Int(parts[1]) { return n }
+                vc.cameraCounter += 1
+                return vc.cameraCounter
+            }()
+            let displayName = "Camera \(displayNumber)"
+
+            // Always rebuild the root name in canonical format using the recovered number.
+            root.name = "SceneCamera_\(displayNumber)_\(cameraID.uuidString)"
+
+             root.components.set(CategoryComponent(toolType: .camera))
+             let visual = vc.makeCameraVisual()
+             visual.components.set(InputTargetComponent())
+             let cam       = PerspectiveCamera()
+             cam.name = "PerspCam_\(cameraID.uuidString)"
+             cam.isEnabled = false
+             root.addChild(visual)
+             root.addChild(cam)
+             root.transform = t
+             anchor.addChild(root)
+             vc.sceneCameras.append(cam)
+             vc.cameraToVisualMap[cam] = root
+             vc.sceneCameraItems.append(
+                 CanvasViewController.SceneCameraItem(
+                     id:          cameraID,
+                     camera:      cam,
+                     cameraRoot:  root,
+                     displayName: displayName
+                 )
+             )
+             // Do NOT call vc.cameraCollectionView?.reloadData() here — see Phase 5 in load().
+             return
         }
 
         // ── Background ─────────────────────────────────────────────────────────

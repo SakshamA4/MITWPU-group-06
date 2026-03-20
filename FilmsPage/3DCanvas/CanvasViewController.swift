@@ -319,13 +319,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var currentAxis: GizmoAxis = .none
     var currentActionMenu: EntityActionMenu?
 
-    struct SceneCameraItem {
-        let camera: PerspectiveCamera
-        let cameraRoot: Entity
-        var previewImage: UIImage?   // snapshot taken from this camera's POV; nil until first capture
-    }
+     struct SceneCameraItem {
+         let id: UUID          // Unique identifier for backend distinction
+         let camera: PerspectiveCamera
+         let cameraRoot: Entity
+         var previewImage: UIImage?   // snapshot taken from this camera's POV; nil until first capture
+         /// Human-readable name shown in the sidebar and preview panel, e.g. "Camera 1".
+         /// Assigned once at spawn time from the monotonically increasing `cameraCounter`
+         /// so it never drifts after deletions or reloads.
+         let displayName: String
+     }
 
     var sceneCameraItems: [SceneCameraItem] = []
+    /// Monotonically increasing counter — never decremented on delete, so "Camera 3"
+    /// is never reused for a newly spawned camera even if Camera 2 was deleted.
+    var cameraCounter: Int = 0
     var cameraCollectionView: UICollectionView!
 
     // MARK: - Top Right UI

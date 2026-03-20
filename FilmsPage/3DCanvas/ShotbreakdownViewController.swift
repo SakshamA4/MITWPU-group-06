@@ -39,17 +39,16 @@ struct ShotDerived {
         let totalDuration = timeline.duration
         guard totalDuration > 0 else { return [] }
 
-        // FIX: Filter for camera-related animation clips
+        // FIX: Filter ONLY for clips that exactly match camera entity names.
+        // Only show shots that are assigned to an actual camera — no props or other entities.
         let cameraClips = timeline.clips.filter { clip in
-            cameraNames.contains(clip.entityName) ||
-            clip.entityName.lowercased().contains("scenecamera") ||
-            clip.entityName.lowercased().contains("camera")
+            cameraNames.contains(clip.entityName)
         }
 
         if cameraClips.isEmpty {
-            // No camera clips → Editor Camera shot for entire timeline
-            return [Shot(id: UUID(), index: 0, cameraName: "Editor Camera",
-                         startTime: 0, duration: totalDuration, thumbnail: nil)]
+            // No camera clips → no shots to show
+            // (User must add cameras and animate them to see shots)
+            return []
         }
 
         // FIX: Create ONE SHOT PER CLIP, no merging

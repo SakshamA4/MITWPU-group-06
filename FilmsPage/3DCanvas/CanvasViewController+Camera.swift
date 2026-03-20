@@ -213,48 +213,56 @@ extension CanvasViewController {
     }
 
     
-    func spawnSceneCamera() {
-        // FIX: use cached mainAnchor — not an O(n) scene DFS
-        guard let anchor = mainAnchor else { return }
-        
-        let index = sceneCameras.count
-        let cameraRoot = Entity()
-        // FIX: unique name uses UUID so reopening never collides
-        cameraRoot.name = "SceneCamera_\(UUID().uuidString)"
-        cameraRoot.components.set(CategoryComponent(toolType: .camera))
-        cameraRoot.components.set(EntityIDComponent(id: UUID()))
-        
-        let visual = makeCameraVisual()
-        visual.generateCollisionShapes(recursive: true)
-        visual.components.set(InputTargetComponent())
-        
-        let camera = PerspectiveCamera()
-        camera.name = "PerspCam_\(UUID().uuidString)"
-        camera.isEnabled = false
-        
-        cameraRoot.addChild(visual)
-        cameraRoot.addChild(camera)
-        
-        // Spawn at a random XZ position so multiple cameras don't overlap
-        let randomX = Float.random(in: -2...2)
-        let randomZ = Float.random(in: -2...2)
-        cameraRoot.position = [randomX, 1, randomZ]
-        anchor.addChild(cameraRoot)
-        
-        sceneCameras.append(camera)
-        cameraToVisualMap[camera] = cameraRoot
-        sceneCameraItems.append(SceneCameraItem(camera: camera, cameraRoot: cameraRoot))
-        
-        cameraCollectionView?.reloadData()
-        // Capture an initial thumbnail for this camera after a short delay so
-        // RealityKit has time to render the camera entity into the scene first.
-        let newIndex = sceneCameraItems.count - 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.capturePreview(forCameraAt: newIndex)
-        }
-        setCameraPanelExpanded(true, animated: true)
-        setupCameraPanelSwipeGestures()
-    }
+     func spawnSceneCamera() {
+         // FIX: use cached mainAnchor — not an O(n) scene DFS
+         guard let anchor = mainAnchor else { return }
+         
+         // Increment counter first so the first camera is "Camera 1"
+         cameraCounter += 1
+         let cameraNumber = cameraCounter
+         let cameraID = UUID()  // Unique backend identifier
+         let cameraRoot = Entity()
+         // Format: "SceneCamera_<counter>_<UUID>"
+         cameraRoot.name = "SceneCamera_\(cameraNumber)_\(cameraID.uuidString)"
+         cameraRoot.components.set(CategoryComponent(toolType: .camera))
+         cameraRoot.components.set(EntityIDComponent(id: cameraID))
+         
+         let visual = makeCameraVisual()
+         visual.generateCollisionShapes(recursive: true)
+         visual.components.set(InputTargetComponent())
+         
+         let camera = PerspectiveCamera()
+         camera.name = "PerspCam_\(cameraID.uuidString)"
+         camera.isEnabled = false
+         
+         cameraRoot.addChild(visual)
+         cameraRoot.addChild(camera)
+         
+         // Spawn at a random XZ position so multiple cameras don't overlap
+         let randomX = Float.random(in: -2...2)
+         let randomZ = Float.random(in: -2...2)
+         cameraRoot.position = [randomX, 1, randomZ]
+         anchor.addChild(cameraRoot)
+         
+         sceneCameras.append(camera)
+         cameraToVisualMap[camera] = cameraRoot
+         sceneCameraItems.append(SceneCameraItem(
+             id: cameraID,
+             camera: camera,
+             cameraRoot: cameraRoot,
+             displayName: "Camera \(cameraNumber)"
+         ))
+         
+         cameraCollectionView?.reloadData()
+         // Capture an initial thumbnail for this camera after a short delay so
+         // RealityKit has time to render the camera entity into the scene first.
+         let newIndex = sceneCameraItems.count - 1
+         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+             self?.capturePreview(forCameraAt: newIndex)
+         }
+         setCameraPanelExpanded(true, animated: true)
+         setupCameraPanelSwipeGestures()
+     }
 
     func setupCameraPanelSwipeGestures() {
         guard let panel = view.viewWithTag(8800) else { return }
@@ -485,7 +493,7 @@ extension CanvasViewController {
                         // reloadItems triggers prepareForReuse which sets image = nil,
                         // causing the cell to flash black on every timer tick.
                         let ip = IndexPath(item: index, section: 0)
-                        let name = "Camera \(index + 1)"
+                        let name = self.sceneCameraItems[index].displayName
                         if let cell = self.cameraCollectionView?.cellForItem(at: ip) as? CameraPreviewCell {
                             cell.updatePreview(image: image, name: name)
                         }
@@ -625,7 +633,7 @@ extension CanvasViewController {
             return UICollectionViewCell()
         }
         let item = sceneCameraItems[indexPath.item]
-        let name = "Camera \(indexPath.item + 1)"
+        let name = item.displayName
         if let img = item.previewImage {
             cell.updatePreview(image: img, name: name)
         } else {
@@ -643,5 +651,3 @@ extension CanvasViewController {
     }
 
 }
-
-
