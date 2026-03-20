@@ -422,20 +422,20 @@ class ShotBreakdownViewController: UIViewController {
         openPlayer(index: 0, playAll: true)
     }
 
-    private func openPlayer(index: Int, playAll: Bool) {
-        let vc = ShotPlayerViewController(
-            shots: shots,
-            startIndex: index,
-            playAll: playAll,
-            sceneName: sceneName,
-            arView: arView,
-            evaluateTimeline: evaluateTimeline,
-            captureFrameAsync: captureFrameAsync,
-            cameraItems: cameraItems
-        )
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+     private func openPlayer(index: Int, playAll: Bool) {
+         let vc = ShotPlayerViewController(
+             shots: shots,
+             startIndex: index,
+             playAll: playAll,
+             sceneName: sceneName,
+             arView: arView,
+             evaluateTimeline: evaluateTimeline,
+             captureFrameAsync: captureFrameAsync,
+             cameraItems: cameraItems
+         )
+         navigationController?.pushViewController(vc, animated: true)
+     }
+ }
 
 // MARK: - UICollectionView DataSource + Delegate
 
@@ -447,12 +447,14 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
         shots.count
     }
 
-    func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
-        let cell = cv.dequeueReusableCell(
-            withReuseIdentifier: ShotCardCell.reuseID, for: ip) as! ShotCardCell
-        cell.configure(with: shots[ip.item], accentColor: stripColors[ip.item % stripColors.count])
-        return cell
-    }
+     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
+         guard let cell = cv.dequeueReusableCell(
+             withReuseIdentifier: ShotCardCell.reuseID, for: ip) as? ShotCardCell else {
+             return UICollectionViewCell()
+         }
+         cell.configure(with: shots[ip.item], accentColor: stripColors[ip.item % stripColors.count])
+         return cell
+     }
 
     func collectionView(_ cv: UICollectionView, didSelectItemAt ip: IndexPath) {
         openPlayer(index: ip.item, playAll: false)

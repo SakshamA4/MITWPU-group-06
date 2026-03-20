@@ -111,10 +111,12 @@ class AllPropsViewController: UIViewController, UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "prop_cell",
             for: indexPath
-        ) as! PropsCollectionViewCell
+        ) as? PropsCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         cell.configureCell(prop: prop[indexPath.row])
         return cell

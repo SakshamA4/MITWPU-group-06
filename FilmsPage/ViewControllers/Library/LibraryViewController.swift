@@ -191,15 +191,19 @@ extension LibraryViewController: UICollectionViewDataSource {
 
            switch sectionType {
            case . featured:
-               let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as! ScenesAndCameraCollectionViewCell
+               guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as? ScenesAndCameraCollectionViewCell else {
+                   return UICollectionViewCell()
+               }
                cell.configure(with: item)
                return cell
 
            case .assets:
-                   let cell = collectionView.dequeueReusableCell(
+                   guard let cell = collectionView.dequeueReusableCell(
                        withReuseIdentifier: "assets_cell",
                        for: indexPath
-                   ) as! CharactersPropsLightsBackgroundCollectionViewCell
+                   ) as? CharactersPropsLightsBackgroundCollectionViewCell else {
+                       return UICollectionViewCell()
+                   }
                    cell.configure(with: item)
                    return cell
                }

@@ -147,34 +147,40 @@ extension CharacterDetailsViewController: UICollectionViewDataSource, UpdateChar
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
-        // SECTION 0: INFO CELL (Text Field)
-        if indexPath.section == 0 {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: infoCellId, for: indexPath) as! CharacterInfoCollectionViewCell
-            
-            if let template = activeTemplate {
-                // 1. Configure standard image data
-                cell.configureCell(character: template, delegate: self)
-                
-                // 2. CRITICAL: Manually set the text field to our current edited name.
-                // This ensures the box isn't empty or showing the default template name when editing.
-                cell.nameTextField.text = characterNameInput
-            }
-            return cell
-        }
-        
-        // SECTION 1: POSES
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: posesCellId, for: indexPath) as! CharacterPosesCollectionViewCell
-        if let pose = activeTemplate?.pose[indexPath.item] {
-            cell.configure(with: pose)
-        }
-        return cell
-    }
-    
-    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: "header", withReuseIdentifier: "header_cell", for: indexPath) as! PoseTitleCollectionReusableView
-        if indexPath.section == 1 { headerView.configureCell() }
-        return headerView
-    }
+         // SECTION 0: INFO CELL (Text Field)
+         if indexPath.section == 0 {
+             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: infoCellId, for: indexPath) as? CharacterInfoCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             
+             if let template = activeTemplate {
+                 // 1. Configure standard image data
+                 cell.configureCell(character: template, delegate: self)
+                 
+                 // 2. CRITICAL: Manually set the text field to our current edited name.
+                 // This ensures the box isn't empty or showing the default template name when editing.
+                 cell.nameTextField.text = characterNameInput
+             }
+             return cell
+         }
+         
+         // SECTION 1: POSES
+         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: posesCellId, for: indexPath) as? CharacterPosesCollectionViewCell else {
+             return UICollectionViewCell()
+         }
+         if let pose = activeTemplate?.pose[indexPath.item] {
+             cell.configure(with: pose)
+         }
+         return cell
+     }
+     
+     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+         guard let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: "header", withReuseIdentifier: "header_cell", for: indexPath) as? PoseTitleCollectionReusableView else {
+             return UICollectionReusableView()
+         }
+         if indexPath.section == 1 { headerView.configureCell() }
+         return headerView
+     }
         
     // Delegate called when typing
     func updateName(text: String) {

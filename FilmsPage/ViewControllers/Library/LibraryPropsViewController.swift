@@ -85,10 +85,12 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "LibraryPropsCollectionViewCell",
             for: indexPath
-        ) as! LibraryPropsCollectionViewCell
+        ) as? LibraryPropsCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         cell.configure(with: props[indexPath.item])
         return cell

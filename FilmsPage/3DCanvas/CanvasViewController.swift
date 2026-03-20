@@ -472,15 +472,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var lastUndoTime: CFTimeInterval = 0
     var pathRebuildFrameCount: Int = 0
 
-    /// Entity lookup cache for evaluateTimeline — rebuilt in enterTimelineMode(),
-    /// cleared in exitTimelineMode(). Avoids O(n) findEntity DFS every display-link tick.
     var timelineEntityCache: [String: Entity] = [:]
 
-    /// Authoritative store for background UIImages, keyed by entity name.
-    /// BackgroundComponent.cachedImage can become nil if TextureResource upload fails
-    /// on first restore.  This dictionary survives that failure and lets save() always
-    /// find the original UIImage so the JPEG is never silently dropped.
-    /// Populated by applyBackgroundImage() and restoreEntity(). Cleared by clearSceneState().
     var backgroundImageCache: [String: UIImage] = [:]
 
     // MARK: - Geometry components

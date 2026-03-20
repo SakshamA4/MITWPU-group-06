@@ -49,15 +49,17 @@ class AllSequencesViewController: UIViewController , UICollectionViewDataSource 
         return sequence.count
     }
     
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: "sequence_cell",
-            for: indexPath
-        ) as! SequencesCollectionViewCell
+     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+         guard let cell = collectionView.dequeueReusableCell(
+             withReuseIdentifier: "sequence_cell",
+             for: indexPath
+         ) as? SequencesCollectionViewCell else {
+             return UICollectionViewCell()
+         }
 
-        cell.configureCell(sequence: sequence[indexPath.row])
-        return cell
-    }
+         cell.configureCell(sequence: sequence[indexPath.row])
+         return cell
+     }
     /*
     // MARK: - Navigation
 

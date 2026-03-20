@@ -11,14 +11,14 @@ enum CameraLibraryDataStore {
         .init(
             type: .cameras,
             items: [
-                .init(name: "DSLR",      imageName: "DSLR_img",    description: "Digital single-lens reflex camera with interchangeable lenses.", modelFileName: "cam1"),
-                .init(name: "Default",   imageName: "Default", description: "Standard camera setup for general shooting."),
-                .init(name: "Sony",      imageName: "Sony",    description: "Sony camera, great for video with strong autofocus."),
-                .init(name: "Canon",     imageName: "Canon",   description: "Canon camera, popular for both photo and video."),
-                .init(name: "iPhone",    imageName: "iPhone",  description: "Mobile shooting with an iPhone or similar smartphone."),
-                .init(name: "GoPro",     imageName: "GoPro",   description: "Action camera for POV and extreme situations."),
-                .init(name: "Drone",     imageName: "Drone",   description: "Aerial camera for high and moving shots."),
-                .init(name: "Arri",      imageName: "Arri",    description: "Professional cinema camera used on film sets.")
+                .init(name: "DSLR",      imageName: "DSLR_img",    description: "Digital single-lens reflex camera with interchangeable lenses.", modelFileName: "cam1")
+//                .init(name: "Default",   imageName: "Default", description: "Standard camera setup for general shooting."),
+//                .init(name: "Sony",      imageName: "Sony",    description: "Sony camera, great for video with strong autofocus."),
+//                .init(name: "Canon",     imageName: "Canon",   description: "Canon camera, popular for both photo and video."),
+//                .init(name: "iPhone",    imageName: "iPhone",  description: "Mobile shooting with an iPhone or similar smartphone."),
+//                .init(name: "GoPro",     imageName: "GoPro",   description: "Action camera for POV and extreme situations."),
+//                .init(name: "Drone",     imageName: "Drone",   description: "Aerial camera for high and moving shots."),
+//                .init(name: "Arri",      imageName: "Arri",    description: "Professional cinema camera used on film sets.")
             ]
         ),
 

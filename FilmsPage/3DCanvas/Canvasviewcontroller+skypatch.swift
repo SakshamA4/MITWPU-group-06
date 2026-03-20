@@ -2,25 +2,6 @@
 //  CanvasViewController+SkyPatch.swift
 //  3DCanvas
 //
-//  CHANGES IN THIS VERSION vs what you have:
-//  ─────────────────────────────────────────
-//  1. applySky(type:) is now defined HERE — removes ALL ProceduralSky* entities
-//     before adding a new one (fixes the Sky(3) duplicate stacking bug).
-//     ★ Comment out applySky(type:) in CanvasViewController_Spawning.swift
-//       to avoid a "redeclaration" compiler error.
-//
-//  2. removeSky() — unchanged from what you had.
-//
-//  3. skyDisplayName(_:) — NEW. Use in refreshSidebarContent() so sidebar shows
-//     "Sky – Day" instead of the raw entity name "ProceduralSky_sky_day".
-//     Usage:
-//       let label = entity.name.hasPrefix("ProceduralSky")
-//           ? skyDisplayName(entity.name) : entity.name
-//
-//  4. startARSession() / stopARSession() — NEW. Fixes the blank AR screen.
-//     ★ Call startARSession()  where you activate AR mode.
-//     ★ Call stopARSession()   where you deactivate AR mode.
-//
 
 import UIKit
 import RealityKit
@@ -28,15 +9,6 @@ import ARKit
 
 extension CanvasViewController {
 
-    // MARK: - Apply Sky
-    //
-    // ★ REPLACE applySky(type:) in CanvasViewController_Spawning.swift with this.
-    //   Comment out the one in Spawning.swift — this version takes over.
-    //
-    // FIX vs old: old version called findEntity(named: "ProceduralSky") which only
-    // finds the entity with that exact name. After the rename to "ProceduralSky_sky_day"
-    // the old remove call found nothing, so every tap stacked a new sphere on top.
-    // This version removes ALL children whose name starts with "ProceduralSky".
 
     func applySky(type: String) {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
@@ -125,45 +97,4 @@ extension CanvasViewController {
             return "Sky – \(readable)"
         }
     }
-
-    // MARK: - AR Session  (fixes blank screen in AR mode)
-    //
-    // automaticallyConfigureSession = false means RealityKit will NOT start the
-    // camera feed. You must call arView.session.run(config) yourself.
-    //
-    // ★ Call startARSession()  wherever isARModeActive is set to true.
-    // ★ Call stopARSession()   wherever isARModeActive is set to false.
-
-    // MARK: - AR Mode Toggle
-    //
-    // CRASH FIX: arView.cameraMode = .nonAR — this is a virtual canvas.
-    // Calling arView.session.run() on a nonAR-mode ARView crashes instantly
-    // because the ARKit session is not bound to this view.
-    //
-    // startARSession / stopARSession now just toggle isARModeActive and hide/show sky.
-    // The gesture handlers (orbit, pinch) already guard on isARModeActive, so
-    // AR-mode behaviour (locked camera, device-moves-world) still works correctly.
-
-//    func startARSession() {
-//        isARModeActive = true
-//        arView.renderOptions = [.disableMotionBlur, .disableDepthOfField]
-//        // Hide sky — irrelevant when device camera is the intended background
-//        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
-//            for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
-//                child.isEnabled = false
-//            }
-//        }
-//        print("📷 AR mode ON")
-//    }
-//
-//    func stopARSession() {
-//        isARModeActive = false
-//        arView.renderOptions = []
-//        if let anchor = arView.scene.findEntity(named: "MainAnchor") {
-//            for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
-//                child.isEnabled = true
-//            }
-//        }
-//        print("🖥 AR mode OFF")
-//    }
 }

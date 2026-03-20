@@ -69,10 +69,12 @@ extension AddCharacterViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: characterCellId,
             for: indexPath
-        ) as! CharactersCollectionViewCell
+        ) as? CharactersCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         let characterItem = characters[indexPath.item]
         cell.configureForLibrary(character: characterItem)

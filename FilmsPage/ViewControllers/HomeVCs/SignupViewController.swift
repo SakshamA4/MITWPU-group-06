@@ -38,37 +38,41 @@ class SignupViewController: UIViewController {
     
     
 
-    // Connect the 'Create account' button to this action
-    @IBAction func createAccountButtonTapped(_ sender: UIButton) {
-        
-        
-        
-        guard let email = emailTextField.text, !email.isEmpty else {
-                // TODO: Handle validation error (e.g., show alert for missing email)
-                print("Email field is empty.")
-                return
-            }
+     // Connect the 'Create account' button to this action
+     @IBAction func createAccountButtonTapped(_ sender: UIButton) {
+         
+         
+         
+         guard let email = emailTextField.text, !email.isEmpty else {
+                 showValidationAlert(title: "Validation Error", message: "Email field is empty. Please enter a valid email address.")
+                 return
+             }
 
-            guard let password = passwordTextField.text, !password.isEmpty else {
-                // TODO: Handle validation error (e.g., show alert for missing password)
-                print("Password field is empty.")
-                return
-            }
+             guard let password = passwordTextField.text, !password.isEmpty else {
+                 showValidationAlert(title: "Validation Error", message: "Password field is empty. Please enter a password.")
+                 return
+             }
 
-            // 2. NOW YOU CAN USE THE 'email' and 'password' variables
-            print("User attempting to sign up with: \(email) and password: \(password)")
-        
-        // **VITAL: Transition to the Home Page**
-        
-        let storyboard = UIStoryboard(name: "HomePage", bundle: nil) // **Check your Storyboard name**
-        
-        guard let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewControllerID") as? UIViewController else {
-            return
-        }
+             // 2. NOW YOU CAN USE THE 'email' and 'password' variables
+             print("User attempting to sign up with: \(email) and password: \(password)")
+         
+         // **VITAL: Transition to the Home Page**
+         
+         let storyboard = UIStoryboard(name: "HomePage", bundle: nil) // **Check your Storyboard name**
+         
+         guard let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewControllerID") as? UIViewController else {
+             return
+         }
 
-        guard let window = self.view.window else { return }
-        window.rootViewController = homeVC
-        
-        UIView.transition(with: window, duration: 0.5, options: .transitionCrossDissolve, animations: nil, completion: nil)
-    }
-}
+         guard let window = self.view.window else { return }
+         window.rootViewController = homeVC
+         
+         UIView.transition(with: window, duration: 0.5, options: .transitionCrossDissolve, animations: nil, completion: nil)
+     }
+     
+     private func showValidationAlert(title: String, message: String) {
+         let alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
+         alertController.addAction(UIAlertAction(title: "OK", style: .default))
+         self.present(alertController, animated: true)
+     }
+ }

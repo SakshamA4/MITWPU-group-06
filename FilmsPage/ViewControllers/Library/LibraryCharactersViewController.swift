@@ -84,16 +84,18 @@ class LibraryCharactersViewController: UIViewController {
             characters.count
         }
 
-        func collectionView(_ collectionView: UICollectionView,
-                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "LibraryCharactersCollectionViewCell",
-                for: indexPath
-            ) as! LibraryCharactersCollectionViewCell
+         func collectionView(_ collectionView: UICollectionView,
+                             cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "LibraryCharactersCollectionViewCell",
+                 for: indexPath
+             ) as? LibraryCharactersCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
 
-            cell.configure(with: characters[indexPath.item])
-            return cell
-        }
+             cell.configure(with: characters[indexPath.item])
+             return cell
+         }
     }
 
 

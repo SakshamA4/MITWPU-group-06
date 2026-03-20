@@ -69,38 +69,44 @@ extension CameraViewController: UICollectionViewDataSource {
         sections[section].items.count
     }
 
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+     func collectionView(_ collectionView: UICollectionView,
+                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 
-        let sectionType = sections[indexPath.section].type
-        let item = sections[indexPath.section].items[indexPath.item]
+         let sectionType = sections[indexPath.section].type
+         let item = sections[indexPath.section].items[indexPath.item]
 
-        switch sectionType {
-        case .cameras:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "CameraCollectionViewCell",
-                for: indexPath
-            ) as! CameraCollectionViewCell
-            cell.configure(with: item)
-            return cell
+         switch sectionType {
+         case .cameras:
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "CameraCollectionViewCell",
+                 for: indexPath
+             ) as? CameraCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             cell.configure(with: item)
+             return cell
 
-        case .movements:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "CameraMovementsCollectionViewCell",
-                for: indexPath
-            ) as! CameraMovementsCollectionViewCell
-            cell.configure(with: item)
-            return cell
+         case .movements:
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "CameraMovementsCollectionViewCell",
+                 for: indexPath
+             ) as? CameraMovementsCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             cell.configure(with: item)
+             return cell
 
-        case .staticShots:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "StaticshotsCollectionViewCell",
-                for: indexPath
-            ) as! StaticshotsCollectionViewCell
-            cell.configure(with: item)
-            return cell
-        }
-    }
+         case .staticShots:
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "StaticshotsCollectionViewCell",
+                 for: indexPath
+             ) as? StaticshotsCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             cell.configure(with: item)
+             return cell
+         }
+     }
     
     func collectionView(_ collectionView: UICollectionView,
                         viewForSupplementaryElementOfKind kind: String,

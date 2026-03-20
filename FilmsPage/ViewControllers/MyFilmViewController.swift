@@ -362,61 +362,67 @@ extension MyFilmViewController: UICollectionViewDataSource, UICollectionViewDele
 
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-            
-            // --- Existing Edit Segues ---
-            if segue.identifier == "sequenceSegue" {
-                let vc = segue.destination as! SequenceViewController
-                vc.sequence = sender as? Sequence
-                vc.filmName = self.film?.name
-            }
-        if segue.identifier == "characterInfoSegue" {
-                    let vc = segue.destination as! CharacterDetailsViewController
-                    // Sender is FilmCharacter (from didSelectItemAt), NOT CharacterItem
-                    vc.filmCharacter = sender as? FilmCharacter
-                }
-        if segue.identifier == "propSegue" {
-                let vc = segue.destination as! PropDetailViewController
-                vc.prop = sender as? PropItem
-            }
-            
-            // --- NEW ADD SEGUES (You must pass the Film!) ---
-            
-        if segue.identifier == "AddNewSequenceSegue" {
-                // Cast to AddSequenceViewController specifically
-                if let vc = segue.destination as? AddSequenceViewController {
-                    vc.film = self.film
-                }
-            }
-            
-            if segue.identifier == "AddNewCharacterSegue" {
-                // Cast to AddCharacterViewController specifically
-                if let vc = segue.destination as? AddCharacterViewController {
-                    vc.film = self.film
-                }
-            }
-            
-            if segue.identifier == "AddNewPropSegue" {
-                // Cast to AddPropViewController specifically
-                if let vc = segue.destination as? AddPropViewController {
-                    vc.film = self.film
-                }
-            }
-            // Keep existing "View All" logic...
-            if segue.identifier == "allSequencesSegue" {
-                let vc = segue.destination as! AllSequencesViewController
-                vc.sequence = sender as! [Sequence]
-            }
-            if segue.identifier == "allCharactersSegue" {
-                let vc = segue.destination as! AllCharactersViewController
-                vc.characters = sender as! [FilmCharacter]
-                vc.film = film
-            }
-            if segue.identifier == "allPropsSegue" {
-                let vc = segue.destination as! AllPropsViewController
-                vc.prop = sender as! [PropItem]
-                vc.film = self.film
-            }
-        }
+             
+             // --- Existing Edit Segues ---
+             if segue.identifier == "sequenceSegue" {
+                 if let vc = segue.destination as? SequenceViewController {
+                     vc.sequence = sender as? Sequence
+                     vc.filmName = self.film?.name
+                 }
+             }
+         if segue.identifier == "characterInfoSegue" {
+                     if let vc = segue.destination as? CharacterDetailsViewController {
+                         // Sender is FilmCharacter (from didSelectItemAt), NOT CharacterItem
+                         vc.filmCharacter = sender as? FilmCharacter
+                     }
+                 }
+         if segue.identifier == "propSegue" {
+                 if let vc = segue.destination as? PropDetailViewController {
+                     vc.prop = sender as? PropItem
+                 }
+             }
+             
+             // --- NEW ADD SEGUES (You must pass the Film!) ---
+             
+         if segue.identifier == "AddNewSequenceSegue" {
+                 // Cast to AddSequenceViewController specifically
+                 if let vc = segue.destination as? AddSequenceViewController {
+                     vc.film = self.film
+                 }
+             }
+             
+             if segue.identifier == "AddNewCharacterSegue" {
+                 // Cast to AddCharacterViewController specifically
+                 if let vc = segue.destination as? AddCharacterViewController {
+                     vc.film = self.film
+                 }
+             }
+             
+             if segue.identifier == "AddNewPropSegue" {
+                 // Cast to AddPropViewController specifically
+                 if let vc = segue.destination as? AddPropViewController {
+                     vc.film = self.film
+                 }
+             }
+             // Keep existing "View All" logic...
+             if segue.identifier == "allSequencesSegue" {
+                 if let vc = segue.destination as? AllSequencesViewController {
+                     vc.sequence = sender as? [Sequence] ?? []
+                 }
+             }
+             if segue.identifier == "allCharactersSegue" {
+                 if let vc = segue.destination as? AllCharactersViewController {
+                     vc.characters = sender as? [FilmCharacter] ?? []
+                     vc.film = film
+                 }
+             }
+             if segue.identifier == "allPropsSegue" {
+                 if let vc = segue.destination as? AllPropsViewController {
+                     vc.prop = sender as? [PropItem] ?? []
+                     vc.film = self.film
+                 }
+             }
+         }
 }
 
 
