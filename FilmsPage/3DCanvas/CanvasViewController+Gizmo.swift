@@ -278,18 +278,14 @@ extension CanvasViewController {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor"),
               let gizmo  = gizmoRoot else { return }
 
-        let bounds       = entity.visualBounds(relativeTo: nil)
-        let maxDimension = max(bounds.extents.x, bounds.extents.z)
-        // Minimum 0.6m so tiny entities (cameras, lights) still get a large,
-        // easy-to-grab gizmo. Scale up for larger objects.
-        let targetScale  = max(0.6, maxDimension * 0.65)
-
+        // PlaneHandle is always a fixed proportion of the gizmo root scale —
+        // no longer driven by object size, so walls/grounds don't bloat the ring.
+        let fixedHandleScale: Float = 0.55
         if let planeHandle = gizmo.findEntity(named: "PlaneHandle") {
-            planeHandle.scale = [targetScale, 1.0, targetScale]
+            planeHandle.scale = [fixedHandleScale, 1.0, fixedHandleScale]
         }
-        // Scale ghost layer to match
         if let ghostPlane = gizmo.findEntity(named: "GhostPlane") {
-            ghostPlane.scale = [targetScale, 1.0, targetScale]
+            ghostPlane.scale = [fixedHandleScale, 1.0, fixedHandleScale]
         }
 
         if gizmo.parent == nil {
@@ -299,14 +295,15 @@ extension CanvasViewController {
         gizmo.position  = entity.position(relativeTo: anchor)
         gizmo.isEnabled = true
 
-        // Scale the whole gizmo with zoom distance so it stays
-        // touchable and proportional regardless of how far the camera is
-        let zoomScale = max(0.3, min(3.0, distance * 0.18))
-        gizmo.scale = SIMD3<Float>(repeating: zoomScale)
+        // Scale the whole gizmo by camera-to-entity distance so it occupies
+        // a consistent screen size regardless of zoom level or entity position.
+        let entityWorldPos = entity.position(relativeTo: nil)
+        let camWorldPos    = activeCamera.position(relativeTo: nil)
+        let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
+        let screenScale    = max(0.15, min(2.5, camToEntity * 0.15))
+        gizmo.scale = SIMD3<Float>(repeating: screenScale)
 
         resetGizmoColors()
-
-        // Show drop shadow immediately when gizmo appears
         updateDropShadow(for: entity)
     }
 
@@ -324,10 +321,14 @@ extension CanvasViewController {
     // ─────────────────────────────────────────────────────────────────────────
     func updateGizmoPosition() {
         guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
-        gizmo.position = entity.position(relativeTo: nil)
-        // Keep size in sync with current zoom level
-        let zoomScale = max(0.3, min(3.0, distance * 0.18))
-        gizmo.scale = SIMD3<Float>(repeating: zoomScale)
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        gizmo.position = entity.position(relativeTo: anchor)
+        // Recompute scale from camera-to-entity distance every drag frame
+        let entityWorldPos = entity.position(relativeTo: nil)
+        let camWorldPos    = activeCamera.position(relativeTo: nil)
+        let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
+        let screenScale    = max(0.15, min(2.5, camToEntity * 0.15))
+        gizmo.scale = SIMD3<Float>(repeating: screenScale)
         updateDropShadow(for: entity)
     }
 
