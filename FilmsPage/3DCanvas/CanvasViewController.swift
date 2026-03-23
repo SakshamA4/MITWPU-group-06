@@ -589,20 +589,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Setup
 
     func setupARView() {
-        arView = ARView(frame: view.bounds)
+        // Single .ar ARView — initialises one Metal pipeline.
+        // Editor mode: white background, idle session (renders frames for Metal).
+        // AR mode: .cameraFeed() background, session with plane detection.
+        arView = ARView(frame: view.bounds,
+                        cameraMode: .ar,
+                        automaticallyConfigureSession: false)
         arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        arView.automaticallyConfigureSession = false
-        // FIX: cameraMode must be .nonAR so RealityKit uses the PerspectiveCamera
-        // nodes in the scene (editorCamera / sceneCameras) instead of the device
-        // camera.  Without this line the default .ar mode ignores all
-        // PerspectiveCamera entities and renders from a zero/identity transform,
-        // making every entity invisible or disoriented on load.
-        arView.cameraMode = .nonAR
-        arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
-        arView.debugOptions  = []
-        arView.environment.background = .color(.white)
+        arView.renderOptions    = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
+        arView.debugOptions     = []
+        arView.environment.background = .color(.white)   // solid white canvas in editor
         view.addSubview(arView)
+
+        // Start idle session so Metal pipeline produces frames → white renders immediately.
+        // Without this, .ar mode shows black because no frames are being generated.
+        let idleConfig = ARWorldTrackingConfiguration()
+        idleConfig.planeDetection = []
+        idleConfig.isLightEstimationEnabled = false
+        arView.session.run(idleConfig)
     }
+
 
     func setupInitialScene() {
         let anchor = AnchorEntity(world: .zero)
@@ -668,25 +674,32 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
                 let entity = try await Entity(named: item.modelFileName)
 
-                // Normalise
-                let bounds = entity.visualBounds(relativeTo: nil)
-                let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
-                if maxDim > 0.0001 {
-                    entity.scale = SIMD3(repeating: 1.0 / maxDim)
-                }
-
-                // Prop-specific scales
                 var verticalOffset: Float = 0.0
-                if item.modelFileName == "Spotlight" {
-                    entity.scale   = SIMD3(repeating: 0.01); verticalOffset = 0.25
-                } else if item.modelFileName.contains("LED") {
-                    entity.scale   = SIMD3(repeating: 0.01)
-                } else if item.modelFileName.contains("Lantern") {
-                    entity.scale   = SIMD3(repeating: 0.0025); verticalOffset = 0.25
-                } else if item.modelFileName.contains("Plant") {
-                    entity.scale   = SIMD3(repeating: 0.01)
+
+                if isARModeActive {
+                    // ── AR: 1:1 physical scale ──
+                    // Keep native USDZ metric scale so a 6ft character = 6ft in AR.
+                    // No normalisation, no prop-specific overrides.
+                    // Just lift to ground plane.
                 } else {
-                    entity.scale   = SIMD3<Float>(repeating: scale)
+                    // ── Editor: normalise + prop-specific scales ──
+                    let bounds = entity.visualBounds(relativeTo: nil)
+                    let maxDim = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+                    if maxDim > 0.0001 {
+                        entity.scale = SIMD3(repeating: 1.0 / maxDim)
+                    }
+
+                    if item.modelFileName == "Spotlight" {
+                        entity.scale   = SIMD3(repeating: 0.01); verticalOffset = 0.25
+                    } else if item.modelFileName.contains("LED") {
+                        entity.scale   = SIMD3(repeating: 0.01)
+                    } else if item.modelFileName.contains("Lantern") {
+                        entity.scale   = SIMD3(repeating: 0.0025); verticalOffset = 0.25
+                    } else if item.modelFileName.contains("Plant") {
+                        entity.scale   = SIMD3(repeating: 0.01)
+                    } else {
+                        entity.scale   = SIMD3<Float>(repeating: scale)
+                    }
                 }
 
                 // Position — AR-aware (see CanvasViewController+ARInteraction.swift)

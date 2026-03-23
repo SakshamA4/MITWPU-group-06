@@ -375,40 +375,7 @@ extension CanvasViewController {
     }
 
 
-    // MARK: - Camera Preview (off-screen ARView, timer-driven)
-    //
-    // A dedicated off-screen ARView (`previewARView`) is created once and never added
-    // to the view hierarchy, so the main viewport never flickers.
-    //
-    // A 3fps repeating Timer (`cameraPreviewTimer`) calls `updateAllCameraPreviews()`
-    // which drives `snapshotPreviewCamera(at:)` — a serial chain that:
-    //   1. Clones `mainAnchor` into the off-screen ARView.
-    //   2. Disables all cameras in the clone; enables only the target camera by name.
-    //   3. Snapshots the off-screen view.
-    //   4. Stores the image in `sceneCameraItems[index].previewImage`, reloads the cell.
-    //   5. Chains to the next index.
-    //
-    // The main `arView` and its active camera are NEVER touched — zero flicker.
-
-    // MARK: Off-screen ARView (lazy, associated object so it can live on the extension)
-
-    private enum PreviewARViewKey { static var key = "previewARView" }
-
-    /// A dedicated off-screen ARView used exclusively for camera thumbnails.
-    /// Never added to any view hierarchy; created once and reused.
-    var previewARView: ARView {
-        if let existing = objc_getAssociatedObject(self, &PreviewARViewKey.key) as? ARView {
-            return existing
-        }
-        let av = ARView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
-        av.cameraMode = .nonAR
-        // Match the main arView's rendering settings so PBR materials are lit correctly
-        // and the background matches (white, like the main scene).
-        av.environment = arView.environment
-        av.renderOptions = arView.renderOptions
-        objc_setAssociatedObject(self, &PreviewARViewKey.key, av, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        return av
-    }
+    // MARK: - Camera Preview (timer-driven, uses main arView)
 
     // MARK: Timer lifecycle
 
@@ -435,68 +402,40 @@ extension CanvasViewController {
 
     private func snapshotPreviewCamera(at index: Int) {
         guard index < sceneCameraItems.count else { return }
-        guard let anchor = mainAnchor else { return }
 
         let item = sceneCameraItems[index]
-        let targetCameraName = item.camera.name   // e.g. "PerspCam_<UUID>"
 
-        let pv = previewARView
+        // Switch to scene camera briefly for the snapshot
+        let wasEditorActive = (activeCamera === editorCamera)
+        for cam in sceneCameras { cam.isEnabled = false }
+        item.camera.isEnabled = true
+        editorCamera.isEnabled = false  // must disable for RealityKit to use scene cam
 
-        // Remove any previous anchor from the off-screen scene so we start clean.
-        for existing in pv.scene.anchors { pv.scene.removeAnchor(existing) }
-
-        // Clone the full scene anchor into the off-screen ARView.
-        let clonedAnchor = anchor.clone(recursive: true)
-        pv.scene.addAnchor(clonedAnchor)
-
-        // Walk the clone: disable all PerspectiveCameras, then enable the target one.
-        var found = false
-        func configureCameras(in entity: Entity) {
-            if let cam = entity as? PerspectiveCamera {
-                cam.isEnabled = (entity.name == targetCameraName)
-                if cam.isEnabled { found = true }
-            }
-            for child in entity.children { configureCameras(in: child) }
-        }
-        configureCameras(in: clonedAnchor)
-
-        guard found else {
-            // Camera not found in clone — skip to next index.
-            snapshotPreviewCamera(at: index + 1)
-            return
-        }
-
-        // Wait for one RealityKit render frame before snapshotting.
-        // Without this delay the off-screen ARView hasn't rendered any pixels yet
-        // and snapshot() returns a black image.
-        var token: AnyCancellable?
-        token = pv.scene.publisher(for: SceneEvents.Update.self)
-            .first()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                token = nil   // release the subscription
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self = self else { return }
+            self.arView.snapshot(saveToHDR: false) { [weak self] image in
                 guard let self = self else { return }
-                pv.snapshot(saveToHDR: false) { [weak self] image in
-                    guard let self = self else { return }
 
-                    if let image = image, index < self.sceneCameraItems.count {
-                        self.sceneCameraItems[index].previewImage = image
-                        // Update the visible cell directly — never call reloadItems here.
-                        // reloadItems triggers prepareForReuse which sets image = nil,
-                        // causing the cell to flash black on every timer tick.
-                        let ip = IndexPath(item: index, section: 0)
-                        let name = "Camera \(index + 1)"
+                // Always restore editor camera immediately
+                for cam in self.sceneCameras { cam.isEnabled = false }
+                self.editorCamera.isEnabled = true
+                self.activeCamera = self.editorCamera
+
+                if let image = image, index < self.sceneCameraItems.count {
+                    self.sceneCameraItems[index].previewImage = image
+                    let ip   = IndexPath(item: index, section: 0)
+                    let name = "Camera \(index + 1)"
+                    DispatchQueue.main.async {
                         if let cell = self.cameraCollectionView?.cellForItem(at: ip) as? CameraPreviewCell {
                             cell.updatePreview(image: image, name: name)
                         }
                     }
-
-                    // Chain to the next camera after a small yield so the run loop can breathe.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                        self?.snapshotPreviewCamera(at: index + 1)
-                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                    self?.snapshotPreviewCamera(at: index + 1)
                 }
             }
+        }
     }
 
     // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
@@ -643,5 +582,3 @@ extension CanvasViewController {
     }
 
 }
-
-
