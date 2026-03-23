@@ -138,26 +138,25 @@ extension CanvasViewController {
 
         let redMat = UnlitMaterial(color: .systemRed)
 
-        // Centre dot — solid red disc, XZ move target
+        // Centre dot — solid red disc, XZ move target. Larger so it's clearly visible
+        // and easy to grab even on small entities like cameras.
         let centreDot      = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.016, radius: 0.09),
+            mesh:      MeshResource.generateCylinder(height: 0.016, radius: 0.22),
             materials: [redMat]
         )
         centreDot.name     = "CentreDot"
         centreDot.position = [0, 0.008, 0]
 
-        // Invisible disc collider for the dot — intentionally much larger than the
-        // visual CentreDot so the user can tap/drag anywhere in the general "foot"
-        // area without having to land precisely on the small red disc.
-        // radius: 0.35 covers the full interior of the outer ring at 1.0 local units,
-        // so any tap inside the ring (but not on the ring itself) triggers XZ-plane move.
-        // PlaneHandle is scaled per-object in showGizmo(), so this radius scales too.
+        // Invisible disc collider — fills the entire interior of the outer ring.
+        // radius: 0.75 (out of the ring's 1.0) gives a large, easy-to-hit target
+        // for XZ-plane dragging, especially on small entities where the ring itself
+        // may be larger than the object's footprint.
         let dotCollider    = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.04, radius: 0.35),
+            mesh:      MeshResource.generateCylinder(height: 0.06, radius: 0.75),
             materials: [SimpleMaterial(color: .clear, isMetallic: false)]
         )
         dotCollider.components.set(OpacityComponent(opacity: 0.0))
-        dotCollider.name     = "Gizmo_Plane_XZ"    // existing hit-test key → XZ move
+        dotCollider.name     = "Gizmo_Plane_XZ"
         dotCollider.position = [0, 0.01, 0]
         dotCollider.generateCollisionShapes(recursive: false)
 
@@ -281,8 +280,9 @@ extension CanvasViewController {
 
         let bounds       = entity.visualBounds(relativeTo: nil)
         let maxDimension = max(bounds.extents.x, bounds.extents.z)
-        // Scale the ring to fit around the object, minimum 0.35m radius
-        let targetScale  = max(0.35, maxDimension * 0.65)
+        // Minimum 0.6m so tiny entities (cameras, lights) still get a large,
+        // easy-to-grab gizmo. Scale up for larger objects.
+        let targetScale  = max(0.6, maxDimension * 0.65)
 
         if let planeHandle = gizmo.findEntity(named: "PlaneHandle") {
             planeHandle.scale = [targetScale, 1.0, targetScale]
