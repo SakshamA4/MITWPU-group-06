@@ -190,7 +190,7 @@ extension CanvasViewController {
             }
             selectedEntity     = root
             activeHandleEntity = nil
-            setEntityTransparency(root, alpha: 0.7)
+            setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
             showActionMenu(at: location)
             if let anim = root.availableAnimations.first {
@@ -305,7 +305,7 @@ extension CanvasViewController {
                     self.hideGizmo()
                     self.hideRotationGizmo()
                 } else {
-                    self.setEntityTransparency(entity, alpha: 0.7)
+                    self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
                 menu.removeFromSuperview()
@@ -538,7 +538,7 @@ extension CanvasViewController {
                 if root?.name.contains("Gizmo") == false {
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
-                    setEntityTransparency(root, alpha: 0.7)
+                    setEntityTransparency(root, alpha: 0.9)
                     updateGizmoMode()
                 }
             } else {
