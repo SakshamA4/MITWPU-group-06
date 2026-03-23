@@ -229,6 +229,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var lastEditedDate: Date = Date()
     var sceneImageName: String?
     var currentSceneID: UUID?
+    
+    // FIX: Track whether the scene has been loaded to prevent reloading it
+    // multiple times when returning from navigation (e.g., shot breakdown).
+    // Reset to false when exiting the scene.
+    // Internal access (not private) so extensions can access it
+    var hasSceneBeenLoaded: Bool = false
 
     // MARK: - Cached anchor reference
     // FIX: Cache MainAnchor so we avoid a full scene-graph DFS on every access.

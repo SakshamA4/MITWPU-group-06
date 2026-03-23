@@ -13,6 +13,12 @@ extension CanvasViewController {
     func loadSceneIfSaved() {
         guard let id = currentSceneID else { return }
         guard ScenePersistenceService.shared.hasSave(for: id) else { return }
+        
+        // FIX: Only load the scene once. When returning from navigation (e.g., shot breakdown),
+        // viewDidAppear is called again but we should not reload the saved version,
+        // as that would clear any unsaved entities and animations.
+        guard !hasSceneBeenLoaded else { return }
+        hasSceneBeenLoaded = true
 
         // Show a loading overlay so the user sees feedback while the scene deserialises.
         // The overlay is removed by the load completion path in ScenePersistence.swift,
@@ -139,6 +145,11 @@ extension CanvasViewController {
             )
             ScenesDataStore.shared.addToRecent(scene: updatedRecent)
         }
+        
+        // FIX: Reset the scene load flag so that if this scene is reopened later,
+        // it will load properly. Without this, reopening a scene would skip loading
+        // because hasSceneBeenLoaded would still be true.
+        hasSceneBeenLoaded = false
 
         dismiss(animated: true)
     }

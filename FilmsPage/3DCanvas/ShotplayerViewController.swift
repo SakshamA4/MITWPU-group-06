@@ -208,6 +208,22 @@ final class ShotPlayerViewController: UIViewController {
     }()
 
 
+    private lazy var scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.backgroundColor = .clear
+        sv.showsVerticalScrollIndicator = true
+        sv.showsHorizontalScrollIndicator = false
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
+
+    private lazy var contentContainer: UIView = {
+        let v = UIView()
+        v.backgroundColor = .clear
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
     private lazy var exportOverlay: UIView = {
         let v = UIView(); v.backgroundColor = UIColor.black.withAlphaComponent(0.80)
         v.isHidden = true; v.translatesAutoresizingMaskIntoConstraints = false; return v
@@ -315,16 +331,22 @@ final class ShotPlayerViewController: UIViewController {
         let sep2 = makeSep()   // below transport
         let sep3 = makeSep()   // below scrubber
 
-        view.addSubview(previewContainer)
-        view.addSubview(sep1)
-        view.addSubview(transportBar)
-        view.addSubview(sep2)
-        view.addSubview(scrubberBar)
-        view.addSubview(sep3)
-        view.addSubview(filmStripContainer)
+        // Main scrollView wraps all content to ensure nothing is cut off
+        view.addSubview(scrollView)
+        
+        // Add all content to the scrollView's content container
+        scrollView.addSubview(previewContainer)
+        scrollView.addSubview(sep1)
+        scrollView.addSubview(transportBar)
+        scrollView.addSubview(sep2)
+        scrollView.addSubview(scrubberBar)
+        scrollView.addSubview(sep3)
+        scrollView.addSubview(filmStripContainer)
 
         let g = view.safeAreaLayoutGuide
         let big         = is13inch
+        
+        // Adaptive button and bar sizing based on screen size
         let transportH  = CGFloat(big ? 62 : 54)
         let scrubberH   = CGFloat(big ? 50 : 44)
         let headerH     = CGFloat(big ? 22 : 18)
@@ -340,11 +362,18 @@ final class ShotPlayerViewController: UIViewController {
         }
 
         NSLayoutConstraint.activate([
+            
+            // MARK: - ScrollView Setup
+            scrollView.topAnchor.constraint(equalTo: g.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-
-            previewContainer.topAnchor.constraint(equalTo: g.topAnchor),
-            previewContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            previewContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // MARK: - Preview Container (Adaptive 16:9)
+            previewContainer.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            previewContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            previewContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            previewContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             previewContainer.heightAnchor.constraint(
                 equalTo: previewContainer.widthAnchor, multiplier: 9.0 / 16.0),
 
@@ -370,14 +399,17 @@ final class ShotPlayerViewController: UIViewController {
             cutFlashLbl.centerXAnchor.constraint(equalTo: previewContainer.centerXAnchor),
             cutFlashLbl.centerYAnchor.constraint(equalTo: previewContainer.centerYAnchor),
 
+            // MARK: - Separator 1
             sep1.topAnchor.constraint(equalTo: previewContainer.bottomAnchor),
-            sep1.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sep1.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sep1.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep1.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             sep1.heightAnchor.constraint(equalToConstant: 1),
 
+            // MARK: - Transport Bar (Adaptive Height)
             transportBar.topAnchor.constraint(equalTo: sep1.bottomAnchor),
-            transportBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            transportBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            transportBar.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            transportBar.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            transportBar.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             transportBar.heightAnchor.constraint(equalToConstant: transportH),
 
             prevBtn.widthAnchor.constraint(equalToConstant: prevDim),
@@ -392,14 +424,17 @@ final class ShotPlayerViewController: UIViewController {
             timeStack.trailingAnchor.constraint(equalTo: transportBar.trailingAnchor, constant: -16),
             timeStack.centerYAnchor.constraint(equalTo: transportBar.centerYAnchor),
 
+            // MARK: - Separator 2
             sep2.topAnchor.constraint(equalTo: transportBar.bottomAnchor),
-            sep2.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sep2.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sep2.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep2.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             sep2.heightAnchor.constraint(equalToConstant: 1),
 
+            // MARK: - Scrubber Bar (Adaptive Height)
             scrubberBar.topAnchor.constraint(equalTo: sep2.bottomAnchor),
-            scrubberBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrubberBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrubberBar.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            scrubberBar.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            scrubberBar.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             scrubberBar.heightAnchor.constraint(equalToConstant: scrubberH),
 
             scrubStartLbl.leadingAnchor.constraint(equalTo: scrubberBar.leadingAnchor, constant: 16),
@@ -412,15 +447,19 @@ final class ShotPlayerViewController: UIViewController {
             scrubber.trailingAnchor.constraint(equalTo: scrubEndLbl.leadingAnchor, constant: -10),
             scrubber.centerYAnchor.constraint(equalTo: scrubberBar.centerYAnchor),
 
+            // MARK: - Separator 3
             sep3.topAnchor.constraint(equalTo: scrubberBar.bottomAnchor),
-            sep3.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sep3.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sep3.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep3.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             sep3.heightAnchor.constraint(equalToConstant: 1),
 
+            // MARK: - Film Strip Container (Adaptive, grows to fit content)
             filmStripContainer.topAnchor.constraint(equalTo: sep3.bottomAnchor),
-            filmStripContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            filmStripContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            filmStripContainer.heightAnchor.constraint(equalToConstant: stripH),
+            filmStripContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            filmStripContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            filmStripContainer.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            filmStripContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            filmStripContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: stripH),
 
             shotsHeaderLbl.topAnchor.constraint(equalTo: filmStripContainer.topAnchor, constant: 8),
             shotsHeaderLbl.leadingAnchor.constraint(equalTo: filmStripContainer.leadingAnchor, constant: 16),
@@ -436,8 +475,9 @@ final class ShotPlayerViewController: UIViewController {
     }
 
     private func applyOrientation(to size: CGSize) {
-
+        // Invalidate and refresh layouts for adaptive sizing
         filmStrip.collectionViewLayout.invalidateLayout()
+        scrollView.layoutIfNeeded()
         view.layoutIfNeeded()
     }
 
