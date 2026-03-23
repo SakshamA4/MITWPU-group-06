@@ -100,25 +100,35 @@ enum ToolType: CaseIterable {
             
         case .sky:
             return [
-                SpawnItem(
-                    title: "Daylight Sky",
-                    imageName: "cloud.sun",
-                    modelFileName: "sky_day"
-                ),
-                SpawnItem(
-                    title: "Sunset Sky",
-                    imageName: "sunset",
-                    modelFileName: "sky_sunset"
-                ),
-                SpawnItem(
-                    title: "Midnight Sky",
-                    imageName: "moon.stars",
-                    modelFileName: "sky_night"
-                ),
+//                SpawnItem(
+//                    title: "Daylight Sky",
+//                    imageName: "cloud.sun",
+//                    modelFileName: "sky_day"
+//                ),
+//                SpawnItem(
+//                    title: "Sunset Sky",
+//                    imageName: "sunset",
+//                    modelFileName: "sky_sunset"
+//                ),
+//                SpawnItem(
+//                    title: "Midnight Sky",
+//                    imageName: "moon.stars",
+//                    modelFileName: "sky_night"
+//                ),
                 SpawnItem(
                     title: "Real Clouds",
                     imageName: "sky_image_1",
                     modelFileName: "sky_image_1"
+                ),
+                SpawnItem(
+                    title: "Starry Night",
+                    imageName: "Nighty_night",
+                    modelFileName: "Nighty_night"
+                ),
+                SpawnItem(
+                    title: "Evening Hue",
+                    imageName: "Evening_sky",
+                    modelFileName: "Evening_sky"
                 )
 
             ]
