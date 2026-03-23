@@ -49,6 +49,14 @@ class AddCharacterViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
 }
 
 extension AddCharacterViewController: UICollectionViewDataSource {
@@ -61,10 +69,12 @@ extension AddCharacterViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: characterCellId,
             for: indexPath
-        ) as! CharactersCollectionViewCell
+        ) as? CharactersCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         let characterItem = characters[indexPath.item]
         cell.configureForLibrary(character: characterItem)

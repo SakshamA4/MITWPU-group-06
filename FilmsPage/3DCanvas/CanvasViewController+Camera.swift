@@ -1,8 +1,8 @@
-import Combine
 import PhotosUI
 import RealityKit
 import UIKit
 import ARKit
+import Combine
 
 extension CanvasViewController {
 
@@ -81,6 +81,73 @@ extension CanvasViewController {
             distance /= capturedScale
             distance = max(1.5, min(15, distance))
             updateEditorCamera()
+            gesture.scale = 1.0
+            return
+        }
+        
+        let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
+        if isLocked { return }
+        
+        guard let modelEntity = entity as? ModelEntity else {
+            gesture.scale = 1.0
+            return
+        }
+        
+        switch gesture.state {
+        case .changed:
+            let scaleFactor = Float(gesture.scale)
+            
+            if var wall = modelEntity.components[WallComponent.self] {
+                wall.width *= scaleFactor
+                wall.height *= scaleFactor
+                wall.width = max(0.3, min(wall.width, 10))
+                wall.height = max(0.3, min(wall.height, 6))
+                let newMesh = MeshResource.generateBox(
+                    width: wall.width,
+                    height: wall.height,
+                    depth: 0.05
+                )
+                modelEntity.model?.mesh = newMesh
+                // generateCollisionShapes removed from .changed — it is called once in
+                // .ended below. Calling it every pinch frame was a major perf regression.
+                modelEntity.components.set(wall)
+            }
+            
+            if var bg = modelEntity.components[BackgroundComponent.self] {
+                bg.width *= scaleFactor
+                bg.height *= scaleFactor
+                bg.width = max(0.5, min(bg.width, 15))
+                bg.height = max(0.5, min(bg.height, 10))
+                modelEntity.model?.mesh = MeshResource.generateBox(
+                    width: bg.width,
+                    height: bg.height,
+                    depth: 0.05
+                )
+                // Deferred to .ended (see above)
+                modelEntity.components.set(bg)
+            }
+            
+            if var ground = modelEntity.components[GroundComponent.self] {
+                ground.width *= scaleFactor
+                ground.depth *= scaleFactor
+                ground.width = max(0.5, min(ground.width, 20))
+                ground.depth = max(0.5, min(ground.depth, 20))
+                let newMesh = MeshResource.generatePlane(
+                    width: ground.width,
+                    depth: ground.depth
+                )
+                modelEntity.model?.mesh = newMesh
+                // Deferred to .ended (see above)
+                modelEntity.components.set(ground)
+            }
+            gesture.scale = 1.0
+
+        case .ended, .cancelled:
+            // Rebuild collision shapes once — mesh is at its final size.
+            modelEntity.generateCollisionShapes(recursive: true)
+
+        default:
+            break
         }
     }
 
@@ -310,14 +377,22 @@ extension CanvasViewController {
 
         // Animate the cell out and reload
         let indexPath = IndexPath(item: index, section: 0)
-        cameraCollectionView?.performBatchUpdates({
-            cameraCollectionView?.deleteItems(at: [indexPath])
-        }, completion: nil)
+        if cameraCollectionView?.numberOfItems(inSection: 0) ?? 0 > index {
+            cameraCollectionView?.performBatchUpdates({
+                cameraCollectionView?.deleteItems(at: [indexPath])
+            }, completion: nil)
+        } else {
+            cameraCollectionView?.reloadData()
+        }
 
         if sceneCameraItems.isEmpty {
             stopCameraPreviewUpdates()
-            setCameraPanelExpanded(false, animated: true)  // ← add this
+            setCameraPanelExpanded(false, animated: true)
+            // Hide the pull-tab when there are no cameras left
+            view.viewWithTag(8803)?.alpha = 0
         }
+
+        refreshSidebarContent()
     }
 
     func collectionView(_ collectionView: UICollectionView,
@@ -388,28 +463,45 @@ extension CanvasViewController {
     }
 
 
-    // MARK: - Live Camera Preview
-    // Uses a dedicated off-screen ARView that is NEVER added to the view hierarchy.
-    // The main arView's camera is never switched — zero flicker.
+    // MARK: - Camera Preview (off-screen ARView, timer-driven)
+    //
+    // A dedicated off-screen ARView (`previewARView`) is created once and never added
+    // to the view hierarchy, so the main viewport never flickers.
+    //
+    // A 3fps repeating Timer (`cameraPreviewTimer`) calls `updateAllCameraPreviews()`
+    // which drives `snapshotPreviewCamera(at:)` — a serial chain that:
+    //   1. Clones `mainAnchor` into the off-screen ARView.
+    //   2. Disables all cameras in the clone; enables only the target camera by name.
+    //   3. Snapshots the off-screen view.
+    //   4. Stores the image in `sceneCameraItems[index].previewImage`, reloads the cell.
+    //   5. Chains to the next index.
+    //
+    // The main `arView` and its active camera are NEVER touched — zero flicker.
 
-    /// A single hidden ARView used only for rendering preview snapshots.
+    // MARK: Off-screen ARView (lazy, associated object so it can live on the extension)
+
+    private enum PreviewARViewKey { static var key = "previewARView" }
+
+    /// A dedicated off-screen ARView used exclusively for camera thumbnails.
+    /// Never added to any view hierarchy; created once and reused.
     var previewARView: ARView {
         if let existing = objc_getAssociatedObject(self, &PreviewARViewKey.key) as? ARView {
             return existing
         }
-        let offscreen = ARView(frame: CGRect(x: 0, y: 0, width: 200, height: 150))
-        offscreen.automaticallyConfigureSession = false
-        offscreen.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
-        offscreen.environment.background = .color(.white)
-        offscreen.cameraMode = .nonAR
-        // Never added to any view hierarchy — purely off-screen
-        objc_setAssociatedObject(self, &PreviewARViewKey.key, offscreen, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        return offscreen
+        let av = ARView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        av.cameraMode = .nonAR
+        // Match the main arView's rendering settings so PBR materials are lit correctly
+        // and the background matches (white, like the main scene).
+        av.environment = arView.environment
+        av.renderOptions = arView.renderOptions
+        objc_setAssociatedObject(self, &PreviewARViewKey.key, av, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        return av
     }
 
+    // MARK: Timer lifecycle
+
     func startCameraPreviewUpdates() {
-        stopCameraPreviewUpdates()
-        // 3fps thumbnail refresh — lightweight, still feels live
+        guard cameraPreviewTimer == nil else { return }
         cameraPreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.33, repeats: true) { [weak self] _ in
             self?.updateAllCameraPreviews()
         }
@@ -420,14 +512,18 @@ extension CanvasViewController {
         cameraPreviewTimer = nil
     }
 
+    // MARK: Timer callback — kick off serial snapshot chain
+
     private func updateAllCameraPreviews() {
         guard !sceneCameraItems.isEmpty else { return }
         snapshotPreviewCamera(at: 0)
     }
 
-    /// Processes each scene camera serially to avoid overlapping snapshot calls.
+    // MARK: Serial snapshot chain
+
     private func snapshotPreviewCamera(at index: Int) {
         guard index < sceneCameraItems.count else { return }
+        guard let anchor = mainAnchor else { return }
 
         let item = sceneCameraItems[index]
         let indexPath = IndexPath(item: index, section: 0)
@@ -481,7 +577,19 @@ extension CanvasViewController {
                 }
                 self.snapshotPreviewCamera(at: index + 1)
             }
-        }
+    }
+
+    // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
+    //
+    // The timer already handles continuous updates, so these just ensure the timer
+    // is running. Individual-index refresh is a no-op since the timer covers all cameras.
+
+    func capturePreview(forCameraAt index: Int) {
+        startCameraPreviewUpdates()
+    }
+
+    func captureAllPreviews() {
+        startCameraPreviewUpdates()
     }
 
     @objc func toggleCameraPanelTapped() {
@@ -561,8 +669,19 @@ extension CanvasViewController {
     }
 
     @objc private func exitCameraViewTapped() {
+        // Find which camera was active so we can refresh its thumbnail after exiting.
+        let activeIndex = sceneCameraItems.firstIndex { $0.camera === activeCamera }
+
         activateEditorCamera()
         cameraCollectionView?.reloadData()
+
+        // Update the thumbnail for the camera the user just exited — it may have
+        // been moved while the user was looking through it.
+        if let idx = activeIndex {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.capturePreview(forCameraAt: idx)
+            }
+        }
     }
 
 
@@ -585,7 +704,13 @@ extension CanvasViewController {
         ) as? CameraPreviewCell else {
             return UICollectionViewCell()
         }
-        cell.label.text = "Camera \(indexPath.item + 1)"
+        let item = sceneCameraItems[indexPath.item]
+        let name = item.displayName
+        if let img = item.previewImage {
+            cell.updatePreview(image: img, name: name)
+        } else {
+            cell.label.text = name
+        }
         return cell
     }
 

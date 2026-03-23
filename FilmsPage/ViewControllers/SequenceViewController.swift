@@ -61,6 +61,14 @@ class SequenceViewController: UIViewController {
         updateTitle()
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     func registerCells() {
         collectionView.register(
             UINib(nibName: "SceneCollectionViewCell", bundle: nil),
@@ -115,12 +123,13 @@ extension SequenceViewController: UICollectionViewDataSource {
 extension SequenceViewController: UICollectionViewDelegate,
     UICollectionViewDelegateFlowLayout
 {
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "addSceneSegue" {
-            let vc = segue.destination as! AddSceneViewController
-            vc.sequence = sequence
-        }
-    }
+     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+         if segue.identifier == "addSceneSegue" {
+             if let vc = segue.destination as? AddSceneViewController {
+                 vc.sequence = sequence
+             }
+         }
+     }
 
     func collectionView(
         _ collectionView: UICollectionView,

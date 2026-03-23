@@ -241,11 +241,12 @@ extension CanvasViewController {
     
     func startPlayback() {
         stopPlayback()  // safety
-        
-        displayLink = CADisplayLink(
-            target: self,
-            selector: #selector(updatePlayback)
-        )
+
+        // FIX 1: Use a proxy object so CADisplayLink doesn't retain self strongly.
+        // Without this, a dismissed modal VC is kept alive indefinitely.
+        let proxy = DisplayLinkProxy()
+        proxy.target = self
+        displayLink = CADisplayLink(target: proxy, selector: #selector(DisplayLinkProxy.tick(_:)))
         displayLink?.add(to: .main, forMode: .common)
     }
 
@@ -303,7 +304,7 @@ extension CanvasViewController {
         for (entityName, clips) in clipsByEntity {
             
             guard
-                let entity = arView.scene.findEntity(named: entityName),
+                let entity = timelineEntityCache[entityName] ?? mainAnchor?.findEntity(named: entityName),
                 let baseTransform = baseTransforms[entityName]
             else { continue }
             
@@ -525,12 +526,20 @@ extension CanvasViewController {
         selectedEntity = nil
         
         baseTransforms.removeAll()
-        
-        for anchor in arView.scene.anchors {
-            for entity in anchor.children {
-                baseTransforms[entity.name] = entity.transform
+        timelineEntityCache.removeAll()
+
+        // Snapshot only the user scene entities under MainAnchor.
+        // Iterating arView.scene.anchors would include the Grid anchor (40,000+ line entities),
+        // causing massive memory allocation and frame drops.
+        // FIX 6: Also skip "PathContainer" — its children (PathRoot_ entities) hold
+        // motion path geometry that must not be snapshotted as user-scene entities.
+        let skipNames: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        mainAnchor?.children
+            .filter { !skipNames.contains($0.name) && !$0.name.isEmpty }
+            .forEach {
+                baseTransforms[$0.name] = $0.transform
+                timelineEntityCache[$0.name] = $0
             }
-        }
     }
 
     
@@ -544,9 +553,10 @@ extension CanvasViewController {
             showAllRotationArcs()
         }
         for (name, transform) in baseTransforms {
-            arView.scene.findEntity(named: name)?.transform = transform
+            mainAnchor?.findEntity(named: name)?.transform = transform
         }
         baseTransforms.removeAll()
+        timelineEntityCache.removeAll()
     }
 
 

@@ -31,6 +31,14 @@ class LightsViewController: UIViewController {
             configureLayout()
         }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.lightsCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     private func configureLayout() {
         guard let layout = lightsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
             let newLayout = UICollectionViewFlowLayout()
@@ -81,16 +89,18 @@ class LightsViewController: UIViewController {
             lights.count
         }
 
-        func collectionView(_ collectionView: UICollectionView,
-                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "LightsCollectionViewCell",
-                for: indexPath
-            ) as! LightsCollectionViewCell
+         func collectionView(_ collectionView: UICollectionView,
+                             cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "LightsCollectionViewCell",
+                 for: indexPath
+             ) as? LightsCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
 
-            cell.configure(with: lights[indexPath.item])
-            return cell
-        }
+             cell.configure(with: lights[indexPath.item])
+             return cell
+         }
     }
 
 extension LightsViewController: UICollectionViewDelegate {

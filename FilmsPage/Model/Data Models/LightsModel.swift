@@ -13,29 +13,9 @@ struct LightsDataStore {
     private(set) static var items: [LightItem] = [
         LightItem(
             name: "LED Panel",
-            imageName: "LED Panel_img",        // change to your asset name
+            imageName: "LED Panel_img",        
             description: "Soft, even light source ideal for key or fill.",
             modelFileName: "LED Panel"
-        ),
-        LightItem(
-            name: "Practical Lantern",
-            imageName: "Practical light",
-            description: "Visible lantern in frame used as both source and prop."
-        ),
-        LightItem(
-            name: "Practical Spotlight",
-            imageName: "Practical Spotlight",
-            description: "Focused practical light creating a strong beam or pool."
-        ),
-        LightItem(
-            name: "Ring Light",
-            imageName: "Ringlight",
-            description: "Circular light giving an even, flattering glow and eye ring."
-        ),
-        LightItem(
-            name: "Fluorescent Tube",
-            imageName: "Fluorescent tube",
-            description: "Long tube light, good for industrial or stylised looks."
         ),
         LightItem(
             name: "Lantern",
@@ -48,21 +28,6 @@ struct LightsDataStore {
             imageName: "Spotlight_img 1",
             description: "Narrow beam for highlighting specific areas or subjects.",
             modelFileName: "Spotlight"
-        ),
-        LightItem(
-            name: "Flood Light",
-            imageName: "Flood Light",
-            description: "Wide, powerful light used to wash large areas."
-        ),
-        LightItem(
-            name: "Fluorescent Tube 2",
-            imageName: "Fluorescent Tube 2",
-            description: "Second variation of fluorescent tube for a different look/colour."
-        ),
-        LightItem(
-            name: "Fluorescent Tube 3",
-            imageName: "Fluorescent Tube 3",
-            description: "Third variation of fluorescent tube for extra flexibility."
         )
     ]
 

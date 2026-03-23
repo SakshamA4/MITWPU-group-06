@@ -31,6 +31,13 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         // 📍 THE FIX: Refresh data from the store to show updated notes/scenes
         refreshData()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
     // MARK: - Setup
     private func setupCollectionView() {
         // Ensure you register your NIBs/Classes here if not done in Storyboard
@@ -81,20 +88,24 @@ extension HomeViewController: UICollectionViewDataSource {
         return section == 0 ? templates.count : recentScenes.count
     }
     
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if indexPath.section == 0 {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as! TemplatesCollectionViewCell
-            let item = templates[indexPath.row]
-            cell.templateLabel.text = item.name
-            cell.templatesImageView.setFilmImage(named: item.image ?? "Image")
-            return cell
-        } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as! RecentScenesCollectionViewCell
-            let item = recentScenes[indexPath.row]
-            cell.configure(with: item)
-            return cell
-        }
-    }
+     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+         if indexPath.section == 0 {
+             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as? TemplatesCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             let item = templates[indexPath.row]
+             cell.templateLabel.text = item.name
+             cell.templatesImageView.setFilmImage(named: item.image ?? "Image")
+             return cell
+         } else {
+             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as? RecentScenesCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
+             let item = recentScenes[indexPath.row]
+             cell.configure(with: item)
+             return cell
+         }
+     }
     
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         guard kind == UICollectionView.elementKindSectionHeader else { return UICollectionReusableView() }

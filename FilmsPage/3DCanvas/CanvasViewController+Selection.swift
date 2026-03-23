@@ -54,6 +54,15 @@ extension CanvasViewController {
         // 2️⃣ DELETE ENTITY + ALL ITS CLIPS
         // ───────────────────────────────
         guard let entity = selectedEntity else { return }
+
+        // If this is a scene camera root, delegate to the dedicated camera delete path.
+        // That path removes the camera from sceneCameras/sceneCameraItems and removes
+        // its collection-view cell — the generic path below does neither.
+        if entity.components[CategoryComponent.self]?.toolType == .camera {
+            selectedEntity = nil
+            deleteSceneCamera(cameraRoot: entity)
+            return
+        }
         
         let entityName = entity.name
         
@@ -85,7 +94,7 @@ extension CanvasViewController {
     
     func selectEntityFromSidebar(named name: String) {
         
-        guard let entity = arView.scene.findEntity(named: name) else { return }
+        guard let entity = mainAnchor?.findEntity(named: name) else { return }
         
         self.selectedEntity = entity
         self.refreshSidebarContent()

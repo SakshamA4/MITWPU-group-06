@@ -33,6 +33,14 @@ class LibraryCharactersViewController: UIViewController {
             super.viewDidLayoutSubviews()
             configureLayout()
         }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.charactersCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
     private func configureLayout() {
         guard let layout = charactersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
             let newLayout = UICollectionViewFlowLayout()
@@ -76,16 +84,18 @@ class LibraryCharactersViewController: UIViewController {
             characters.count
         }
 
-        func collectionView(_ collectionView: UICollectionView,
-                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "LibraryCharactersCollectionViewCell",
-                for: indexPath
-            ) as! LibraryCharactersCollectionViewCell
+         func collectionView(_ collectionView: UICollectionView,
+                             cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "LibraryCharactersCollectionViewCell",
+                 for: indexPath
+             ) as? LibraryCharactersCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
 
-            cell.configure(with: characters[indexPath.item])
-            return cell
-        }
+             cell.configure(with: characters[indexPath.item])
+             return cell
+         }
     }
 
 

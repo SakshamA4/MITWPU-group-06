@@ -246,30 +246,31 @@ extension CanvasViewController {
         return button
     }
 
-    func makeGrid(size: Int, spacing: Float) -> Entity {
+    // Grid: size:100 produces 402 line entities (±20 m span at 0.2 m spacing).
+    func makeGrid(size: Int = 100, spacing: Float) -> Entity {
         let container = Entity()
         let length = Float(size) * spacing * 2
-        
+
         for i in -size...size {
             let isMajor = i % 5 == 0
-            
+
             var xColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
             var zColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
-            
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+
             if i == 0 {
                 xColor = .red
                 zColor = .blue
             }
-            
+
             let xLine = ModelEntity(
                 mesh: .generateBox(size: [length, 0.002, 0.002]),
                 materials: [SimpleMaterial(color: xColor, isMetallic: false)]
             )
             xLine.position = [0, 0, Float(i) * spacing]
             container.addChild(xLine)
-            
+
             let zLine = ModelEntity(
                 mesh: .generateBox(size: [0.002, 0.002, length]),
                 materials: [SimpleMaterial(color: zColor, isMetallic: false)]
@@ -277,7 +278,7 @@ extension CanvasViewController {
             zLine.position = [Float(i) * spacing, 0, 0]
             container.addChild(zLine)
         }
-        
+
         return container
     }
 
@@ -321,9 +322,14 @@ extension CanvasViewController {
 
     
     func refreshSidebarContent() {
+        // FIX 8: Skip redundant rebuilds during batch load — the persistence service
+        // resets isBatchLoading and calls us exactly once at Phase 9.
+        guard !isBatchLoading else { return }
         hierarchyStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        let allEntities = arView.scene.anchors.flatMap { $0.children }
+
+        // Use mainAnchor directly — never arView.scene.anchors.flatMap, which would
+        // include the Grid anchor (40,000+ line entities) and cause severe slowdowns.
+        let allEntities: [Entity] = mainAnchor.map { Array($0.children) } ?? []
         
         var itemsByCategory: [ToolType: [Entity]] = [:]
         ToolType.allCases.forEach { itemsByCategory[$0] = [] }
@@ -346,7 +352,16 @@ extension CanvasViewController {
             hierarchyStackView.addArrangedSubview(header)
             
             for entity in entities {
-                let row = createHierarchyItemRow(title: entity.name)
+                // For camera entities, show the human-readable "Camera N" name
+                // instead of the raw internal name (e.g. "SceneCamera_1_<UUID>").
+                let displayTitle: String
+                if tool == .camera,
+                   let cameraItem = sceneCameraItems.first(where: { $0.cameraRoot === entity }) {
+                    displayTitle = cameraItem.displayName
+                } else {
+                    displayTitle = entity.name
+                }
+                let row = createHierarchyItemRow(title: displayTitle, entityName: entity.name)
                 hierarchyStackView.addArrangedSubview(row)
             }
         }
@@ -381,13 +396,15 @@ extension CanvasViewController {
 
 
     
-    private func createHierarchyItemRow(title: String) -> UIView {
+    private func createHierarchyItemRow(title: String, entityName: String? = nil) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
         
         // 2. Set the title and color
         config.title = title
-        let isSelected = selectedEntity?.name == title
+        // Selection highlight uses the actual entity name for the match
+        let nameForSelection = entityName ?? title
+        let isSelected = selectedEntity?.name == nameForSelection
         config.baseForegroundColor = isSelected ? .systemRed : .label
         
         config.contentInsets = NSDirectionalEdgeInsets(
@@ -409,10 +426,10 @@ extension CanvasViewController {
         // Alignment still works on the button property
         button.contentHorizontalAlignment = .leading
         
-        // 6. Add the action
+        // 6. Add the action — select by the real entity name, not the display label
         button.addAction(
             UIAction { [weak self] _ in
-                self?.selectEntityFromSidebar(named: title)
+                self?.selectEntityFromSidebar(named: nameForSelection)
             },
             for: .touchUpInside
         )
@@ -823,20 +840,76 @@ extension CanvasViewController {
 //        generator.impactOccurred()
 //        print("🎬 Shot Breakdown Tapped")
 //    }
-    // In CanvasViewController, inside shotBreakdownTapped()
-//    @objc private func shotBreakdownTapped() {
-//        let vc = ShotBreakdownViewController()
-//        vc.sceneName        = self.sceneName
-//        vc.timeline         = self.timeline
-//        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
-//        vc.arView           = self.arView                    // ← new
-//        vc.evaluateTimeline = { [weak self] t in             // ← new
-//            self?.evaluateTimeline(at: t)
-//        }
-//        navigationController?.pushViewController(vc, animated: true)
-//    }
+    
+    @objc func shotBreakdownTapped_DISABLED() {
+        let vc = ShotBreakdownViewController()
+        vc.sceneName        = self.sceneName
+        vc.timeline         = self.timeline
+        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
+        vc.arView           = self.arView                    // ← new
+         vc.evaluateTimeline = { [weak self] t in             // ← new
+            self?.evaluateTimeline(at: t)
+        }
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    // MARK: - Color Picker
+    func showColorPicker(for entity: ModelEntity) {
+        self.colorPickerTargetEntity = entity
+        let picker = UIColorPickerViewController()
+        picker.delegate = self
+        picker.supportsAlpha = false
+        
+        // Set initial color from the entity
+        if let wallComp = entity.components[WallComponent.self] {
+            picker.selectedColor = wallComp.uiColor
+        } else if let groundComp = entity.components[GroundComponent.self] {
+            picker.selectedColor = groundComp.uiColor
+        }
+        
+        // Add a custom done button with checkmark
+        let doneButton = UIBarButtonItem(
+            image: UIImage(systemName: "checkmark"),
+            style: .done,
+            target: self,
+            action: #selector(colorPickerDoneTapped)
+        )
+        picker.navigationItem.rightBarButtonItem = doneButton
+        
+        // Present in a navigation controller to show the custom bar button
+        let navController = UINavigationController(rootViewController: picker)
+        self.present(navController, animated: true)
+    }
+
+    // Helper function for showing color picker immediately after spawning
+    func showColorPickerForNewSpawn(_ entity: ModelEntity) {
+        // Select the entity first
+        self.selectedEntity = entity
+        // Show the color picker
+        self.showColorPicker(for: entity)
+    }
+
+    @objc func colorPickerDoneTapped() {
+        self.dismiss(animated: true)
+    }
 
 
+}
+
+// MARK: - UIColorPickerViewController Delegate
+extension CanvasViewController: UIColorPickerViewControllerDelegate {
+    func colorPickerViewController(
+        _ viewController: UIColorPickerViewController,
+        didSelect color: UIColor,
+        continuously: Bool
+    ) {
+        guard let entity = colorPickerTargetEntity as? ModelEntity else { return }
+        self.applyColor(color, to: entity)
+    }
+
+    func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+        colorPickerTargetEntity = nil
+    }
 }
 
 // MARK: - UICollectionView DataSource + Delegate

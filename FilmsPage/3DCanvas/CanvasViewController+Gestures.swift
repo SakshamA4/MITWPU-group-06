@@ -249,6 +249,12 @@ extension CanvasViewController {
         let isCurrentlyLocked = entity.components[LockComponent.self]?.isLocked ?? false
         let isCamera = entity.name.lowercased().contains("scenecamera")
             || entity.components[CategoryComponent.self]?.toolType == .camera
+
+        // ── Check if entity is a wall or ground (colorable) ──────────────────
+        let isWall = entity.components[CanvasViewController.WallComponent.self] != nil
+        let isGround = entity.components[CanvasViewController.GroundComponent.self] != nil
+        let showColorOption = isWall || isGround
+
         let menu = EntityActionMenu()
         menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked)
         menu.translatesAutoresizingMaskIntoConstraints = false
@@ -273,6 +279,15 @@ extension CanvasViewController {
             case .addMovement:
                 menu.removeFromSuperview()
                 self.presentAddMovementPicker(for: entity)
+
+            case .changeColour:
+                // Open color picker for wall/ground entities
+                menu.removeFromSuperview()
+                if let modelEntity = entity as? ModelEntity {
+                    self.showColorPicker(for: modelEntity)
+                }
+
+            // ── Camera entity actions ───────────────────────────────────────
             case .addShot:
                 menu.removeFromSuperview()
                 self.presentShotPicker(for: entity)
@@ -333,6 +348,14 @@ extension CanvasViewController {
         let dx =  Float(translation.x) * 0.005
         let dy = -Float(translation.y) * 0.005
         var newPosition = startPos
+        // FIX: sensitivity now scales with camera distance, matching panCameraTarget()
+        // which uses distance * 0.0015. At distance=5 this gives 0.0015; at distance=15
+        // it gives 0.0045 — so dragging feels consistent regardless of zoom level.
+        // The old fixed 0.005 was too fast when zoomed in and too slow when zoomed out.
+        let sensitivity: Float = max(0.001, distance * 0.0003)
+        let dx = mouseDelta.x * sensitivity
+        let dy = -mouseDelta.y * sensitivity
+        
         if currentDragMode == .ground {
             let camPos      = activeCamera.position(relativeTo: nil)
             let scenePos    = entity.position(relativeTo: nil)
@@ -500,6 +523,8 @@ extension CanvasViewController {
         let location = gesture.location(in: arView)
         switch gesture.state {
         case .began:
+            // FIX 5: Do NOT call saveCurrentStateToUndo() unconditionally.
+            // Camera-orbit / deselect pans mustn't create empty undo entries.
             let hits = arView.hitTest(location)
             activeRotationAxis = nil
             activeGizmoPart    = .none
@@ -547,6 +572,7 @@ extension CanvasViewController {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
                 if root?.name.contains("Gizmo") == false {
+                    saveCurrentStateToUndo()   // FIX 5: only when an entity is selected
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
                     setEntityTransparency(root, alpha: 0.9)

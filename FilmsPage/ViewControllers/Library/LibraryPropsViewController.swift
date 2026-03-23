@@ -18,7 +18,7 @@ class LibraryPropsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         propsCollectionView.dataSource = self
-        propsCollectionView.delegate = self
+//        propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
         props = propService.getProps()
         print(props)
@@ -33,6 +33,14 @@ class LibraryPropsViewController: UIViewController {
         super.viewDidLayoutSubviews()
         configureLayout()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.propsCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
 
     private func configureLayout() {
         guard let layout = propsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
@@ -77,31 +85,33 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "LibraryPropsCollectionViewCell",
             for: indexPath
-        ) as! LibraryPropsCollectionViewCell
+        ) as? LibraryPropsCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         cell.configure(with: props[indexPath.item])
         return cell
     }
 }
 
-extension LibraryPropsViewController: UICollectionViewDelegate {
-
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
-
-        let selectedProp = props[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
-            withIdentifier: "PropDetailViewController"
-        ) as? PropDetailViewController else {
-            return
-        }
-
-        vc.prop = selectedProp
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+//extension LibraryPropsViewController: UICollectionViewDelegate {
+//
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//
+//        let selectedProp = props[indexPath.item]
+//
+//        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "PropDetailViewController"
+//        ) as? PropDetailViewController else {
+//            return
+//        }
+//
+//        vc.prop = selectedProp
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
+//}

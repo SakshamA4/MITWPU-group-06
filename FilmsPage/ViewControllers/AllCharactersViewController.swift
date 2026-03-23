@@ -49,6 +49,14 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
         )
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
     @objc private func refreshData() {
         loadCharacters()
     }
@@ -64,26 +72,28 @@ class AllCharactersViewController: UIViewController , UICollectionViewDataSource
         return characters.count
     }
     
-    func collectionView(_ collectionView: UICollectionView,
-                           cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+     func collectionView(_ collectionView: UICollectionView,
+                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 
-           let cell = collectionView.dequeueReusableCell(
-               withReuseIdentifier: characterCellId,
-               for: indexPath
-           ) as! CharactersCollectionViewCell
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: characterCellId,
+                for: indexPath
+            ) as? CharactersCollectionViewCell else {
+                return UICollectionViewCell()
+            }
 
-           let filmCharacter = characters[indexPath.item]
+            let filmCharacter = characters[indexPath.item]
 
-           // Resolve template from service
-           let template = FilmCharacterService.shared.getTemplate(for: filmCharacter)
+            // Resolve template from service
+            let template = FilmCharacterService.shared.getTemplate(for: filmCharacter)
 
-           cell.configureCell(
-               filmCharacter: filmCharacter,
-               template: template
-           )
+            cell.configureCell(
+                filmCharacter: filmCharacter,
+                template: template
+            )
 
-           return cell
-       }
+            return cell
+        }
     /*
     // MARK: - Navigation
 

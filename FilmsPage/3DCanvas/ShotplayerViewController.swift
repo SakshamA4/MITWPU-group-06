@@ -2,35 +2,38 @@
 //  ShotPlayerViewController.swift
 //  3DCanvas
 //
-//  FIX 1: Timeline bar is now at the BOTTOM of the frame, no overlap with buttons.
-//         Buttons sit above the strip in their own clean panel.
-//  FIX 2: Frame shows actual camera POV — activates the shot's PerspectiveCamera,
-//         snapshots via the passed captureFromCamera closure, then restores.
-//  FIX 3: Export can trigger MP4 recording via ReplayKit.
-//
 
 import UIKit
 import RealityKit
-import ReplayKit
+import AVFoundation
 
-class ShotPlayerViewController: UIViewController {
 
-    // MARK: - Colours
-    private let navy     = UIColor(red: 11/255,  green: 11/255,  blue: 22/255,  alpha: 1)
-    private let appRed   = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
-    private let panelBg  = UIColor(red: 17/255,  green: 17/255,  blue: 30/255,  alpha: 1)
-    private let thumbBg  = UIColor(red: 10/255,  green: 10/255,  blue: 20/255,  alpha: 1)
+final class ShotPlayerViewController: UIViewController {
 
-    // MARK: - Init
-    /// captureFromCamera: given a SceneCameraItem, return a UIImage of what that camera sees.
-    /// evaluateTimeline:  scrub the scene to a given master time.
+    private let bgColor      = UIColor(red: 0.043, green: 0.043, blue: 0.086, alpha: 1)
+    private let surfaceColor = UIColor(red: 0.060, green: 0.060, blue: 0.108, alpha: 1)
+    private let controlsBg   = UIColor(red: 0.048, green: 0.048, blue: 0.092, alpha: 1)
+    private let accentRed    = UIColor(red: 0.694, green: 0.125, blue: 0.224, alpha: 1)
+    private let trackColor   = UIColor(white: 1, alpha: 0.10)
+    private let labelFaded   = UIColor(white: 1, alpha: 0.38)
+
+    private let stripColors: [UIColor] = [
+        UIColor(red: 0.694, green: 0.125, blue: 0.224, alpha: 1),
+        UIColor(red: 0.18,  green: 0.44,  blue: 0.78,  alpha: 1),
+        UIColor(red: 0.12,  green: 0.65,  blue: 0.45,  alpha: 1),
+        UIColor(red: 0.72,  green: 0.45,  blue: 0.12,  alpha: 1),
+        UIColor(red: 0.55,  green: 0.22,  blue: 0.75,  alpha: 1),
+    ]
+
+
     init(shots: [Shot],
          startIndex: Int,
          playAll: Bool,
          sceneName: String,
          arView: ARView?,
          evaluateTimeline: ((Float) -> Void)?,
-         captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)? = nil,
+         captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
+                              @escaping (UIImage?) -> Void) -> Void)? = nil,
          cameraItems: [CanvasViewController.SceneCameraItem] = []) {
         self.shots             = shots
         self.currentIndex      = startIndex
@@ -38,132 +41,123 @@ class ShotPlayerViewController: UIViewController {
         self.sceneName         = sceneName
         self.arView            = arView
         self.evaluateTimeline  = evaluateTimeline
-        self.captureFromCamera = captureFromCamera
+        self.captureFrameAsync = captureFrameAsync
         self.cameraItems       = cameraItems
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    // MARK: - State
+ 
     var shots: [Shot]
     var currentIndex: Int
     var playAll: Bool
     var sceneName: String
     weak var arView: ARView?
     var evaluateTimeline: ((Float) -> Void)?
-    var captureFromCamera: ((CanvasViewController.SceneCameraItem?) -> UIImage?)?
+    var captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
+                             @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
 
-    private var isPlaying   = false
+    private var isPlaying        = false
+    private var snapshotInFlight: UIImage?
+    private var snapshotPending  = false
     private var displayLink: CADisplayLink?
-    private var playStart:   CFTimeInterval = 0
+    private var playStart: CFTimeInterval = 0
     private var currentTime: Float = 0
+    private var lastSnapshotTime: CFTimeInterval = 0
     private var currentShot: Shot { shots[currentIndex] }
 
-    // MARK: - UI
+    private var is13inch: Bool {
+        let s = UIScreen.main.bounds
+        return s.width >= 1024 || s.height >= 1024
+    }
 
-    // Large frame viewer — shows camera POV
-    private lazy var frameView: UIView = {
+
+    private lazy var previewContainer: UIView = {
         let v = UIView()
-        v.backgroundColor      = thumbBg
-        v.layer.cornerRadius   = 0   // full width
-        v.clipsToBounds        = true
+        v.backgroundColor    = .black
+        v.clipsToBounds      = true
+        v.layer.cornerRadius = 6
+        v.layer.borderWidth  = 1
+        v.layer.borderColor  = UIColor(white: 1, alpha: 0.06).cgColor
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
 
     private lazy var frameImageView: UIImageView = {
         let iv = UIImageView()
-        iv.contentMode         = .scaleAspectFit
-        iv.clipsToBounds       = true
+        iv.contentMode = .scaleAspectFit
+        iv.clipsToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
 
-    private let placeholderIcon: UIImageView = {
+    private lazy var framePlaceholder: UIImageView = {
         let iv = UIImageView()
-        let cfg = UIImage.SymbolConfiguration(pointSize: 44, weight: .thin)
-        iv.image = UIImage(systemName: "camera.fill", withConfiguration: cfg)
-        iv.tintColor = UIColor.white.withAlphaComponent(0.08)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 40, weight: .ultraLight)
+        iv.image       = UIImage(systemName: "camera.aperture", withConfiguration: cfg)
+        iv.tintColor   = UIColor(white: 1, alpha: 0.07)
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
 
-    // HUD overlaid on the frame — shot name top-left, time bottom-left
-    private let hudShotLabel: UILabel = {
-        let l = UILabel()
-        l.font            = .systemFont(ofSize: 13, weight: .bold)
-        l.textColor       = .white
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        l.layer.cornerRadius = 6; l.clipsToBounds = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+    private lazy var loadingSpinner: UIActivityIndicatorView = {
+        let s = UIActivityIndicatorView(style: .medium)
+        s.color = UIColor(white: 1, alpha: 0.30)
+        s.hidesWhenStopped = true
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
     }()
 
-    private let hudCamLabel: UILabel = {
+    // HUD chips overlaid on preview corners
+    private lazy var hudShotLbl: UILabel = makeHUDChip(size: 11, weight: .bold)
+    private lazy var hudCamLbl:  UILabel = makeHUDChip(size: 10, weight: .medium, alpha: 0.70)
+    private lazy var hudTimeLbl: UILabel = {
+        let l = makeHUDChip(size: 11, weight: .semibold)
+        l.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        return l
+    }()
+    private lazy var cutFlashLbl: UILabel = {
         let l = UILabel()
-        l.font            = .systemFont(ofSize: 11, weight: .medium)
-        l.textColor       = UIColor.white.withAlphaComponent(0.8)
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.45)
+        l.font = .systemFont(ofSize: 12, weight: .semibold)
+        l.textColor       = UIColor(white: 1, alpha: 0.85)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.65)
         l.layer.cornerRadius = 5; l.clipsToBounds = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    private let hudTimeLabel: UILabel = {
-        let l = UILabel()
-        l.font            = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
-        l.textColor       = .white
-        l.backgroundColor = UIColor.black.withAlphaComponent(0.45)
-        l.layer.cornerRadius = 5; l.clipsToBounds = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    // Cut flash
-    private let cutLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 13, weight: .semibold)
-        l.textColor = UIColor.white.withAlphaComponent(0.8)
         l.textAlignment = .center; l.alpha = 0
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
-    // ── TIMELINE BAR ──────────────────────────────────────────────────────────
-    // Sits at the very bottom of the frame — does NOT overlap buttons.
-    // Layout: [00:00] [━━━━━━━━●━━━━━━━━] [00:04]
 
-    private lazy var timelineBar: UIView = {
+    private lazy var transportBar: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        v.backgroundColor = controlsBg
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
 
-    private let startTimeLbl: UILabel = {
-        let l = UILabel()
-        l.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        l.textColor = UIColor.white.withAlphaComponent(0.55)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+    private lazy var prevBtn = makeTransportBtn(icon: "backward.end.fill", symbolPt: 14)
+    private lazy var playBtn = makeTransportBtn(icon: "play.fill",          symbolPt: 20, primary: true)
+    private lazy var nextBtn = makeTransportBtn(icon: "forward.end.fill",   symbolPt: 14)
+
+    private lazy var currentTimeLbl: UILabel = makeMonoLabel()
+    private lazy var durationLbl:    UILabel = makeMonoLabel()
+    private lazy var timeSepLbl:     UILabel = {
+        let l = makeMonoLabel(); l.text = "/"; l.textColor = labelFaded.withAlphaComponent(0.25); return l
     }()
 
-    private let endTimeLbl: UILabel = {
-        let l = UILabel()
-        l.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        l.textColor = UIColor.white.withAlphaComponent(0.55)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+
+    private lazy var scrubberBar: UIView = {
+        let v = UIView()
+        v.backgroundColor = controlsBg
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
     }()
 
-    private lazy var scrubber: UISlider = {
-        let s = UISlider()
-        s.minimumValue          = 0; s.maximumValue = 1; s.value = 0
-        s.minimumTrackTintColor = appRed
-        s.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.2)
-        s.thumbTintColor        = .white
+    private lazy var scrubber: PlayerSlider = {
+        let s = PlayerSlider(accent: accentRed, track: trackColor)
+        s.minimumValue = 0; s.maximumValue = 1; s.value = 0
         s.translatesAutoresizingMaskIntoConstraints = false
         s.addTarget(self, action: #selector(scrubChanged),   for: .valueChanged)
         s.addTarget(self, action: #selector(scrubTouchDown), for: .touchDown)
@@ -171,296 +165,414 @@ class ShotPlayerViewController: UIViewController {
         return s
     }()
 
-    // ── BUTTONS PANEL (separate from timeline, clearly above strip) ───────────
-    private lazy var buttonsPanel: UIView = {
+    private lazy var scrubStartLbl: UILabel = makeMonoLabel()
+    private lazy var scrubEndLbl:   UILabel = makeMonoLabel()
+
+    // Film strip row  —  SHOTS  N  [ ][ ][ ]…
+    private lazy var filmStripContainer: UIView = {
         let v = UIView()
-        v.backgroundColor = panelBg
-        v.layer.cornerRadius = 14
+        v.backgroundColor = surfaceColor
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
 
-    private let shotInfoLabel: UILabel = {
+    private lazy var shotsHeaderLbl: UILabel = {
         let l = UILabel()
-        l.font = .systemFont(ofSize: 11, weight: .semibold)
-        l.textColor = UIColor.white.withAlphaComponent(0.45)
-        l.textAlignment = .center
+        l.font = .systemFont(ofSize: 9, weight: .black)
+        l.textColor = labelFaded
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
-    private lazy var prevBtn = makeBtn(icon: "backward.end.fill", size: 17)
-    private lazy var playBtn = makeBtn(icon: "play.fill",          size: 24)
-    private lazy var nextBtn = makeBtn(icon: "forward.end.fill",   size: 17)
+    private lazy var shotCountLbl: UILabel = {
+        let l = UILabel()
+        l.font = .monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        l.textColor = labelFaded.withAlphaComponent(0.50)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
 
-    // ── FILM STRIP ────────────────────────────────────────────────────────────
-    private lazy var strip: UICollectionView = {
+    private lazy var filmStrip: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.itemSize = CGSize(width: 70, height: 46)
+        layout.scrollDirection    = .horizontal
         layout.minimumLineSpacing = 8
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+        layout.sectionInset       = UIEdgeInsets(top: 4, left: 16, bottom: 4, right: 16)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.backgroundColor = .clear
         cv.showsHorizontalScrollIndicator = false
+        cv.showsVerticalScrollIndicator   = false
         cv.register(StripCell.self, forCellWithReuseIdentifier: StripCell.reuseID)
         cv.dataSource = self; cv.delegate = self
         cv.translatesAutoresizingMaskIntoConstraints = false
         return cv
     }()
 
-    private let stripHeaderLbl: UILabel = {
-        let l = UILabel()
-        l.text = "ALL SHOTS"
-        l.font = .systemFont(ofSize: 9, weight: .black)
-        l.textColor = UIColor.white.withAlphaComponent(0.22)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+
+    private lazy var scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.backgroundColor = .clear
+        sv.showsVerticalScrollIndicator = true
+        sv.showsHorizontalScrollIndicator = false
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
     }()
 
-    // MARK: - Lifecycle
+    private lazy var contentContainer: UIView = {
+        let v = UIView()
+        v.backgroundColor = .clear
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private lazy var exportOverlay: UIView = {
+        let v = UIView(); v.backgroundColor = UIColor.black.withAlphaComponent(0.80)
+        v.isHidden = true; v.translatesAutoresizingMaskIntoConstraints = false; return v
+    }()
+    private lazy var exportLabel: UILabel = {
+        let l = UILabel(); l.font = .systemFont(ofSize: 13, weight: .semibold)
+        l.textColor = .white; l.textAlignment = .center; l.numberOfLines = 2
+        l.translatesAutoresizingMaskIntoConstraints = false; return l
+    }()
+    private lazy var exportProgress: UIProgressView = {
+        let p = UIProgressView(progressViewStyle: .default)
+        p.progressTintColor = accentRed; p.trackTintColor = UIColor(white: 1, alpha: 0.13)
+        p.translatesAutoresizingMaskIntoConstraints = false; return p
+    }()
+    private var exportOverlayAdded = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = navy
+        view.backgroundColor = bgColor
         setupNav()
-        setupLayout()
-        sync()
+        buildLayout()
+        applyOrientation(to: view.bounds.size)
+        syncToCurrentShot()
         if playAll { startPlayback() }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        [prevBtn, nextBtn].forEach { $0.layer.cornerRadius = $0.bounds.height / 2 }
+        playBtn.layer.cornerRadius = playBtn.bounds.height / 2
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        stopPlayback()
-        evaluateTimeline?(0)
+        stopPlayback(); evaluateTimeline?(0)
+        frameImageView.image = nil; snapshotInFlight = nil
     }
 
-    // MARK: - Nav
+    override func viewWillTransition(to size: CGSize,
+                                     with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            self?.applyOrientation(to: size)
+            self?.filmStrip.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
 
     private func setupNav() {
-        let app = UINavigationBarAppearance()
-        app.configureWithOpaqueBackground()
-        app.backgroundColor = navy
-        app.titleTextAttributes = [.foregroundColor: UIColor.white,
-                                    .font: UIFont.systemFont(ofSize: 17, weight: .semibold)]
-        navigationController?.navigationBar.standardAppearance   = app
-        navigationController?.navigationBar.scrollEdgeAppearance = app
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = bgColor
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor.white,
+            .font: UIFont.systemFont(ofSize: 15, weight: .semibold)
+        ]
+        appearance.shadowColor = UIColor(white: 1, alpha: 0.05)
+        navigationController?.navigationBar.standardAppearance   = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.tintColor = .white
 
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "chevron.left"),
             style: .plain, target: self, action: #selector(backTapped))
 
-        let exportItem = UIBarButtonItem(title: "Export", style: .plain,
-                                         target: self, action: #selector(exportTapped))
-        exportItem.setTitleTextAttributes([.foregroundColor: appRed,
-                                            .font: UIFont.systemFont(ofSize: 15, weight: .semibold)],
-                                           for: .normal)
-        navigationItem.rightBarButtonItem = exportItem
+        let exp = UIBarButtonItem(title: "Export", style: .plain,
+                                  target: self, action: #selector(exportTapped))
+        exp.setTitleTextAttributes([.foregroundColor: accentRed,
+                                    .font: UIFont.systemFont(ofSize: 14, weight: .semibold)],
+                                   for: .normal)
+        navigationItem.rightBarButtonItem = exp
     }
 
-    // MARK: - Layout
-    //
-    // Structure (top → bottom):
-    //   [Nav bar]
-    //   [frameView — 16:9 — fills width]
-    //     └─ frameImageView (fills)
-    //     └─ hudShotLabel (top-left)
-    //     └─ hudCamLabel  (top-left, below shot label)
-    //     └─ hudTimeLabel (bottom-left)
-    //     └─ cutLabel     (bottom-center)
-    //     └─ timelineBar  (bottom, 40pt tall)
-    //           [startTime] [━━scrubber━━] [endTime]
-    //   [buttonsPanel — 80pt]
-    //     [shotInfoLabel centered]
-    //     [prev | ▶ | next centered]
-    //   [stripHeaderLbl]
-    //   [strip — 56pt]
+    private func buildLayout() {
 
-    private func setupLayout() {
-        // Frame
-        frameView.addSubview(frameImageView)
-        frameView.addSubview(placeholderIcon)
-        frameView.addSubview(hudShotLabel)
-        frameView.addSubview(hudCamLabel)
-        frameView.addSubview(hudTimeLabel)
-        frameView.addSubview(cutLabel)
-        frameView.addSubview(timelineBar)
+        previewContainer.addSubview(frameImageView)
+        previewContainer.addSubview(framePlaceholder)
+        previewContainer.addSubview(loadingSpinner)
+        previewContainer.addSubview(hudShotLbl)
+        previewContainer.addSubview(hudCamLbl)
+        previewContainer.addSubview(hudTimeLbl)
+        previewContainer.addSubview(cutFlashLbl)
 
-        // Timeline bar contents
-        timelineBar.addSubview(startTimeLbl)
-        timelineBar.addSubview(scrubber)
-        timelineBar.addSubview(endTimeLbl)
-
-        view.addSubview(frameView)
-
-        // Buttons panel
         let btnStack = UIStackView(arrangedSubviews: [prevBtn, playBtn, nextBtn])
-        btnStack.axis = .horizontal; btnStack.spacing = 32; btnStack.alignment = .center
+        btnStack.axis = .horizontal; btnStack.alignment = .center; btnStack.spacing = 24
         btnStack.translatesAutoresizingMaskIntoConstraints = false
-        buttonsPanel.addSubview(shotInfoLabel)
-        buttonsPanel.addSubview(btnStack)
-        view.addSubview(buttonsPanel)
 
-        // Strip
-        view.addSubview(stripHeaderLbl)
-        view.addSubview(strip)
+        let timeStack = UIStackView(arrangedSubviews: [currentTimeLbl, timeSepLbl, durationLbl])
+        timeStack.axis = .horizontal; timeStack.alignment = .center; timeStack.spacing = 4
+        timeStack.translatesAutoresizingMaskIntoConstraints = false
+
+        transportBar.addSubview(btnStack)
+        transportBar.addSubview(timeStack)
+
+        scrubberBar.addSubview(scrubStartLbl)
+        scrubberBar.addSubview(scrubber)
+        scrubberBar.addSubview(scrubEndLbl)
+
+        filmStripContainer.addSubview(shotsHeaderLbl)
+        filmStripContainer.addSubview(shotCountLbl)
+        filmStripContainer.addSubview(filmStrip)
+
+        let sep1 = makeSep()   // below preview
+        let sep2 = makeSep()   // below transport
+        let sep3 = makeSep()   // below scrubber
+
+        // Main scrollView wraps all content to ensure nothing is cut off
+        view.addSubview(scrollView)
+        
+        // Add all content to the scrollView's content container
+        scrollView.addSubview(previewContainer)
+        scrollView.addSubview(sep1)
+        scrollView.addSubview(transportBar)
+        scrollView.addSubview(sep2)
+        scrollView.addSubview(scrubberBar)
+        scrollView.addSubview(sep3)
+        scrollView.addSubview(filmStripContainer)
+
+        let g = view.safeAreaLayoutGuide
+        let big         = is13inch
+        
+        // Adaptive button and bar sizing based on screen size
+        let transportH  = CGFloat(big ? 62 : 54)
+        let scrubberH   = CGFloat(big ? 50 : 44)
+        let headerH     = CGFloat(big ? 22 : 18)
+        let cellH       = CGFloat(big ? 84 : 74)
+        let cellW       = CGFloat(big ? 94 : 82)
+        let stripH      = cellH + headerH + 20
+        let playDim     = CGFloat(big ? 50 : 44)
+        let prevDim     = CGFloat(big ? 38 : 34)
+
+        if let layout = filmStrip.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.scrollDirection = .horizontal
+            layout.itemSize = CGSize(width: cellW, height: cellH)
+        }
 
         NSLayoutConstraint.activate([
-            // Frame — full width, 16:9
-            frameView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            frameView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            frameView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            frameView.heightAnchor.constraint(equalTo: frameView.widthAnchor, multiplier: 9.0/16.0),
+            
+            // MARK: - ScrollView Setup
+            scrollView.topAnchor.constraint(equalTo: g.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            frameImageView.topAnchor.constraint(equalTo: frameView.topAnchor),
-            frameImageView.leadingAnchor.constraint(equalTo: frameView.leadingAnchor),
-            frameImageView.trailingAnchor.constraint(equalTo: frameView.trailingAnchor),
-            frameImageView.bottomAnchor.constraint(equalTo: frameView.bottomAnchor),
+            // MARK: - Preview Container (Adaptive 16:9)
+            previewContainer.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            previewContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            previewContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            previewContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            previewContainer.heightAnchor.constraint(
+                equalTo: previewContainer.widthAnchor, multiplier: 9.0 / 16.0),
 
-            placeholderIcon.centerXAnchor.constraint(equalTo: frameView.centerXAnchor),
-            placeholderIcon.centerYAnchor.constraint(equalTo: frameView.centerYAnchor),
+            frameImageView.topAnchor.constraint(equalTo: previewContainer.topAnchor),
+            frameImageView.leadingAnchor.constraint(equalTo: previewContainer.leadingAnchor),
+            frameImageView.trailingAnchor.constraint(equalTo: previewContainer.trailingAnchor),
+            frameImageView.bottomAnchor.constraint(equalTo: previewContainer.bottomAnchor),
 
-            // HUD — top-left
-            hudShotLabel.topAnchor.constraint(equalTo: frameView.topAnchor, constant: 10),
-            hudShotLabel.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
+            framePlaceholder.centerXAnchor.constraint(equalTo: previewContainer.centerXAnchor),
+            framePlaceholder.centerYAnchor.constraint(equalTo: previewContainer.centerYAnchor),
+            framePlaceholder.widthAnchor.constraint(equalToConstant: 48),
+            framePlaceholder.heightAnchor.constraint(equalToConstant: 48),
 
-            hudCamLabel.topAnchor.constraint(equalTo: hudShotLabel.bottomAnchor, constant: 4),
-            hudCamLabel.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
+            loadingSpinner.centerXAnchor.constraint(equalTo: previewContainer.centerXAnchor),
+            loadingSpinner.centerYAnchor.constraint(equalTo: previewContainer.centerYAnchor),
 
-            // HUD — bottom-left (above timeline bar)
-            hudTimeLabel.bottomAnchor.constraint(equalTo: timelineBar.topAnchor, constant: -6),
-            hudTimeLabel.leadingAnchor.constraint(equalTo: frameView.leadingAnchor, constant: 10),
+            hudShotLbl.topAnchor.constraint(equalTo: previewContainer.topAnchor, constant: 10),
+            hudShotLbl.leadingAnchor.constraint(equalTo: previewContainer.leadingAnchor, constant: 10),
+            hudCamLbl.topAnchor.constraint(equalTo: hudShotLbl.bottomAnchor, constant: 3),
+            hudCamLbl.leadingAnchor.constraint(equalTo: previewContainer.leadingAnchor, constant: 10),
+            hudTimeLbl.topAnchor.constraint(equalTo: previewContainer.topAnchor, constant: 10),
+            hudTimeLbl.trailingAnchor.constraint(equalTo: previewContainer.trailingAnchor, constant: -10),
+            cutFlashLbl.centerXAnchor.constraint(equalTo: previewContainer.centerXAnchor),
+            cutFlashLbl.centerYAnchor.constraint(equalTo: previewContainer.centerYAnchor),
 
-            cutLabel.bottomAnchor.constraint(equalTo: timelineBar.topAnchor, constant: -6),
-            cutLabel.centerXAnchor.constraint(equalTo: frameView.centerXAnchor),
+            // MARK: - Separator 1
+            sep1.topAnchor.constraint(equalTo: previewContainer.bottomAnchor),
+            sep1.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep1.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            sep1.heightAnchor.constraint(equalToConstant: 1),
 
-            // Timeline bar — bottom of frame, full width, 40pt
-            timelineBar.leadingAnchor.constraint(equalTo: frameView.leadingAnchor),
-            timelineBar.trailingAnchor.constraint(equalTo: frameView.trailingAnchor),
-            timelineBar.bottomAnchor.constraint(equalTo: frameView.bottomAnchor),
-            timelineBar.heightAnchor.constraint(equalToConstant: 40),
+            // MARK: - Transport Bar (Adaptive Height)
+            transportBar.topAnchor.constraint(equalTo: sep1.bottomAnchor),
+            transportBar.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            transportBar.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            transportBar.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            transportBar.heightAnchor.constraint(equalToConstant: transportH),
 
-            startTimeLbl.leadingAnchor.constraint(equalTo: timelineBar.leadingAnchor, constant: 12),
-            startTimeLbl.centerYAnchor.constraint(equalTo: timelineBar.centerYAnchor),
-            startTimeLbl.widthAnchor.constraint(equalToConstant: 44),
+            prevBtn.widthAnchor.constraint(equalToConstant: prevDim),
+            prevBtn.heightAnchor.constraint(equalToConstant: prevDim),
+            playBtn.widthAnchor.constraint(equalToConstant: playDim),
+            playBtn.heightAnchor.constraint(equalToConstant: playDim),
+            nextBtn.widthAnchor.constraint(equalToConstant: prevDim),
+            nextBtn.heightAnchor.constraint(equalToConstant: prevDim),
 
-            endTimeLbl.trailingAnchor.constraint(equalTo: timelineBar.trailingAnchor, constant: -12),
-            endTimeLbl.centerYAnchor.constraint(equalTo: timelineBar.centerYAnchor),
-            endTimeLbl.widthAnchor.constraint(equalToConstant: 44),
+            btnStack.centerXAnchor.constraint(equalTo: transportBar.centerXAnchor),
+            btnStack.centerYAnchor.constraint(equalTo: transportBar.centerYAnchor),
+            timeStack.trailingAnchor.constraint(equalTo: transportBar.trailingAnchor, constant: -16),
+            timeStack.centerYAnchor.constraint(equalTo: transportBar.centerYAnchor),
 
-            scrubber.leadingAnchor.constraint(equalTo: startTimeLbl.trailingAnchor, constant: 6),
-            scrubber.trailingAnchor.constraint(equalTo: endTimeLbl.leadingAnchor, constant: -6),
-            scrubber.centerYAnchor.constraint(equalTo: timelineBar.centerYAnchor),
+            // MARK: - Separator 2
+            sep2.topAnchor.constraint(equalTo: transportBar.bottomAnchor),
+            sep2.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep2.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            sep2.heightAnchor.constraint(equalToConstant: 1),
 
-            // Buttons panel
-            buttonsPanel.topAnchor.constraint(equalTo: frameView.bottomAnchor, constant: 12),
-            buttonsPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
-            buttonsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            // MARK: - Scrubber Bar (Adaptive Height)
+            scrubberBar.topAnchor.constraint(equalTo: sep2.bottomAnchor),
+            scrubberBar.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            scrubberBar.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            scrubberBar.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            scrubberBar.heightAnchor.constraint(equalToConstant: scrubberH),
 
-            shotInfoLabel.topAnchor.constraint(equalTo: buttonsPanel.topAnchor, constant: 10),
-            shotInfoLabel.centerXAnchor.constraint(equalTo: buttonsPanel.centerXAnchor),
+            scrubStartLbl.leadingAnchor.constraint(equalTo: scrubberBar.leadingAnchor, constant: 16),
+            scrubStartLbl.centerYAnchor.constraint(equalTo: scrubberBar.centerYAnchor),
+            scrubStartLbl.widthAnchor.constraint(equalToConstant: 40),
+            scrubEndLbl.trailingAnchor.constraint(equalTo: scrubberBar.trailingAnchor, constant: -16),
+            scrubEndLbl.centerYAnchor.constraint(equalTo: scrubberBar.centerYAnchor),
+            scrubEndLbl.widthAnchor.constraint(equalToConstant: 40),
+            scrubber.leadingAnchor.constraint(equalTo: scrubStartLbl.trailingAnchor, constant: 10),
+            scrubber.trailingAnchor.constraint(equalTo: scrubEndLbl.leadingAnchor, constant: -10),
+            scrubber.centerYAnchor.constraint(equalTo: scrubberBar.centerYAnchor),
 
-            btnStack.topAnchor.constraint(equalTo: shotInfoLabel.bottomAnchor, constant: 10),
-            btnStack.centerXAnchor.constraint(equalTo: buttonsPanel.centerXAnchor),
-            btnStack.bottomAnchor.constraint(equalTo: buttonsPanel.bottomAnchor, constant: -14),
+            // MARK: - Separator 3
+            sep3.topAnchor.constraint(equalTo: scrubberBar.bottomAnchor),
+            sep3.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            sep3.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            sep3.heightAnchor.constraint(equalToConstant: 1),
 
-            prevBtn.widthAnchor.constraint(equalToConstant: 44),
-            prevBtn.heightAnchor.constraint(equalToConstant: 44),
-            playBtn.widthAnchor.constraint(equalToConstant: 56),
-            playBtn.heightAnchor.constraint(equalToConstant: 56),
-            nextBtn.widthAnchor.constraint(equalToConstant: 44),
-            nextBtn.heightAnchor.constraint(equalToConstant: 44),
+            // MARK: - Film Strip Container (Adaptive, grows to fit content)
+            filmStripContainer.topAnchor.constraint(equalTo: sep3.bottomAnchor),
+            filmStripContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            filmStripContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            filmStripContainer.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            filmStripContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            filmStripContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: stripH),
 
-            // Strip
-            stripHeaderLbl.topAnchor.constraint(equalTo: buttonsPanel.bottomAnchor, constant: 18),
-            stripHeaderLbl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            shotsHeaderLbl.topAnchor.constraint(equalTo: filmStripContainer.topAnchor, constant: 8),
+            shotsHeaderLbl.leadingAnchor.constraint(equalTo: filmStripContainer.leadingAnchor, constant: 16),
+            shotsHeaderLbl.heightAnchor.constraint(equalToConstant: headerH),
+            shotCountLbl.centerYAnchor.constraint(equalTo: shotsHeaderLbl.centerYAnchor),
+            shotCountLbl.leadingAnchor.constraint(equalTo: shotsHeaderLbl.trailingAnchor, constant: 6),
 
-            strip.topAnchor.constraint(equalTo: stripHeaderLbl.bottomAnchor, constant: 8),
-            strip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            strip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            strip.heightAnchor.constraint(equalToConstant: 56),
-            strip.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            filmStrip.topAnchor.constraint(equalTo: shotsHeaderLbl.bottomAnchor, constant: 4),
+            filmStrip.leadingAnchor.constraint(equalTo: filmStripContainer.leadingAnchor),
+            filmStrip.trailingAnchor.constraint(equalTo: filmStripContainer.trailingAnchor),
+            filmStrip.bottomAnchor.constraint(equalTo: filmStripContainer.bottomAnchor, constant: -6),
         ])
     }
 
-    // MARK: - Camera POV Snapshot
-    //
-    // For the shot's camera we:
-    // 1. Find the matching SceneCameraItem by name
-    // 2. Call captureFromCamera (supplied by CanvasViewController)
-    //    which activates that camera, snapshots, then restores editor camera
-    // 3. Display the result in frameImageView
-
-    private func updateFrameImage(at masterTime: Float) {
-        guard let evaluate = evaluateTimeline else {
-            placeholderIcon.isHidden = false; return
-        }
-
-        // Evaluate scene positions
-        evaluate(masterTime)
-
-        // Find the camera item for the current shot
-        let camItem = cameraItems.first { item in
-            item.cameraRoot.name == currentShot.cameraName ||
-            item.cameraRoot.name.contains(currentShot.cameraName)
-        }
-
-        if let capture = captureFromCamera {
-            // Use camera POV capture
-            if let img = capture(camItem) {
-                frameImageView.image = img
-                placeholderIcon.isHidden = true
-            } else {
-                // Fallback to direct snapshot
-                fallbackSnapshot()
-            }
-        } else {
-            fallbackSnapshot()
-        }
+    private func applyOrientation(to size: CGSize) {
+        // Invalidate and refresh layouts for adaptive sizing
+        filmStrip.collectionViewLayout.invalidateLayout()
+        scrollView.layoutIfNeeded()
+        view.layoutIfNeeded()
     }
 
-    private func fallbackSnapshot() {
-        arView?.snapshot(saveToHDR: false) { [weak self] image in
-            guard let self = self, let image = image else { return }
-            DispatchQueue.main.async {
-                self.frameImageView.image = image
-                self.placeholderIcon.isHidden = true
-            }
-        }
-    }
 
-    // MARK: - Sync
+    private func syncToCurrentShot() {
+        let shot   = currentShot
+        let accent = stripColors[currentIndex % stripColors.count]
 
-    private func sync() {
-        let shot = currentShot
-        title = "\(sceneName) — \(shot.displayName)"
-        shotInfoLabel.text = "\(shot.displayName.uppercased())  ·  \(shot.cleanCameraName.uppercased())"
-        endTimeLbl.text  = fmt(shot.duration)
-        startTimeLbl.text = "00:00"
-        scrubber.value   = 0
-        currentTime      = 0
+        title = "\(sceneName)  ·  \(shot.displayName)"
 
-        // HUD
-        hudShotLabel.text = "  \(shot.displayName)  "
-        hudCamLabel.text  = "  \(shot.cleanCameraName)  "
-        hudTimeLabel.text = "  00:00  "
+        scrubber.setAccent(accent)
 
-        strip.reloadData()
+        currentTimeLbl.text = fmt(0)
+        durationLbl.text    = fmt(shot.duration)
+        scrubStartLbl.text  = fmt(0)
+        scrubEndLbl.text    = fmt(shot.duration)
+        scrubber.value      = 0
+        currentTime         = 0
+
+        shotCountLbl.text = "\(shots.count)"
+
+        hudShotLbl.text = "  \(shot.displayName)  "
+        hudCamLbl.text  = "  \(shot.cleanCameraName)  "
+        hudTimeLbl.text = "  00:00 / \(fmt(shot.duration))  "
+
+        setHeaderSpacing()
+
+        filmStrip.reloadData()
         if currentIndex < shots.count {
-            strip.scrollToItem(at: IndexPath(item: currentIndex, section: 0),
-                               at: .centeredHorizontally, animated: true)
+            filmStrip.scrollToItem(
+                at: IndexPath(item: currentIndex, section: 0),
+                at: .centeredHorizontally, animated: true)
+        }
+        captureFrame(at: shot.startTime, force: true)
+    }
+
+    private func setHeaderSpacing() {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .kern: 1.8, .font: shotsHeaderLbl.font as Any, .foregroundColor: labelFaded
+        ]
+        shotsHeaderLbl.attributedText = NSAttributedString(string: "SHOTS", attributes: attrs)
+    }
+
+
+    private func captureFrame(at masterTime: Float, force: Bool = false) {
+        evaluateTimeline?(masterTime)
+
+        if let img = snapshotInFlight {
+            frameImageView.image      = img
+            framePlaceholder.isHidden = true
+            snapshotInFlight          = nil
+            loadingSpinner.stopAnimating()
         }
 
-        updateFrameImage(at: shot.startTime)
+        let now = CACurrentMediaTime()
+        let minInterval: CFTimeInterval = isPlaying ? 1.0 / 24.0 : 0
+        guard force || (now - lastSnapshotTime) >= minInterval else { return }
+        guard !snapshotPending else { return }
+
+        lastSnapshotTime = now
+        if !isPlaying { loadingSpinner.startAnimating() }
+
+        let camItem = cameraItem(for: currentShot)
+        snapshotPending = true
+
+        let doCapture: (@escaping (UIImage?) -> Void) -> Void
+        if let capture = captureFrameAsync {
+            doCapture = { cb in capture(camItem, cb) }
+        } else {
+            doCapture = { [weak self] cb in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                    self?.arView?.snapshot(saveToHDR: false, completion: cb)
+                }
+            }
+        }
+
+        doCapture { [weak self] img in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let img = img { self.snapshotInFlight = img }
+                self.snapshotPending = false
+            }
+        }
     }
 
-    private func fmt(_ s: Float) -> String {
-        let t = max(0, s)
-        return String(format: "%02d:%02d", Int(t) / 60, Int(t) % 60)
+    private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
+        cameraItems.first { $0.cameraRoot.name == shot.cameraName }
+        ?? cameraItems.first {
+            $0.cameraRoot.name.contains(shot.cameraName) ||
+            shot.cameraName.contains($0.cameraRoot.name)
+        }
+        ?? cameraItems.first { _ in true }
     }
 
-    // MARK: - Playback
+
 
     private func startPlayback() {
         stopPlayback()
@@ -473,13 +585,14 @@ class ShotPlayerViewController: UIViewController {
 
     private func stopPlayback() {
         displayLink?.invalidate(); displayLink = nil
-        isPlaying = false; updatePlayIcon()
+        isPlaying = false; snapshotPending = false
+        updatePlayIcon()
     }
 
     private func updatePlayIcon() {
-        let name = isPlaying ? "pause.fill" : "play.fill"
-        let cfg  = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
-        playBtn.setImage(UIImage(systemName: name, withConfiguration: cfg), for: .normal)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        playBtn.setImage(UIImage(systemName: isPlaying ? "pause.fill" : "play.fill",
+                                 withConfiguration: cfg), for: .normal)
     }
 
     @objc private func tick() {
@@ -489,13 +602,13 @@ class ShotPlayerViewController: UIViewController {
 
         if currentTime >= duration {
             if playAll && currentIndex < shots.count - 1 {
-                let fromName = currentShot.displayName
+                let from = currentShot.displayName
                 currentIndex += 1; currentTime = 0
                 playStart = CACurrentMediaTime()
-                sync()
-                cutLabel.text = "\(fromName)  →  \(currentShot.displayName)"
-                UIView.animate(withDuration: 0.15, animations: { self.cutLabel.alpha = 1 }) { _ in
-                    UIView.animate(withDuration: 0.35, delay: 1.0) { self.cutLabel.alpha = 0 }
+                syncToCurrentShot()
+                cutFlashLbl.text = "  \(from)  →  \(currentShot.displayName)  "
+                UIView.animate(withDuration: 0.12, animations: { self.cutFlashLbl.alpha = 1 }) { _ in
+                    UIView.animate(withDuration: 0.30, delay: 1.0) { self.cutFlashLbl.alpha = 0 }
                 }
                 return
             } else {
@@ -503,219 +616,395 @@ class ShotPlayerViewController: UIViewController {
             }
         }
 
-        let progress = currentTime / max(0.01, duration)
-        scrubber.value       = progress
-        startTimeLbl.text    = fmt(currentTime)
-        hudTimeLabel.text    = "  \(fmt(currentTime)) / \(fmt(duration))  "
-        title = playAll ? "Playing: \(sceneName) — \(currentShot.displayName)" : title
+        let p = currentTime / max(0.001, duration)
+        scrubber.value      = p
+        currentTimeLbl.text = fmt(currentTime)
+        scrubStartLbl.text  = fmt(currentTime)
+        hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(duration))  "
 
-        // Update frame — camera POV at master time
-        let masterTime = currentShot.startTime + currentTime
-        updateFrameImage(at: masterTime)
+        captureFrame(at: currentShot.startTime + currentTime)
     }
 
-    // MARK: - Actions
+
+
+    @objc private func scrubChanged(_ s: UISlider) {
+        currentTime = s.value * currentShot.duration
+        currentTimeLbl.text = fmt(currentTime)
+        scrubStartLbl.text  = fmt(currentTime)
+        hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
+        if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
+        captureFrame(at: currentShot.startTime + currentTime, force: true)
+    }
+
+    @objc private func scrubTouchDown() { stopPlayback() }
+    @objc private func scrubTouchUp()   { startPlayback() }
+
+
+    @objc private func controlTapped(_ btn: UIButton) {
+        switch btn {
+        case playBtn:
+            if isPlaying { stopPlayback() } else {
+                if currentTime >= currentShot.duration { currentTime = 0; scrubber.value = 0 }
+                startPlayback()
+            }
+        case prevBtn:
+            stopPlayback(); guard currentIndex > 0 else { return }
+            currentIndex -= 1; currentTime = 0; syncToCurrentShot()
+        case nextBtn:
+            stopPlayback(); guard currentIndex < shots.count - 1 else { return }
+            currentIndex += 1; currentTime = 0; syncToCurrentShot()
+        default: break
+        }
+    }
 
     @objc private func backTapped() {
         stopPlayback(); evaluateTimeline?(0)
         navigationController?.popViewController(animated: true)
     }
 
-    // FIX 3: MP4 Export via ReplayKit screen recording
-    @objc private func exportTapped() {
-        let alert = UIAlertController(title: "Export Shot",
-                                       message: "\(currentShot.displayName)  ·  \(currentShot.cleanCameraName)",
-                                       preferredStyle: .actionSheet)
 
-        alert.addAction(UIAlertAction(title: "📹 Record MP4 (Screen Recording)", style: .default) { [weak self] _ in
-            self?.startMP4Recording()
-        })
-        alert.addAction(UIAlertAction(title: "🖼 Export Frame as JPEG", style: .default) { [weak self] _ in
-            self?.exportCurrentFrame(asPNG: false)
-        })
-        alert.addAction(UIAlertAction(title: "🖼 Export Frame as PNG", style: .default) { [weak self] _ in
-            self?.exportCurrentFrame(asPNG: true)
-        })
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        if let pop = alert.popoverPresentationController {
-            pop.barButtonItem = navigationItem.rightBarButtonItem
-        }
-        present(alert, animated: true)
+    private func makeHUDChip(size: CGFloat, weight: UIFont.Weight,
+                              alpha: CGFloat = 1) -> UILabel {
+        let l = UILabel()
+        l.font            = .systemFont(ofSize: size, weight: weight)
+        l.textColor       = UIColor(white: 1, alpha: alpha)
+        l.backgroundColor = UIColor.black.withAlphaComponent(0.50)
+        l.layer.cornerRadius = 4; l.clipsToBounds = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
     }
 
-    // ── MP4: use ReplayKit to record screen while playing the shot ────────────
-    private func startMP4Recording() {
-        let recorder = RPScreenRecorder.shared()
-        guard recorder.isAvailable else {
-            showAlert("Screen recording not available on this device.")
-            return
+    private func makeMonoLabel() -> UILabel {
+        let l = UILabel()
+        l.font      = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        l.textColor = labelFaded
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }
+
+    private func makeTransportBtn(icon: String, symbolPt: CGFloat,
+                                   primary: Bool = false) -> UIButton {
+        let btn = UIButton(type: .system)
+        let cfg = UIImage.SymbolConfiguration(pointSize: symbolPt, weight: .medium)
+        btn.setImage(UIImage(systemName: icon, withConfiguration: cfg), for: .normal)
+        btn.tintColor       = .white
+        btn.backgroundColor = primary ? accentRed.withAlphaComponent(0.90)
+                                      : UIColor(white: 1, alpha: 0.08)
+        btn.layer.cornerRadius = 20     // refined to height/2 in viewDidLayoutSubviews
+        btn.clipsToBounds      = true
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.addTarget(self, action: #selector(controlTapped(_:)), for: .touchUpInside)
+        return btn
+    }
+
+    private func makeSep() -> UIView {
+        let v = UIView()
+        v.backgroundColor = UIColor(white: 1, alpha: 0.07)
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }
+
+    private func fmt(_ s: Float) -> String {
+        let t = max(0, s)
+        return String(format: "%02d:%02d", Int(t) / 60, Int(t) % 60)
+    }
+
+
+    @objc private func exportTapped() {
+        let shot  = currentShot
+        let sheet = UIAlertController(title: shot.displayName,
+                                      message: shot.cleanCameraName,
+                                      preferredStyle: .actionSheet)
+        sheet.addAction(.init(title: "Export MP4",        style: .default) { [weak self] _ in self?.renderAndExportMP4() })
+        sheet.addAction(.init(title: "Export JPEG Frame", style: .default) { [weak self] _ in self?.exportFrame(png: false) })
+        sheet.addAction(.init(title: "Export PNG Frame",  style: .default) { [weak self] _ in self?.exportFrame(png: true) })
+        sheet.addAction(.init(title: "Cancel", style: .cancel))
+        if let pop = sheet.popoverPresentationController { pop.barButtonItem = navigationItem.rightBarButtonItem }
+        present(sheet, animated: true)
+    }
+
+    private func exportFrame(png: Bool) {
+        guard let img = frameImageView.image else { showAlert("No frame captured."); return }
+        let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
+        guard let d = data, let out = UIImage(data: d) else { return }
+        presentShareSheet([out])
+    }
+
+    private func ensureExportOverlay() {
+        guard !exportOverlayAdded else { return }
+        exportOverlayAdded = true
+        view.addSubview(exportOverlay)
+        exportOverlay.addSubview(exportLabel)
+        exportOverlay.addSubview(exportProgress)
+        NSLayoutConstraint.activate([
+            exportOverlay.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            exportOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            exportOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            exportOverlay.heightAnchor.constraint(equalTo: previewContainer.heightAnchor),
+            exportLabel.centerXAnchor.constraint(equalTo: exportOverlay.centerXAnchor),
+            exportLabel.centerYAnchor.constraint(equalTo: exportOverlay.centerYAnchor, constant: -14),
+            exportProgress.topAnchor.constraint(equalTo: exportLabel.bottomAnchor, constant: 14),
+            exportProgress.leadingAnchor.constraint(equalTo: exportOverlay.leadingAnchor, constant: 40),
+            exportProgress.trailingAnchor.constraint(equalTo: exportOverlay.trailingAnchor, constant: -40),
+        ])
+    }
+
+    private func setExportState(visible: Bool, text: String = "", progress: Float = 0) {
+        ensureExportOverlay()
+        exportOverlay.isHidden = !visible
+        exportLabel.text = text; exportProgress.progress = progress
+    }
+
+    private func renderAndExportMP4() {
+        stopPlayback()
+        let shot = currentShot; let fps: Int32 = 24
+        let totalFrames = max(1, Int(ceil(shot.duration * Float(fps))))
+
+        let outURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Shot\(shot.index + 1)_\(Int(Date().timeIntervalSince1970)).mp4")
+        try? FileManager.default.removeItem(at: outURL)
+
+        let size = frameImageView.image.map { $0.size } ?? CGSize(width: 1280, height: 720)
+        guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: .mp4) else {
+            showAlert("Could not create video writer."); return
         }
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: size.width, AVVideoHeightKey: size.height,
+        ])
+        videoInput.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                kCVPixelBufferWidthKey  as String: size.width,
+                kCVPixelBufferHeightKey as String: size.height,
+            ])
+        writer.add(videoInput)
+        writer.startWriting(); writer.startSession(atSourceTime: .zero)
+        setExportState(visible: true, text: "Preparing…", progress: 0)
+        renderNextFrame(index: 0, total: totalFrames, fps: fps, shot: shot,
+                        writer: writer, input: videoInput, adaptor: adaptor,
+                        size: size, outURL: outURL)
+    }
 
-        recorder.startRecording { [weak self] error in
-            guard let self = self else { return }
-            if let error = error {
-                DispatchQueue.main.async { self.showAlert("Recording failed: \(error.localizedDescription)") }
-                return
-            }
-            DispatchQueue.main.async {
-                // Play the shot — recording captures exactly what's on screen
-                self.currentTime = 0
-                self.scrubber.value = 0
-                self.startPlayback()
-
-                // Stop recording after shot duration + small buffer
-                let duration = Double(self.currentShot.duration) + 0.3
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                    self.stopPlayback()
-                    recorder.stopRecording { previewVC, error in
-                        DispatchQueue.main.async {
-                            if let previewVC = previewVC {
-                                previewVC.previewControllerDelegate = self
-                                self.present(previewVC, animated: true)
-                            } else if let error = error {
-                                self.showAlert("Could not finish recording: \(error.localizedDescription)")
-                            }
-                        }
-                    }
+    private func renderNextFrame(index: Int, total: Int, fps: Int32,
+                                  shot: Shot, writer: AVAssetWriter,
+                                  input: AVAssetWriterInput,
+                                  adaptor: AVAssetWriterInputPixelBufferAdaptor,
+                                  size: CGSize, outURL: URL) {
+        guard index < total else {
+            input.markAsFinished()
+            writer.finishWriting { [weak self] in
+                DispatchQueue.main.async {
+                    self?.setExportState(visible: false)
+                    if writer.status == .completed { self?.presentShareSheet([outURL]) }
+                    else { self?.showAlert("MP4 export failed: \(writer.error?.localizedDescription ?? "unknown")") }
                 }
             }
+            return
+        }
+        setExportState(visible: true,
+                       text: "Rendering \(shot.displayName)… \(index + 1)/\(total)",
+                       progress: Float(index) / Float(total))
+
+        let masterTime = shot.startTime + Float(index) / Float(fps)
+        evaluateTimeline?(masterTime)
+        let camItem = cameraItem(for: shot)
+        let doCapture: (@escaping (UIImage?) -> Void) -> Void
+        if let capture = captureFrameAsync { doCapture = { cb in capture(camItem, cb) } }
+        else { doCapture = { [weak self] cb in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                self?.arView?.snapshot(saveToHDR: false, completion: cb) }
+        }}
+        doCapture { [weak self] image in
+            guard let self = self else { return }
+            if let img = image, let pb = img.toPixelBuffer(size: size) {
+                while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
+                adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(index), timescale: fps))
+            }
+            DispatchQueue.main.async {
+                self.renderNextFrame(index: index + 1, total: total, fps: fps, shot: shot,
+                                     writer: writer, input: input, adaptor: adaptor,
+                                     size: size, outURL: outURL)
+            }
         }
     }
 
-    private func exportCurrentFrame(asPNG: Bool) {
-        guard let img = frameImageView.image else {
-            showAlert("No frame to export. Play the shot first."); return
-        }
-        let data = asPNG ? img.pngData() : img.jpegData(compressionQuality: 0.92)
-        guard let d = data, let exportImg = UIImage(data: d) else { return }
-        let vc = UIActivityViewController(activityItems: [exportImg], applicationActivities: nil)
-        if let pop = vc.popoverPresentationController {
-            pop.barButtonItem = navigationItem.rightBarButtonItem
-        }
+    private func presentShareSheet(_ items: [Any]) {
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let pop = vc.popoverPresentationController { pop.barButtonItem = navigationItem.rightBarButtonItem }
         present(vc, animated: true)
     }
 
     private func showAlert(_ msg: String) {
         let a = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: "OK", style: .default))
+        a.addAction(.init(title: "OK", style: .default))
         present(a, animated: true)
-    }
-
-    @objc private func btnTapped(_ sender: UIButton) {
-        if sender == playBtn {
-            isPlaying ? stopPlayback() : startPlayback()
-        } else if sender == prevBtn {
-            stopPlayback(); guard currentIndex > 0 else { return }
-            currentIndex -= 1; currentTime = 0; sync()
-        } else if sender == nextBtn {
-            stopPlayback(); guard currentIndex < shots.count - 1 else { return }
-            currentIndex += 1; currentTime = 0; sync()
-        }
-    }
-
-    @objc private func scrubChanged(_ s: UISlider) {
-        currentTime = s.value * currentShot.duration
-        startTimeLbl.text = fmt(currentTime)
-        hudTimeLabel.text = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
-        if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
-        updateFrameImage(at: currentShot.startTime + currentTime)
-    }
-    @objc private func scrubTouchDown() { stopPlayback() }
-    @objc private func scrubTouchUp()   { startPlayback() }
-
-    private func makeBtn(icon: String, size: CGFloat) -> UIButton {
-        let btn = UIButton(type: .system)
-        let cfg = UIImage.SymbolConfiguration(pointSize: size, weight: .medium)
-        btn.setImage(UIImage(systemName: icon, withConfiguration: cfg), for: .normal)
-        btn.tintColor = .white
-        btn.backgroundColor = UIColor.white.withAlphaComponent(0.07)
-        btn.layer.cornerRadius = size == 24 ? 28 : 22
-        btn.translatesAutoresizingMaskIntoConstraints = false
-        btn.addTarget(self, action: #selector(btnTapped(_:)), for: .touchUpInside)
-        return btn
     }
 }
 
-// MARK: - Strip DataSource
 
 extension ShotPlayerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+
     func collectionView(_ cv: UICollectionView, numberOfItemsInSection _: Int) -> Int { shots.count }
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
         let cell = cv.dequeueReusableCell(withReuseIdentifier: StripCell.reuseID, for: ip) as! StripCell
-        cell.configure(with: shots[ip.item], isActive: ip.item == currentIndex)
+        cell.configure(with: shots[ip.item],
+                       isActive: ip.item == currentIndex,
+                       accentColor: stripColors[ip.item % stripColors.count])
         return cell
     }
 
     func collectionView(_ cv: UICollectionView, didSelectItemAt ip: IndexPath) {
-        stopPlayback(); currentIndex = ip.item; currentTime = 0; sync()
+        stopPlayback(); currentIndex = ip.item; currentTime = 0
+        syncToCurrentShot()
     }
 }
 
-// MARK: - ReplayKit Preview Delegate
 
-extension ShotPlayerViewController: RPPreviewViewControllerDelegate {
-    func previewControllerDidFinish(_ previewController: RPPreviewViewController) {
-        previewController.dismiss(animated: true)
+final class PlayerSlider: UISlider {
+    init(accent: UIColor, track: UIColor) {
+        super.init(frame: .zero)
+        minimumTrackTintColor = accent
+        maximumTrackTintColor = track
+        setThumbImage(thumb(r: 7), for: .normal)
+        setThumbImage(thumb(r: 9), for: .highlighted)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func setAccent(_ c: UIColor) { minimumTrackTintColor = c }
+
+    private func thumb(r: CGFloat) -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: r*2, height: r*2)).image { ctx in
+            UIColor.white.setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: r*2, height: r*2))
+        }
+    }
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        bounds.insetBy(dx: -10, dy: -18).contains(point)
     }
 }
 
-// MARK: - Strip Cell
 
-class StripCell: UICollectionViewCell {
+final class StripCell: UICollectionViewCell {
+
     static let reuseID = "StripCell"
-    private let appRed = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
 
-    private let bg   = UIView()
-    private let img  = UIImageView()
-    private let lbl  = UILabel()
-    private let bar  = UIView()
+    private let bg        = UIView()
+    private let thumbImg  = UIImageView()
+    private let indexLbl  = UILabel()
+    private let nameLbl   = UILabel()
+    private let durLbl    = UILabel()
+    private let activeBar = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        bg.layer.cornerRadius = 6; bg.clipsToBounds = true
+        bg.layer.cornerRadius = 8; bg.clipsToBounds = true
         bg.translatesAutoresizingMaskIntoConstraints = false
-        img.contentMode = .scaleAspectFill; img.clipsToBounds = true
-        img.translatesAutoresizingMaskIntoConstraints = false
-        lbl.font = .systemFont(ofSize: 11, weight: .bold); lbl.textAlignment = .center
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        bar.layer.cornerRadius = 1.5
-        bar.translatesAutoresizingMaskIntoConstraints = false
-        bg.addSubview(img); bg.addSubview(lbl); bg.addSubview(bar)
-        contentView.addSubview(bg)
+
+        thumbImg.contentMode = .scaleAspectFill; thumbImg.clipsToBounds = true
+        thumbImg.translatesAutoresizingMaskIntoConstraints = false
+
+        indexLbl.font = .systemFont(ofSize: 18, weight: .light)
+        indexLbl.textAlignment = .center
+        indexLbl.textColor = UIColor(white: 1, alpha: 0.25)
+        indexLbl.translatesAutoresizingMaskIntoConstraints = false
+
+        nameLbl.font = .systemFont(ofSize: 9, weight: .semibold)
+        nameLbl.textColor = .white; nameLbl.textAlignment = .center
+        nameLbl.adjustsFontSizeToFitWidth = true; nameLbl.minimumScaleFactor = 0.7
+        nameLbl.translatesAutoresizingMaskIntoConstraints = false
+
+        durLbl.font = .monospacedDigitSystemFont(ofSize: 8, weight: .regular)
+        durLbl.textColor = UIColor(white: 1, alpha: 0.40)
+        durLbl.textAlignment = .center
+        durLbl.translatesAutoresizingMaskIntoConstraints = false
+
+        activeBar.layer.cornerRadius = 2
+        activeBar.translatesAutoresizingMaskIntoConstraints = false
+
+        let labelBg = UIView()
+        labelBg.backgroundColor = UIColor.black.withAlphaComponent(0.58)
+        labelBg.translatesAutoresizingMaskIntoConstraints = false
+
+        bg.addSubview(thumbImg); bg.addSubview(indexLbl)
+        bg.addSubview(labelBg); labelBg.addSubview(nameLbl); labelBg.addSubview(durLbl)
+        bg.addSubview(activeBar); contentView.addSubview(bg)
+
         NSLayoutConstraint.activate([
             bg.topAnchor.constraint(equalTo: contentView.topAnchor),
             bg.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             bg.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             bg.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            img.topAnchor.constraint(equalTo: bg.topAnchor),
-            img.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
-            img.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
-            img.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
-            lbl.centerXAnchor.constraint(equalTo: bg.centerXAnchor),
-            lbl.centerYAnchor.constraint(equalTo: bg.centerYAnchor),
-            bar.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 4),
-            bar.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -4),
-            bar.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -2),
-            bar.heightAnchor.constraint(equalToConstant: 3),
+
+            thumbImg.topAnchor.constraint(equalTo: bg.topAnchor),
+            thumbImg.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
+            thumbImg.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+            thumbImg.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
+
+            indexLbl.centerXAnchor.constraint(equalTo: bg.centerXAnchor),
+            indexLbl.centerYAnchor.constraint(equalTo: bg.centerYAnchor, constant: -8),
+
+            labelBg.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
+            labelBg.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+            labelBg.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
+
+            nameLbl.topAnchor.constraint(equalTo: labelBg.topAnchor, constant: 3),
+            nameLbl.leadingAnchor.constraint(equalTo: labelBg.leadingAnchor, constant: 4),
+            nameLbl.trailingAnchor.constraint(equalTo: labelBg.trailingAnchor, constant: -4),
+
+            durLbl.topAnchor.constraint(equalTo: nameLbl.bottomAnchor, constant: 1),
+            durLbl.leadingAnchor.constraint(equalTo: labelBg.leadingAnchor, constant: 4),
+            durLbl.trailingAnchor.constraint(equalTo: labelBg.trailingAnchor, constant: -4),
+            durLbl.bottomAnchor.constraint(equalTo: labelBg.bottomAnchor, constant: -3),
+
+            activeBar.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 4),
+            activeBar.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -4),
+            activeBar.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -2),
+            activeBar.heightAnchor.constraint(equalToConstant: 3),
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(with shot: Shot, isActive: Bool) {
+    func configure(with shot: Shot, isActive: Bool, accentColor: UIColor) {
         if let thumb = shot.thumbnail {
-            img.image = thumb; img.isHidden = false; lbl.isHidden = true
-            img.alpha = isActive ? 1.0 : 0.45
+            thumbImg.image = thumb; thumbImg.isHidden = false
+            thumbImg.alpha = isActive ? 1.0 : 0.45; indexLbl.isHidden = true
         } else {
-            img.isHidden = true; lbl.isHidden = false; lbl.text = shot.shortLabel
+            thumbImg.isHidden = true; indexLbl.isHidden = false
+            indexLbl.text = "\(shot.index + 1)"
         }
+        nameLbl.text = shot.shortLabel
+        durLbl.text  = String(format: "%02d:%02d", Int(shot.duration)/60, Int(shot.duration)%60)
         bg.backgroundColor = isActive
-            ? UIColor(red: 32/255, green: 16/255, blue: 42/255, alpha: 1)
-            : UIColor(red: 18/255, green: 18/255, blue: 30/255, alpha: 1)
+            ? UIColor(red: 0.12, green: 0.06, blue: 0.16, alpha: 1)
+            : UIColor(red: 0.07, green: 0.07, blue: 0.12, alpha: 1)
         bg.layer.borderWidth = isActive ? 1.5 : 0
-        bg.layer.borderColor = appRed.cgColor
-        bar.backgroundColor  = isActive ? appRed : .clear
-        lbl.textColor = isActive ? .white : UIColor.white.withAlphaComponent(0.3)
+        bg.layer.borderColor = accentColor.cgColor
+        activeBar.backgroundColor = isActive ? accentColor : .clear
+    }
+}
+
+
+extension UIImage {
+    func toPixelBuffer(size: CGSize) -> CVPixelBuffer? {
+        var pb: CVPixelBuffer?
+        CVPixelBufferCreate(kCFAllocatorDefault, Int(size.width), Int(size.height),
+                            kCVPixelFormatType_32ARGB,
+                            [kCVPixelBufferCGImageCompatibilityKey: true,
+                             kCVPixelBufferCGBitmapContextCompatibilityKey: true] as CFDictionary,
+                            &pb)
+        guard let buf = pb else { return nil }
+        CVPixelBufferLockBaseAddress(buf, [])
+        let ctx = CGContext(data: CVPixelBufferGetBaseAddress(buf),
+                            width: Int(size.width), height: Int(size.height),
+                            bitsPerComponent: 8,
+                            bytesPerRow: CVPixelBufferGetBytesPerRow(buf),
+                            space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+        if let cg = cgImage { ctx?.draw(cg, in: CGRect(origin: .zero, size: size)) }
+        CVPixelBufferUnlockBaseAddress(buf, [])
+        return buf
     }
 }

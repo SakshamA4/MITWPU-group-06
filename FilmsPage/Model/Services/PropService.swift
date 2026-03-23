@@ -117,9 +117,9 @@ class PropService {
                 PropItem(id: UUID(), name: "Table", imageName: "Table_img", filmId: nil, description: "Standard table", modelFileName: "Table"),
                 PropItem(id: UUID(), name: "Lamp", imageName: "lamp_img", filmId: nil, description: "Desk lamp", modelFileName: "lamp"),
                 PropItem(id: UUID(), name: "Robot", imageName: "robot_img", filmId: nil, description: "Toy robot", modelFileName: "Robot"),
-                PropItem(name: "Flower Vase", imageName: "flowerVase_img", filmId: nil, description: "Flower vase", modelFileName: "flowerVase"),
-                PropItem(name: "Plant", imageName: "Plant_img", filmId: nil, description: "House Plant", modelFileName: "Plant"),
-                PropItem(name: "Wardrobe", imageName: "wardrobe_img", filmId: nil, description: "Wardrobe", modelFileName: "wardrobe"),
+                PropItem(id: UUID(), name: "Flower Vase", imageName: "flowerVase_img", filmId: nil, description: "Flower vase", modelFileName: "flowerVase"),
+                PropItem(id: UUID(), name: "Plant", imageName: "Plant_img", filmId: nil, description: "House Plant", modelFileName: "Plant"),
+                PropItem(id: UUID(), name: "Wardrobe", imageName: "wardrobe_img", filmId: nil, description: "Wardrobe", modelFileName: "wardrobe"),
                 PropItem(id: UUID(), name: "Ball", imageName: "ball_img", filmId: nil, description: "Sports ball", modelFileName: "ball")
             ]
         }
