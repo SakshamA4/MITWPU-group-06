@@ -24,77 +24,57 @@ extension CanvasViewController {
         if gesture.state == .began {
             saveCurrentStateToUndo()
         }
-        guard editorMode == .edit else { return }
-        
-        guard let entity = selectedEntity else {
-            guard !isARModeActive else {
-                gesture.scale = 1.0
-                return
-            }
-            distance /= Float(gesture.scale)
+        guard editorMode == .edit, !isARModeActive else {
+            gesture.scale = 1.0
+            return
+        }
+
+        // Zoom always happens regardless of selection
+        if gesture.state == .changed {
+            let capturedScale = Float(gesture.scale)
+            distance /= capturedScale
             distance = max(1.5, min(15, distance))
             updateEditorCamera()
             gesture.scale = 1.0
-            return
-        }
-        
-        let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-        if isLocked { return }
-        
-        guard let modelEntity = entity as? ModelEntity else {
-            gesture.scale = 1.0
-            return
-        }
-        
-        switch gesture.state {
-        case .changed:
-            let scaleFactor = Float(gesture.scale)
-            
+
+            // Additionally resize wall / background / ground if selected
+            guard let entity = selectedEntity,
+                  let modelEntity = entity as? ModelEntity,
+                  !(entity.components[LockComponent.self]?.isLocked ?? false)
+            else { return }
+
             if var wall = modelEntity.components[WallComponent.self] {
-                wall.width *= scaleFactor
-                wall.height *= scaleFactor
+                wall.width *= capturedScale
+                wall.height *= capturedScale
                 wall.width = max(0.3, min(wall.width, 10))
                 wall.height = max(0.3, min(wall.height, 6))
-                let newMesh = MeshResource.generateBox(
-                    width: wall.width,
-                    height: wall.height,
-                    depth: 0.05
-                )
-                modelEntity.model?.mesh = newMesh
+                modelEntity.model?.mesh = MeshResource.generateBox(
+                    width: wall.width, height: wall.height, depth: 0.05)
                 modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(wall)
             }
-            
+
             if var bg = modelEntity.components[BackgroundComponent.self] {
-                bg.width *= scaleFactor
-                bg.height *= scaleFactor
+                bg.width *= capturedScale
+                bg.height *= capturedScale
                 bg.width = max(0.5, min(bg.width, 15))
                 bg.height = max(0.5, min(bg.height, 10))
                 modelEntity.model?.mesh = MeshResource.generateBox(
-                    width: bg.width,
-                    height: bg.height,
-                    depth: 0.05
-                )
+                    width: bg.width, height: bg.height, depth: 0.05)
                 modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(bg)
             }
-            
+
             if var ground = modelEntity.components[GroundComponent.self] {
-                ground.width *= scaleFactor
-                ground.depth *= scaleFactor
+                ground.width *= capturedScale
+                ground.depth *= capturedScale
                 ground.width = max(0.5, min(ground.width, 20))
                 ground.depth = max(0.5, min(ground.depth, 20))
-                let newMesh = MeshResource.generatePlane(
-                    width: ground.width,
-                    depth: ground.depth
-                )
-                modelEntity.model?.mesh = newMesh
+                modelEntity.model?.mesh = MeshResource.generatePlane(
+                    width: ground.width, depth: ground.depth)
                 modelEntity.generateCollisionShapes(recursive: true)
                 modelEntity.components.set(ground)
             }
-            gesture.scale = 1.0
-        default:
-            break
         }
     }
 
