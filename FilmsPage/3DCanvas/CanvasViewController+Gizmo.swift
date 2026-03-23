@@ -428,6 +428,29 @@ extension CanvasViewController {
         entity.addChild(gizmo)
         rotationGizmo = gizmo
         setupRotationDiscs(on: gizmo)
+
+        // RotationRingGizmo sizes its rings internally from entity bounds
+        // (radius = maxDimension * 0.75). We override that by computing the
+        // scale needed to reach our desired world-space size.
+        //
+        // Desired size = camToEntity * 0.15, hard-capped at 0.6m so large
+        // entities (walls, grounds) never produce oversized rings.
+        let entityWorldPos = entity.position(relativeTo: nil)
+        let camWorldPos    = activeCamera.position(relativeTo: nil)
+        let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
+        let desiredSize    = min(camToEntity * 0.15, 0.6)
+        let clampedSize    = max(0.15, desiredSize)
+
+        // The gizmo's internal radius (what it actually built the rings at)
+        let bounds         = entity.visualBounds(relativeTo: entity)
+        let maxDim         = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+        let internalRadius = max(maxDim * 0.75, 0.0001)
+
+        // localScale cancels out the internal radius and replaces it with clampedSize.
+        // Also account for entity's own world scale since gizmo is entity-parented.
+        let entityWorldScale = max(entity.scale(relativeTo: nil).x, 0.0001)
+        let localScale       = (clampedSize / internalRadius) / entityWorldScale
+        gizmo.scale = SIMD3<Float>(repeating: localScale)
     }
 
     /// Injects hidden filled-disc entities alongside each rotation ring so they
@@ -704,6 +727,38 @@ extension CanvasViewController {
         for child in entity.children {
             applyMaterialRecursive(material, to: child,
                                    excludingColliders: excludingColliders)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MARK: - Live gizmo scale update
+    //
+    // Called every render frame via SceneEvents.Update subscription so gizmos
+    // rescale continuously as the camera moves, not just on tap.
+    // ─────────────────────────────────────────────────────────────────────────
+    func updateGizmoScales() {
+        let camPos = activeCamera.position(relativeTo: nil)
+
+        // ── Move gizmo ────────────────────────────────────────────────────────
+        if let gizmo = gizmoRoot, gizmo.isEnabled,
+           let entity = selectedEntity {
+            let camToEntity = simd_distance(camPos, entity.position(relativeTo: nil))
+            let screenScale = max(0.15, min(2.5, camToEntity * 0.15))
+            gizmo.scale     = SIMD3<Float>(repeating: screenScale)
+        }
+
+        // ── Rotation rings ────────────────────────────────────────────────────
+        if let rotGizmo = rotationGizmo,
+           let entity   = selectedEntity {
+            let camToEntity      = simd_distance(camPos, entity.position(relativeTo: nil))
+            let desiredSize      = min(camToEntity * 0.15, 0.6)
+            let clampedSize      = max(0.15, desiredSize)
+            let bounds           = entity.visualBounds(relativeTo: entity)
+            let maxDim           = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+            let internalRadius   = max(maxDim * 0.75, 0.0001)
+            let entityWorldScale = max(entity.scale(relativeTo: nil).x, 0.0001)
+            let localScale       = (clampedSize / internalRadius) / entityWorldScale
+            rotGizmo.scale       = SIMD3<Float>(repeating: localScale)
         }
     }
 }

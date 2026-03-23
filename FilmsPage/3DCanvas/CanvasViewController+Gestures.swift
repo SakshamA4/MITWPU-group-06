@@ -89,26 +89,8 @@ extension CanvasViewController {
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
 
-        if let entity = selectedEntity {
-            let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-            if isLocked { return }
-            switch gesture.state {
-            case .began:
-                saveCurrentStateToUndo()
-                initialRotation = entity.orientation
-            case .changed:
-                if let start = initialRotation {
-                    let q = simd_quatf(angle: -Float(gesture.rotation), axis: [0, 1, 0])
-                    entity.orientation = simd_normalize(q * start)
-                    cameraCollectionView?.reloadData()
-                }
-            case .ended, .cancelled:
-                initialRotation = nil
-            default: break
-            }
-            return
-        }
-
+        // Two-finger twist always rotates the camera (yaw), never the entity.
+        // Entity rotation is only via the rotation rings or the outer ring gizmo.
         switch gesture.state {
         case .began:    initialCameraYaw = yaw
         case .changed:
@@ -496,7 +478,7 @@ extension CanvasViewController {
                     return
                 }
 
-                // Positive screen angle (clockwise in UIKit) → negative Y rotation
+                // Clockwise screen drag → clockwise Y rotation (negate UIKit angle convention)
                 var t = selected.transform
                 t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0,1,0]) * t.rotation)
                 selected.transform = t
@@ -522,10 +504,39 @@ extension CanvasViewController {
             activeRotationAxis = nil
             activeGizmoPart    = .none
             if let hit = hits.first(where: { ["xRing","yRing","zRing"].contains($0.entity.name) }) {
+                // The RotationRingGizmo is parented directly to the entity, so its
+                // world-space matrix columns ARE the entity's current local axes in
+                // world space. Read those columns from the gizmo itself (not from
+                // the individual ring entities, which carry extra per-ring orientations
+                // that don't correspond to the rotation axes).
+                //   column 0 = entity's world +X  (red ring rotates around this)
+                //   column 1 = entity's world +Y  (green ring rotates around this)
+                //   column 2 = entity's world +Z  (blue ring rotates around this)
+                // The torus mesh is built in the XY plane (face normal = [0,0,1]).
+                // Each ring then gets an orientation baked in RotationRingGizmo:
+                //   xRing: pi/2 around Y  → face normal becomes [1,0,0]  → col 0
+                //   yRing: pi/2 around X  → face normal becomes [0,-1,0] → -col 1
+                //   zRing: identity       → face normal stays  [0,0,1]   → col 2
+                // We read these from the RotationRingGizmo's world matrix so the
+                // axes follow the entity's current orientation correctly.
+                let gizmoMatrix = (rotationGizmo ?? hit.entity).transformMatrix(relativeTo: nil)
                 switch hit.entity.name {
-                case "xRing": activeRotationAxis = [1,0,0]; activeGizmoPart = .rotateX
-                case "yRing": activeRotationAxis = [0,1,0]; activeGizmoPart = .rotateY
-                default:      activeRotationAxis = [0,0,1]; activeGizmoPart = .rotateZ
+                case "xRing":
+                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.0.x,
+                                                                       gizmoMatrix.columns.0.y,
+                                                                       gizmoMatrix.columns.0.z))
+                    activeGizmoPart    = .rotateX
+                case "yRing":
+                    // yRing face normal is [0,-1,0] in local gizmo space → negate col 1
+                    activeRotationAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
+                                                                     -gizmoMatrix.columns.1.y,
+                                                                     -gizmoMatrix.columns.1.z))
+                    activeGizmoPart    = .rotateY
+                default:
+                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.2.x,
+                                                                       gizmoMatrix.columns.2.y,
+                                                                       gizmoMatrix.columns.2.z))
+                    activeGizmoPart    = .rotateZ
                 }
                 saveCurrentStateToUndo()
                 highlightGizmoPart(activeGizmoPart)
@@ -547,14 +558,50 @@ extension CanvasViewController {
                 hideGizmo(); hideRotationGizmo()
             }
         case .changed:
-            guard let axis = activeRotationAxis, let sel = selectedEntity else { return }
-            let dx    = Float(location.x - lastPanLocation.x)
-            let dy    = Float(location.y - lastPanLocation.y)
-            let angle = (abs(dx) > abs(dy) ? dx : -dy) * 0.006
+            guard let sel = selectedEntity else { return }
+            let dx = Float(location.x - lastPanLocation.x)
+            let dy = Float(location.y - lastPanLocation.y)
+
+            // Get the ring entity directly from the gizmo so we can read its
+            // true world-space normal — the axis the ring is physically lying on
+            // right now, after all prior rotations.
+            guard let gizmo = rotationGizmo else { lastPanLocation = location; return }
+
+            let ringName: String
+            switch activeGizmoPart {
+            case .rotateX: ringName = "xRing"
+            case .rotateY: ringName = "yRing"
+            case .rotateZ: ringName = "zRing"
+            default: lastPanLocation = location; return
+            }
+
+            guard let ring = gizmo.findEntity(named: ringName) else {
+                lastPanLocation = location; return
+            }
+
+            // The ring's world orientation quaternion directly gives us its
+            // local axes. The torus mesh is built in the XY plane so its face
+            // normal is local +Z. After the ring's own baked orientation:
+            //   xRing (pi/2 around Y): local Z rotates to world X  → use act([0,0,1])
+            //   yRing (pi/2 around X): local Z rotates to world -Y → use act([0,0,1])
+            //   zRing (identity):      local Z stays world Z        → use act([0,0,1])
+            // In all cases we just rotate [0,0,1] by the ring's world quaternion.
+            let ringWorldQuat = ring.orientation(relativeTo: nil)
+            let liveAxis = simd_normalize(ringWorldQuat.act([0, 0, 1]))
+
+            let angle: Float
+            switch activeGizmoPart {
+            case .rotateX: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
+            case .rotateZ: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
+            default:       angle = (abs(dx) > abs(dy) ?  dx : -dy) * 0.006
+            }
             guard angle.isFinite else { return }
-            var t      = sel.transform
-            t.rotation = simd_normalize(simd_quatf(angle: angle, axis: axis) * t.rotation)
-            sel.transform   = t
+
+            // Apply rotation in world space using setOrientation so we don't
+            // have to manually convert between local and world quaternion spaces.
+            let deltaQuat    = simd_quatf(angle: angle, axis: liveAxis)
+            let currentWorld = sel.orientation(relativeTo: nil)
+            sel.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
             lastPanLocation = location
         case .ended, .cancelled:
             activeRotationAxis = nil
