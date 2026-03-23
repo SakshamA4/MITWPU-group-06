@@ -292,7 +292,12 @@ extension CanvasViewController {
             anchor.addChild(gizmo)
         }
 
-        gizmo.position  = entity.position(relativeTo: anchor)
+        // Place gizmo at the entity's XZ position but at the BOTTOM of its
+        // bounding box so it always sits at the base regardless of pivot point.
+        // This fixes walls and backgrounds where the pivot is at the centre.
+        let entityPos  = entity.position(relativeTo: anchor)
+        let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
+        gizmo.position = SIMD3<Float>(entityPos.x, boundsMinY, entityPos.z)
         gizmo.isEnabled = true
 
         // Scale the whole gizmo by camera-to-entity distance so it occupies
@@ -322,8 +327,9 @@ extension CanvasViewController {
     func updateGizmoPosition() {
         guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-        gizmo.position = entity.position(relativeTo: anchor)
-        // Recompute scale from camera-to-entity distance every drag frame
+        let entityPos  = entity.position(relativeTo: anchor)
+        let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
+        gizmo.position = SIMD3<Float>(entityPos.x, boundsMinY, entityPos.z)
         let entityWorldPos = entity.position(relativeTo: nil)
         let camWorldPos    = activeCamera.position(relativeTo: nil)
         let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
@@ -350,38 +356,33 @@ extension CanvasViewController {
 
         hideDropShadow()
 
-        let worldPos = entity.position(relativeTo: nil)
+        let worldPos  = entity.position(relativeTo: nil)
+        let baseY     = entity.visualBounds(relativeTo: nil).min.y  // same as gizmo position
         let groundY: Float = 0.0
 
-        // Only draw when the object is meaningfully above the ground plane
-        guard worldPos.y > groundY + 0.02 else { return }
+        // Only draw when the gizmo base is meaningfully above the ground plane
+        guard baseY > groundY + 0.02 else { return }
 
-        let lineHeight = worldPos.y - groundY
-        let xz         = SIMD3<Float>(worldPos.x, 0, worldPos.z)
+        let lineHeight = baseY - groundY
 
-        // Yellow semi-transparent projection line + floor circle
         let lineMat   = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.75))
         let circleMat = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
 
-        // ── Vertical line ─────────────────────────────────────────────────────
-        // Single cylinder, thin (r = 0.005), centred between ground and object
-        let line      = ModelEntity(
+        let line = ModelEntity(
             mesh:      MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
             materials: [lineMat]
         )
-        // Cylinder default height is along local Y — position at midpoint
-        line.position  = SIMD3<Float>(worldPos.x, groundY + lineHeight * 0.5, worldPos.z)
-        line.name      = "ShadowLine"
+        line.position = SIMD3<Float>(worldPos.x, groundY + lineHeight * 0.5, worldPos.z)
+        line.name     = "ShadowLine"
         line.components.set(DropShadowComponent())
         anchor.addChild(line)
 
-        // ── Floor projection circle ───────────────────────────────────────────
-        let circle     = ModelEntity(
+        let circle = ModelEntity(
             mesh:      MeshResource.generateCylinder(height: 0.006, radius: 0.07),
             materials: [circleMat]
         )
-        circle.position  = SIMD3<Float>(xz.x, groundY + 0.003, xz.z)
-        circle.name      = "ShadowCircle"
+        circle.position = SIMD3<Float>(worldPos.x, groundY + 0.003, worldPos.z)
+        circle.name     = "ShadowCircle"
         circle.components.set(DropShadowComponent())
         anchor.addChild(circle)
     }
