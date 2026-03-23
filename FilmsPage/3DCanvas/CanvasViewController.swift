@@ -324,6 +324,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     var currentAxis: GizmoAxis = .none
     var currentActionMenu: EntityActionMenu?
+    weak var colorPickerTargetEntity: ModelEntity?
 
      struct SceneCameraItem {
          let id: UUID          // Unique identifier for backend distinction
@@ -497,11 +498,37 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     struct WallComponent: Component {
         var width: Float = 1.5
         var height: Float = 1.2
+        var colorR: Float = 0.83
+        var colorG: Float = 0.83
+        var colorB: Float = 0.83
+        var colorA: Float = 1.0
+
+        var uiColor: UIColor {
+            get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
+            set {
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                newValue.getRed(&r, green: &g, blue: &b, alpha: &a)
+                colorR = Float(r); colorG = Float(g); colorB = Float(b); colorA = Float(a)
+            }
+        }
     }
 
     struct GroundComponent: Component {
         var width: Float
         var depth: Float
+        var colorR: Float = 0.33
+        var colorG: Float = 0.33
+        var colorB: Float = 0.33
+        var colorA: Float = 1.0
+
+        var uiColor: UIColor {
+            get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
+            set {
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                newValue.getRed(&r, green: &g, blue: &b, alpha: &a)
+                colorR = Float(r); colorG = Float(g); colorB = Float(b); colorA = Float(a)
+            }
+        }
     }
 
     // MARK: - Lifecycle
@@ -668,8 +695,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             do {
                 let checkName = (customName ?? item.modelFileName).lowercased()
 
-                if checkName.contains("ground") { spawnGround(); return }
-                if checkName.contains("wall") || item.modelFileName == "cube" { spawnWall(); return }
+                if checkName.contains("ground") { 
+                    if let spawnedEntity = spawnGround() {
+                        refreshSidebarContent()
+                        // Show color picker on main thread
+                        DispatchQueue.main.async { [weak self] in
+                            self?.showColorPickerForNewSpawn(spawnedEntity)
+                        }
+                    }
+                    return 
+                }
+                if checkName.contains("wall") || item.modelFileName == "cube" { 
+                    if let spawnedEntity = spawnWall() {
+                        refreshSidebarContent()
+                        // Show color picker on main thread
+                        DispatchQueue.main.async { [weak self] in
+                            self?.showColorPickerForNewSpawn(spawnedEntity)
+                        }
+                    }
+                    return 
+                }
                 if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(); return }
                 if item.isBackground { spawnBackgroundPlane(item); return }
 

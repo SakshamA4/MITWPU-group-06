@@ -27,6 +27,7 @@ class EntityActionMenu: UIView {
         case move           // standard: add move animation
         case rotate         // standard: add rotate animation
         case addMovement    // standard: open animation-type picker (Move / Rotate)
+        case changeColour   // standard: open color picker (walls/ground only)
         case addShot        // camera:   open shot/movement picker
         case lock
         case delete
@@ -40,6 +41,7 @@ class EntityActionMenu: UIView {
     // ── Private state ────────────────────────────────────────────────────────
     private var mode: MenuMode = .standard
     private var isCurrentlyLocked: Bool = false
+    private var showColorOption: Bool = false
 
     private let stackView: UIStackView = {
         let sv = UIStackView()
@@ -73,9 +75,10 @@ class EntityActionMenu: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     // ── Configuration — MUST be called before addSubview ─────────────────────
-    func configure(mode: MenuMode, isLocked: Bool) {
+    func configure(mode: MenuMode, isLocked: Bool, showColorOption: Bool = false) {
         self.mode = mode
         self.isCurrentlyLocked = isLocked
+        self.showColorOption = showColorOption
         buildButtons()
     }
 
@@ -96,9 +99,13 @@ class EntityActionMenu: UIView {
         switch mode {
 
         case .standard:
-            // Add Movement | Lock | Delete
+            // Add Movement | [Change Colour] | Lock | Delete
             addMenuButton(title: "Add Movement", action: .addMovement)
             addSeparator()
+            if showColorOption {
+                addMenuButton(title: "Change Colour", action: .changeColour)
+                addSeparator()
+            }
             addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
             addSeparator()
             addMenuButton(title: "Delete",       action: .delete, isDestructive: true)

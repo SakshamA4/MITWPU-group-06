@@ -847,13 +847,69 @@ extension CanvasViewController {
         vc.timeline         = self.timeline
         vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
         vc.arView           = self.arView                    // ← new
-        vc.evaluateTimeline = { [weak self] t in             // ← new
+         vc.evaluateTimeline = { [weak self] t in             // ← new
             self?.evaluateTimeline(at: t)
         }
         navigationController?.pushViewController(vc, animated: true)
     }
 
+    // MARK: - Color Picker
+    func showColorPicker(for entity: ModelEntity) {
+        self.colorPickerTargetEntity = entity
+        let picker = UIColorPickerViewController()
+        picker.delegate = self
+        picker.supportsAlpha = false
+        
+        // Set initial color from the entity
+        if let wallComp = entity.components[WallComponent.self] {
+            picker.selectedColor = wallComp.uiColor
+        } else if let groundComp = entity.components[GroundComponent.self] {
+            picker.selectedColor = groundComp.uiColor
+        }
+        
+        // Add a custom done button with checkmark
+        let doneButton = UIBarButtonItem(
+            image: UIImage(systemName: "checkmark"),
+            style: .done,
+            target: self,
+            action: #selector(colorPickerDoneTapped)
+        )
+        picker.navigationItem.rightBarButtonItem = doneButton
+        
+        // Present in a navigation controller to show the custom bar button
+        let navController = UINavigationController(rootViewController: picker)
+        self.present(navController, animated: true)
+    }
 
+    // Helper function for showing color picker immediately after spawning
+    func showColorPickerForNewSpawn(_ entity: ModelEntity) {
+        // Select the entity first
+        self.selectedEntity = entity
+        // Show the color picker
+        self.showColorPicker(for: entity)
+    }
+
+    @objc func colorPickerDoneTapped() {
+        self.dismiss(animated: true)
+    }
+
+
+}
+
+// MARK: - UIColorPickerViewController Delegate
+extension CanvasViewController: UIColorPickerViewControllerDelegate {
+    func colorPickerViewController(
+        _ viewController: UIColorPickerViewController,
+        didSelect color: UIColor,
+        continuously: Bool
+    ) {
+        guard let entity = colorPickerTargetEntity as? ModelEntity else { return }
+        self.applyColor(color, to: entity)
+    }
+
+    func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+        colorPickerTargetEntity = nil
+    }
 }
 
 // MARK: - UICollectionView DataSource + Delegate

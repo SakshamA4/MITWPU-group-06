@@ -244,6 +244,11 @@ extension CanvasViewController {
         let isCamera = entity.name.lowercased().contains("scenecamera")
             || entity.components[CategoryComponent.self]?.toolType == .camera
 
+        // ── Check if entity is a wall or ground (colorable) ──────────────────
+        let isWall = entity.components[CanvasViewController.WallComponent.self] != nil
+        let isGround = entity.components[CanvasViewController.GroundComponent.self] != nil
+        let showColorOption = isWall || isGround
+
         let menu = EntityActionMenu()
 
         // ⚠️  configure() MUST be called before addSubview.
@@ -251,7 +256,8 @@ extension CanvasViewController {
         //     the view is already in the hierarchy with no buttons built yet.
         menu.configure(
             mode: isCamera ? .camera : .standard,
-            isLocked: isCurrentlyLocked
+            isLocked: isCurrentlyLocked,
+            showColorOption: showColorOption
         )
 
         menu.translatesAutoresizingMaskIntoConstraints = false
@@ -286,6 +292,13 @@ extension CanvasViewController {
                 // so timing, path creation, and showMotionPath() all work automatically.
                 menu.removeFromSuperview()
                 self.presentAddMovementPicker(for: entity)
+
+            case .changeColour:
+                // Open color picker for wall/ground entities
+                menu.removeFromSuperview()
+                if let modelEntity = entity as? ModelEntity {
+                    self.showColorPicker(for: modelEntity)
+                }
 
             // ── Camera entity actions ───────────────────────────────────────
             case .addShot:

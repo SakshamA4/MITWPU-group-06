@@ -56,8 +56,16 @@ struct EntityRecord: Codable {
     let transform: CodableTransform
     let wallWidth: Float?
     let wallHeight: Float?
+    let wallColorR: Float?
+    let wallColorG: Float?
+    let wallColorB: Float?
+    let wallColorA: Float?
     let groundWidth: Float?
     let groundDepth: Float?
+    let groundColorR: Float?
+    let groundColorG: Float?
+    let groundColorB: Float?
+    let groundColorA: Float?
     let bgWidth: Float?
     let bgHeight: Float?
     let backgroundImagePath: String?
@@ -226,28 +234,36 @@ final class ScenePersistenceService {
                   !eName.hasPrefix("PathRoot_"),
                   !eName.hasPrefix("Gizmo_"),
                   !eName.contains("Ring"),
-                  !eName.contains("Guts"),
-                  eName != "MotionPath"
-            else { continue }
+                   !eName.contains("Guts"),
+                   eName != "MotionPath"
+             else { continue }
 
-            let toolTypeTitle = entity.components[CategoryComponent.self]?.toolType.title ?? "Prop"
-            let isBackground  = entity.components[CategoryComponent.self]?.toolType == .background
-            let modelFileName = resolveModelFileName(entity: entity)
+             let toolTypeTitle = entity.components[CategoryComponent.self]?.toolType.title ?? "Prop"
+             let isBackground  = entity.components[CategoryComponent.self]?.toolType == .background
+             let modelFileName = resolveModelFileName(entity: entity)
 
-            var wallWidth: Float?;   var wallHeight: Float?
-            var groundWidth: Float?; var groundDepth: Float?
-            var bgWidth: Float?;     var bgHeight: Float?
-            var backgroundImagePath: String?
+             var wallWidth: Float?;   var wallHeight: Float?
+             var wallColorR: Float?;  var wallColorG: Float?
+             var wallColorB: Float?;  var wallColorA: Float?
+             var groundWidth: Float?; var groundDepth: Float?
+             var groundColorR: Float?; var groundColorG: Float?
+             var groundColorB: Float?; var groundColorA: Float?
+             var bgWidth: Float?;     var bgHeight: Float?
+             var backgroundImagePath: String?
 
-            if let model = entity as? ModelEntity {
+             if let model = entity as? ModelEntity {
 
-                if let w = model.components[CanvasViewController.WallComponent.self] {
-                    wallWidth = w.width; wallHeight = w.height
-                }
+                 if let w = model.components[CanvasViewController.WallComponent.self] {
+                     wallWidth = w.width; wallHeight = w.height
+                     wallColorR = w.colorR; wallColorG = w.colorG
+                     wallColorB = w.colorB; wallColorA = w.colorA
+                 }
 
-                if let g = model.components[CanvasViewController.GroundComponent.self] {
-                    groundWidth = g.width; groundDepth = g.depth
-                }
+                 if let g = model.components[CanvasViewController.GroundComponent.self] {
+                     groundWidth = g.width; groundDepth = g.depth
+                     groundColorR = g.colorR; groundColorG = g.colorG
+                     groundColorB = g.colorB; groundColorA = g.colorA
+                 }
 
                 // Background image extraction.
                 //
@@ -285,24 +301,28 @@ final class ScenePersistenceService {
                 }
             }
 
-            entityRecords.append(EntityRecord(
-                id:                  {
-                    // Read existing stable UUID from component; assign one if missing.
-                    if entity.components[CanvasViewController.EntityIDComponent.self] == nil {
-                        entity.components.set(CanvasViewController.EntityIDComponent(id: UUID()))
-                    }
-                    return entity.components[CanvasViewController.EntityIDComponent.self]!.id.uuidString
-                }(),
-                name:                entity.name,
-                modelFileName:       modelFileName,
-                toolType:            toolTypeTitle,
-                isBackground:        isBackground,
-                transform:           CodableTransform(entity.transform),
-                wallWidth:           wallWidth,   wallHeight:   wallHeight,
-                groundWidth:         groundWidth, groundDepth:  groundDepth,
-                bgWidth:             bgWidth,     bgHeight:     bgHeight,
-                backgroundImagePath: backgroundImagePath
-            ))
+             entityRecords.append(EntityRecord(
+                 id:                  {
+                     // Read existing stable UUID from component; assign one if missing.
+                     if entity.components[CanvasViewController.EntityIDComponent.self] == nil {
+                         entity.components.set(CanvasViewController.EntityIDComponent(id: UUID()))
+                     }
+                     return entity.components[CanvasViewController.EntityIDComponent.self]!.id.uuidString
+                 }(),
+                 name:                entity.name,
+                 modelFileName:       modelFileName,
+                 toolType:            toolTypeTitle,
+                 isBackground:        isBackground,
+                 transform:           CodableTransform(entity.transform),
+                 wallWidth:           wallWidth,   wallHeight:   wallHeight,
+                 wallColorR:          wallColorR,  wallColorG:   wallColorG,
+                 wallColorB:          wallColorB,  wallColorA:   wallColorA,
+                 groundWidth:         groundWidth, groundDepth:  groundDepth,
+                 groundColorR:        groundColorR, groundColorG: groundColorG,
+                 groundColorB:        groundColorB, groundColorA: groundColorA,
+                 bgWidth:             bgWidth,     bgHeight:     bgHeight,
+                 backgroundImagePath: backgroundImagePath
+             ))
         }
 
         let clipRecords: [AnimationClipRecord] = vc.timeline.clips.map { clip in
@@ -637,47 +657,65 @@ final class ScenePersistenceService {
         guard let anchor = vc.mainAnchor else { return }
         let t = record.transform.transform
 
-        // ── Wall ───────────────────────────────────────────────────────────────
-        if record.name.lowercased().contains("wall") || record.modelFileName == "cube" {
-            let w = record.wallWidth  ?? 1.5
-            let h = record.wallHeight ?? 1.2
-            let e = ModelEntity()
-            e.name  = record.name
-            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
-                e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
-            }
-            e.model = ModelComponent(
-                mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
-                materials: [SimpleMaterial(color: .lightGray, roughness: 0.6, isMetallic: false)]
-            )
-            e.components.set(CategoryComponent(toolType: .wall))
-            e.components.set(CanvasViewController.WallComponent(width: w, height: h))
-            e.components.set(InputTargetComponent())
-            e.transform = t
-            anchor.addChild(e)
-            return
-        }
+         // ── Wall ───────────────────────────────────────────────────────────────
+         if record.name.lowercased().contains("wall") || record.modelFileName == "cube" {
+             let w = record.wallWidth  ?? 1.5
+             let h = record.wallHeight ?? 1.2
+             let e = ModelEntity()
+             e.name  = record.name
+             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                 e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+             }
+             
+             // Create wall component with saved color, fallback to light gray defaults
+             var wallComp = CanvasViewController.WallComponent(width: w, height: h)
+             if let r = record.wallColorR, let g = record.wallColorG,
+                let b = record.wallColorB, let a = record.wallColorA {
+                 wallComp.colorR = r; wallComp.colorG = g
+                 wallComp.colorB = b; wallComp.colorA = a
+             }
+             
+             e.model = ModelComponent(
+                 mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
+                 materials: [SimpleMaterial(color: wallComp.uiColor, roughness: 0.6, isMetallic: false)]
+             )
+             e.components.set(CategoryComponent(toolType: .wall))
+             e.components.set(wallComp)
+             e.components.set(InputTargetComponent())
+             e.transform = t
+             anchor.addChild(e)
+             return
+         }
 
-        // ── Ground ─────────────────────────────────────────────────────────────
-        if record.name.lowercased().contains("ground") {
-            let w = record.groundWidth ?? 4.0
-            let d = record.groundDepth ?? 4.0
-            let e = ModelEntity()
-            e.name  = record.name
-            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
-                e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
-            }
-            e.model = ModelComponent(
-                mesh:      MeshResource.generatePlane(width: w, depth: d),
-                materials: [SimpleMaterial(color: .darkGray, roughness: 1.0, isMetallic: false)]
-            )
-            e.components.set(CategoryComponent(toolType: .wall))
-            e.components.set(CanvasViewController.GroundComponent(width: w, depth: d))
-            e.components.set(InputTargetComponent())
-            e.transform = t
-            anchor.addChild(e)
-            return
-        }
+         // ── Ground ─────────────────────────────────────────────────────────────
+         if record.name.lowercased().contains("ground") {
+             let w = record.groundWidth ?? 4.0
+             let d = record.groundDepth ?? 4.0
+             let e = ModelEntity()
+             e.name  = record.name
+             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                 e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+             }
+             
+             // Create ground component with saved color, fallback to dark gray defaults
+             var groundComp = CanvasViewController.GroundComponent(width: w, depth: d)
+             if let r = record.groundColorR, let g = record.groundColorG,
+                let b = record.groundColorB, let a = record.groundColorA {
+                 groundComp.colorR = r; groundComp.colorG = g
+                 groundComp.colorB = b; groundComp.colorA = a
+             }
+             
+             e.model = ModelComponent(
+                 mesh:      MeshResource.generatePlane(width: w, depth: d),
+                 materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
+             )
+             e.components.set(CategoryComponent(toolType: .wall))
+             e.components.set(groundComp)
+             e.components.set(InputTargetComponent())
+             e.transform = t
+             anchor.addChild(e)
+             return
+         }
 
         // ── Scene camera ───────────────────────────────────────────────────────
         //

@@ -245,8 +245,8 @@ extension CanvasViewController {
 
     // MARK: Wall / Ground
 
-    func spawnWall() {
-        guard let anchor = mainAnchor else { return }
+    func spawnWall(color: UIColor? = nil) -> ModelEntity? {
+        guard let anchor = mainAnchor else { return nil }
 
         let wallRoot = ModelEntity()
         wallRoot.name = {
@@ -257,43 +257,70 @@ extension CanvasViewController {
             return existing == 0 ? base : "\(base)_\(existing + 1)"
         }()
 
+        var wallComp = WallComponent()
+        if let color = color {
+            wallComp.uiColor = color
+        }
         wallRoot.model = ModelComponent(
             mesh: MeshResource.generateBox(width: 1.5, height: 1.2, depth: 0.05),
-            materials: [SimpleMaterial(color: .lightGray, roughness: 0.6, isMetallic: false)]
+            materials: [SimpleMaterial(color: wallComp.uiColor, roughness: 0.6, isMetallic: false)]
         )
         wallRoot.position = [0, 0.6, -2]
         wallRoot.generateCollisionShapes(recursive: true)
         wallRoot.components.set(InputTargetComponent())
         wallRoot.components.set(CategoryComponent(toolType: .wall))
-        wallRoot.components.set(WallComponent())
+        wallRoot.components.set(wallComp)
 
         anchor.addChild(wallRoot)
+        return wallRoot as? ModelEntity
     }
 
-    func spawnGround() {
-        guard let anchor = mainAnchor else { return }
+     func spawnGround(color: UIColor? = nil) -> ModelEntity? {
+         guard let anchor = mainAnchor else { return nil }
 
-        let ground = ModelEntity()
-        ground.name = {
-            let base     = "Ground"
-            let existing = anchor.children.filter {
-                $0.name == base || $0.name.hasPrefix(base + "_")
-            }.count
-            return existing == 0 ? base : "\(base)_\(existing + 1)"
-        }()
+         let ground = ModelEntity()
+         ground.name = {
+             let base     = "Ground"
+             let existing = anchor.children.filter {
+                 $0.name == base || $0.name.hasPrefix(base + "_")
+             }.count
+             return existing == 0 ? base : "\(base)_\(existing + 1)"
+         }()
 
-        ground.model = ModelComponent(
-            mesh: MeshResource.generatePlane(width: 4, depth: 4),
-            materials: [SimpleMaterial(color: .darkGray, roughness: 1.0, isMetallic: false)]
-        )
-        ground.position = [0, 0, 0]
-        ground.generateCollisionShapes(recursive: true)
-        ground.components.set(InputTargetComponent())
-        ground.components.set(CategoryComponent(toolType: .wall))
-        ground.components.set(GroundComponent(width: 4, depth: 4))
+         var groundComp = GroundComponent(width: 4, depth: 4)
+         if let color = color {
+             groundComp.uiColor = color
+         }
+         ground.model = ModelComponent(
+             mesh: MeshResource.generatePlane(width: 4, depth: 4),
+             materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
+         )
+         ground.position = [0, 0, 0]
+         ground.generateCollisionShapes(recursive: true)
+         ground.components.set(InputTargetComponent())
+         ground.components.set(CategoryComponent(toolType: .wall))
+         ground.components.set(groundComp)
 
-        anchor.addChild(ground)
-    }
+         anchor.addChild(ground)
+         return ground as? ModelEntity
+     }
+
+     // MARK: - Color Management
+
+     func applyColor(_ color: UIColor, to entity: ModelEntity) {
+         // Update the visual material and component color for walls
+         if var comp = entity.components[WallComponent.self] {
+             entity.model?.materials = [SimpleMaterial(color: color, roughness: 0.6, isMetallic: false)]
+             comp.uiColor = color
+             entity.components.set(comp)
+         }
+         // Update the visual material and component color for ground
+         else if var comp = entity.components[GroundComponent.self] {
+             entity.model?.materials = [SimpleMaterial(color: color, roughness: 1.0, isMetallic: false)]
+             comp.uiColor = color
+             entity.components.set(comp)
+         }
+     }
 
     // MARK: Character
 
