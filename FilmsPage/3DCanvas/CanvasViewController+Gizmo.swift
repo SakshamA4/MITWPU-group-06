@@ -166,17 +166,32 @@ extension CanvasViewController {
         let outerRing      = makeRing(radius: 1.0, tubeRadius: 0.008, segmentCount: 64, color: .systemRed)
         outerRing.name     = "OuterRing"
 
-        // Wide invisible annular collider (thin cylinder at ring radius)
-        // Must NOT overlap the centre dot — inner edge at ~0.12, outer at ~0.15
-        // We use two stacked invisible cylinders at slightly different heights
-        // to catch hits anywhere near the ring line.
-        let ringCollider   = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.06, radius: 1.0),
-            materials: [SimpleMaterial(color: .clear, isMetallic: false)]
-        )
-        ringCollider.components.set(OpacityComponent(opacity: 0.0))
-        ringCollider.name  = "Gizmo_Ring_XZ"       // NEW hit-test key → Y-rotate
-        ringCollider.generateCollisionShapes(recursive: false)
+        // Annular ring collider — built from 32 thin box segments positioned
+        // along the ring perimeter so the hit area is only the ring band itself,
+        // NOT the interior disc (which belongs to dotCollider / Gizmo_Plane_XZ).
+        let ringColliderParent = Entity()
+        ringColliderParent.name = "Gizmo_Ring_XZ"
+        let ringSegCount = 32
+        let ringR: Float = 1.0
+        let segWidth: Float = 0.18   // tangential width — wide enough to tap easily
+        let segDepth: Float = 0.12   // radial depth — keeps collider on the ring, not inside
+        let segHeight: Float = 0.10  // vertical — generous for touch targeting
+        for i in 0..<ringSegCount {
+            let angle = Float(i) / Float(ringSegCount) * 2 * Float.pi
+            let x = sin(angle) * ringR
+            let z = cos(angle) * ringR
+            let seg = ModelEntity(
+                mesh: MeshResource.generateBox(size: [segWidth, segHeight, segDepth]),
+                materials: [SimpleMaterial(color: .clear, isMetallic: false)]
+            )
+            seg.components.set(OpacityComponent(opacity: 0.0))
+            seg.position = [x, 0.02, z]
+            seg.orientation = simd_quatf(angle: -angle, axis: [0, 1, 0])
+            seg.generateCollisionShapes(recursive: false)
+            ringColliderParent.addChild(seg)
+        }
+        // InputTargetComponent on the parent so hit-test works
+        ringColliderParent.components.set(InputTargetComponent())
 
         // Filled disc that lights up when the outer ring is dragged (Y-rotate highlight)
         // Uses PBR transparent so it blends nicely; hidden at rest.
@@ -199,7 +214,7 @@ extension CanvasViewController {
         planeHandle.addChild(centreDot)
         planeHandle.addChild(dotCollider)
         planeHandle.addChild(outerRing)
-        planeHandle.addChild(ringCollider)
+        planeHandle.addChild(ringColliderParent)
         planeHandle.addChild(planeDisc)
 
         root.addChild(arrowHandle)
@@ -283,6 +298,12 @@ extension CanvasViewController {
 
         gizmo.position  = entity.position(relativeTo: anchor)
         gizmo.isEnabled = true
+
+        // Scale the whole gizmo with zoom distance so it stays
+        // touchable and proportional regardless of how far the camera is
+        let zoomScale = max(0.3, min(3.0, distance * 0.18))
+        gizmo.scale = SIMD3<Float>(repeating: zoomScale)
+
         resetGizmoColors()
 
         // Show drop shadow immediately when gizmo appears
@@ -304,6 +325,9 @@ extension CanvasViewController {
     func updateGizmoPosition() {
         guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
         gizmo.position = entity.position(relativeTo: nil)
+        // Keep size in sync with current zoom level
+        let zoomScale = max(0.3, min(3.0, distance * 0.18))
+        gizmo.scale = SIMD3<Float>(repeating: zoomScale)
         updateDropShadow(for: entity)
     }
 

@@ -611,6 +611,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         self.sceneNameLabel.text = self.sceneName
     }
 
+        // Add this method anywhere inside the CanvasViewController class
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            return true
+        }
     
     @objc func backButtonTapped() {
         let currentID =
@@ -1506,31 +1510,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 return
             }
 
-            // 3. OBJECT BODY TOUCH
-            // • Already selected + unlocked → start XZ drag immediately.
-            // • Unselected / different object → select it; drag begins next pan.
+            // 3. ENTITY BODY HIT — select, and if already selected start planeXZ drag
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" {
                     root = parent
                 }
-                guard let root = root,
-                      root.name != "GizmoRoot",
-                      !root.name.contains("Gizmo") else { break }
-
-                let isLocked = root.components[LockComponent.self]?.isLocked ?? false
-
-                if let already = selectedEntity, already === root, !isLocked {
-                    // Entity is already selected — begin XZ plane drag
+                if root?.name != "GizmoRoot" {
+                    selectedEntity = root
+                }
+                // If entity is selected (or just became selected) and gizmo is visible,
+                // treat body drag as planeXZ so the entity moves with the finger
+                if let sel = selectedEntity,
+                   gizmoRoot?.isEnabled == true,
+                   !(sel.components[LockComponent.self]?.isLocked ?? false) {
                     activeGizmoPart   = .planeXZ
-                    dragStartPosition = root.position
+                    dragStartPosition = sel.position
                     isDraggingObject  = true
-                    highlightGizmoPart(.planeXZ)
+                    lastPanLocation   = location
                 } else {
-                    // Different or unselected — just select, no drag yet
-                    selectedEntity  = root
                     activeGizmoPart = .none
-                    updateGizmoMode()
                 }
             }
 
@@ -1591,13 +1590,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             if activeGizmoPart == .arrowY {
                 newPos.y = startPos.y - (Float(translation.y) * sensitivity)
             } else if activeGizmoPart == .planeXZ {
-                let camOri = arView.cameraTransform.rotation
-                let right = camOri.act([1, 0, 0])
-                let forward = camOri.act([0, 0, -1])
-                let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-                let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
-                let dx = Float(translation.x) * sensitivity
-                let dy = Float(translation.y) * sensitivity
+                // Derive stable right/forward from camera yaw (fixed for this drag).
+                let flatRight   = SIMD3<Float>( cos(yaw), 0, -sin(yaw))
+                let flatForward = SIMD3<Float>(-sin(yaw), 0, -cos(yaw))
+
+                // Match sensitivity to actual screen-to-world scale by projecting
+                // two world points and measuring their pixel distance — same approach
+                // that makes the arrowY feel 1:1.
+                let worldOrigin = target.position(relativeTo: nil)
+                let xzSensitivity: Float
+                if let p0 = arView.project(worldOrigin),
+                   let p1 = arView.project(worldOrigin + flatRight) {
+                    let pxPerMeter = simd_length(SIMD2<Float>(
+                        Float(p1.x - p0.x), Float(p1.y - p0.y)))
+                    xzSensitivity = pxPerMeter > 1 ? 1.0 / pxPerMeter : sensitivity
+                } else {
+                    xzSensitivity = sensitivity
+                }
+
+                let dx = Float(translation.x) * xzSensitivity
+                let dy = Float(translation.y) * xzSensitivity
                 let movement = (flatRight * dx) - (flatForward * dy)
                 newPos.x = startPos.x + movement.x
                 newPos.z = startPos.z + movement.z

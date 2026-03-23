@@ -6,21 +6,16 @@ import ARKit
 import ObjectiveC.runtime
 
 // MARK: - Stored properties for ring gesture (via ObjC associated objects)
-// Swift extensions cannot store properties directly; associated objects are
-// the standard pattern for adding stored state in an extension.
-private var _ringPanGRKey:     UInt8 = 0
+private var _ringPanGRKey:      UInt8 = 0
 private var _ringDragActiveKey: UInt8 = 0
 
 extension CanvasViewController {
 
-    /// The dedicated UIPanGestureRecognizer for the outer ring.
-    /// Stored here so gestureRecognizerShouldBegin can identify it by ===.
     var ringPanGestureRecognizer: UIPanGestureRecognizer? {
         get { objc_getAssociatedObject(self, &_ringPanGRKey) as? UIPanGestureRecognizer }
         set { objc_setAssociatedObject(self, &_ringPanGRKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
     }
 
-    /// True while a ring-drag gesture is in progress.
     var ringDragActive: Bool {
         get { (objc_getAssociatedObject(self, &_ringDragActiveKey) as? Bool) ?? false }
         set { objc_setAssociatedObject(self, &_ringDragActiveKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
@@ -30,38 +25,44 @@ extension CanvasViewController {
 extension CanvasViewController {
 
     func setupGestures() {
-        // ── 1. Single tap — select entity / path handle ───────────────────────
+        // ── 1. Single tap ─────────────────────────────────────────────────────
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         tap.numberOfTapsRequired = 1
         arView.addGestureRecognizer(tap)
 
-        // ── 2. Double tap — focus/frame the tapped entity ─────────────────────
+        // ── 2. Double tap — focus/frame entity ────────────────────────────────
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         tap.require(toFail: doubleTap)
         arView.addGestureRecognizer(doubleTap)
 
-        // ── 3. 1-finger pan — object/gizmo drag OR camera pan on empty space ──
+        // ── 3a. Ring drag — registered first to capture ring touches ──────────
+        let ringPan = UIPanGestureRecognizer(target: self, action: #selector(handleRingPan(_:)))
+        ringPan.maximumNumberOfTouches = 1
+        arView.addGestureRecognizer(ringPan)
+        ringPanGestureRecognizer = ringPan
+
+        // ── 3b. 1-finger pan — gizmo drag OR camera pan on empty space ────────
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.delegate = self
         arView.addGestureRecognizer(pan)
 
-        // ── 4. 2-finger pan — camera pitch (vertical orbit) ───────────────────
+        // ── 4. 2-finger pan — camera pitch ────────────────────────────────────
         let twoPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
         twoPan.minimumNumberOfTouches = 2
         twoPan.maximumNumberOfTouches = 2
         arView.addGestureRecognizer(twoPan)
 
-        // ── 5. Pinch — zoom in/out (or scale entity if selected) ─────────────
+        // ── 5. Pinch — zoom / scale ───────────────────────────────────────────
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         arView.addGestureRecognizer(pinch)
 
-        // ── 6. Twist — camera yaw (nothing selected) or entity Y-rotation ─────
+        // ── 6. Twist — camera yaw or entity Y-rotation ────────────────────────
         let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
         arView.addGestureRecognizer(rotation)
 
-        // ── 7. Long press — path/arc context menu ────────────────────────────
+        // ── 7. Long press — path/arc context menu ─────────────────────────────
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handlePathLongPress(_:)))
         longPress.minimumPressDuration = 0.45
         longPress.cancelsTouchesInView = false
@@ -72,7 +73,7 @@ extension CanvasViewController {
         twoPan.delegate   = self
     }
 
-    // ── 2-finger vertical drag → camera pitch ────────────────────────────────
+    // ── 2-finger pitch ────────────────────────────────────────────────────────
 
     @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
@@ -83,7 +84,7 @@ extension CanvasViewController {
         updateEditorCamera()
     }
 
-    // ── Twist — camera yaw (nothing selected) or entity Y-rotation ───────────
+    // ── Twist — yaw (empty) or entity Y-rotation (selected) ──────────────────
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
@@ -109,19 +110,17 @@ extension CanvasViewController {
         }
 
         switch gesture.state {
-        case .began:
-            initialCameraYaw = yaw
+        case .began:    initialCameraYaw = yaw
         case .changed:
             guard let startYaw = initialCameraYaw else { return }
             yaw = startYaw + Float(gesture.rotation)
             updateEditorCamera()
-        case .ended, .cancelled:
-            initialCameraYaw = nil
+        case .ended, .cancelled: initialCameraYaw = nil
         default: break
         }
     }
 
-    // ── Single tap — select entity / handle ──────────────────────────────────
+    // ── Single tap ────────────────────────────────────────────────────────────
 
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
@@ -150,8 +149,7 @@ extension CanvasViewController {
 
         // 1️⃣ Motion path handle
         if let hit = arView.entity(at: location),
-           let handle = hit.components[MotionPathHandleComponent.self]
-        {
+           let handle = hit.components[MotionPathHandleComponent.self] {
             selectedPathClipID = handle.clipID
             updatePathSelection()
             setEntityTransparency(selectedEntity, alpha: 1.0)
@@ -170,14 +168,14 @@ extension CanvasViewController {
         let objectHit = hits.first { hit in
             var current: Entity? = hit.entity
             while let e = current {
-                if e.name == "GizmoRoot" || e.name.contains("Gizmo")    { return false }
+                if e.name == "GizmoRoot" || e.name.contains("Gizmo")       { return false }
                 if e.name == "MotionPath" || e.name.hasPrefix("PathRoot_")
-                    || e.name.hasPrefix("path.")                         { return false }
+                    || e.name.hasPrefix("path.")                            { return false }
                 if e.name.hasPrefix("RotationArc_") || e.name == "startLine"
                     || e.name == "endLine" || e.name == "arcCurve"
-                    || e.name.hasPrefix("arcHandle.")                    { return false }
+                    || e.name.hasPrefix("arcHandle.")                       { return false }
                 if e.components[MotionPathHandleComponent.self] != nil
-                    || e.components[RotationArcComponent.self]  != nil   { return false }
+                    || e.components[RotationArcComponent.self]  != nil      { return false }
                 if e.name == "MainAnchor" { break }
                 current = e.parent
             }
@@ -187,7 +185,6 @@ extension CanvasViewController {
         if let hitResult = objectHit {
             var root: Entity = hitResult.entity
             while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
-
             if let previous = selectedEntity, previous != root {
                 setEntityTransparency(previous, alpha: 1.0)
             }
@@ -210,14 +207,12 @@ extension CanvasViewController {
         }
     }
 
-    // ── Double tap — smoothly focus/frame the tapped entity ──────────────────
+    // ── Double tap — focus/frame entity ──────────────────────────────────────
 
     @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
-
         let location = gesture.location(in: arView)
         let hits     = arView.hitTest(location)
-
         let objectHit = hits.first { hit in
             var current: Entity? = hit.entity
             while let e = current {
@@ -231,29 +226,24 @@ extension CanvasViewController {
             }
             return true
         }
-
         guard let hit = objectHit else { return }
         var root: Entity = hit.entity
         while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
         frameEntityAnimated(root)
     }
 
-    /// Smoothly animates the camera to frame `entity` over 0.35 s.
     func frameEntityAnimated(_ entity: Entity) {
         guard !isARModeActive else { return }
-
         let bounds     = entity.visualBounds(relativeTo: nil)
         let targetPos  = (bounds.min + bounds.max) * 0.5
         let maxDim     = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
         let targetDist = max(1.5, min(15.0, maxDim * 3.0))
-
         framingStartTarget = cameraTarget
         framingEndTarget   = targetPos
         framingStartDist   = distance
         framingEndDist     = targetDist
         framingStartTime   = CACurrentMediaTime()
         framingDuration    = 0.35
-
         framingDisplayLink?.invalidate()
         let link = CADisplayLink(target: self, selector: #selector(framingTick(_:)))
         link.add(to: .main, forMode: .common)
@@ -263,38 +253,28 @@ extension CanvasViewController {
     @objc func framingTick(_ link: CADisplayLink) {
         let elapsed = CACurrentMediaTime() - framingStartTime
         let raw     = Float(min(elapsed / framingDuration, 1.0))
-        let t       = 1 - pow(1 - raw, 3)   // ease-out cubic
-
-        cameraTarget = simd_mix(framingStartTarget, framingEndTarget,
-                                SIMD3<Float>(repeating: t))
+        let t       = 1 - pow(1 - raw, 3)
+        cameraTarget = simd_mix(framingStartTarget, framingEndTarget, SIMD3<Float>(repeating: t))
         distance     = framingStartDist + (framingEndDist - framingStartDist) * t
         updateEditorCamera()
-
-        if raw >= 1.0 {
-            link.invalidate()
-            framingDisplayLink = nil
-        }
+        if raw >= 1.0 { link.invalidate(); framingDisplayLink = nil }
     }
 
     // ── Action menu ───────────────────────────────────────────────────────────
 
     func showActionMenu(at point: CGPoint) {
         guard let entity = selectedEntity else { return }
-
         let isCurrentlyLocked = entity.components[LockComponent.self]?.isLocked ?? false
         let isCamera = entity.name.lowercased().contains("scenecamera")
             || entity.components[CategoryComponent.self]?.toolType == .camera
-
         let menu = EntityActionMenu()
         menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
-
         NSLayoutConstraint.activate([
             menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
             menu.bottomAnchor.constraint(equalTo: view.topAnchor,      constant: point.y - 40),
         ])
-
         menu.onAction = { [weak self] action in
             guard let self else { return }
             switch action {
@@ -325,7 +305,7 @@ extension CanvasViewController {
                     self.hideGizmo()
                     self.hideRotationGizmo()
                 } else {
-                    // No transparency on unlock — gizmo renders on top via UnlitMaterial
+                    self.setEntityTransparency(entity, alpha: 0.7)
                     self.updateGizmoMode()
                 }
                 menu.removeFromSuperview()
@@ -357,28 +337,26 @@ extension CanvasViewController {
         present(alert, animated: true)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Body drag (called from handlePan when no gizmo part is hit) ───────────
+    // Uses the virtual editor camera for direction, not arView.cameraTransform
 
     func handleBodyDrag(_ gesture: UIPanGestureRecognizer, entity: Entity) {
-        // If dragStartPosition wasn't set in .began (e.g. touch landed on the
-        // object body / foot rather than a named gizmo part), bootstrap it now
-        // from the entity's current world position so the drag still works.
         if dragStartPosition == nil {
             dragStartPosition = entity.position
             gesture.setTranslation(.zero, in: arView)
             return
         }
         guard let startPos = dragStartPosition else { return }
-
         let translation = gesture.translation(in: arView)
-        let mouseDelta  = SIMD2<Float>(Float(translation.x), Float(translation.y))
+        let dx =  Float(translation.x) * 0.005
+        let dy = -Float(translation.y) * 0.005
         var newPosition = startPos
-        let dx = mouseDelta.x * 0.005
-        let dy = -mouseDelta.y * 0.005
         if currentDragMode == .ground {
-            let camOri      = arView.cameraTransform.rotation
-            let flatForward = simd_normalize(SIMD3<Float>(camOri.act([0,0,-1]).x, 0, camOri.act([0,0,-1]).z))
-            let flatRight   = simd_normalize(SIMD3<Float>(camOri.act([1,0,0]).x,  0, camOri.act([1,0,0]).z))
+            let camPos      = activeCamera.position(relativeTo: nil)
+            let scenePos    = entity.position(relativeTo: nil)
+            let forward3D   = simd_normalize(scenePos - camPos)
+            let flatForward = simd_normalize(SIMD3<Float>(forward3D.x, 0, forward3D.z))
+            let flatRight   = simd_normalize(simd_cross(flatForward, SIMD3<Float>(0, 1, 0)))
             newPosition    += (flatRight * dx) + (flatForward * dy)
             newPosition.y   = startPos.y
         } else {
@@ -393,8 +371,8 @@ extension CanvasViewController {
         gesture.setTranslation(.zero, in: arView)
         let dx = Float(translation.x) * 0.005
         let dz = Float(translation.y) * 0.005
-        let cam = arView.cameraTransform.rotation
-        return (cam.act([1,0,0]) * dx) + (cam.act([0,0,1]) * dz)
+        let camOri = activeCamera.orientation(relativeTo: nil)
+        return (camOri.act([1,0,0]) * dx) + (camOri.act([0,0,1]) * dz)
     }
 
     @objc func toggleMovementTapped(_ sender: UIButton) {
@@ -426,74 +404,58 @@ extension CanvasViewController {
     }
 
     // ── Gesture recogniser delegate ───────────────────────────────────────────
+    // Only blocks handlePan when the ring is touched (ringPan owns those touches).
+    // All other touches — gizmo arrows, entity body, empty space — always allowed.
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-
         guard gestureRecognizer is UIPanGestureRecognizer else { return true }
         if gestureRecognizer.numberOfTouches >= 2 { return true }
         let location = gestureRecognizer.location(in: arView)
         let hits     = arView.hitTest(location)
-        let hitNames = Set(hits.map { $0.entity.name })
-
-        // If the touch started on the outer ring, ringPan owns it exclusively.
-        // Block handlePan so it doesn't also fire.
-        if hitNames.contains("Gizmo_Ring_XZ") {
-            return false
+        // Block handlePan when ring is touched — ringPan handles it.
+        // Walk up parents since ring collider segments are children of Gizmo_Ring_XZ.
+        for hit in hits {
+            var e: Entity? = hit.entity
+            while let entity = e {
+                if entity.name == "Gizmo_Ring_XZ" { return false }
+                e = entity.parent
+            }
         }
-
-        // In ROTATE mode: only allow handlePan on the 3-ring rotation gizmo
-        if interactionMode == .rotate {
-            let ringNames: Set<String> = ["xRing", "yRing", "zRing"]
-            return !hitNames.isDisjoint(with: ringNames)
-        }
-
-        // Move mode / no mode: always allow — handlePan routes arrow/dot/body internally
         return true
     }
 
+    // ── Ring pan — Y-axis rotation via outer ring ─────────────────────────────
 
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // MARK: - handleRingPan
-    //
-    // Dedicated 1-finger pan recognizer registered BEFORE handlePan so it
-    // gets first priority on touches that start on the outer ring collider
-    // ("Gizmo_Ring_XZ").
-    //
-    // Behaviour: dragging along the ring rotates the selected entity around
-    // its own world-space Y axis.  Works in any interactionMode — the ring is
-    // always part of the move gizmo.
-    //
-    // gestureRecognizerShouldBegin returns false when the touch did NOT start
-    // on the ring, so handlePan fires normally for all other touches.
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// Returns true only when the touch begins on "Gizmo_Ring_XZ".
-    /// Because this recognizer is registered first it wins priority; handlePan
-    /// falls through for every other touch location.
     func ringPanShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
         let location = gesture.location(in: arView)
-        let hits     = arView.hitTest(location)
-        return hits.contains { $0.entity.name == "Gizmo_Ring_XZ" }
+        return arView.hitTest(location).contains { hit in
+            var e: Entity? = hit.entity
+            while let entity = e {
+                if entity.name == "Gizmo_Ring_XZ" { return true }
+                e = entity.parent
+            }
+            return false
+        }
     }
 
     @objc func handleRingPan(_ gesture: UIPanGestureRecognizer) {
-
-        // Only act when there is a selected, unlocked entity
         guard let selected = selectedEntity else { return }
         let isLocked = selected.components[LockComponent.self]?.isLocked ?? false
         guard !isLocked else { return }
-
         let location = gesture.location(in: arView)
 
         switch gesture.state {
-
         case .began:
-            // Confirm the touch really started on the ring collider
             let hits = arView.hitTest(location)
-            guard hits.contains(where: { $0.entity.name == "Gizmo_Ring_XZ" }) else {
-                return
+            let ringHit = hits.contains { hit in
+                var e: Entity? = hit.entity
+                while let entity = e {
+                    if entity.name == "Gizmo_Ring_XZ" { return true }
+                    e = entity.parent
+                }
+                return false
             }
+            guard ringHit else { return }
             saveCurrentStateToUndo()
             ringDragActive  = true
             lastPanLocation = location
@@ -502,57 +464,64 @@ extension CanvasViewController {
         case .changed:
             guard ringDragActive else { return }
 
-            let dx   = Float(location.x - lastPanLocation.x)
-            let dy   = Float(location.y - lastPanLocation.y)
-            // Map horizontal screen drag → Y-axis rotation angle.
-            // Negate dx: positive dx (drag right) → negative angle → clockwise
-            // rotation when viewed from above (right-hand rule around +Y).
-            let angle: Float = -dx * 0.012
-            guard angle.isFinite, angle != 0 else {
-                lastPanLocation = location
-                return
+            // Circular motion: project the gizmo centre to screen space,
+            // then measure the angle of the touch around that centre.
+            // The delta angle between frames is the rotation amount.
+            if let gizmo = gizmoRoot,
+               let centre2D = arView.project(gizmo.position(relativeTo: nil)) {
+
+                let prev = CGPoint(x: lastPanLocation.x  - centre2D.x,
+                                   y: lastPanLocation.y  - centre2D.y)
+                let curr = CGPoint(x: location.x         - centre2D.x,
+                                   y: location.y         - centre2D.y)
+
+                // Only act when fingers are far enough from centre to give a stable angle
+                let prevLen = sqrt(prev.x*prev.x + prev.y*prev.y)
+                let currLen = sqrt(curr.x*curr.x + curr.y*curr.y)
+                guard prevLen > 8, currLen > 8 else {
+                    lastPanLocation = location
+                    return
+                }
+
+                let prevAngle = Float(atan2(prev.y, prev.x))
+                let currAngle = Float(atan2(curr.y, curr.x))
+
+                // Wrap delta to (-π, π]
+                var delta = currAngle - prevAngle
+                if delta >  Float.pi { delta -= 2 * Float.pi }
+                if delta < -Float.pi { delta += 2 * Float.pi }
+
+                guard delta.isFinite, abs(delta) > 0.0001 else {
+                    lastPanLocation = location
+                    return
+                }
+
+                // Positive screen angle (clockwise in UIKit) → negative Y rotation
+                var t = selected.transform
+                t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0,1,0]) * t.rotation)
+                selected.transform = t
+                updateGizmoPosition()
             }
-
-            // Rotate around the WORLD Y axis so the object spins in place
-            // regardless of its current orientation.
-            var t      = selected.transform
-            let rot    = simd_quatf(angle: angle, axis: SIMD3<Float>(0, 1, 0))
-            t.rotation = simd_normalize(rot * t.rotation)
-            selected.transform = t
-
-            // Gizmo follows the entity
-            updateGizmoPosition()
             lastPanLocation = location
 
         case .ended, .cancelled:
             ringDragActive = false
             resetGizmoColors()
-
-        default:
-            break
+        default: break
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // MARK: - handleRotationPan  (3-ring rotation gizmo — .rotate mode only)
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 3-ring rotation gizmo pan (.rotate mode only) ─────────────────────────
+
     @objc func handleRotationPan(_ gesture: UIPanGestureRecognizer) {
-
-        // Only run in rotation mode — the 3-ring gizmo is only shown then
         guard interactionMode == .rotate else { return }
-
         let location = gesture.location(in: arView)
-
         switch gesture.state {
-
         case .began:
             let hits = arView.hitTest(location)
             activeRotationAxis = nil
             activeGizmoPart    = .none
-
-            if let hit = hits.first(where: {
-                ["xRing","yRing","zRing"].contains($0.entity.name)
-            }) {
+            if let hit = hits.first(where: { ["xRing","yRing","zRing"].contains($0.entity.name) }) {
                 switch hit.entity.name {
                 case "xRing": activeRotationAxis = [1,0,0]; activeGizmoPart = .rotateX
                 case "yRing": activeRotationAxis = [0,1,0]; activeGizmoPart = .rotateY
@@ -563,8 +532,6 @@ extension CanvasViewController {
                 lastPanLocation = location
                 return
             }
-
-            // Object selection in rotate mode
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
@@ -579,26 +546,20 @@ extension CanvasViewController {
                 selectedEntity = nil
                 hideGizmo(); hideRotationGizmo()
             }
-
         case .changed:
-            guard let axis     = activeRotationAxis,
-                  let selected = selectedEntity else { return }
+            guard let axis = activeRotationAxis, let sel = selectedEntity else { return }
             let dx    = Float(location.x - lastPanLocation.x)
             let dy    = Float(location.y - lastPanLocation.y)
-            let drag  = abs(dx) > abs(dy) ? dx : -dy
-            let angle = drag * 0.006
+            let angle = (abs(dx) > abs(dy) ? dx : -dy) * 0.006
             guard angle.isFinite else { return }
-            var t      = selected.transform
+            var t      = sel.transform
             t.rotation = simd_normalize(simd_quatf(angle: angle, axis: axis) * t.rotation)
-            selected.transform = t
-            lastPanLocation    = location
-
+            sel.transform   = t
+            lastPanLocation = location
         case .ended, .cancelled:
             activeRotationAxis = nil
             resetGizmoColors()
-
-        default:
-            break
+        default: break
         }
     }
 }
