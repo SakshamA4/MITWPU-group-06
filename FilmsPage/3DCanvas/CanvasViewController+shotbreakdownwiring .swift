@@ -47,16 +47,59 @@ extension CanvasViewController {
              return
          }
          
-         // Clone with smaller resolution hint for faster rendering
+         // Clone the full scene
          let clonedAnchor = mainAnchor.clone(recursive: true)
          clonedAnchor.name = Self.ShotPreviewCloneName  // Tag for safe removal later
          offscreen.scene.addAnchor(clonedAnchor)
 
-          // 3. Disable ALL cameras in the clone, then enable only the target camera
-          // forEachDescendant is defined on Entity extension in CanvasViewController.swift
-          clonedAnchor.forEachDescendant { entity in
-              if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
-          }
+         // 3. Hide the TARGET camera visual (same as setActiveCamera behavior)
+         if let targetCamRoot = clonedAnchor.findEntity(named: item.cameraRoot.name) as? Entity {
+             targetCamRoot.children.forEach { child in
+                 if !(child is PerspectiveCamera) { child.isEnabled = false }
+             }
+         }
+
+         // 4. Hide all OTHER scene camera visuals (keep them enabled for rendering, hide their geometry)
+         clonedAnchor.forEachDescendant { entity in
+             // Hide camera visual geometry for other cameras
+             let cameraRootName = entity.name
+             if cameraRootName.hasPrefix("SceneCameraRoot_"),
+                cameraRootName != item.cameraRoot.name {
+                 // Keep this camera enabled for rendering, but hide its visual
+                 entity.children.forEach { child in
+                     if !(child is PerspectiveCamera) { child.isEnabled = false }
+                 }
+             }
+         }
+
+         // 5. Hide editor overlays (same as setActiveCamera)
+         //    Hide all gizmo roots
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("GizmoRoot") {
+                 entity.isEnabled = false
+             }
+         }
+
+         // 6. Hide all motion paths
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("PathRoot_") {
+                 entity.isEnabled = false
+             }
+         }
+
+         // 7. Hide all rotation arcs
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("RotationArc_") {
+                 entity.isEnabled = false
+             }
+         }
+
+         // 8. Disable ALL scene cameras, then enable only the target camera for rendering
+         clonedAnchor.forEachDescendant { entity in
+             if let cam = entity as? PerspectiveCamera {
+                 cam.isEnabled = false
+             }
+         }
 
          if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
              targetCam.isEnabled = true
@@ -68,7 +111,7 @@ extension CanvasViewController {
              clonedAnchor.addChild(fallback)
          }
 
-         // 4. Snapshot the offscreen view — main arView completely untouched
+         // 9. Snapshot the offscreen view — main arView completely untouched
          // Reduced delay from 50ms to 33ms (one frame at 30fps) to speed up capture
          DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
              offscreen.snapshot(saveToHDR: false) { [weak self] image in

@@ -436,6 +436,7 @@ extension CanvasViewController {
         av.environment = arView.environment
         av.renderOptions = arView.renderOptions
         objc_setAssociatedObject(self, &PreviewARViewKey.key, av, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        gizmoRoot?.isEnabled = false
         return av
     }
 
@@ -462,64 +463,97 @@ extension CanvasViewController {
 
     // MARK: Serial snapshot chain
 
-    private func snapshotPreviewCamera(at index: Int) {
-        guard index < sceneCameraItems.count else { return }
-        guard let anchor = mainAnchor else { return }
+     private func snapshotPreviewCamera(at index: Int) {
+         guard index < sceneCameraItems.count else { return }
+         guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else { return }
 
-        let item = sceneCameraItems[index]
-        let indexPath = IndexPath(item: index, section: 0)
-        let offscreen = previewARView
+         let item = sceneCameraItems[index]
+         let indexPath = IndexPath(item: index, section: 0)
+         let offscreen = previewARView
 
-        // 1. Build a minimal preview scene — only non-camera entities + a camera.
-        //    We deliberately do NOT clone the full scene because USDZ camera
-        //    visuals (cam1) contain geometry that triggers Metal validation errors
-        //    in the off-screen ARView's renderer.
-        offscreen.scene.anchors.removeAll()
+         // 1. Clone the entire scene into the offscreen view
+         offscreen.scene.anchors.removeAll()
 
-        let previewAnchor = AnchorEntity(world: .zero)
-        previewAnchor.name = "PreviewAnchor"
+         let clonedAnchor = mainAnchor.clone(recursive: true)
+         clonedAnchor.name = "PreviewAnchor"
+         offscreen.scene.addAnchor(clonedAnchor)
 
-        // Copy only renderable scene entities — exclude everything that is
-        // editor UI (cameras, gizmos, motion paths, rotation arcs, grid)
-        if let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
-            for child in mainAnchor.children {
-                guard child.components[CategoryComponent.self]?.toolType != .camera,
-                      !child.name.hasPrefix("SceneCameraRoot_"),
-                      !child.name.hasPrefix("GizmoRoot"),
-                      !child.name.hasPrefix("PathRoot_"),
-                      !child.name.hasPrefix("RotationArc_"),
-                      child.name != "Grid",
-                      child.name != "EditorCamera" else { continue }
-                previewAnchor.addChild(child.clone(recursive: true))
-            }
-        }
+         // 2. Hide the TARGET camera visual (same as setActiveCamera behavior)
+         if let targetCamRoot = clonedAnchor.findEntity(named: item.cameraRoot.name) as? Entity {
+             targetCamRoot.children.forEach { child in
+                 if !(child is PerspectiveCamera) { child.isEnabled = false }
+             }
+         }
 
-        // 2. Add a camera positioned at the exact world transform of the scene camera
-        let previewCam = PerspectiveCamera()
-        previewCam.transform = item.camera.transform
-        // If camera is nested under cameraRoot, compute world-space transform
-        if let parent = item.camera.parent {
-            let worldPos  = item.camera.position(relativeTo: nil)
-            let worldOri  = item.camera.orientation(relativeTo: nil)
-            previewCam.position    = worldPos
-            previewCam.orientation = worldOri
-        }
-        previewCam.isEnabled = true
-        previewAnchor.addChild(previewCam)
+         // 3. Hide all OTHER scene camera visuals (keep them enabled for rendering, hide their geometry)
+         clonedAnchor.forEachDescendant { entity in
+             // Hide camera visual geometry for other cameras
+             let cameraRootName = entity.name
+             if cameraRootName.hasPrefix("SceneCameraRoot_"),
+                cameraRootName != item.cameraRoot.name {
+                 // Keep this camera enabled for rendering, but hide its visual
+                 entity.children.forEach { child in
+                     if !(child is PerspectiveCamera) { child.isEnabled = false }
+                 }
+             }
+         }
 
-        offscreen.scene.addAnchor(previewAnchor)
+         // 4. Hide editor overlays (same as setActiveCamera)
+         //    Hide gizmo root
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("GizmoRoot") {
+                 entity.isEnabled = false
+             }
+         }
 
-        // 3. Snapshot
-        offscreen.snapshot(saveToHDR: false) { [weak self] image in
-            guard let self = self, let image = image else { return }
-            DispatchQueue.main.async {
-                if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
-                    cell.updatePreview(image: image, name: "Camera \(index + 1)")
-                }
-                self.snapshotPreviewCamera(at: index + 1)
-            }
-        }
-    }
+         // 5. Hide all motion paths
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("PathRoot_") {
+                 entity.isEnabled = false
+             }
+         }
+
+         // 6. Hide all rotation arcs
+         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("RotationArc_") {
+                 entity.isEnabled = false
+             }
+         }
+
+         // 7. Disable ALL scene cameras, then enable only the target camera for rendering
+         clonedAnchor.forEachDescendant { entity in
+             if let cam = entity as? PerspectiveCamera {
+                 cam.isEnabled = false
+             }
+         }
+
+         if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
+             targetCam.isEnabled = true
+         } else {
+             // Fallback: create a camera at the target's world transform
+             let fallback = PerspectiveCamera()
+             fallback.transform = item.camera.transform
+             if let parent = item.camera.parent {
+                 let worldPos  = item.camera.position(relativeTo: nil)
+                 let worldOri  = item.camera.orientation(relativeTo: nil)
+                 fallback.position    = worldPos
+                 fallback.orientation = worldOri
+             }
+             fallback.isEnabled = true
+             clonedAnchor.addChild(fallback)
+         }
+
+         // 8. Snapshot
+         offscreen.snapshot(saveToHDR: false) { [weak self] image in
+             guard let self = self, let image = image else { return }
+             DispatchQueue.main.async {
+                 if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
+                     cell.updatePreview(image: image, name: "Camera \(index + 1)")
+                 }
+                 self.snapshotPreviewCamera(at: index + 1)
+             }
+         }
+     }
 
     // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
     //
