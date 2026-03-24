@@ -24,11 +24,11 @@ enum CameraMovementPreset: String, CaseIterable {
     // Custom illustrative icon name — falls back to SF Symbol if image not found
     var imageName: String {
         switch self {
-        case .pan:      return "shot_pan"
-        case .tilt:     return "shot_tilt"
-        case .dollyIn:  return "shot_dollyin"
-        case .dollyOut: return "shot_dollyout"
-        case .crane:    return "shot_crane"
+        case .pan:      return "Pan"
+        case .tilt:     return "Tilt"
+        case .dollyIn:  return "Dolly-in"
+        case .dollyOut: return "Dolly-out"
+        case .crane:    return "Crane"
         }
     }
     var fallbackSFSymbol: String {
