@@ -1557,8 +1557,10 @@ extension CanvasViewController {
         }
     }
     
-    /// Clamps `proposedPosition` to avoid overlapping any sibling entity.
+    /// Clamps `proposedPosition` to smoothly avoid overlapping any sibling entity.
     /// Uses `cachedSiblingBounds` so this is O(n) with no extra scene-graph work.
+    /// Instead of hard-blocking, applies gentle repulsion so colliding objects
+    /// smoothly push apart without drastic position changes.
     func clampPositionAvoidingOverlap(
         entity: Entity,
         proposedPosition: SIMD3<Float>
@@ -1579,27 +1581,34 @@ extension CanvasViewController {
             let overlapZ = selfBounds.max.z > otherBounds.min.z && selfBounds.min.z < otherBounds.max.z
             guard overlapX && overlapY && overlapZ else { continue }
             
+            // Calculate penetration depths on all axes
             let penRight  = selfBounds.max.x  - otherBounds.min.x
             let penLeft   = otherBounds.max.x  - selfBounds.min.x
             let penTop    = selfBounds.max.y  - otherBounds.min.y
             let penBottom = otherBounds.max.y  - selfBounds.min.y
             let penFront  = selfBounds.max.z  - otherBounds.min.z
             let penBack   = otherBounds.max.z  - selfBounds.min.z
-            let minPen    = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
             
-            // Apply smallest penetration vector to resolve the overlap
+            // Find the minimum penetration direction
+            let minPen = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
+            
+            // Apply a fraction (0.4) of the minimum penetration for smooth, gentle repulsion
+            // instead of hard-blocking. This lets objects smoothly push apart.
+            let repulsionFactor: Float = 0.4
+            let gentleRepulsion = minPen * repulsionFactor
+            
             if minPen == penRight {
-                resolved.x += penRight
+                resolved.x += gentleRepulsion
             } else if minPen == penLeft {
-                resolved.x -= penLeft
+                resolved.x -= gentleRepulsion
             } else if minPen == penTop {
-                resolved.y += penTop
+                resolved.y += gentleRepulsion
             } else if minPen == penBottom {
-                resolved.y -= penBottom
+                resolved.y -= gentleRepulsion
             } else if minPen == penFront {
-                resolved.z += penFront
+                resolved.z += gentleRepulsion
             } else if minPen == penBack {
-                resolved.z -= penBack
+                resolved.z -= gentleRepulsion
             }
         }
         
