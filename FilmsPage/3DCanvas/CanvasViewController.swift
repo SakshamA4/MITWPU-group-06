@@ -1480,19 +1480,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - Long press (path / arc context menus)
 
-    @objc func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+    @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
         guard gesture.state == .began else { return }
         let location = gesture.location(in: arView)
         guard let hit = arView.entity(at: location) else { return }
 
-        // Arc tip
+        // ── 1. Rotation arc handle (component on the hit entity) ──────────────
         if let arcComp = hit.components[RotationArcComponent.self],
            let arcRoot = activeRotationArcs[arcComp.clipID]?.root {
             showRotationArcContextMenu(clipID: arcComp.clipID, arcRoot: arcRoot)
             return
         }
 
-        // Arc curve / shaft — walk up to arcRoot
+        // ── 2. Rotation arc curve / shaft — walk up to the arc root ──────────
         var walkArc: Entity? = hit
         while let e = walkArc {
             if e.name.hasPrefix("RotationArc_") {
@@ -1505,20 +1505,41 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             walkArc = e.parent
         }
 
-        // Motion path handle
+        // ── 3. Motion path handle ─────────────────────────────────────────────
         if let handle = hit.components[MotionPathHandleComponent.self],
            let pathRoot = hit.parent {
             showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
             return
         }
 
-        // Motion path curve
+        // ── 4. Motion path curve ──────────────────────────────────────────────
         if hit.name == "MotionPath",
            let pathRoot = hit.parent,
            let handle   = pathRoot.children
                .compactMap({ $0.components[MotionPathHandleComponent.self] }).first {
             showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
+            return
         }
+
+        // ── 5. Regular entity — show action menu ──────────────────────────────
+        // Walk up to the MainAnchor child (the entity root), skipping any
+        // gizmo, path, or arc entities that slipped through the checks above.
+        var root: Entity = hit
+        while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+
+        guard !root.name.contains("Gizmo"),
+              !root.name.hasPrefix("PathRoot_"),
+              !root.name.hasPrefix("RotationArc_")
+        else { return }
+
+        // Select the entity if it isn't already, then show the menu.
+        if selectedEntity !== root {
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity = root
+            setEntityTransparency(root, alpha: 0.9)
+            updateGizmoMode()
+        }
+        showActionMenu(at: location)
     }
 }
 
