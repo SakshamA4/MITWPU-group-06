@@ -17,7 +17,7 @@ class LibraryCharactersViewController: UIViewController {
         override func viewDidLoad() {
             super.viewDidLoad()
             charactersCollectionView.dataSource = self
-            charactersCollectionView.delegate = self
+//            charactersCollectionView.delegate = self
             charactersCollectionView.backgroundColor = .clear
 
             charactersCollectionView.register(
@@ -99,24 +99,24 @@ class LibraryCharactersViewController: UIViewController {
     }
 
 
-
-extension LibraryCharactersViewController: UICollectionViewDelegate {
-
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
-
-        let selectedCharacter = characters[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
-            withIdentifier: "CharacterDetailsViewController"
-        ) as? CharacterDetailsViewController else {
-            return
-        }
-        
-        vc.characterTemplate = selectedCharacter
-
-
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+//
+//extension LibraryCharactersViewController: UICollectionViewDelegate {
+//
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//
+//        let selectedCharacter = characters[indexPath.item]
+//
+//        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "CharacterDetailsViewController"
+//        ) as? CharacterDetailsViewController else {
+//            return
+//        }
+//        
+//        vc.characterTemplate = selectedCharacter
+//
+//
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
+//}

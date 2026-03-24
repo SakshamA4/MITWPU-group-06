@@ -17,7 +17,7 @@ class SequenceViewController: UIViewController {
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
-    var filmName: String?   
+    var filmName: String?
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
@@ -30,7 +30,7 @@ class SequenceViewController: UIViewController {
         updateTitle()
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
-        layout.minimumLineSpacing = 8
+        layout.minimumLineSpacing = 30
         layout.minimumInteritemSpacing = 8
         collectionView.setCollectionViewLayout(layout, animated: false)
         collectionView.dataSource = self
@@ -96,6 +96,7 @@ extension SequenceViewController: UICollectionViewDataSource {
                 for: indexPath
             ) as? PlaceholderCollectionViewCell else { return UICollectionViewCell() }
             
+            cell.addNew.text = "New Scene"
             cell.onPlusButtonTapped = { [weak self] in
                 self?.performSegue(withIdentifier: "addSceneSegue", sender: nil)
             }
