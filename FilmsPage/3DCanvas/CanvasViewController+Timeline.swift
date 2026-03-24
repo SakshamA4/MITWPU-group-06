@@ -232,6 +232,7 @@ extension CanvasViewController {
         
         stopPlayback()
         playbackState = .paused
+        stopAllWalkCycles()
         
         pauseButton.isHidden = true
         playButton.isHidden = false
@@ -281,6 +282,7 @@ extension CanvasViewController {
         currentTimelineTime = 0
         playbackStartTime = 0
         
+        stopAllWalkCycles()
         exitTimelineMode()
         
         timelineContainer.isHidden = true
@@ -339,19 +341,18 @@ extension CanvasViewController {
                 switch clip.track {
                     
                 case .position:
-                    
                     if let path = clip.motionPath {
-                        
-                        let t = max(
-                            0,
-                            min(
-                                1,
-                                (time - clip.startTime) / clip.duration
-                            )
-                        )
-                        
-                        translation = path.evaluateConstantSpeed(t)
-                        
+                        let t = max(0, min(1, (time - clip.startTime) / clip.duration))
+                        if clip.type == .walk {
+                            // Walk: position + facing + skeleton set directly on entity
+                            applyWalkToEntity(entity, path: path, progress: t)
+                            // Sync back so the final Transform(...) at the bottom of the
+                            // loop doesn't overwrite what applyWalkToEntity just set
+                            translation = entity.position
+                            rotation    = entity.transform.rotation
+                        } else {
+                            translation = path.evaluateConstantSpeed(t)
+                        }
                     }
                     
                 case .rotation:

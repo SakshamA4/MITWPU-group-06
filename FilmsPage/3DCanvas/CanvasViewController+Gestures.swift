@@ -175,9 +175,11 @@ extension CanvasViewController {
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
             showActionMenu(at: location)
-            if let anim = root.availableAnimations.first {
-                root.playAnimation(anim.repeat(count: 1))
-            }
+            
+            // commented this to stop auto animation playing
+//            if let anim = root.availableAnimations.first {
+//                root.playAnimation(anim.repeat(count: 1))
+//            }
         } else {
             setEntityTransparency(selectedEntity, alpha: 1.0)
             selectedEntity     = nil
@@ -330,6 +332,12 @@ extension CanvasViewController {
             self?.interactionMode = .rotate
             self?.presentAnimationPrompt(type: .rotate)
         })
+        if entity.components[CategoryComponent.self]?.toolType == .character {
+            alert.addAction(UIAlertAction(title: "Walk (Path + Animation)", style: .default) { [weak self] _ in
+                self?.interactionMode = .move
+                self?.animateWalk()
+            })
+        }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }

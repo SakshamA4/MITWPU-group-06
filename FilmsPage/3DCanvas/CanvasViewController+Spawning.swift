@@ -56,7 +56,7 @@ extension CanvasViewController {
 
     //            if let texture = try? TextureResource.load(named: type) {
 
-            let imageSkyTypes: Set<String> = ["sky_image_1", "Evening_sky", "Nighty_night"]  // add new names here
+            let imageSkyTypes: Set<String> = ["Blue_sky", "Evening_sky", "Nighty_night"]  // add new names here
 
 
 
@@ -80,25 +80,7 @@ extension CanvasViewController {
 
                 }
 
-            } else {
-
-                switch type {
-
-                case "sky_sunset": topColor = .orange
-
-                case "sky_night": topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
-
-                default: topColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
-
-                }
-
-                skyMaterial.color.tint = topColor
-
-                arView.environment.background = .color(topColor)
-
             }
-
-            
 
             // 3. Create Sphere
 
