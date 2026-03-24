@@ -1528,11 +1528,30 @@ extension CanvasViewController {
     /// Called once in handlePan(.began) so .changed never traverses the scene graph per frame.
     private func buildSiblingBoundsCache() {
         guard let anchor = mainAnchor else { cachedSiblingBounds = []; return }
+        
+        // Characters are allowed to overlap everything — skip building the cache.
+        if let draggedCategory = selectedEntity?.components[CategoryComponent.self],
+           draggedCategory.toolType == .character {
+            cachedSiblingBounds = []
+            return
+        }
+        
         cachedSiblingBounds = anchor.children.compactMap { sibling in
             guard sibling !== selectedEntity,
                   sibling.name != "GizmoRoot",
+                  sibling.name != "Grid",
+                  sibling.name != "EditorCamera",
+                  sibling.name != "PathContainer",
                   !sibling.children.isEmpty || sibling is ModelEntity
             else { return nil }
+            
+            // Also skip characters as collision targets —
+            // non-character entities should not be blocked by characters either.
+            if let cat = sibling.components[CategoryComponent.self],
+               cat.toolType == .character {
+                return nil
+            }
+            
             return (sibling, sibling.visualBounds(relativeTo: nil))
         }
     }
@@ -1566,10 +1585,23 @@ extension CanvasViewController {
             let penFront  = selfBounds.max.z  - otherBounds.min.z
             let penBack   = otherBounds.max.z  - selfBounds.min.z
             let minPen    = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
-
-            //  OLD STEP 2 — NORMAL OBJECT / GIZMO DRAGGING (SAKSHAM)
+            
+            // Apply smallest penetration vector to resolve the overlap
+            if minPen == penRight {
+                resolved.x += penRight
+            } else if minPen == penLeft {
+                resolved.x -= penLeft
+            } else if minPen == penTop {
+                resolved.y += penTop
+            } else if minPen == penBottom {
+                resolved.y -= penBottom
+            } else if minPen == penFront {
+                resolved.z += penFront
+            } else if minPen == penBack {
+                resolved.z -= penBack
+            }
         }
-
+        
         return resolved
     }
 
