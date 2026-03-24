@@ -99,12 +99,16 @@ final class AnimationInputCard: UIViewController {
     // ── Card ──────────────────────────────────────────────────────────────────
 
     private func buildCard() {
-        card.backgroundColor    = UIColor(red: 0.12, green: 0.12, blue: 0.18, alpha: 1)
-        card.layer.cornerRadius = 24
+        // Deep navy matching the app's global background (11,11,22) with a touch lighter
+        card.backgroundColor    = UIColor(red: 18/255, green: 18/255, blue: 34/255, alpha: 1)
+        card.layer.cornerRadius = 28
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         card.layer.shadowColor   = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.4
-        card.layer.shadowRadius  = 20
+        card.layer.shadowOpacity = 0.6
+        card.layer.shadowRadius  = 24
+        // Subtle top border to lift card off the dim
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.07).cgColor
+        card.layer.borderWidth = 1
         card.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(card)
 
@@ -118,8 +122,8 @@ final class AnimationInputCard: UIViewController {
 
         // ── Handle bar ───────────────────────────────────────────────────────
         let handle = UIView()
-        handle.backgroundColor    = UIColor.white.withAlphaComponent(0.2)
-        handle.layer.cornerRadius = 2.5
+        handle.backgroundColor    = UIColor.white.withAlphaComponent(0.15)
+        handle.layer.cornerRadius = 3
         handle.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(handle)
         NSLayoutConstraint.activate([
@@ -139,7 +143,7 @@ final class AnimationInputCard: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text      = titleStr
-        titleLabel.font      = .systemFont(ofSize: 20, weight: .bold)
+        titleLabel.font      = UIFont.systemFont(ofSize: 20, weight: .semibold)
         titleLabel.textColor = .white
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -318,27 +322,24 @@ final class AnimationInputCard: UIViewController {
     }
 
     private func cardMeta() -> (title: String, icon: String, tint: UIColor) {
+        // App primary red: matches "New Scene" / "New Film" red buttons
+        let appRed   = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
+        let softBlue = UIColor(red: 64/255,  green: 156/255, blue: 255/255, alpha: 1)
         switch mode {
         case .addMove:
-            return ("Add Move", "arrow.up.right.circle.fill",
-                    UIColor(red: 0.2, green: 0.7, blue: 1.0, alpha: 1))
+            return ("Add Move", "arrow.up.right.circle.fill", softBlue)
         case .addRotate:
-            return ("Add Rotation", "rotate.3d.fill",
-                    UIColor(red: 0.6, green: 0.4, blue: 1.0, alpha: 1))
+            return ("Add Rotation", "rotate.3d.fill", appRed)
         case .editRotate, .editRotateFull:
-            return ("Edit Rotation", "rotate.3d",
-                    UIColor(red: 0.6, green: 0.4, blue: 1.0, alpha: 1))
+            return ("Edit Rotation", "rotate.3d", appRed)
         case .editMoveTiming:
-            return ("Edit Move Timing", "clock.arrow.2.circlepath",
-                    UIColor(red: 0.2, green: 0.7, blue: 1.0, alpha: 1))
+            return ("Edit Move Timing", "clock.arrow.2.circlepath", softBlue)
         case .addShot(let shotName, _):
-            return (shotName, "video.fill",
-                    UIColor(red: 1.0, green: 0.45, blue: 0.2, alpha: 1))
+            return (shotName, "video.fill", appRed)
         }
     }
 
     private func buildConfirmButton() -> UIButton {
-        let btn = UIButton(type: .system)
         let label: String
         switch mode {
         case .addMove:         label = "Add Move to Timeline"
@@ -348,11 +349,22 @@ final class AnimationInputCard: UIViewController {
              .editRotateFull,
              .editMoveTiming:  label = "Apply"
         }
-        btn.setTitle(label, for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        btn.setTitleColor(.white, for: .normal)
-        btn.backgroundColor = UIColor(red: 0.25, green: 0.25, blue: 0.55, alpha: 1)
-        btn.layer.cornerRadius = 14
+
+        // Use UIButton.Configuration for a fully native SF Pro pill button
+        var config = UIButton.Configuration.filled()
+        config.title = label
+        config.baseForegroundColor = .white
+        // App red — matches "New Scene" / "New Film" buttons
+        config.baseBackgroundColor = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
+        config.cornerStyle = .large
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var out = incoming
+            out.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+            return out
+        }
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+
+        let btn = UIButton(configuration: config)
         btn.heightAnchor.constraint(equalToConstant: 52).isActive = true
         btn.addAction(UIAction { [weak self] _ in self?.confirm() }, for: .touchUpInside)
         return btn
@@ -394,7 +406,7 @@ final class AnimationInputCard: UIViewController {
         UIView.animate(withDuration: 0.38, delay: 0,
                        usingSpringWithDamping: 0.82,
                        initialSpringVelocity: 0.5) {
-            self.dimView.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+            self.dimView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
             self.view.layoutIfNeeded()
         }
     }
@@ -454,31 +466,32 @@ final class LabelledField: UIView {
 
         // Icon
         let iconView = UIImageView(image: UIImage(systemName: icon)?
-            .withConfiguration(UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)))
-        iconView.tintColor = UIColor.white.withAlphaComponent(0.5)
+            .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)))
+        iconView.tintColor = UIColor.white.withAlphaComponent(0.4)
         iconView.setContentHuggingPriority(.required, for: .horizontal)
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Label
+        // Label — SF Pro caption style
         let lbl = UILabel()
         lbl.text      = label.uppercased()
-        lbl.font      = .systemFont(ofSize: 11, weight: .semibold)
-        lbl.textColor = UIColor.white.withAlphaComponent(0.5)
+        lbl.font      = UIFont.systemFont(ofSize: 11, weight: .medium)
+        lbl.textColor = UIColor.white.withAlphaComponent(0.45)
         lbl.translatesAutoresizingMaskIntoConstraints = false
 
         // Header row
         let header = UIStackView(arrangedSubviews: [iconView, lbl])
-        header.axis    = .horizontal
-        header.spacing = 6
+        header.axis      = .horizontal
+        header.spacing   = 6
         header.alignment = .center
         header.translatesAutoresizingMaskIntoConstraints = false
 
-        // Text field
+        // Text field — large SF Pro numerals, app-red tint cursor
         textField.text            = value
         textField.keyboardType    = keyboard
-        textField.font            = .systemFont(ofSize: 22, weight: .semibold)
+        textField.font            = UIFont.monospacedDigitSystemFont(ofSize: 24, weight: .semibold)
         textField.textColor       = .white
-        textField.tintColor       = UIColor(red: 0.4, green: 0.6, blue: 1, alpha: 1)
+        // Cursor color = app red
+        textField.tintColor       = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
         textField.backgroundColor = .clear
         textField.borderStyle     = .none
         textField.translatesAutoresizingMaskIntoConstraints = false
@@ -486,17 +499,17 @@ final class LabelledField: UIView {
 
         // Hint label
         let hintLbl = UILabel()
-        hintLbl.text      = hint
-        hintLbl.font      = .systemFont(ofSize: 11, weight: .regular)
-        hintLbl.textColor = UIColor.white.withAlphaComponent(0.3)
+        hintLbl.text          = hint
+        hintLbl.font          = UIFont.systemFont(ofSize: 11, weight: .regular)
+        hintLbl.textColor     = UIColor.white.withAlphaComponent(0.28)
         hintLbl.numberOfLines = 0
         hintLbl.translatesAutoresizingMaskIntoConstraints = false
 
-        // Separator
+        // Separator — thinner, more refined
         let sep = UIView()
-        sep.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        sep.backgroundColor = UIColor.white.withAlphaComponent(0.09)
         sep.translatesAutoresizingMaskIntoConstraints = false
-        sep.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        sep.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
 
         // Main stack
         let stack = UIStackView(arrangedSubviews: [header, textField, hintLbl, sep])
@@ -541,11 +554,11 @@ final class AxisSegmentedControl: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func build() {
-        // Section label
+        // Section label — SF Pro caption
         let lbl = UILabel()
         lbl.text      = "ROTATION AXIS"
-        lbl.font      = .systemFont(ofSize: 11, weight: .semibold)
-        lbl.textColor = UIColor.white.withAlphaComponent(0.5)
+        lbl.font      = UIFont.systemFont(ofSize: 11, weight: .medium)
+        lbl.textColor = UIColor.white.withAlphaComponent(0.45)
         lbl.translatesAutoresizingMaskIntoConstraints = false
 
         // Button row
@@ -564,9 +577,9 @@ final class AxisSegmentedControl: UIView {
         for (axis, label) in axisLabels {
             let btn = UIButton(type: .system)
             btn.setTitle(label, for: .normal)
-            btn.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-            btn.layer.cornerRadius = 10
-            btn.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            btn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+            btn.layer.cornerRadius = 12
+            btn.heightAnchor.constraint(equalToConstant: 46).isActive = true
             btn.tag = axisTag(axis)
             btn.addAction(UIAction { [weak self] _ in
                 guard let self else { return }
@@ -613,10 +626,10 @@ final class AxisSegmentedControl: UIView {
                 btn.layer.borderColor = color.cgColor
                 btn.layer.borderWidth = 1.5
             } else {
-                btn.backgroundColor = UIColor.white.withAlphaComponent(0.06)
-                btn.setTitleColor(UIColor.white.withAlphaComponent(0.45), for: .normal)
-                btn.layer.borderColor = UIColor.clear.cgColor
-                btn.layer.borderWidth = 0
+                btn.backgroundColor = UIColor.white.withAlphaComponent(0.05)
+                btn.setTitleColor(UIColor.white.withAlphaComponent(0.4), for: .normal)
+                btn.layer.borderColor = UIColor.white.withAlphaComponent(0.08).cgColor
+                btn.layer.borderWidth = 0.5
             }
         }
     }

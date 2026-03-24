@@ -667,35 +667,36 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Navigation
 
     @objc func backButtonTapped() {
-        let currentID =
-            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
-
-        // Handle Template check as you currently do
-        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
-            $0.id == currentID
-        }
-
-        if isTemplate {
-            ScenesDataStore.shared.saveTemplateNote(
-                id: currentID,
-                notes: self.sceneNotes
-            )
-        } else {
-            // 1. Update Recent Scenes (Global)
-            let updatedRecent = ScenesModel(
-                id: currentID,
-                name: self.sceneName,
-                image: self.sceneImageName ?? "Image",
-                notes: self.sceneNotes
-            )
-            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
-
-            if var projectScene = self.currentSceneObject {
-                projectScene.name = self.sceneName
-            }
-        }
-
-        self.dismiss(animated: true)
+        promptSaveAndExit()
+//        let currentID =
+//            self.currentSceneID ?? self.currentSceneObject?.id ?? UUID()
+//
+//        // Handle Template check as you currently do
+//        let isTemplate = ScenesDataStore.shared.currentTemplates.contains {
+//            $0.id == currentID
+//        }
+//
+//        if isTemplate {
+//            ScenesDataStore.shared.saveTemplateNote(
+//                id: currentID,
+//                notes: self.sceneNotes
+//            )
+//        } else {
+//            // 1. Update Recent Scenes (Global)
+//            let updatedRecent = ScenesModel(
+//                id: currentID,
+//                name: self.sceneName,
+//                image: self.sceneImageName ?? "Image",
+//                notes: self.sceneNotes
+//            )
+//            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
+//
+//            if var projectScene = self.currentSceneObject {
+//                projectScene.name = self.sceneName
+//            }
+//        }
+//
+//        self.dismiss(animated: true)
     }
 
     // MARK: - Setup
