@@ -454,31 +454,37 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         return label
     }()
 
-    // MARK: - Timeline properties
-    var activeDraggedClipID: UUID?
-    var activeDraggedHandleName: String?
+     // MARK: - Timeline properties
+     var activeDraggedClipID: UUID?
+     var activeDraggedHandleName: String?
 
-    var timelineContainer: UIView!
-    var playButton: UIButton!
-    var stopButton: UIButton!
-    var pauseButton: UIButton!
-    var playbackButtonStack: UIStackView!
-    var scrubber: UISlider!
+     var timelineContainer: UIView!
+     var playButton: UIButton!
+     var stopButton: UIButton!
+     var pauseButton: UIButton!
+     var playbackButtonStack: UIStackView!
+     var scrubber: UISlider!
 
-    // FIX: displayLink is tracked as a property so it can be reliably invalidated on teardown.
-    var displayLink: CADisplayLink?
+     // FIX: displayLink is tracked as a property so it can be reliably invalidated on teardown.
+     var displayLink: CADisplayLink?
 
-    /// Repeating 3fps timer that drives the off-screen camera preview snapshots.
-    var cameraPreviewTimer: Timer?
+     /// Repeating 3fps timer that drives the off-screen camera preview snapshots.
+     var cameraPreviewTimer: Timer?
 
-    var playbackStartTime: CFTimeInterval = 0
-    var currentTimelineTime: Float = 0
+     var playbackStartTime: CFTimeInterval = 0
+     var currentTimelineTime: Float = 0
 
-    enum PlaybackState { case stopped; case playing; case paused }
-    var playbackState: PlaybackState = .stopped
+     enum PlaybackState { case stopped; case playing; case paused }
+     var playbackState: PlaybackState = .stopped
 
-    var baseTransforms: [String: Transform] = [:]
-    var selectedPathClipID: UUID?
+     var baseTransforms: [String: Transform] = [:]
+     var selectedPathClipID: UUID?
+     
+     // ISSUE 4 & 5: Stored constraint references for camera panel layout
+     var panelTrailingConstraint: NSLayoutConstraint?
+     var panelHeightConstraint: NSLayoutConstraint?
+     var panelWidthConstraint: NSLayoutConstraint?
+     var topControlsHeight: CGFloat = 56  // Store computed toolbar height
 
     // MARK: - Motion path state
     struct MotionPathHandleComponent: Component {
@@ -621,17 +627,43 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         super.viewWillDisappear(animated)
         // FIX: Always invalidate the display link on disappear to prevent it from
         // running against a deallocated view controller, which caused the slowdown
-        // observed after save→exit→reload.
-        displayLink?.invalidate()
-        displayLink = nil
-    }
+         // observed after save→exit→reload.
+         displayLink?.invalidate()
+         displayLink = nil
+     }
+     
+     override func viewDidLayoutSubviews() {
+         super.viewDidLayoutSubviews()
+         // ISSUE 4 & 5: Update camera panel size on layout changes
+         updateCameraPanelLayout()
+     }
 
-    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        super.viewWillTransition(to: size, with: coordinator)
-        coordinator.animate(alongsideTransition: { _ in
-            self.cameraCollectionView?.collectionViewLayout.invalidateLayout()
-        })
-    }
+     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+         super.viewWillTransition(to: size, with: coordinator)
+         coordinator.animate(alongsideTransition: { _ in
+             // ISSUE 4 & 5: Recompute panel layout on rotation
+             self.updateCameraPanelLayout()
+             self.cameraCollectionView?.collectionViewLayout.invalidateLayout()
+         })
+     }
+     
+     private func updateCameraPanelLayout() {
+         // ISSUE 4 & 5: Recompute sizes based on current device and orientation
+         let isLarge = isLargeIPad
+         let newPanelWidth: CGFloat = isLarge ? 200 : 176
+         let availableHeight = view.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom - topControlsHeight
+         let newMaxHeight = min(availableHeight * 0.55, isLarge ? 420 : 340)
+         let cellHeight = newPanelWidth * 0.75
+         
+         // Update stored constraints
+         panelWidthConstraint?.constant = newPanelWidth
+         panelHeightConstraint?.constant = newMaxHeight
+         
+         // Update collection view layout item size
+         if let layout = cameraCollectionView?.collectionViewLayout as? UICollectionViewFlowLayout {
+             layout.itemSize = CGSize(width: newPanelWidth - 16, height: cellHeight)
+         }
+     }
 
 
     deinit {
@@ -1551,10 +1583,34 @@ extension CanvasViewController {
         return entity.position(relativeTo: nil)
     }
 
+
 }
 
 // MARK: - SIMD4 helper
 
 extension SIMD4 where Scalar == Float {
     var xyz: SIMD3<Float> { SIMD3<Float>(x, y, z) }
+}
+
+// MARK: - ISSUE 6: Entity extension and editor overlay prefixes
+
+extension Entity {
+    /// Recursively visits this entity and all descendants, invoking body on each.
+    /// Used by snapshot capture and preview generation to filter editor overlay entities.
+    func forEachDescendant(_ body: (Entity) -> Void) {
+        body(self)
+        for child in children {
+            child.forEachDescendant(body)
+        }
+    }
+}
+
+extension CanvasViewController {
+    /// ISSUE 6: Shared list of entity name prefixes that represent editor-only overlays.
+    /// These are filtered out in snapshot captures so they don't appear in exported media.
+    static let editorOverlayPrefixes = [
+        "PathRoot_",       // Motion path visualizations
+        "RotationArc_",    // Rotation arc visualizations
+        "GizmoRoot",       // Transform gizmos
+    ]
 }

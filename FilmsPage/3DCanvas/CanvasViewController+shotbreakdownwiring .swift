@@ -52,11 +52,11 @@ extension CanvasViewController {
          clonedAnchor.name = Self.ShotPreviewCloneName  // Tag for safe removal later
          offscreen.scene.addAnchor(clonedAnchor)
 
-         // 3. Disable ALL cameras in the clone, then enable only the target camera
-         // forEachDescendant is defined in CameraPreviewCell.swift on Entity
-         clonedAnchor.forEachDescendant { entity in
-             if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
-         }
+          // 3. Disable ALL cameras in the clone, then enable only the target camera
+          // forEachDescendant is defined on Entity extension in CanvasViewController.swift
+          clonedAnchor.forEachDescendant { entity in
+              if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
+          }
 
          if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
              targetCam.isEnabled = true
@@ -81,25 +81,35 @@ extension CanvasViewController {
          }
      }
 
-    // MARK: - Shot Breakdown Entry Point
+     // MARK: - Shot Breakdown Entry Point
 
-    @objc func shotBreakdownTapped() {
-        let vc = ShotBreakdownViewController()
-        vc.sceneName   = self.sceneName
-        vc.timeline    = self.timeline
-        vc.cameraNames = self.sceneCameraItems.map { $0.cameraRoot.name }
-        vc.arView      = self.arView
-        vc.cameraItems = self.sceneCameraItems
+     @objc func shotBreakdownTapped() {
+         let vc = ShotBreakdownViewController()
+         vc.sceneName   = self.sceneName
+         vc.timeline    = self.timeline
+         vc.cameraNames = self.sceneCameraItems.map { $0.cameraRoot.name }
+         vc.arView      = self.arView
+         vc.cameraItems = self.sceneCameraItems
 
-        vc.evaluateTimeline = { [weak self] t in
-            self?.evaluateTimeline(at: t)
-        }
+         vc.evaluateTimeline = { [weak self] t in
+             self?.evaluateTimeline(at: t)
+         }
 
-        vc.captureFrameAsync = { [weak self] item, completion in
-            guard let self = self else { completion(nil); return }
-            self.captureFrameFromCamera(item, completion: completion)
-        }
+         vc.captureFrameAsync = { [weak self] item, completion in
+             guard let self = self else { completion(nil); return }
+             self.captureFrameFromCamera(item, completion: completion)
+         }
+         
+         // ISSUE 2: Set prepareForCapture closure to hide gizmos, paths, and camera lens before capture
+         vc.prepareForCapture = { [weak self] item in
+             guard let self = self else { return }
+             if let item = item {
+                 self.setActiveCamera(item.camera)
+             } else {
+                 self.activateEditorCamera()
+             }
+         }
 
-        navigationController?.pushViewController(vc, animated: true)
-    }
+         navigationController?.pushViewController(vc, animated: true)
+     }
 }

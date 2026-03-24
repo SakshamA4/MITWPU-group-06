@@ -57,6 +57,7 @@ final class ShotPlayerViewController: UIViewController {
     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
                              @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
+    var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
     private var isPlaying        = false
     private var snapshotInFlight: UIImage?
@@ -66,6 +67,13 @@ final class ShotPlayerViewController: UIViewController {
     private var currentTime: Float = 0
     private var lastSnapshotTime: CFTimeInterval = 0
     private var currentShot: Shot { shots[currentIndex] }
+    
+    // ISSUE 1: Snapshot cache keyed by camera name
+    private var snapshotCache: [String: UIImage] = [:]
+    
+    // ISSUE 3: Double-buffer rendering
+    private var frameBuffer: [UIImage?] = [nil, nil]  // two slots
+    private var displaySlot: Int = 0  // which slot is being displayed
 
     private var is13inch: Bool {
         let s = UIScreen.main.bounds
@@ -260,6 +268,10 @@ final class ShotPlayerViewController: UIViewController {
         super.viewWillDisappear(animated)
         stopPlayback(); evaluateTimeline?(0)
         frameImageView.image = nil; snapshotInFlight = nil
+        // ISSUE 1: Clear cache to release memory
+        snapshotCache.removeAll()
+        // ISSUE 2: Clear prepareForCapture to release closure references
+        prepareForCapture = nil
     }
 
     override func viewWillTransition(to size: CGSize,
@@ -511,6 +523,22 @@ final class ShotPlayerViewController: UIViewController {
                 at: IndexPath(item: currentIndex, section: 0),
                 at: .centeredHorizontally, animated: true)
         }
+        
+        // ISSUE 1: Populate cache from previewImage for all cameras at sync time
+        for item in cameraItems {
+            if let previewImg = item.previewImage {
+                snapshotCache[item.cameraRoot.name] = previewImg
+            }
+        }
+        
+        // ISSUE 1: Try to show cached snapshot immediately if available
+        let camItem = cameraItem(for: shot)
+        if let cachedImg = snapshotCache[camItem?.cameraRoot.name ?? ""] {
+            frameImageView.image = cachedImg
+            framePlaceholder.isHidden = true
+            loadingSpinner.stopAnimating()
+        }
+        
         captureFrame(at: shot.startTime, force: true)
     }
 
@@ -525,6 +553,7 @@ final class ShotPlayerViewController: UIViewController {
     private func captureFrame(at masterTime: Float, force: Bool = false) {
         evaluateTimeline?(masterTime)
 
+        // Display any buffered frame from the previous slot
         if let img = snapshotInFlight {
             frameImageView.image      = img
             framePlaceholder.isHidden = true
@@ -542,6 +571,9 @@ final class ShotPlayerViewController: UIViewController {
 
         let camItem = cameraItem(for: currentShot)
         snapshotPending = true
+        
+        // ISSUE 2: Call prepareForCapture before capturing to hide gizmos, etc.
+        prepareForCapture?(camItem)
 
         let doCapture: (@escaping (UIImage?) -> Void) -> Void
         if let capture = captureFrameAsync {
@@ -557,7 +589,12 @@ final class ShotPlayerViewController: UIViewController {
         doCapture { [weak self] img in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let img = img { self.snapshotInFlight = img }
+                if let img = img {
+                    self.snapshotInFlight = img
+                    // ISSUE 1: Update cache with freshest image
+                    let camName = camItem?.cameraRoot.name ?? ""
+                    self.snapshotCache[camName] = img
+                }
                 self.snapshotPending = false
             }
         }
@@ -633,6 +670,8 @@ final class ShotPlayerViewController: UIViewController {
         scrubStartLbl.text  = fmt(currentTime)
         hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
         if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
+        // ISSUE 3: Cancel in-flight capture by setting snapshotPending = false before force capture
+        snapshotPending = false
         captureFrame(at: currentShot.startTime + currentTime, force: true)
     }
 
@@ -810,6 +849,9 @@ final class ShotPlayerViewController: UIViewController {
         let masterTime = shot.startTime + Float(index) / Float(fps)
         evaluateTimeline?(masterTime)
         let camItem = cameraItem(for: shot)
+        // ISSUE 2: Call prepareForCapture before each frame capture in export path
+        prepareForCapture?(camItem)
+        
         let doCapture: (@escaping (UIImage?) -> Void) -> Void
         if let capture = captureFrameAsync { doCapture = { cb in capture(camItem, cb) } }
         else { doCapture = { [weak self] cb in

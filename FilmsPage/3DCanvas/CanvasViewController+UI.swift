@@ -5,6 +5,15 @@ import UIKit
 import ARKit
 
 extension CanvasViewController {
+    
+    // ISSUE 5: Adaptive layout properties
+    var isLargeIPad: Bool {
+        max(UIScreen.main.bounds.width, UIScreen.main.bounds.height) >= 1024
+    }
+    
+    var layoutScale: CGFloat {
+        isLargeIPad ? 1.0 : 0.88
+    }
 
     func setupTopControlsUI() {
         // 1. Add Breakdown button
@@ -682,19 +691,34 @@ extension CanvasViewController {
         cameraPanel.addSubview(cameraCollectionView)
 
         // Panel constraints — slides in/out from the right edge.
-        // trailingOffset = -8 → fully visible; trailingOffset = +panelWidth → fully off-screen right.
-        let panelWidth: CGFloat = 200
-        let panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
+        // ISSUE 4 & 5: Adaptive sizing based on device
+        // On 13-inch iPad: panel width = 200pt, cell height = panelWidth * 0.75, max panel height = min(availableHeight * 0.55, 420)
+        // On 11-inch iPad: panel width = 176pt, cell height = panelWidth * 0.75, max panel height = min(availableHeight * 0.55, 340)
+        let isLarge = isLargeIPad
+        let panelWidth: CGFloat = isLarge ? 200 : 176
+        let availableHeight = view.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom - topControlsHeight
+        let maxPanelHeight = min(availableHeight * 0.55, isLarge ? 420 : 340)
+        let cellHeight = panelWidth * 0.75
+        
+        // Update column width in collection view layout
+        if let layout = cameraCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.itemSize = CGSize(width: panelWidth - 16, height: cellHeight)
+        }
+        
+        panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.trailingAnchor,
             constant: panelWidth  // start fully off-screen (collapsed)
         )
-        panelTrailingConstraint.identifier = "panelTrailing"
+        panelTrailingConstraint?.identifier = "panelTrailing"
+        
+        panelWidthConstraint = cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth)
+        panelHeightConstraint = cameraPanel.heightAnchor.constraint(equalToConstant: maxPanelHeight)
 
         NSLayoutConstraint.activate([
-            panelTrailingConstraint,
+            panelTrailingConstraint!,
             cameraPanel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth),
-            cameraPanel.heightAnchor.constraint(equalToConstant: 520),
+            panelWidthConstraint!,
+            panelHeightConstraint!,
 
             cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
             cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
@@ -718,6 +742,7 @@ extension CanvasViewController {
         pullTab.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
         pullTab.alpha = 0.0  // hidden until first camera is added
         view.addSubview(pullTab)
+
 
         NSLayoutConstraint.activate([
             pullTab.trailingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),

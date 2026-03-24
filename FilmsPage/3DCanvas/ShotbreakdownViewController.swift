@@ -79,14 +79,15 @@ class ShotBreakdownViewController: UIViewController {
     private let sepColor   = UIColor(white: 1, alpha: 0.06)
     private let accentRed  = UIColor(red: 0.694, green: 0.125, blue: 0.224, alpha: 1) // #B12038
 
-    // MARK: - Public API
-    var sceneName: String  = "Scene"
-    var timeline: Timeline = Timeline()
-    var cameraNames: [String] = []
-    weak var arView: ARView?
-    var evaluateTimeline: ((Float) -> Void)?
-    var cameraItems: [CanvasViewController.SceneCameraItem] = []
-    var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
+     // MARK: - Public API
+     var sceneName: String  = "Scene"
+     var timeline: Timeline = Timeline()
+     var cameraNames: [String] = []
+     weak var arView: ARView?
+     var evaluateTimeline: ((Float) -> Void)?
+     var cameraItems: [CanvasViewController.SceneCameraItem] = []
+     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
+     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
     // MARK: - State
     private var shots: [Shot] = []

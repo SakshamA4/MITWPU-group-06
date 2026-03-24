@@ -81,12 +81,3 @@ class CameraPreviewCell: UICollectionViewCell {
 
     required init?(coder: NSCoder) { fatalError() }
 }
-
-extension Entity {
-    func forEachDescendant(_ body: (Entity) -> Void) {
-        body(self)
-        for child in children {
-            child.forEachDescendant(body)
-        }
-    }
-}
