@@ -37,6 +37,7 @@ class SceneState: ObservableObject {
 enum AnimationType: String, Codable {
     case move
     case rotate
+    case walk
 }
 enum EasingType: String, Codable {
     case linear
@@ -566,6 +567,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Animation Fix helpers
     var lastUndoTime: TimeInterval = 0
     var pathRebuildFrameCount: Int = 0
+    var activeWalkControllers: [String: AnimationPlaybackController] = [:]
 
     // MARK: - Editor Mode
     var editorMode: EditorMode = .edit
@@ -788,9 +790,18 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // 4. Add to Scene
                 if let anchor = arView.scene.findEntity(named: "MainAnchor") {
                     anchor.addChild(entity)
+                    // Stop Mixamo's baked auto-animation on spawn.
+                    // Walk clips start it explicitly via applyWalkToEntity.
+                    if !entity.availableAnimations.isEmpty {
+                        let ctrl = entity.playAnimation(
+                            entity.availableAnimations[0].repeat(count: 1),
+                            transitionDuration: 0,
+                            startsPaused: true
+                        )
+                        ctrl.pause()
+                    }
                     self.refreshSidebarContent()
-                }
-            } catch {
+                }            } catch {
                 print("Failed to load \(item.modelFileName): \(error)")
             }
         }
