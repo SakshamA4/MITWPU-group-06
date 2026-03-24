@@ -275,6 +275,9 @@ extension CanvasViewController {
     // MARK: - showGizmo
     // ─────────────────────────────────────────────────────────────────────────
     func showGizmo(at entity: Entity) {
+        // Do not show gizmos when viewing through a camera
+        guard activeCamera === editorCamera else { return }
+        
         guard let anchor = arView.scene.findEntity(named: "MainAnchor"),
               let gizmo  = gizmoRoot else { return }
 
@@ -503,6 +506,13 @@ extension CanvasViewController {
     // MARK: - updateGizmoMode
     // ─────────────────────────────────────────────────────────────────────────
     func updateGizmoMode() {
+        // Do not show gizmos when viewing through a camera
+        guard activeCamera === editorCamera else {
+            hideGizmo()
+            hideRotationGizmo()
+            return
+        }
+        
         guard let selected = selectedEntity else {
             hideRotationGizmo()
             hideGizmo()
