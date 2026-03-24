@@ -116,9 +116,9 @@ enum ToolType: CaseIterable {
 //                    modelFileName: "sky_night"
 //                ),
                 SpawnItem(
-                    title: "Real Clouds",
-                    imageName: "sky_image_1",
-                    modelFileName: "sky_image_1"
+                    title: "Blue Sky",
+                    imageName: "Blue_sky",
+                    modelFileName: "Blue_sky"
                 ),
                 SpawnItem(
                     title: "Starry Night",
