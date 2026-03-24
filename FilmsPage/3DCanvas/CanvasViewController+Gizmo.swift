@@ -328,11 +328,21 @@ extension CanvasViewController {
     // MARK: - updateGizmoPosition  (called every frame while dragging)
     // ─────────────────────────────────────────────────────────────────────────
     func updateGizmoPosition() {
-        guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
+        guard let gizmo = gizmoRoot else { return }
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+
+        // FIX: When dragging a path handle, selectedEntity is nil (cleared on tap).
+        // Use activeHandleEntity as the tracking target so the gizmo follows the
+        // sphere handle during drag — without this the gizmo freezes at its spawn
+        // position and the second gizmo hit-test misses (appears as "one axis only").
+        let trackEntity: Entity? = activeHandleEntity ?? selectedEntity
+        guard let entity = trackEntity else { return }
+
         let entityPos  = entity.position(relativeTo: anchor)
         let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
-        gizmo.position = SIMD3<Float>(entityPos.x, boundsMinY, entityPos.z)
+        // For handles (small spheres) place gizmo at the handle centre, not bounds bottom
+        let gizmoY     = activeHandleEntity != nil ? entityPos.y : boundsMinY
+        gizmo.position = SIMD3<Float>(entityPos.x, gizmoY, entityPos.z)
         let entityWorldPos = entity.position(relativeTo: nil)
         let camWorldPos    = activeCamera.position(relativeTo: nil)
         let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
@@ -359,17 +369,54 @@ extension CanvasViewController {
 
         hideDropShadow()
 
-        let worldPos  = entity.position(relativeTo: nil)
-        let baseY     = entity.visualBounds(relativeTo: nil).min.y  // same as gizmo position
+        let worldPos = entity.position(relativeTo: nil)
+        // For small entities (path handles, radius ~0.035m) visualBounds.min.y ≈
+        // worldPos.y - 0.035 which can fail the guard below. Use worldPos.y directly
+        // for small entities; bounding-box bottom for normal scene objects.
+        let bounds       = entity.visualBounds(relativeTo: nil)
+        let isSmall      = bounds.extents.y < 0.15
+        let baseY: Float = isSmall ? worldPos.y : bounds.min.y
         let groundY: Float = 0.0
 
-        // Only draw when the gizmo base is meaningfully above the ground plane
         guard baseY > groundY + 0.02 else { return }
 
         let lineHeight = baseY - groundY
+        let lineMat    = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.75))
+        let circleMat  = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
 
-        let lineMat   = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.75))
-        let circleMat = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
+        let line = ModelEntity(
+            mesh:      MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
+            materials: [lineMat]
+        )
+        line.position = SIMD3<Float>(worldPos.x, groundY + lineHeight * 0.5, worldPos.z)
+        line.name     = "ShadowLine"
+        line.components.set(DropShadowComponent())
+        anchor.addChild(line)
+
+        let circle = ModelEntity(
+            mesh:      MeshResource.generateCylinder(height: 0.006, radius: 0.07),
+            materials: [circleMat]
+        )
+        circle.position = SIMD3<Float>(worldPos.x, groundY + 0.003, worldPos.z)
+        circle.name     = "ShadowCircle"
+        circle.components.set(DropShadowComponent())
+        anchor.addChild(circle)
+    }
+
+    /// Overload that takes an explicit world position — used during handle drags
+    /// where reading target.position(relativeTo:nil) may return a stale value.
+    func updateDropShadow(worldPos: SIMD3<Float>) {
+        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+
+        hideDropShadow()
+
+        let baseY:   Float = worldPos.y
+        let groundY: Float = 0.0
+        guard baseY > groundY + 0.02 else { return }
+
+        let lineHeight = baseY - groundY
+        let lineMat    = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.75))
+        let circleMat  = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
 
         let line = ModelEntity(
             mesh:      MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
@@ -750,11 +797,15 @@ extension CanvasViewController {
         let camPos = activeCamera.position(relativeTo: nil)
 
         // ── Move gizmo ────────────────────────────────────────────────────────
-        if let gizmo = gizmoRoot, gizmo.isEnabled,
-           let entity = selectedEntity {
-            let camToEntity = simd_distance(camPos, entity.position(relativeTo: nil))
-            let screenScale = max(0.15, min(2.5, camToEntity * 0.15))
-            gizmo.scale     = SIMD3<Float>(repeating: screenScale)
+        // FIX: also track activeHandleEntity so the gizmo rescales correctly
+        // while dragging a path handle (selectedEntity is nil in that state).
+        if let gizmo = gizmoRoot, gizmo.isEnabled {
+            let trackEntity: Entity? = activeHandleEntity ?? selectedEntity
+            if let entity = trackEntity {
+                let camToEntity = simd_distance(camPos, entity.position(relativeTo: nil))
+                let screenScale = max(0.15, min(2.5, camToEntity * 0.15))
+                gizmo.scale     = SIMD3<Float>(repeating: screenScale)
+            }
         }
 
         // ── Rotation rings ────────────────────────────────────────────────────

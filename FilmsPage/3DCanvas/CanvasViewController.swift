@@ -1195,70 +1195,101 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 return
             }
 
-            // Move gizmo
-            let translation     = gesture.translation(in: arView)
+            // Move gizmo — per-frame delta, no axis freeze
+            //
+            // FIX 1 (axis lock): switched from absolute-from-startPos math to per-frame
+            // delta using lastPanLocation. Both arrowY and planeXZ now accumulate freely
+            // within the same gesture — no more "one direction only" per grab.
+            //
+            // FIX 2 (handle disconnect): when moving a path handle, pass the entity's
+            // true world-space position into updateMotionPathHandle. Bezier path coords
+            // are always world-space, so the visual tube root (at path.start) stays
+            // locked to the sphere handle throughout the drag.
+
             let isMovingHandle  = activeHandleEntity != nil
             let targetEntity: Entity? = isMovingHandle ? activeHandleEntity : selectedEntity
             guard let target = targetEntity else { return }
 
-            let dist        = simd_distance(target.position(relativeTo: nil), activeCamera.position)
-            let sensitivity = max(0.001, 0.001 * dist)
-            var newPos      = startPos
+            // Per-frame screen delta (finger movement since the last event)
+            let dx2D = Float(location.x - lastPanLocation.x)
+            let dy2D = Float(location.y - lastPanLocation.y)
+
+            let worldOrigin = target.position(relativeTo: nil)
+            let sensitivityAxis: SIMD3<Float> = (activeGizmoPart == .arrowY) ? [0, 1, 0] : [1, 0, 0]
+            var pixelsPerMeter: Float = 200
+            if let p0 = arView.project(worldOrigin),
+               let p1 = arView.project(worldOrigin + sensitivityAxis) {
+                let screenLen = simd_length(SIMD2<Float>(Float(p1.x - p0.x),
+                                                          Float(p1.y - p0.y)))
+                if screenLen > 1 { pixelsPerMeter = screenLen }
+            }
+            let metersPerPixel = 1.0 / pixelsPerMeter
+
+            var delta3D = SIMD3<Float>.zero
 
             if activeGizmoPart == .arrowY {
-                newPos.y = startPos.y - (Float(translation.y) * sensitivity)
+                // Screen Y up → world Y up (UIKit Y is inverted)
+                delta3D.y = -dy2D * metersPerPixel
             } else if activeGizmoPart == .planeXZ {
-                // Derive stable right/forward from camera yaw (fixed for this drag).
                 let flatRight   = SIMD3<Float>( cos(yaw), 0, -sin(yaw))
                 let flatForward = SIMD3<Float>(-sin(yaw), 0, -cos(yaw))
-
-                // Match sensitivity to actual screen-to-world scale by projecting
-                // two world points and measuring their pixel distance — same approach
-                // that makes the arrowY feel 1:1.
-                let worldOrigin = target.position(relativeTo: nil)
-                let xzSensitivity: Float
-                if let p0 = arView.project(worldOrigin),
-                   let p1 = arView.project(worldOrigin + flatRight) {
-                    let pxPerMeter = simd_length(SIMD2<Float>(
-                        Float(p1.x - p0.x), Float(p1.y - p0.y)))
-                    xzSensitivity = pxPerMeter > 1 ? 1.0 / pxPerMeter : sensitivity
-                } else {
-                    xzSensitivity = sensitivity
-                }
-
-                let dx = Float(translation.x) * xzSensitivity
-                let dy = Float(translation.y) * xzSensitivity
-                let movement = (flatRight * dx) - (flatForward * dy)
-                newPos.x = startPos.x + movement.x
-                newPos.z = startPos.z + movement.z
+                let dxW = dx2D * metersPerPixel
+                let dyW = dy2D * metersPerPixel
+                let movement = (flatRight * dxW) - (flatForward * dyW)
+                delta3D.x = movement.x
+                delta3D.z = movement.z
             }
 
+            // Advance the per-frame baseline NOW so all branches below can return/break safely
+            lastPanLocation = location
+
+            // New world position of the target
+            let newWorldPos = worldOrigin + delta3D
+
             if isMovingHandle {
+                target.setPosition(newWorldPos, relativeTo: nil)
+
+                // Reposition gizmo using newWorldPos directly — do NOT read back
+                // target.position() here because RealityKit may not propagate the
+                // transform in the same frame, returning the stale old position.
                 if let anchor = mainAnchor {
-                    target.setPosition(newPos, relativeTo: anchor)
-                    gizmoRoot?.position = target.position(relativeTo: anchor)
+                    gizmoRoot?.position = anchor.convert(position: newWorldPos, from: nil)
                 }
+
+                // Update drop shadow live so it tracks the handle during drag.
+                updateDropShadow(worldPos: newWorldPos)
+
+                // Increment frame counter HERE so the rebuildArcLengthTable throttle
+                // guards (% 4 == 0) inside updateMotionPathHandle fire on schedule.
+                // Previously the counter only incremented inside updatePathMeshThrottled,
+                // AFTER the guards had already evaluated — so they always saw 0 and
+                // rebuilt every single frame, causing lag.
+                pathRebuildFrameCount += 1
+
+                // Pass newWorldPos directly — same reason as gizmo reposition above.
                 if let handleComp = target.components[MotionPathHandleComponent.self],
-                   let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleComp.clipID }),
-                   var path = timeline.clips[clipIndex].motionPath,
-                   let visual = activeMotionPaths[handleComp.clipID] {
+                   let clipIndex  = timeline.clips.firstIndex(where: { $0.id == handleComp.clipID }),
+                   var path       = timeline.clips[clipIndex].motionPath,
+                   let visual     = activeMotionPaths[handleComp.clipID] {
                     updateMotionPathHandle(
-                        target: target, newPos: newPos,
-                        clipIndex: clipIndex, path: &path, visual: visual
+                        target:    target,
+                        newPos:    newWorldPos,
+                        clipIndex: clipIndex,
+                        path:      &path,
+                        visual:    visual
                     )
                 }
                 // Motion path handle drag is handled above.
                 // Rotation arc handles use direct radial drag (see handlePan .began arc block)
                 // and never reach this isMovingHandle path.
             } else {
-                // Capture position BEFORE moving so we can compute the true per-frame delta
-                let prevPos = target.position
-                let clampedPos = clampPositionAvoidingOverlap(entity: target, proposedPosition: newPos)
-                target.position = clampedPos
+                // Capture world position BEFORE moving so we can compute the true per-frame delta
+                let prevWorldPos = target.position(relativeTo: nil)
+                target.setPosition(newWorldPos, relativeTo: nil)
                 updateGizmoPosition()
 
                 let entityName = target.name
-                let frameDelta = newPos - prevPos
+                let frameDelta = newWorldPos - prevWorldPos
                 guard simd_length(frameDelta) > 0.00001 else { break }
 
                 // Shift all motion paths by the per-frame delta
@@ -1311,9 +1342,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             activeGizmoPart      = .none
             activeRotationAxis   = nil
             isDraggingObject     = false
-            activeHandleEntity   = nil
-            cachedSiblingBounds  = []   // release cached bounds
-            pathRebuildFrameCount = 0   // reset throttle counter between drags
+            // activeHandleEntity intentionally NOT cleared here — clearing it causes
+            // the next gizmo-part drag to find targetEntity == nil and silently
+            // camera-pan instead of moving the handle. Cleared only in handleTap.
+            cachedSiblingBounds   = []
+            pathRebuildFrameCount = 0
             resetGizmoColors()
 
         default:
@@ -1479,19 +1512,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - Long press (path / arc context menus)
 
-    @objc func handlePathLongPress(_ gesture: UILongPressGestureRecognizer) {
+    @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
         guard gesture.state == .began else { return }
         let location = gesture.location(in: arView)
         guard let hit = arView.entity(at: location) else { return }
 
-        // Arc tip
+        // ── 1. Rotation arc handle (component on the hit entity) ──────────────
         if let arcComp = hit.components[RotationArcComponent.self],
            let arcRoot = activeRotationArcs[arcComp.clipID]?.root {
             showRotationArcContextMenu(clipID: arcComp.clipID, arcRoot: arcRoot)
             return
         }
 
-        // Arc curve / shaft — walk up to arcRoot
+        // ── 2. Rotation arc curve / shaft — walk up to the arc root ──────────
         var walkArc: Entity? = hit
         while let e = walkArc {
             if e.name.hasPrefix("RotationArc_") {
@@ -1504,20 +1537,41 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             walkArc = e.parent
         }
 
-        // Motion path handle
+        // ── 3. Motion path handle ─────────────────────────────────────────────
         if let handle = hit.components[MotionPathHandleComponent.self],
            let pathRoot = hit.parent {
             showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
             return
         }
 
-        // Motion path curve
+        // ── 4. Motion path curve ──────────────────────────────────────────────
         if hit.name == "MotionPath",
            let pathRoot = hit.parent,
            let handle   = pathRoot.children
                .compactMap({ $0.components[MotionPathHandleComponent.self] }).first {
             showPathContextMenu(clipID: handle.clipID, pathRoot: pathRoot)
+            return
         }
+
+        // ── 5. Regular entity — show action menu ──────────────────────────────
+        // Walk up to the MainAnchor child (the entity root), skipping any
+        // gizmo, path, or arc entities that slipped through the checks above.
+        var root: Entity = hit
+        while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+
+        guard !root.name.contains("Gizmo"),
+              !root.name.hasPrefix("PathRoot_"),
+              !root.name.hasPrefix("RotationArc_")
+        else { return }
+
+        // Select the entity if it isn't already, then show the menu.
+        if selectedEntity !== root {
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity = root
+            setEntityTransparency(root, alpha: 0.9)
+            updateGizmoMode()
+        }
+        showActionMenu(at: location)
     }
 }
 

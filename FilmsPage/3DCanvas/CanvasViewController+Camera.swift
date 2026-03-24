@@ -98,6 +98,9 @@ extension CanvasViewController {
         
         // Always look at the current pivot point
         camera.look(at: cameraTarget, from: camera.position, relativeTo: nil)
+
+        // Rescale gizmos so they stay a constant screen size as the camera moves
+        updateGizmoScales()
     }
 
     // MARK: - Camera Pivot: Orbit Around Selected Entity

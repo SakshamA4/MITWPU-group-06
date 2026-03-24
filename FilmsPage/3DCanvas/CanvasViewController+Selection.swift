@@ -99,6 +99,9 @@ extension CanvasViewController {
         self.selectedEntity = entity
         self.refreshSidebarContent()
         
+        // Focus the camera on the selected entity so it's easy to find on canvas
+        frameEntityAnimated(entity)
+        
         if let screenPosition = arView.project(entity.position(relativeTo: nil))
         {
             

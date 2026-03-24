@@ -62,8 +62,8 @@ extension CanvasViewController {
         let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
         arView.addGestureRecognizer(rotation)
 
-        // ── 7. Long press — path/arc context menu ─────────────────────────────
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handlePathLongPress(_:)))
+        // ── 7. Long press — entity action menu OR path/arc context menu ──────
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         longPress.minimumPressDuration = 0.45
         longPress.cancelsTouchesInView = false
         arView.addGestureRecognizer(longPress)
@@ -174,8 +174,8 @@ extension CanvasViewController {
             activeHandleEntity = nil
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
-            showActionMenu(at: location)
-            
+            // Menu is now triggered by long press, not tap
+
             // commented this to stop auto animation playing
 //            if let anim = root.availableAnimations.first {
 //                root.playAnimation(anim.repeat(count: 1))
