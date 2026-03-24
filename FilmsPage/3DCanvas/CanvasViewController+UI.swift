@@ -568,17 +568,17 @@ extension CanvasViewController {
         let arButton = UIButton(type: .system)
         let arIconCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
         arButton.setImage(UIImage(systemName: "arkit", withConfiguration: arIconCfg), for: .normal)
-        arButton.tintColor = .systemGreen
-        arButton.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        arButton.tintColor = .systemGray
+        arButton.backgroundColor = UIColor.systemBackground
         arButton.layer.cornerRadius = 16
         arButton.clipsToBounds = true
         arButton.translatesAutoresizingMaskIntoConstraints = false
         self.arModeButton = arButton
-        arButton.addAction(UIAction { [weak self] _ in
-            guard let self = self else { return }
-            self.isARModeActive.toggle()
-            self.toggleARMode(isOn: self.isARModeActive)
-        }, for: .touchUpInside)
+//        arButton.addAction(UIAction { [weak self] _ in
+//            guard let self = self else { return }
+//            self.isARModeActive.toggle()
+//            self.toggleARMode(isOn: self.isARModeActive)
+//        }, for: .touchUpInside)
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
@@ -629,8 +629,8 @@ extension CanvasViewController {
                 constant: -16
             ),
             viewModeControl.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -20
+                equalTo: view.bottomAnchor,
+                constant: -16
             ),
             viewModeControl.heightAnchor.constraint(equalToConstant: 32),
             viewModeControl.widthAnchor.constraint(equalToConstant: 120),
@@ -647,8 +647,8 @@ extension CanvasViewController {
                 constant: 16
             ),
             rotateBtn.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -20
+                equalTo: view.bottomAnchor,
+                constant: -16
             ),
             rotateBtn.widthAnchor.constraint(equalToConstant: 40),
             rotateBtn.heightAnchor.constraint(equalToConstant: 40),
@@ -916,3 +916,4 @@ extension CanvasViewController: UIColorPickerViewControllerDelegate {
 extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     // Implementations are in CanvasViewController+Camera.swift
 }
+
