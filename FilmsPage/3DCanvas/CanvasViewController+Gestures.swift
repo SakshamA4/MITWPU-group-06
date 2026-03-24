@@ -258,7 +258,7 @@ extension CanvasViewController {
         let showColorOption = isWall || isGround
 
         let menu = EntityActionMenu()
-        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked)
+        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
         NSLayoutConstraint.activate([
