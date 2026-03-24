@@ -34,12 +34,21 @@ extension CanvasViewController {
     
     func applySky(type: String) {
 
-            // 1. Remove existing sky
+            // 1. Remove existing sky (check both naming conventions for backward compatibility)
 
             if let existingSky = arView.scene.findEntity(named: "ProceduralSky") {
 
                 existingSky.removeFromParent()
 
+            }
+            
+            // Also remove any ProceduralSky_<type> entities
+            if let anchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
+                for child in anchor.children {
+                    if child.name.hasPrefix("ProceduralSky_") {
+                        child.removeFromParent()
+                    }
+                }
             }
 
             
@@ -88,7 +97,8 @@ extension CanvasViewController {
 
             let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
 
-            skyEntity.name = "ProceduralSky"
+            // FIX: Name should include type for proper saving/loading
+            skyEntity.name = "ProceduralSky_\(type)"
 
             
 
