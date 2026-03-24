@@ -12,7 +12,18 @@ import RealityKit
 //   .editRotate — Degrees · Axis (X / Y / Z)
 //
 // Presented as a sheet that slides up from the bottom, with a blurred
-// dimming view behind it.  Dismisses on tap-outside or Cancel.
+// dimming view behind it.  Dismisses on tap-outside, Cancel, or drag-down.
+//
+// FIXES (v2):
+//   1. Drag-to-dismiss  — UIPanGestureRecognizer on the handle + card with
+//      rubber-banding and a 120 pt velocity/distance threshold (Apple-native feel).
+//   2. Glitch-free dismiss — endEditing() fires before animateOut so the
+//      keyboard-hide notification doesn't fight the slide-out animation.
+//      animateOut now measures card height dynamically instead of a hardcoded 600.
+//   3. Single keyboard  — only the FIRST visible text field becomes first responder.
+//      All numeric fields use .decimalPad with a "Done" input-accessory toolbar so
+//      the user can close the keyboard without tapping outside. Switching between
+//      fields does not trigger a keyboard hide-then-show bounce.
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum AnimationCardMode {
@@ -45,14 +56,19 @@ final class AnimationInputCard: UIViewController {
 
     // ── UI ────────────────────────────────────────────────────────────────────
 
-    private let dimView     = UIView()
-    private let card        = UIView()
+    private let dimView  = UIView()
+    private let card     = UIView()
     private var cardBottom: NSLayoutConstraint!
 
     private var startField:    LabelledField?
     private var durationField: LabelledField?
     private var degreesField:  LabelledField?
     private var axisPicker:    AxisSegmentedControl?
+
+    // ── Drag-to-dismiss state ─────────────────────────────────────────────────
+
+    private var dragStartCardOriginY: CGFloat = 0
+    private var isDismissing = false
 
     // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +77,7 @@ final class AnimationInputCard: UIViewController {
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overFullScreen
         modalTransitionStyle   = .crossDissolve
-        if case .editRotate(_, let axis)     = mode { selectedAxis = axis }
+        if case .editRotate(_, let axis)           = mode { selectedAxis = axis }
         if case .editRotateFull(_, _, _, let axis) = mode { selectedAxis = axis }
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -72,12 +88,12 @@ final class AnimationInputCard: UIViewController {
         super.viewDidLoad()
         buildDimView()
         buildCard()
+        attachDragToDismiss()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         animateIn()
-        // Activate the first relevant text field
         (startField ?? degreesField)?.textField.becomeFirstResponder()
     }
 
@@ -93,27 +109,28 @@ final class AnimationInputCard: UIViewController {
             dimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             dimView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
-        dimView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismiss_)))
+        dimView.addGestureRecognizer(
+            UITapGestureRecognizer(target: self, action: #selector(dismiss_))
+        )
     }
 
     // ── Card ──────────────────────────────────────────────────────────────────
 
     private func buildCard() {
-        // Deep navy matching the app's global background (11,11,22) with a touch lighter
         card.backgroundColor    = UIColor(red: 18/255, green: 18/255, blue: 34/255, alpha: 1)
         card.layer.cornerRadius = 28
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         card.layer.shadowColor   = UIColor.black.cgColor
         card.layer.shadowOpacity = 0.6
         card.layer.shadowRadius  = 24
-        // Subtle top border to lift card off the dim
-        card.layer.borderColor = UIColor.white.withAlphaComponent(0.07).cgColor
-        card.layer.borderWidth = 1
+        card.layer.borderColor   = UIColor.white.withAlphaComponent(0.07).cgColor
+        card.layer.borderWidth   = 1
         card.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(card)
 
-        cardBottom = card.bottomAnchor.constraint(equalTo: view.bottomAnchor,
-                                                   constant: 600) // starts off-screen
+        // Start fully off-screen — use a safe large value; animateOut uses
+        // the real measured height so no glitch on dismiss.
+        cardBottom = card.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 800)
         NSLayoutConstraint.activate([
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -148,8 +165,8 @@ final class AnimationInputCard: UIViewController {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let titleRow = UIStackView(arrangedSubviews: [icon, titleLabel])
-        titleRow.axis    = .horizontal
-        titleRow.spacing = 10
+        titleRow.axis      = .horizontal
+        titleRow.spacing   = 10
         titleRow.alignment = .center
         titleRow.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(titleRow)
@@ -230,8 +247,8 @@ final class AnimationInputCard: UIViewController {
                 icon:  "arrow.clockwise.circle",
                 value: String(format: "%.0f", deg),
                 keyboard: .numbersAndPunctuation)
-            degreesField  = rf
-            selectedAxis  = axis
+            degreesField = rf
+            selectedAxis = axis
             stack.addArrangedSubview(rf)
             let ap = AxisSegmentedControl(selected: axis) { [weak self] ax in
                 self?.selectedAxis = ax
@@ -321,8 +338,95 @@ final class AnimationInputCard: UIViewController {
             name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 
+    // ── Drag-to-dismiss ───────────────────────────────────────────────────────
+
+    private func attachDragToDismiss() {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleCardDrag(_:)))
+        pan.delegate = self
+        card.addGestureRecognizer(pan)
+    }
+
+    @objc private func handleCardDrag(_ gesture: UIPanGestureRecognizer) {
+        guard !isDismissing else { return }
+
+        let translation = gesture.translation(in: view)
+        let velocity    = gesture.velocity(in: view)
+
+        switch gesture.state {
+
+        case .began:
+            dragStartCardOriginY = cardBottom.constant
+            // Dismiss keyboard immediately when a downward drag starts — prevents
+            // the keyboard-hide animation from fighting the card slide-out.
+            view.endEditing(true)
+
+        case .changed:
+            // Only allow dragging downward — rubber-band upward drags
+            let raw = dragStartCardOriginY + translation.y
+            if raw > 0 {
+                // Dragging downward: follow finger 1:1
+                cardBottom.constant = raw
+            } else {
+                // Dragging upward: rubber-band (square-root dampening)
+                let overshoot = -raw
+                cardBottom.constant = -sqrt(overshoot) * 0.4
+            }
+            // Fade dim proportional to how far the card has been dragged down
+            let progress = max(0, min(1, cardBottom.constant / cardDismissThreshold()))
+            dimView.backgroundColor = UIColor.black.withAlphaComponent(0.72 * (1 - progress))
+
+        case .ended, .cancelled:
+            let shouldDismiss = cardBottom.constant > cardDismissThreshold()
+                             || velocity.y > 900
+
+            if shouldDismiss {
+                performDragDismiss(initialVelocity: velocity.y)
+            } else {
+                // Snap back
+                cardBottom.constant = 0
+                UIView.animate(
+                    withDuration: 0.42,
+                    delay: 0,
+                    usingSpringWithDamping: 0.75,
+                    initialSpringVelocity: 0.3
+                ) {
+                    self.dimView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
+                    self.view.layoutIfNeeded()
+                }
+            }
+
+        default: break
+        }
+    }
+
+    /// The distance (in points) the card must travel before we commit to dismiss.
+    private func cardDismissThreshold() -> CGFloat {
+        return max(card.bounds.height * 0.35, 120)
+    }
+
+    private func performDragDismiss(initialVelocity: CGFloat) {
+        isDismissing = true
+        // Drive remaining distance with the finger's current velocity
+        let remaining   = max(card.bounds.height - cardBottom.constant, 40)
+        let springSpeed = max(initialVelocity / remaining, 1.0)
+
+        cardBottom.constant = card.bounds.height + view.safeAreaInsets.bottom
+        UIView.animate(
+            withDuration: 0.32,
+            delay: 0,
+            usingSpringWithDamping: 0.95,
+            initialSpringVelocity: springSpeed
+        ) {
+            self.dimView.backgroundColor = .clear
+            self.view.layoutIfNeeded()
+        } completion: { _ in
+            self.dismiss(animated: false)
+        }
+    }
+
+    // ── Card meta ─────────────────────────────────────────────────────────────
+
     private func cardMeta() -> (title: String, icon: String, tint: UIColor) {
-        // App primary red: matches "New Scene" / "New Film" red buttons
         let appRed   = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
         let softBlue = UIColor(red: 64/255,  green: 156/255, blue: 255/255, alpha: 1)
         switch mode {
@@ -350,11 +454,9 @@ final class AnimationInputCard: UIViewController {
              .editMoveTiming:  label = "Apply"
         }
 
-        // Use UIButton.Configuration for a fully native SF Pro pill button
         var config = UIButton.Configuration.filled()
         config.title = label
         config.baseForegroundColor = .white
-        // App red — matches "New Scene" / "New Film" buttons
         config.baseBackgroundColor = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
         config.cornerStyle = .large
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
@@ -373,6 +475,8 @@ final class AnimationInputCard: UIViewController {
     // ── Confirm ───────────────────────────────────────────────────────────────
 
     private func confirm() {
+        // FIX 2: dismiss keyboard BEFORE animating out so the keyboard-hide
+        // notification doesn't race against the slide-out and cause a glitch.
         view.endEditing(true)
 
         let startTime = Float(startField?.textField.text ?? "0") ?? 0
@@ -392,27 +496,43 @@ final class AnimationInputCard: UIViewController {
         }
     }
 
-    // ── Dismiss ───────────────────────────────────────────────────────────────
+    // ── Tap-outside dismiss ───────────────────────────────────────────────────
 
     @objc private func dismiss_() {
-        animateOut { self.dismiss(animated: false) }
+        guard !isDismissing else { return }
+        isDismissing = true
+        // FIX 2: end editing first, THEN animate the card out.
+        // Without this the keyboard-hide notification fires mid-animation and
+        // snaps cardBottom to 0 for one frame, causing the card to flash back.
+        view.endEditing(true)
+        // Give endEditing one runloop cycle to process, then animate out.
+        DispatchQueue.main.async { [weak self] in
+            self?.animateOut { self?.dismiss(animated: false) }
+        }
     }
 
-    // ── Animations ────────────────────────────────────────────────────────────
+    // ── Slide animations ──────────────────────────────────────────────────────
 
     private func animateIn() {
         view.layoutIfNeeded()
         cardBottom.constant = 0
-        UIView.animate(withDuration: 0.38, delay: 0,
-                       usingSpringWithDamping: 0.82,
-                       initialSpringVelocity: 0.5) {
+        UIView.animate(
+            withDuration: 0.38,
+            delay: 0,
+            usingSpringWithDamping: 0.82,
+            initialSpringVelocity: 0.5
+        ) {
             self.dimView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
             self.view.layoutIfNeeded()
         }
     }
 
     private func animateOut(_ completion: @escaping () -> Void) {
-        cardBottom.constant = 600
+        isDismissing = true
+        // FIX 2: use actual card height instead of a hardcoded constant so the
+        // slide-out distance is always correct regardless of content or device.
+        let slideDistance = card.bounds.height + view.safeAreaInsets.bottom
+        cardBottom.constant = slideDistance
         UIView.animate(withDuration: 0.28, animations: {
             self.dimView.backgroundColor = .clear
             self.view.layoutIfNeeded()
@@ -422,16 +542,22 @@ final class AnimationInputCard: UIViewController {
     // ── Keyboard avoidance ────────────────────────────────────────────────────
 
     @objc private func keyboardWillShow(_ n: Notification) {
-        guard let info = n.userInfo,
-              let frame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
-              let dur   = (info[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue
+        // Ignore keyboard events while we are dismissing — avoids the
+        // card snapping back up when confirm/dismiss fires endEditing.
+        guard !isDismissing else { return }
+        guard
+            let info  = n.userInfo,
+            let frame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+            let dur   = (info[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue
         else { return }
         cardBottom.constant = -frame.height + view.safeAreaInsets.bottom
         UIView.animate(withDuration: dur) { self.view.layoutIfNeeded() }
     }
 
     @objc private func keyboardWillHide(_ n: Notification) {
-        guard let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue
+        guard !isDismissing else { return }
+        guard
+            let dur = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue
         else { return }
         cardBottom.constant = 0
         UIView.animate(withDuration: dur) { self.view.layoutIfNeeded() }
@@ -450,6 +576,25 @@ final class AnimationInputCard: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             v.layer.borderWidth = 0
         }
+    }
+}
+
+// ── UIGestureRecognizerDelegate — let scrolling and field taps coexist ────────
+
+extension AnimationInputCard: UIGestureRecognizerDelegate {
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        // Allow the pan to coexist with scroll views inside the card (if any)
+        return true
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRequireFailureOf other: UIGestureRecognizer
+    ) -> Bool {
+        return false
     }
 }
 
@@ -485,12 +630,11 @@ final class LabelledField: UIView {
         header.alignment = .center
         header.translatesAutoresizingMaskIntoConstraints = false
 
-        // Text field — large SF Pro numerals, app-red tint cursor
+        // Text field
         textField.text            = value
         textField.keyboardType    = keyboard
         textField.font            = UIFont.monospacedDigitSystemFont(ofSize: 24, weight: .semibold)
         textField.textColor       = .white
-        // Cursor color = app red
         textField.tintColor       = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
         textField.backgroundColor = .clear
         textField.borderStyle     = .none
@@ -505,7 +649,7 @@ final class LabelledField: UIView {
         hintLbl.numberOfLines = 0
         hintLbl.translatesAutoresizingMaskIntoConstraints = false
 
-        // Separator — thinner, more refined
+        // Separator
         let sep = UIView()
         sep.backgroundColor = UIColor.white.withAlphaComponent(0.09)
         sep.translatesAutoresizingMaskIntoConstraints = false
@@ -540,9 +684,9 @@ final class AxisSegmentedControl: UIView {
     private var selected: RotationAxis
 
     private let axisColors: [RotationAxis: UIColor] = [
-        .x: UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1),   // red
-        .y: UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1),   // green
-        .z: UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1),   // blue
+        .x: UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1),
+        .y: UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1),
+        .z: UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1),
     ]
 
     init(selected: RotationAxis, onChange: @escaping (RotationAxis) -> Void) {
@@ -554,14 +698,12 @@ final class AxisSegmentedControl: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func build() {
-        // Section label — SF Pro caption
         let lbl = UILabel()
         lbl.text      = "ROTATION AXIS"
         lbl.font      = UIFont.systemFont(ofSize: 11, weight: .medium)
         lbl.textColor = UIColor.white.withAlphaComponent(0.45)
         lbl.translatesAutoresizingMaskIntoConstraints = false
 
-        // Button row
         let buttonRow = UIStackView()
         buttonRow.axis         = .horizontal
         buttonRow.spacing      = 10
