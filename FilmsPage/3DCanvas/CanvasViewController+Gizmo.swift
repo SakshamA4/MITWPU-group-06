@@ -325,17 +325,29 @@ extension CanvasViewController {
     // MARK: - updateGizmoPosition  (called every frame while dragging)
     // ─────────────────────────────────────────────────────────────────────────
     func updateGizmoPosition() {
-        guard let entity = selectedEntity, let gizmo = gizmoRoot else { return }
+        guard let gizmo = gizmoRoot else { return }
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+
+        // FIX: When dragging a path handle, selectedEntity is nil (cleared on tap).
+        // Use activeHandleEntity as the tracking target so the gizmo follows the
+        // sphere handle during drag — without this the gizmo freezes at its spawn
+        // position and the second gizmo hit-test misses (appears as "one axis only").
+        let trackEntity: Entity? = activeHandleEntity ?? selectedEntity
+        guard let entity = trackEntity else { return }
+
         let entityPos  = entity.position(relativeTo: anchor)
         let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
-        gizmo.position = SIMD3<Float>(entityPos.x, boundsMinY, entityPos.z)
+        // For handles (small spheres) place gizmo at the handle centre, not bounds bottom
+        let gizmoY     = activeHandleEntity != nil ? entityPos.y : boundsMinY
+        gizmo.position = SIMD3<Float>(entityPos.x, gizmoY, entityPos.z)
         let entityWorldPos = entity.position(relativeTo: nil)
         let camWorldPos    = activeCamera.position(relativeTo: nil)
         let camToEntity    = simd_distance(camWorldPos, entityWorldPos)
         let screenScale    = max(0.15, min(2.5, camToEntity * 0.15))
         gizmo.scale = SIMD3<Float>(repeating: screenScale)
-        updateDropShadow(for: entity)
+        if activeHandleEntity == nil {
+            updateDropShadow(for: entity)
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -740,11 +752,15 @@ extension CanvasViewController {
         let camPos = activeCamera.position(relativeTo: nil)
 
         // ── Move gizmo ────────────────────────────────────────────────────────
-        if let gizmo = gizmoRoot, gizmo.isEnabled,
-           let entity = selectedEntity {
-            let camToEntity = simd_distance(camPos, entity.position(relativeTo: nil))
-            let screenScale = max(0.15, min(2.5, camToEntity * 0.15))
-            gizmo.scale     = SIMD3<Float>(repeating: screenScale)
+        // FIX: also track activeHandleEntity so the gizmo rescales correctly
+        // while dragging a path handle (selectedEntity is nil in that state).
+        if let gizmo = gizmoRoot, gizmo.isEnabled {
+            let trackEntity: Entity? = activeHandleEntity ?? selectedEntity
+            if let entity = trackEntity {
+                let camToEntity = simd_distance(camPos, entity.position(relativeTo: nil))
+                let screenScale = max(0.15, min(2.5, camToEntity * 0.15))
+                gizmo.scale     = SIMD3<Float>(repeating: screenScale)
+            }
         }
 
         // ── Rotation rings ────────────────────────────────────────────────────

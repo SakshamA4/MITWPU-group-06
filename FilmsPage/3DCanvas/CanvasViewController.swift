@@ -1163,69 +1163,101 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 return
             }
 
-            // Move gizmo
-            let translation     = gesture.translation(in: arView)
+            // Move gizmo — per-frame delta, no axis freeze
+            //
+            // FIX 1 (axis lock): switched from absolute-from-startPos math to per-frame
+            // delta using lastPanLocation. Both arrowY and planeXZ now accumulate freely
+            // within the same gesture — no more "one direction only" per grab.
+            //
+            // FIX 2 (handle disconnect): when moving a path handle, pass the entity's
+            // true world-space position into updateMotionPathHandle. Bezier path coords
+            // are always world-space, so the visual tube root (at path.start) stays
+            // locked to the sphere handle throughout the drag.
+
             let isMovingHandle  = activeHandleEntity != nil
             let targetEntity: Entity? = isMovingHandle ? activeHandleEntity : selectedEntity
             guard let target = targetEntity else { return }
 
-            let dist        = simd_distance(target.position(relativeTo: nil), activeCamera.position)
-            let sensitivity = max(0.001, 0.001 * dist)
-            var newPos      = startPos
+            // Per-frame screen delta (finger movement since the last event)
+            let dx2D = Float(location.x - lastPanLocation.x)
+            let dy2D = Float(location.y - lastPanLocation.y)
+
+            // Sensitivity: map 1 screen pixel → metres using the live camera projection.
+            // Use the world axis that matches the gizmo part being dragged so that
+            // arrowY (vertical) uses a world-Y reference vector, not world-X.
+            // Using the wrong axis gives badly mismatched sensitivity (typically makes
+            // arrowY feel stuck or jittery depending on camera pitch).
+            let worldOrigin = target.position(relativeTo: nil)
+            let sensitivityAxis: SIMD3<Float> = (activeGizmoPart == .arrowY) ? [0, 1, 0] : [1, 0, 0]
+            var pixelsPerMeter: Float = 200   // safe fallback
+            if let p0 = arView.project(worldOrigin),
+               let p1 = arView.project(worldOrigin + sensitivityAxis) {
+                let screenLen = simd_length(SIMD2<Float>(Float(p1.x - p0.x),
+                                                          Float(p1.y - p0.y)))
+                if screenLen > 1 { pixelsPerMeter = screenLen }
+            }
+            let metersPerPixel = 1.0 / pixelsPerMeter
+
+            var delta3D = SIMD3<Float>.zero
 
             if activeGizmoPart == .arrowY {
-                newPos.y = startPos.y - (Float(translation.y) * sensitivity)
+                // Screen Y up → world Y up (UIKit Y is inverted)
+                delta3D.y = -dy2D * metersPerPixel
             } else if activeGizmoPart == .planeXZ {
-                // Derive stable right/forward from camera yaw (fixed for this drag).
                 let flatRight   = SIMD3<Float>( cos(yaw), 0, -sin(yaw))
                 let flatForward = SIMD3<Float>(-sin(yaw), 0, -cos(yaw))
-
-                // Match sensitivity to actual screen-to-world scale by projecting
-                // two world points and measuring their pixel distance — same approach
-                // that makes the arrowY feel 1:1.
-                let worldOrigin = target.position(relativeTo: nil)
-                let xzSensitivity: Float
-                if let p0 = arView.project(worldOrigin),
-                   let p1 = arView.project(worldOrigin + flatRight) {
-                    let pxPerMeter = simd_length(SIMD2<Float>(
-                        Float(p1.x - p0.x), Float(p1.y - p0.y)))
-                    xzSensitivity = pxPerMeter > 1 ? 1.0 / pxPerMeter : sensitivity
-                } else {
-                    xzSensitivity = sensitivity
-                }
-
-                let dx = Float(translation.x) * xzSensitivity
-                let dy = Float(translation.y) * xzSensitivity
-                let movement = (flatRight * dx) - (flatForward * dy)
-                newPos.x = startPos.x + movement.x
-                newPos.z = startPos.z + movement.z
+                let dxW = dx2D * metersPerPixel
+                let dyW = dy2D * metersPerPixel
+                let movement = (flatRight * dxW) - (flatForward * dyW)
+                delta3D.x = movement.x
+                delta3D.z = movement.z
             }
 
+            // Advance the per-frame baseline NOW so all branches below can return/break safely
+            lastPanLocation = location
+
+            // New world position of the target
+            let newWorldPos = worldOrigin + delta3D
+
             if isMovingHandle {
+                // Place handle in world space (path coords are world-space)
+                target.setPosition(newWorldPos, relativeTo: nil)
+
+                // Keep the gizmo over the handle.
+                // IMPORTANT: use newWorldPos, NOT target.position(relativeTo:) —
+                // RealityKit does not guarantee same-frame transform propagation after
+                // setPosition, so reading back would return the stale old position.
                 if let anchor = mainAnchor {
-                    target.setPosition(newPos, relativeTo: anchor)
-                    gizmoRoot?.position = target.position(relativeTo: anchor)
+                    let handleLocalToAnchor = anchor.convert(position: newWorldPos, from: nil)
+                    gizmoRoot?.position = handleLocalToAnchor
                 }
+
+                // Pass newWorldPos directly into the path updater for the same reason:
+                // reading target.position(relativeTo: nil) here could return the old value,
+                // causing the Bezier data to not update while the sphere visually moves.
                 if let handleComp = target.components[MotionPathHandleComponent.self],
-                   let clipIndex = timeline.clips.firstIndex(where: { $0.id == handleComp.clipID }),
-                   var path = timeline.clips[clipIndex].motionPath,
-                   let visual = activeMotionPaths[handleComp.clipID] {
+                   let clipIndex  = timeline.clips.firstIndex(where: { $0.id == handleComp.clipID }),
+                   var path       = timeline.clips[clipIndex].motionPath,
+                   let visual     = activeMotionPaths[handleComp.clipID] {
                     updateMotionPathHandle(
-                        target: target, newPos: newPos,
-                        clipIndex: clipIndex, path: &path, visual: visual
+                        target:    target,
+                        newPos:    newWorldPos,
+                        clipIndex: clipIndex,
+                        path:      &path,
+                        visual:    visual
                     )
                 }
                 // Motion path handle drag is handled above.
                 // Rotation arc handles use direct radial drag (see handlePan .began arc block)
                 // and never reach this isMovingHandle path.
             } else {
-                // Capture position BEFORE moving so we can compute the true per-frame delta
-                let prevPos = target.position
-                target.position = newPos
+                // Capture world position BEFORE moving so we can compute the true per-frame delta
+                let prevWorldPos = target.position(relativeTo: nil)
+                target.setPosition(newWorldPos, relativeTo: nil)
                 updateGizmoPosition()
 
                 let entityName = target.name
-                let frameDelta = newPos - prevPos
+                let frameDelta = newWorldPos - prevWorldPos
                 guard simd_length(frameDelta) > 0.00001 else { break }
 
                 // Shift all motion paths by the per-frame delta
@@ -1278,7 +1310,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             activeGizmoPart      = .none
             activeRotationAxis   = nil
             isDraggingObject     = false
-            activeHandleEntity   = nil
+            // NOTE: activeHandleEntity is intentionally NOT cleared here.
+            // Clearing it would mean the user has to re-tap the handle before
+            // dragging a different gizmo part (arrowY → planeXZ etc.), because
+            // the .changed guard `guard let target = targetEntity` would find
+            // targetEntity == nil and silently fall through to camera-pan.
+            // activeHandleEntity is cleared only when a different entity is
+            // explicitly selected (handleTap) or the gizmo is hidden.
             cachedSiblingBounds  = []   // release cached bounds
             pathRebuildFrameCount = 0   // reset throttle counter between drags
             resetGizmoColors()
