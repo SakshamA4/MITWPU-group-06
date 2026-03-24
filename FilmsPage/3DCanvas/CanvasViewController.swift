@@ -504,7 +504,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // Camera preview panel — snapshots keyed by camera ObjectIdentifier
     var cameraPreviewSnapshots: [ObjectIdentifier: UIImage] = [:]
-    var cameraPreviewTimer: Timer?
 
     // Which rotation arc clip is currently selected (for long-press context menu).
     var selectedArcClipID: UUID?
@@ -529,14 +528,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     enum InteractionMode { case move; case rotate; case none }
     var interactionMode: InteractionMode = .move
-
-    // MARK: - Pan drag state
-    var activeRotationAxis: SIMD3<Float>?
-    var lastPanLocation: CGPoint = .zero
-    var lastDragPoint: SIMD3<Float>?
-    var activeHandleEntity: Entity?
-    var lastUndoTime: CFTimeInterval = 0
-    var pathRebuildFrameCount: Int = 0
 
     var timelineEntityCache: [String: Entity] = [:]
 
@@ -787,7 +778,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             do {
                 let checkName = (customName ?? item.modelFileName).lowercased()
 
-                if checkName.contains("ground") { 
+                if checkName.contains("ground") {
                     if let spawnedEntity = spawnGround() {
                         refreshSidebarContent()
                         // Show color picker on main thread
@@ -795,9 +786,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                             self?.showColorPickerForNewSpawn(spawnedEntity)
                         }
                     }
-                    return 
+                    return
                 }
-                if checkName.contains("wall") || item.modelFileName == "cube" { 
+                if checkName.contains("wall") || item.modelFileName == "cube" {
                     if let spawnedEntity = spawnWall() {
                         refreshSidebarContent()
                         // Show color picker on main thread
@@ -805,7 +796,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                             self?.showColorPickerForNewSpawn(spawnedEntity)
                         }
                     }
-                    return 
+                    return
                 }
                 if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(); return }
                 if item.isBackground { spawnBackgroundPlane(item); return }
@@ -1488,7 +1479,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 // MARK: - Collision Prevention Helper
 
 extension CanvasViewController {
-
+    
     /// Builds a snapshot of sibling bounds at drag start.
     /// Called once in handlePan(.began) so .changed never traverses the scene graph per frame.
     private func buildSiblingBoundsCache() {
@@ -1501,7 +1492,7 @@ extension CanvasViewController {
             return (sibling, sibling.visualBounds(relativeTo: nil))
         }
     }
-
+    
     /// Clamps `proposedPosition` to avoid overlapping any sibling entity.
     /// Uses `cachedSiblingBounds` so this is O(n) with no extra scene-graph work.
     func clampPositionAvoidingOverlap(
@@ -1509,21 +1500,21 @@ extension CanvasViewController {
         proposedPosition: SIMD3<Float>
     ) -> SIMD3<Float> {
         guard !cachedSiblingBounds.isEmpty else { return proposedPosition }
-
+        
         // Temporarily move entity to proposed position to compute its bounds there
         let originalPosition = entity.position
         entity.position      = proposedPosition
         let selfBounds       = entity.visualBounds(relativeTo: nil)
         entity.position      = originalPosition
-
+        
         var resolved = proposedPosition
-
+        
         for (_, otherBounds) in cachedSiblingBounds {
             let overlapX = selfBounds.max.x > otherBounds.min.x && selfBounds.min.x < otherBounds.max.x
             let overlapY = selfBounds.max.y > otherBounds.min.y && selfBounds.min.y < otherBounds.max.y
             let overlapZ = selfBounds.max.z > otherBounds.min.z && selfBounds.min.z < otherBounds.max.z
             guard overlapX && overlapY && overlapZ else { continue }
-
+            
             let penRight  = selfBounds.max.x  - otherBounds.min.x
             let penLeft   = otherBounds.max.x  - selfBounds.min.x
             let penTop    = selfBounds.max.y  - otherBounds.min.y
@@ -1532,7 +1523,11 @@ extension CanvasViewController {
             let penBack   = otherBounds.max.z  - selfBounds.min.z
             let minPen    = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
 
-        //  OLD STEP 2 — NORMAL OBJECT / GIZMO DRAGGING (SAKSHAM)
+            //  OLD STEP 2 — NORMAL OBJECT / GIZMO DRAGGING (SAKSHAM)
+        }
+
+        return resolved
+    }
 
     /// Returns the world-space centre of the rotation arc for a clip.
     /// The arc root sits at the entity's world position at clip-creation time.

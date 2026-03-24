@@ -84,71 +84,6 @@ extension CanvasViewController {
             gesture.scale = 1.0
             return
         }
-        
-        let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-        if isLocked { return }
-        
-        guard let modelEntity = entity as? ModelEntity else {
-            gesture.scale = 1.0
-            return
-        }
-        
-        switch gesture.state {
-        case .changed:
-            let scaleFactor = Float(gesture.scale)
-            
-            if var wall = modelEntity.components[WallComponent.self] {
-                wall.width *= scaleFactor
-                wall.height *= scaleFactor
-                wall.width = max(0.3, min(wall.width, 10))
-                wall.height = max(0.3, min(wall.height, 6))
-                let newMesh = MeshResource.generateBox(
-                    width: wall.width,
-                    height: wall.height,
-                    depth: 0.05
-                )
-                modelEntity.model?.mesh = newMesh
-                // generateCollisionShapes removed from .changed — it is called once in
-                // .ended below. Calling it every pinch frame was a major perf regression.
-                modelEntity.components.set(wall)
-            }
-            
-            if var bg = modelEntity.components[BackgroundComponent.self] {
-                bg.width *= scaleFactor
-                bg.height *= scaleFactor
-                bg.width = max(0.5, min(bg.width, 15))
-                bg.height = max(0.5, min(bg.height, 10))
-                modelEntity.model?.mesh = MeshResource.generateBox(
-                    width: bg.width,
-                    height: bg.height,
-                    depth: 0.05
-                )
-                // Deferred to .ended (see above)
-                modelEntity.components.set(bg)
-            }
-            
-            if var ground = modelEntity.components[GroundComponent.self] {
-                ground.width *= scaleFactor
-                ground.depth *= scaleFactor
-                ground.width = max(0.5, min(ground.width, 20))
-                ground.depth = max(0.5, min(ground.depth, 20))
-                let newMesh = MeshResource.generatePlane(
-                    width: ground.width,
-                    depth: ground.depth
-                )
-                modelEntity.model?.mesh = newMesh
-                // Deferred to .ended (see above)
-                modelEntity.components.set(ground)
-            }
-            gesture.scale = 1.0
-
-        case .ended, .cancelled:
-            // Rebuild collision shapes once — mesh is at its final size.
-            modelEntity.generateCollisionShapes(recursive: true)
-
-        default:
-            break
-        }
     }
 
     
@@ -278,7 +213,13 @@ extension CanvasViewController {
 
         sceneCameras.append(camera)
         cameraToVisualMap[camera] = cameraRoot
-        sceneCameraItems.append(SceneCameraItem(camera: camera, cameraRoot: cameraRoot))
+        cameraCounter += 1
+        sceneCameraItems.append(SceneCameraItem(
+            id: UUID(),
+            camera: camera,
+            cameraRoot: cameraRoot,
+            displayName: "Camera \(cameraCounter)"
+        ))
 
         cameraCollectionView?.reloadData()
         startCameraPreviewUpdates()
@@ -577,6 +518,7 @@ extension CanvasViewController {
                 }
                 self.snapshotPreviewCamera(at: index + 1)
             }
+        }
     }
 
     // MARK: On-demand refresh (called after camera moved/rotated or newly spawned)
@@ -722,11 +664,4 @@ extension CanvasViewController {
         setActiveCamera(item.camera)
     }
 
-}
-
-
-
-// MARK: - Storage key for the off-screen preview ARView
-private enum PreviewARViewKey {
-    static var key = "previewARView"
 }

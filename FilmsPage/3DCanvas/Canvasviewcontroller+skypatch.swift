@@ -10,48 +10,48 @@ import ARKit
 extension CanvasViewController {
 
 
-    func applySky(type: String) {
-        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-
-        // Remove ALL existing sky variants before adding a new one
-        for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
-            child.removeFromParent()
-        }
-
-        // Build material
-        var skyMaterial = UnlitMaterial()
-        var topColor: UIColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
-
-        if type == "sky_image_1" {
-            if let texture = try? TextureResource.load(named: type) {
-                skyMaterial.color.texture = .init(texture)
-                arView.environment.background = .color(.black)
-            } else {
-                topColor = .systemGray
-                skyMaterial.color.tint = topColor
-                arView.environment.background = .color(topColor)
-            }
-        } else {
-            switch type {
-            case "sky_sunset": topColor = .orange
-            case "sky_night":  topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
-            default:           topColor = UIColor(red: 0.4,  green: 0.7,  blue: 1.0, alpha: 1)
-            }
-            skyMaterial.color.tint = topColor
-            arView.environment.background = .color(topColor)
-        }
-
-        let skyMesh   = MeshResource.generateSphere(radius: 50)
-        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
-        skyEntity.name        = "ProceduralSky_\(type)"
-        skyEntity.scale      *= -1
-        skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
-        skyEntity.components.set(CategoryComponent(toolType: .sky))
-
-        anchor.addChild(skyEntity)
-        refreshSidebarContent()
-        print("🌅 Sky applied: \(type)")
-    }
+//    func applySky(type: String) {
+//        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+//
+//        // Remove ALL existing sky variants before adding a new one
+//        for child in anchor.children where child.name.hasPrefix("ProceduralSky") {
+//            child.removeFromParent()
+//        }
+//
+//        // Build material
+//        var skyMaterial = UnlitMaterial()
+//        var topColor: UIColor = UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1)
+//
+//        if type == "sky_image_1" {
+//            if let texture = try? TextureResource.load(named: type) {
+//                skyMaterial.color.texture = .init(texture)
+//                arView.environment.background = .color(.black)
+//            } else {
+//                topColor = .systemGray
+//                skyMaterial.color.tint = topColor
+//                arView.environment.background = .color(topColor)
+//            }
+//        } else {
+//            switch type {
+//            case "sky_sunset": topColor = .orange
+//            case "sky_night":  topColor = UIColor(red: 0.05, green: 0.05, blue: 0.2, alpha: 1)
+//            default:           topColor = UIColor(red: 0.4,  green: 0.7,  blue: 1.0, alpha: 1)
+//            }
+//            skyMaterial.color.tint = topColor
+//            arView.environment.background = .color(topColor)
+//        }
+//
+//        let skyMesh   = MeshResource.generateSphere(radius: 50)
+//        let skyEntity = ModelEntity(mesh: skyMesh, materials: [skyMaterial])
+//        skyEntity.name        = "ProceduralSky_\(type)"
+//        skyEntity.scale      *= -1
+//        skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
+//        skyEntity.components.set(CategoryComponent(toolType: .sky))
+//
+//        anchor.addChild(skyEntity)
+//        refreshSidebarContent()
+//        print("🌅 Sky applied: \(type)")
+//    }
 
     // MARK: - Remove Sky
     //

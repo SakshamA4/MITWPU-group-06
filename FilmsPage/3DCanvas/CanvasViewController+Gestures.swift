@@ -345,16 +345,14 @@ extension CanvasViewController {
         }
         guard let startPos = dragStartPosition else { return }
         let translation = gesture.translation(in: arView)
-        let dx =  Float(translation.x) * 0.005
-        let dy = -Float(translation.y) * 0.005
         var newPosition = startPos
         // FIX: sensitivity now scales with camera distance, matching panCameraTarget()
         // which uses distance * 0.0015. At distance=5 this gives 0.0015; at distance=15
         // it gives 0.0045 — so dragging feels consistent regardless of zoom level.
         // The old fixed 0.005 was too fast when zoomed in and too slow when zoomed out.
         let sensitivity: Float = max(0.001, distance * 0.0003)
-        let dx = mouseDelta.x * sensitivity
-        let dy = -mouseDelta.y * sensitivity
+        let dx =  Float(translation.x) * sensitivity
+        let dy = -Float(translation.y) * sensitivity
         
         if currentDragMode == .ground {
             let camPos      = activeCamera.position(relativeTo: nil)
