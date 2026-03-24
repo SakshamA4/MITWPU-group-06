@@ -30,7 +30,7 @@ enum CameraLibraryDataStore {
                 .init(name: "Tilt",       imageName: "Tilt",       description: "Camera tilts up or down from a fixed position."),
                 .init(name: "Dolly-in",   imageName: "Dolly-in",   description: "Camera physically moves closer to the subject."),
                 .init(name: "Dolly-out",  imageName: "Dolly-out",  description: "Camera physically moves away from the subject."),
-                .init(name: "Crane/Boom", imageName: "Crane/Boom", description: "Camera moves up, down or across on a crane/boom.")
+                .init(name: "Crane", imageName: "Crane", description: "Camera moves up, down or across on a crane/boom.")
             ]
         ),
 

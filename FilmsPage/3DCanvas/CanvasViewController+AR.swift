@@ -43,8 +43,8 @@ extension CanvasViewController {
             arView.session.run(config, options: [.resetTracking])
 
             // 7. Update button appearance to "active"
-            arModeButton?.tintColor = .white
-            arModeButton?.backgroundColor = UIColor(red: 0/255, green: 100/255, blue: 220/255, alpha: 1)
+            arModeButton?.tintColor = .systemMint
+            arModeButton?.backgroundColor = UIColor.systemBackground
 
         } else {
             // Return to editor mode
