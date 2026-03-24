@@ -1253,7 +1253,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             } else {
                 // Capture position BEFORE moving so we can compute the true per-frame delta
                 let prevPos = target.position
-                target.position = newPos
+                let clampedPos = clampPositionAvoidingOverlap(entity: target, proposedPosition: newPos)
+                target.position = clampedPos
                 updateGizmoPosition()
 
                 let entityName = target.name

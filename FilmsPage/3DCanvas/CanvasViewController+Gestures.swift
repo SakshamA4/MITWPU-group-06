@@ -373,7 +373,8 @@ extension CanvasViewController {
         } else {
             newPosition.y = startPos.y + (dy * 2.0)
         }
-        entity.position = newPosition
+        let clampedPosition = clampPositionAvoidingOverlap(entity: entity, proposedPosition: newPosition)
+        entity.position = clampedPosition
         updateGizmoPosition()
     }
 
