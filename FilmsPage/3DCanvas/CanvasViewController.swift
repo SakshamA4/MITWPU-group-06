@@ -1182,14 +1182,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             let dx2D = Float(location.x - lastPanLocation.x)
             let dy2D = Float(location.y - lastPanLocation.y)
 
-            // Sensitivity: map 1 screen pixel → metres using the live camera projection.
-            // Use the world axis that matches the gizmo part being dragged so that
-            // arrowY (vertical) uses a world-Y reference vector, not world-X.
-            // Using the wrong axis gives badly mismatched sensitivity (typically makes
-            // arrowY feel stuck or jittery depending on camera pitch).
             let worldOrigin = target.position(relativeTo: nil)
             let sensitivityAxis: SIMD3<Float> = (activeGizmoPart == .arrowY) ? [0, 1, 0] : [1, 0, 0]
-            var pixelsPerMeter: Float = 200   // safe fallback
+            var pixelsPerMeter: Float = 200
             if let p0 = arView.project(worldOrigin),
                let p1 = arView.project(worldOrigin + sensitivityAxis) {
                 let screenLen = simd_length(SIMD2<Float>(Float(p1.x - p0.x),
@@ -1220,21 +1215,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             let newWorldPos = worldOrigin + delta3D
 
             if isMovingHandle {
-                // Place handle in world space (path coords are world-space)
                 target.setPosition(newWorldPos, relativeTo: nil)
 
-                // Keep the gizmo over the handle.
-                // IMPORTANT: use newWorldPos, NOT target.position(relativeTo:) —
-                // RealityKit does not guarantee same-frame transform propagation after
-                // setPosition, so reading back would return the stale old position.
+                // Reposition gizmo using newWorldPos directly — do NOT read back
+                // target.position() here because RealityKit may not propagate the
+                // transform in the same frame, returning the stale old position.
                 if let anchor = mainAnchor {
-                    let handleLocalToAnchor = anchor.convert(position: newWorldPos, from: nil)
-                    gizmoRoot?.position = handleLocalToAnchor
+                    gizmoRoot?.position = anchor.convert(position: newWorldPos, from: nil)
                 }
 
-                // Pass newWorldPos directly into the path updater for the same reason:
-                // reading target.position(relativeTo: nil) here could return the old value,
-                // causing the Bezier data to not update while the sphere visually moves.
+                // Update drop shadow live so it tracks the handle during drag.
+                updateDropShadow(worldPos: newWorldPos)
+
+                // Increment frame counter HERE so the rebuildArcLengthTable throttle
+                // guards (% 4 == 0) inside updateMotionPathHandle fire on schedule.
+                // Previously the counter only incremented inside updatePathMeshThrottled,
+                // AFTER the guards had already evaluated — so they always saw 0 and
+                // rebuilt every single frame, causing lag.
+                pathRebuildFrameCount += 1
+
+                // Pass newWorldPos directly — same reason as gizmo reposition above.
                 if let handleComp = target.components[MotionPathHandleComponent.self],
                    let clipIndex  = timeline.clips.firstIndex(where: { $0.id == handleComp.clipID }),
                    var path       = timeline.clips[clipIndex].motionPath,
@@ -1310,15 +1310,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             activeGizmoPart      = .none
             activeRotationAxis   = nil
             isDraggingObject     = false
-            // NOTE: activeHandleEntity is intentionally NOT cleared here.
-            // Clearing it would mean the user has to re-tap the handle before
-            // dragging a different gizmo part (arrowY → planeXZ etc.), because
-            // the .changed guard `guard let target = targetEntity` would find
-            // targetEntity == nil and silently fall through to camera-pan.
-            // activeHandleEntity is cleared only when a different entity is
-            // explicitly selected (handleTap) or the gizmo is hidden.
-            cachedSiblingBounds  = []   // release cached bounds
-            pathRebuildFrameCount = 0   // reset throttle counter between drags
+            // activeHandleEntity intentionally NOT cleared here — clearing it causes
+            // the next gizmo-part drag to find targetEntity == nil and silently
+            // camera-pan instead of moving the handle. Cleared only in handleTap.
+            cachedSiblingBounds   = []
+            pathRebuildFrameCount = 0
             resetGizmoColors()
 
         default:
