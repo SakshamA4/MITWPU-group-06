@@ -171,9 +171,7 @@
                             <constraint firstItem="Gtc-NX-FN5" firstAttribute="trailing" secondItem="JHl-AU-Otb" secondAttribute="trailing" id="l4C-vJ-syO"/>
                         </constraints>
                     </view>
-                    <navigationItem key="navigationItem" largeTitleDisplayMode="always" id="E1i-M0-rUh">
-                        <barButtonItem key="rightBarButtonItem" systemItem="search" id="Tic-G7-E9X"/>
-                    </navigationItem>
+                    <navigationItem key="navigationItem" largeTitleDisplayMode="always" id="E1i-M0-rUh"/>
                     <connections>
                         <outlet property="libraryCollectionView" destination="Gtc-NX-FN5" id="ZfG-v8-mmQ"/>
                         <segue destination="Rbs-cT-bva" kind="show" identifier="BackgroundViewController" id="tPM-fk-MAX"/>
