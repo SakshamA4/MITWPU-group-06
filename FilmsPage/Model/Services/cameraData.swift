@@ -39,10 +39,10 @@ enum CameraLibraryDataStore {
             type: .staticShots,
             items: [
                 .init(name: "Establishing Shot", imageName: "Establishing Shot", description: "Wide shot that sets up location and context."),
-                .init(name: "Wide Shot",         imageName: "Wide Shot",         description: "Shows the subject in their full environment."),
-                .init(name: "Medium Shot",       imageName: "Medium Shot",       description: "Frames the subject from waist up."),
-                .init(name: "Close-up",          imageName: "Close-up",      description: "Tight framing on the subject’s face or detail."),
-                .init(name: "Insert/Cutaway",    imageName: "insert",       description: "Cut to a detail that supports the main action.")
+                .init(name: "Zoom-in Shot",         imageName: "Zoom-in Shot",         description: "The camera gradually moves closer to the subject to highlight details or increase focus/intensity."),
+                .init(name: "Zoom-out Shot",       imageName: "Zoom-out Shot",       description: "The camera pulls away from the subject to reveal more surroundings or reduce focus.")
+//                .init(name: "Close-up",          imageName: "Close-up",      description: "Tight framing on the subject’s face or detail."),
+//                .init(name: "Insert/Cutaway",    imageName: "insert",       description: "Cut to a detail that supports the main action.")
             ]
         ),
     ]
