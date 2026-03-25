@@ -21,11 +21,41 @@ class FilmsViewController: UIViewController {
 
     // MARK: - State
     var allFilms: [Film] = []
+    private var filteredFilms: [Film] = []
+    private var currentSearchText: String = ""
+    private var savedSearchButton: UIBarButtonItem?
     private let filmService = FilmService.shared
+    
+    // Computed properties for search
+    private var isSearching: Bool { !currentSearchText.isEmpty }
+    private var currentFilms: [Film] { isSearching ? filteredFilms : allFilms }
+    
+    // Search controller
+    private let searchController = UISearchController(searchResultsController: nil)
 
     // MARK: - Outlets
     @IBOutlet weak var FilmsPageTitleLabel: UILabel!
     @IBOutlet weak var collectionView: UICollectionView!
+    @IBOutlet weak var searchButton: UIBarButtonItem!
+    
+    @IBAction func searchAction(_ sender: Any) {
+        // Show search controller in navigation bar
+        navigationItem.searchController = searchController
+        
+        // Hide the search button by removing it from nav bar
+        navigationItem.rightBarButtonItem = nil
+        
+        // Animate the search bar appearance
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
+        
+        // Activate and focus the search bar
+        searchController.isActive = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.searchController.searchBar.becomeFirstResponder()
+        }
+    }
 
     // MARK: - Lifecycle
 
@@ -36,6 +66,11 @@ class FilmsViewController: UIViewController {
 
         registerCells()
         setupObservers()
+        setupSearchController()
+        
+        // Save the search button and ensure it's visible initially
+        savedSearchButton = searchButton
+        navigationItem.rightBarButtonItem = searchButton
 
         collectionView.dataSource = self
         collectionView.delegate   = self
@@ -48,6 +83,10 @@ class FilmsViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
+        
+        // Always hide search bar and show search button when view appears
+        navigationItem.searchController = nil
+        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -78,9 +117,37 @@ class FilmsViewController: UIViewController {
             object: nil
         )
     }
+    
+    private func setupSearchController() {
+        searchController.searchResultsUpdater = self
+        searchController.searchBar.delegate = self
+        searchController.delegate = self
+        searchController.obscuresBackgroundDuringPresentation = false
+        searchController.searchBar.placeholder = "Search Films"
+        // Don't set navigationItem.searchController initially (search bar hidden)
+        definesPresentationContext = true
+    }
 
     @objc private func refreshData() {
         allFilms = filmService.getFilms().reversed() // newest first
+        // Clear search state when data refreshes
+        currentSearchText = ""
+        filteredFilms = []
+        searchController.isActive = false
+        collectionView.reloadData()
+    }
+    
+    // MARK: - Filter Logic
+    
+    private func filterFilms(for query: String) {
+        currentSearchText = query.trimmingCharacters(in: .whitespaces)
+        if currentSearchText.isEmpty {
+            filteredFilms = []
+        } else {
+            filteredFilms = allFilms.filter {
+                $0.name.localizedCaseInsensitiveContains(currentSearchText)
+            }
+        }
         collectionView.reloadData()
     }
 
@@ -211,13 +278,18 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
     func numberOfSections(in collectionView: UICollectionView) -> Int { 1 }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return allFilms.count + 1  // +1 for placeholder at index 0
+        // When searching, no placeholder cell
+        if isSearching {
+            return currentFilms.count
+        }
+        // When not searching, include placeholder at index 0
+        return currentFilms.count + 1
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 
-        // Index 0 → placeholder / add-new cell
-        if indexPath.item == 0 {
+        // Index 0 → placeholder / add-new cell (only when not searching)
+        if !isSearching && indexPath.item == 0 {
             guard let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: placeholderCellId,
                 for: indexPath
@@ -229,23 +301,30 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
             return cell
         }
 
-        // Index 1+ → newest-first film cells
+        // Index 1+ → newest-first film cells (or index 0+ when searching)
         guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: filmCellId,
             for: indexPath
         ) as? OtherFilmCollectionViewCell else { return UICollectionViewCell() }
 
-        cell.configureCell(film: allFilms[indexPath.item - 1])
-        let tappedFilm = allFilms[indexPath.item - 1]
+        // Adjust index based on whether search is active
+        let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
+        let film = currentFilms[itemIndex]
+        
+        cell.configureCell(film: film)
         cell.onSeeNotesTapped = { [weak self] in
-            self?.performSegue(withIdentifier: "displayNotesSegue", sender: tappedFilm)
+            self?.performSegue(withIdentifier: "displayNotesSegue", sender: film)
         }
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard indexPath.item != 0 else { return }
-        performSegue(withIdentifier: "myFilmSegue", sender: allFilms[indexPath.item - 1])
+        // When not searching, index 0 is placeholder (ignore it)
+        guard !(!isSearching && indexPath.item == 0) else { return }
+        
+        // Adjust index based on whether search is active
+        let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
+        performSegue(withIdentifier: "myFilmSegue", sender: currentFilms[itemIndex])
     }
 }
 
@@ -259,8 +338,12 @@ extension FilmsViewController {
         point: CGPoint
     ) -> UIContextMenuConfiguration? {
 
-        guard indexPath.item != 0 else { return nil }
-        let film = allFilms[indexPath.item - 1]
+        // When not searching, index 0 is placeholder (ignore it)
+        guard !(!isSearching && indexPath.item == 0) else { return nil }
+        
+        // Adjust index based on whether search is active
+        let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
+        let film = currentFilms[itemIndex]
 
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
             let editAction = UIAction(title: "Edit", image: UIImage(systemName: "pencil")) { [weak self] _ in
@@ -274,6 +357,49 @@ extension FilmsViewController {
             }
             return UIMenu(title: film.name, children: [editAction, infoAction, deleteAction])
         }
+    }
+}
+
+// MARK: - UISearchResultsUpdating
+
+extension FilmsViewController: UISearchResultsUpdating {
+    func updateSearchResults(for searchController: UISearchController) {
+        let searchText = searchController.searchBar.text ?? ""
+        filterFilms(for: searchText)
+    }
+}
+
+// MARK: - UISearchBarDelegate
+
+extension FilmsViewController: UISearchBarDelegate {
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        currentSearchText = ""
+        filteredFilms = []
+        collectionView.reloadData()
+        
+        // Hide the search controller and remove from nav bar
+        searchController.isActive = false
+        navigationItem.searchController = nil
+        
+        // Restore the search button to nav bar
+        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+    }
+}
+
+// MARK: - UISearchControllerDelegate
+
+extension FilmsViewController: UISearchControllerDelegate {
+    func willDismissSearchController(_ searchController: UISearchController) {
+        // Clear search state before dismissing
+        currentSearchText = ""
+        filteredFilms = []
+        collectionView.reloadData()
+    }
+    
+    func didDismissSearchController(_ searchController: UISearchController) {
+        // Restore the search button when search controller is dismissed
+        navigationItem.searchController = nil
+        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
     }
 }
 

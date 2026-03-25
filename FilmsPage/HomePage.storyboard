@@ -67,7 +67,11 @@
                             </button>
                         </barButtonItem>
                         <rightBarButtonItems>
-                            <barButtonItem style="plain" systemItem="search" id="8I4-ab-4dz"/>
+                            <barButtonItem style="plain" systemItem="search" id="8I4-ab-4dz">
+                                <connections>
+                                    <action selector="searchAction:" destination="Y6W-OH-hqX" id="axQ-PP-nuD"/>
+                                </connections>
+                            </barButtonItem>
                             <barButtonItem style="plain" systemItem="add" id="lke-mh-KxJ">
                                 <connections>
                                     <segue destination="xln-3y-NOp" kind="popoverPresentation" popoverAnchorBarButtonItem="lke-mh-KxJ" id="2SI-bg-tzM">
@@ -79,6 +83,7 @@
                     </navigationItem>
                     <connections>
                         <outlet property="collectionView" destination="uZO-Io-WKM" id="kOa-sn-bXX"/>
+                        <outlet property="searchButton" destination="8I4-ab-4dz" id="8mk-iF-1hp"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="Ief-a0-LHa" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>

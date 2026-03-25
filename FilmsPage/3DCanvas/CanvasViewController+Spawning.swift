@@ -160,6 +160,9 @@ extension CanvasViewController {
                 let plane = ModelEntity(mesh: mesh, materials: [material])
                 plane.name = uniqueName
 
+                // FIX: Assign stable UUID so entity references in animations persist across save/load cycles
+                plane.components.set(EntityIDComponent(id: UUID()))
+
                 // Store in the VC-level cache so save() can always find the UIImage
                 // even if BackgroundComponent.cachedImage is later lost.
                 self.backgroundImageCache[uniqueName] = image
