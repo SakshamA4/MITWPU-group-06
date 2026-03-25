@@ -4,9 +4,11 @@ import RealityKit
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: - Clip Conflict Detection & Resolution
 //
-// Hooks into showPathEditToolbar's Apply action.
-// Detects when a timing edit causes an overlap with the next clip for the
-// same entity, then presents a three-option resolution dialog.
+// Hooks into showPathEditToolbar's Apply action (editing existing clips) and
+// into applyCameraMovementPreset / applyStaticShotPreset (adding new clips).
+//
+// When clipIndex == timeline.clips.count it is treated as a "new clip append"
+// sentinel — commitClipTimingChange appends instead of replacing.
 // ─────────────────────────────────────────────────────────────────────────────
 
 extension CanvasViewController {
@@ -19,20 +21,18 @@ extension CanvasViewController {
     /// - Parameters:
     ///   - editedClip:  The candidate clip with proposed new timing.
     ///   - replacingID: The UUID of the clip being replaced (excluded from search).
+    ///                  Pass a fresh `UUID()` when adding a brand-new clip so
+    ///                  nothing is accidentally excluded.
     func detectClipConflict(
         editedClip:  AnimationClip,
         replacingID: UUID
     ) -> AnimationClip? {
         let editedEnd = editedClip.startTime + editedClip.duration
 
-        // All clips for the same entity, sorted by start time, excluding the
-        // clip being edited so we don't compare it against itself.
         let siblings = timeline.clips
             .filter { $0.entityName == editedClip.entityName && $0.id != replacingID }
             .sorted { $0.startTime < $1.startTime }
 
-        // A conflict exists when the edited clip's end time exceeds the
-        // start time of any sibling clip that comes after it.
         return siblings.first {
             $0.startTime >= editedClip.startTime && editedEnd > $0.startTime
         }
@@ -41,13 +41,16 @@ extension CanvasViewController {
     // ── MARK: Resolution Dialog ───────────────────────────────────────────────
 
     /// Presents a UIAlertController with three resolution options whenever
-    /// a timing edit would cause an overlap.
+    /// a timing edit (or new addition) would cause an overlap.
+    ///
+    /// `clipIndex` may equal `timeline.clips.count` when this is called for a
+    /// brand-new clip that hasn't been inserted yet (camera shot addition).
     func presentClipConflictResolution(
         editedClip:      AnimationClip,
         replacingID:     UUID,
         conflicting:     AnimationClip,
         clipIndex:       Int,
-        originalEndTime: Float       // oldClip.startTime + oldClip.duration before the edit
+        originalEndTime: Float
     ) {
         let alert = UIAlertController(
             title:   "Animation Timing Conflict",
@@ -65,28 +68,18 @@ extension CanvasViewController {
         ) { [weak self] _ in
             guard let self else { return }
 
-            // Commit the edited clip first
             self.commitClipTimingChange(
                 newClip:   editedClip,
                 oldClipID: replacingID,
                 clipIndex: clipIndex
             )
 
-            // originalGap = second clip's start - first clip's ORIGINAL end time
-            // This is the gap that existed before the user's edit.
-            // Example: Clip A ended at 1s, Clip B started at 2s → gap = 1s
-            let originalGap = conflicting.startTime - originalEndTime
-
-            // New Clip B start = new Clip A end + original gap
+            let originalGap   = conflicting.startTime - originalEndTime
             let editedEnd     = editedClip.startTime + editedClip.duration
             let newClipBStart = editedEnd + originalGap
-
-            // How far does Clip B (and everything after it) need to move?
-            let shiftDelta = newClipBStart - conflicting.startTime
+            let shiftDelta    = newClipBStart - conflicting.startTime
 
             if shiftDelta > 0.0001 {
-                // Boundary = conflicting clip's startTime so it AND everything
-                // after it gets shifted (not just clips starting after editedEnd)
                 self.shiftSubsequentClips(
                     entityName:    editedClip.entityName,
                     startingAfter: conflicting.startTime,
@@ -102,18 +95,15 @@ extension CanvasViewController {
         ) { [weak self] _ in
             guard let self else { return }
 
-            // Commit the edited clip first
             self.commitClipTimingChange(
                 newClip:   editedClip,
                 oldClipID: replacingID,
                 clipIndex: clipIndex
             )
 
-            // Merge: next clip starts right after edited clip ends,
-            // duration shrinks to preserve original end time.
-            let editedEnd       = editedClip.startTime + editedClip.duration
-            let originalEnd     = conflicting.startTime + conflicting.duration
-            let newDuration     = max(0, originalEnd - editedEnd)
+            let editedEnd   = editedClip.startTime + editedClip.duration
+            let originalEnd = conflicting.startTime + conflicting.duration
+            let newDuration = max(0, originalEnd - editedEnd)
 
             self.mergeConflictingClip(
                 conflicting:  conflicting,
@@ -128,16 +118,34 @@ extension CanvasViewController {
     // ── MARK: Commit ──────────────────────────────────────────────────────────
 
     /// Writes a new clip into the timeline and re-keys motion path visuals.
-    /// This is the same logic previously inlined in the Apply button, now
-    /// extracted so both the conflict-free and conflict paths share it.
+    ///
+    /// When `clipIndex == timeline.clips.count` the clip is appended (new-clip
+    /// sentinel used by camera shot additions). In that case `oldClipID` is
+    /// ignored and visuals are shown fresh instead of re-keyed.
     func commitClipTimingChange(
         newClip:   AnimationClip,
         oldClipID: UUID,
         clipIndex: Int
     ) {
+        let isNewClip = clipIndex >= timeline.clips.count
+
+        if isNewClip {
+            // Brand-new clip — append and show visuals fresh
+            timeline.addClip(newClip)
+            if newClip.motionPath != nil {
+                showMotionPath(for: newClip)
+            }
+            if newClip.track == .rotation,
+               let entity = arView.scene.findEntity(named: newClip.entityName) {
+                showRotationArc(for: newClip, on: entity)
+            }
+            return
+        }
+
+        // Existing clip — replace in-place
         timeline.clips[clipIndex] = newClip
 
-        // Re-key the motion path visual from oldClipID → newClip.id
+        // Re-key motion path visual from oldClipID → newClip.id
         if let visual = activeMotionPaths.removeValue(forKey: oldClipID) {
             activeMotionPaths[newClip.id] = visual
             let newComp = MotionPathHandleComponent(clipID: newClip.id)
@@ -215,7 +223,7 @@ extension CanvasViewController {
             track:      conflicting.track,
             easing:     conflicting.easing,
             startTime:  newStartTime,
-            duration:   max(0.01, newDuration),   // never zero
+            duration:   max(0.01, newDuration),
             fromValue:  conflicting.fromValue,
             toValue:    conflicting.toValue,
             motionPath: conflicting.motionPath
@@ -227,10 +235,8 @@ extension CanvasViewController {
 
     // ── MARK: Visual Re-keying ────────────────────────────────────────────────
 
-    /// Transfers motion-path and rotation-arc visuals from `oldID` to `newClip.id`,
-    /// updating every embedded MotionPathHandleComponent / RotationArcComponent.
+    /// Transfers motion-path and rotation-arc visuals from `oldID` to `newClip.id`.
     private func reKeyVisuals(oldID: UUID, newClip: AnimationClip) {
-        // Motion path
         if let visual = activeMotionPaths.removeValue(forKey: oldID) {
             activeMotionPaths[newClip.id] = visual
             let comp = MotionPathHandleComponent(clipID: newClip.id)
@@ -241,7 +247,6 @@ extension CanvasViewController {
             if selectedPathClipID == oldID { selectedPathClipID = newClip.id }
         }
 
-        // Rotation arc
         if let arcVisual = activeRotationArcs.removeValue(forKey: oldID) {
             activeRotationArcs[newClip.id] = arcVisual
             arcVisual.startHandle.components.set(

@@ -6,20 +6,8 @@ import ARKit
 
 extension CanvasViewController {
 
-    /// Returns true when the start handle sphere should be shown for a clip.
-    /// The start handle is shown only for the FIRST motion-path clip of an entity
-    /// (no earlier path clip for the same entity exists). Subsequent clips are
-    /// chained — their start is the previous clip's end, so showing a second
-    /// start handle would be redundant and confusing.
-    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
-        guard clip.motionPath != nil else { return false }
-        let earlier = timeline.clips.filter {
-            $0.entityName == clip.entityName &&
-            $0.motionPath != nil &&
-            $0.startTime < clip.startTime
-        }
-        return earlier.isEmpty
-    }
+    // NOTE: shouldShowStartHandle(for:) lives in CanvasViewController+Timeline.swift
+    // to avoid the "invalid redeclaration" error. Do NOT redeclare it here.
 
     func makePathHandle(color: UIColor, name: String) -> ModelEntity {
         let mesh     = MeshResource.generateSphere(radius: 0.04)
@@ -82,7 +70,7 @@ extension CanvasViewController {
         end.position = (path.end - path.start) + SIMD3<Float>(0, 0.02, 0)
         pathRoot.addChild(end)
 
-        // FIX 6: Add path root to pathAnchor (not mainAnchor) so it is excluded from
+        // Add path root to pathAnchor (not mainAnchor) so it is excluded from
         // sidebar, undo snapshots, and the save document automatically.
         (pathAnchor ?? anchor).addChild(pathRoot)
 

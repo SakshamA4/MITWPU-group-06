@@ -21,7 +21,6 @@ enum CameraMovementPreset: String, CaseIterable {
         case .crane:    return "Camera moves up with a slight forward arc."
         }
     }
-    // Custom illustrative icon name — falls back to SF Symbol if image not found
     var imageName: String {
         switch self {
         case .pan:      return "Pan"
@@ -92,7 +91,6 @@ extension CanvasViewController {
     // Called from showActionMenu .addShot
     func presentShotPicker(for cameraEntity: Entity) {
         let vc = ShotPickerViewController(cameraEntity: cameraEntity) { [weak self] selection in
-            // After user picks a shot, ask for start time + duration
             self?.presentShotSettings(selection: selection, cameraEntity: cameraEntity)
         }
         let nav = UINavigationController(rootViewController: vc)
@@ -112,7 +110,6 @@ extension CanvasViewController {
     // ── Shot Settings presented after picking a shot ──────────────────────────
     func presentShotSettings(selection: ShotSelection, cameraEntity: Entity) {
 
-        // Determine whether this selection needs rotation controls
         let isRotation: Bool
         var presetAxis    = RotationAxis.y
         var presetDegrees: Float = 60
@@ -122,11 +119,11 @@ extension CanvasViewController {
             case .pan:
                 isRotation    = true
                 presetAxis    = .y
-                presetDegrees = 60   // π/3 in degrees
+                presetDegrees = 60
             case .tilt:
                 isRotation    = true
                 presetAxis    = .x
-                presetDegrees = -40  // −π/4.5 ≈ −40°
+                presetDegrees = -40
             default:
                 isRotation = false
             }
@@ -143,7 +140,6 @@ extension CanvasViewController {
         let card: AnimationInputCard
 
         if isRotation {
-            // Pan / Tilt — show full rotation card so user can tweak axis + degrees
             card = AnimationInputCard(mode: .editRotateFull(
                 currentStart:    timeline.duration,
                 currentDuration: 3.0,
@@ -152,7 +148,6 @@ extension CanvasViewController {
             ))
             card.onConfirm = { [weak self] startTime, duration, degrees, axis in
                 guard let self, duration > 0 else { return }
-                // Override the clip values with what the user chose
                 self.applyCameraRotationShot(
                     selection:    selection,
                     cameraEntity: cameraEntity,
@@ -163,7 +158,6 @@ extension CanvasViewController {
                 )
             }
         } else {
-            // Dolly / Crane / Static — just timing
             card = AnimationInputCard(mode: .addShot(
                 shotName:     shotName,
                 defaultStart: timeline.duration
@@ -191,6 +185,7 @@ extension CanvasViewController {
     }
 
     /// Applies a pan or tilt with user-specified degrees and axis.
+    /// Includes clip conflict detection/resolution identical to motion-path clips.
     private func applyCameraRotationShot(
         selection:    ShotSelection,
         cameraEntity: Entity,
@@ -209,7 +204,8 @@ extension CanvasViewController {
         if baseTransforms[cameraRoot.name] == nil {
             baseTransforms[cameraRoot.name] = cameraRoot.transform
         }
-        let clip = AnimationClip(
+
+        let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
             type:       .rotate,
             track:      .rotation,
@@ -219,9 +215,24 @@ extension CanvasViewController {
             fromValue:  axis.simdAxis,
             toValue:    SIMD3<Float>(degrees * (.pi / 180), 0, 0)
         )
-        timeline.addClip(clip)
-        if let entity = arView.scene.findEntity(named: cameraRoot.name) {
-            showRotationArc(for: clip, on: entity)
+
+        // ── Conflict check ────────────────────────────────────────────────────
+        if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {
+            // Use a "fake" old clip index — for new clips we append, so pass count as sentinel.
+            // commitClipTimingChange handles appending when index == clips.count.
+            let insertIndex = timeline.clips.count
+            presentClipConflictResolution(
+                editedClip:      candidateClip,
+                replacingID:     candidateClip.id,   // new clip — no old ID to replace
+                conflicting:     conflict,
+                clipIndex:       insertIndex,
+                originalEndTime: startTime           // no previous end; gap = conflict.start - startTime
+            )
+        } else {
+            timeline.addClip(candidateClip)
+            if let entity = arView.scene.findEntity(named: cameraRoot.name) {
+                showRotationArc(for: candidateClip, on: entity)
+            }
         }
         debugPrintTimeline()
     }
@@ -233,8 +244,6 @@ extension CanvasViewController {
         startTime: Float,
         duration: Float
     ) {
-        // Resolve to the SceneCameraRoot_ so entityName matches what the timeline
-        // and entity-drag code uses. The tapped entity may be the visual model child.
         var cameraRoot: Entity = cameraEntity
         var cur: Entity? = cameraEntity.parent
         while let p = cur {
@@ -246,7 +255,17 @@ extension CanvasViewController {
             baseTransforms[cameraRoot.name] = cameraRoot.transform
         }
 
-        let motionPath = generateCameraMovementPath(preset: preset, camera: cameraRoot)
+        // ── Chain origin: use the end-position of the last motion-path clip
+        //    for this camera, just like regular entities do. If no prior clip
+        //    exists, fall back to the camera's current world position.
+        let chainedOrigin = lastMotionPathEndPosition(for: cameraRoot.name)
+                         ?? cameraRoot.position(relativeTo: nil)
+
+        let motionPath = generateCameraMovementPath(
+            preset: preset,
+            camera: cameraRoot,
+            origin: chainedOrigin
+        )
 
         let track:     AnimationTrack
         let fromValue: SIMD3<Float>
@@ -254,12 +273,10 @@ extension CanvasViewController {
 
         switch preset {
         case .pan:
-            // Y-axis rotation (horizontal pan): totalRadians = pi/3 (~60°)
             track     = .rotation
             fromValue = RotationAxis.y.simdAxis
             toValue   = SIMD3<Float>(.pi / 3, 0, 0)
         case .tilt:
-            // X-axis rotation — negative angle tilts down (toward the subject)
             track     = .rotation
             fromValue = RotationAxis.x.simdAxis
             toValue   = SIMD3<Float>(-.pi / 4.5, 0, 0)
@@ -269,7 +286,7 @@ extension CanvasViewController {
             toValue   = .zero
         }
 
-        let clip = AnimationClip(
+        let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
             type:       track == .rotation ? .rotate : .move,
             track:      track,
@@ -280,13 +297,25 @@ extension CanvasViewController {
             toValue:    toValue,
             motionPath: motionPath
         )
-        timeline.addClip(clip)
 
-        if clip.motionPath != nil {
-            showMotionPath(for: clip)
-        }
-        if track == .rotation, let entity = arView.scene.findEntity(named: cameraEntity.name) {
-            showRotationArc(for: clip, on: entity)
+        // ── Conflict check ────────────────────────────────────────────────────
+        if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {
+            let insertIndex = timeline.clips.count
+            presentClipConflictResolution(
+                editedClip:      candidateClip,
+                replacingID:     candidateClip.id,
+                conflicting:     conflict,
+                clipIndex:       insertIndex,
+                originalEndTime: startTime
+            )
+        } else {
+            timeline.addClip(candidateClip)
+            if candidateClip.motionPath != nil {
+                showMotionPath(for: candidateClip)
+            }
+            if track == .rotation, let entity = arView.scene.findEntity(named: cameraRoot.name) {
+                showRotationArc(for: candidateClip, on: entity)
+            }
         }
         debugPrintTimeline()
     }
@@ -308,8 +337,12 @@ extension CanvasViewController {
         if baseTransforms[cameraRoot.name] == nil {
             baseTransforms[cameraRoot.name] = cameraRoot.transform
         }
-        let pos = cameraRoot.position(relativeTo: nil)
-        let clip = AnimationClip(
+
+        // Static shots also chain from the last known end position
+        let pos = lastMotionPathEndPosition(for: cameraRoot.name)
+                ?? cameraRoot.position(relativeTo: nil)
+
+        let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
             type:       .move,
             track:      .position,
@@ -320,20 +353,55 @@ extension CanvasViewController {
             toValue:    .zero,
             motionPath: BezierMotionPath(start: pos, control1: pos, control2: pos, end: pos)
         )
-        timeline.addClip(clip)
-        showMotionPath(for: clip)
+
+        // ── Conflict check ────────────────────────────────────────────────────
+        if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {
+            let insertIndex = timeline.clips.count
+            presentClipConflictResolution(
+                editedClip:      candidateClip,
+                replacingID:     candidateClip.id,
+                conflicting:     conflict,
+                clipIndex:       insertIndex,
+                originalEndTime: startTime
+            )
+        } else {
+            timeline.addClip(candidateClip)
+            showMotionPath(for: candidateClip)
+        }
         debugPrintTimeline()
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // MARK: - Chained Origin Helper
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Returns the world-space end position of the last motion-path clip for
+    /// `entityName`, so that a newly-added path starts exactly where the
+    /// previous one finishes — mirroring the behaviour for regular entities.
+    ///
+    /// Returns `nil` when no prior motion-path clips exist.
+    func lastMotionPathEndPosition(for entityName: String) -> SIMD3<Float>? {
+        let lastPathClip = timeline.clips
+            .filter { $0.entityName == entityName && $0.motionPath != nil }
+            .sorted { $0.startTime < $1.startTime }
+            .last
+        return lastPathClip?.motionPath?.end
+    }
+
     // ── Path Generator ────────────────────────────────────────────────────────
+
+    /// Generates a `BezierMotionPath` for `preset` starting at `origin`.
+    ///
+    /// `origin` is supplied by the caller (either the camera's current position
+    /// or the chained end of the previous clip) so this function stays pure and
+    /// testable without touching the entity hierarchy.
     func generateCameraMovementPath(
         preset: CameraMovementPreset,
-        camera: Entity
+        camera: Entity,
+        origin: SIMD3<Float>
     ) -> BezierMotionPath? {
-        // IMPORTANT: `camera` may be the visual model child rather than the root
-        // entity tracked by entityName/timeline. Walk up to the entity whose name
-        // is registered in the timeline so path.start matches the tracked position.
-        // If the root is not a SceneCameraRoot_ we fall back to the passed entity.
+        // Walk up to the SceneCameraRoot_ so orientation is correct even when
+        // `camera` is a visual-model child entity.
         var root: Entity = camera
         var current: Entity? = camera.parent
         while let p = current {
@@ -341,12 +409,7 @@ extension CanvasViewController {
             current = p.parent
         }
 
-        let origin = root.position(relativeTo: nil)
-        let rot    = root.orientation(relativeTo: nil)
-
-        // The PerspectiveCamera child is rotated 180° around Y so it shoots
-        // along +Z (toward the lens front). Use +Z as the camera's forward
-        // vector so dolly/crane paths move in the correct direction.
+        let rot     = root.orientation(relativeTo: nil)
         let forward = rot.act(SIMD3<Float>( 0,  0,  1))
         let up      = rot.act(SIMD3<Float>( 0,  1,  0))
 
@@ -367,14 +430,51 @@ extension CanvasViewController {
                 control2: origin + lift + forward * 0.3, end: origin + lift + forward * 0.5)
         }
     }
+
+    // Overload kept for call sites that don't yet pass an explicit origin.
+    // It reads the current entity position, matching legacy behaviour.
+    func generateCameraMovementPath(
+        preset: CameraMovementPreset,
+        camera: Entity
+    ) -> BezierMotionPath? {
+        var root: Entity = camera
+        var current: Entity? = camera.parent
+        while let p = current {
+            if p.name.hasPrefix("SceneCameraRoot_") { root = p; break }
+            current = p.parent
+        }
+        return generateCameraMovementPath(preset: preset, camera: root,
+                                          origin: root.position(relativeTo: nil))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MARK: - Conflict resolution override for NEW clips
+//
+// commitClipTimingChange assumes an existing index to overwrite. For brand-new
+// camera clips the "index" sentinel is timeline.clips.count (append).
+// We extend ClipConflict to handle this case gracefully.
+// ─────────────────────────────────────────────────────────────────────────────
+
+extension CanvasViewController {
+
+    /// Variant of commitClipTimingChange used when adding a brand-new clip
+    /// (no existing clip to replace). The clip is simply appended and visuals
+    /// are shown if needed.
+    func commitNewCameraClip(_ clip: AnimationClip) {
+        timeline.addClip(clip)
+        if clip.motionPath != nil {
+            showMotionPath(for: clip)
+        }
+        if clip.track == .rotation,
+           let entity = arView.scene.findEntity(named: clip.entityName) {
+            showRotationArc(for: clip, on: entity)
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: - ShotPickerViewController
-//
-// Card-grid layout matching the provided screenshot:
-//   Section 0  — Camera Movements  (horizontal scroll row)
-//   Section 1  — Static Shots      (horizontal scroll row)
 // ─────────────────────────────────────────────────────────────────────────────
 
 final class ShotPickerViewController: UIViewController {
@@ -382,14 +482,13 @@ final class ShotPickerViewController: UIViewController {
     private let cameraEntity: Entity
     private let onSelect: (ShotSelection) -> Void
 
-    private let scrollView  = UIScrollView()
+    private let scrollView   = UIScrollView()
     private let contentStack = UIStackView()
 
     private let movementPresets = CameraMovementPreset.allCases
     private let staticPresets   = StaticShotPreset.allCases
 
-    // Card size matching screenshot proportions
-    private let cardSize = CGSize(width: 220, height: 200)
+    private let cardSize    = CGSize(width: 220, height: 200)
     private let cardSpacing: CGFloat = 12
 
     init(cameraEntity: Entity, onSelect: @escaping (ShotSelection) -> Void) {
@@ -437,7 +536,6 @@ final class ShotPickerViewController: UIViewController {
     }
 
     private func buildSections() {
-        // ── Camera Movements ──────────────────────────────────────────────────
         let movSection = makeSectionView(
             title: "Camera Movements",
             cards: movementPresets.map { preset in
@@ -454,7 +552,6 @@ final class ShotPickerViewController: UIViewController {
         )
         contentStack.addArrangedSubview(movSection)
 
-        // ── Static Shots ──────────────────────────────────────────────────────
         let staticSection = makeSectionView(
             title: "Static Shots",
             cards: staticPresets.map { preset in
@@ -472,12 +569,10 @@ final class ShotPickerViewController: UIViewController {
         contentStack.addArrangedSubview(staticSection)
     }
 
-    // ── Section builder ────────────────────────────────────────────────────────
     private func makeSectionView(title: String, cards: [ShotCardView]) -> UIView {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        // Section title
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 22, weight: .bold)
@@ -485,13 +580,11 @@ final class ShotPickerViewController: UIViewController {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
 
-        // Horizontal scroll
         let scroll = UIScrollView()
         scroll.showsHorizontalScrollIndicator = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(scroll)
 
-        // Card row
         let row = UIStackView()
         row.axis    = .horizontal
         row.spacing = cardSpacing
@@ -533,13 +626,6 @@ final class ShotPickerViewController: UIViewController {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: - ShotCardView
-//
-// Individual card matching the screenshot:
-//   • Dark rounded rectangle
-//   • Image/illustration fills the top ~75% (uses imageName asset, falls back
-//     to SF Symbol rendered large)
-//   • Label centred at the bottom
-//   • Subtle pressed-state highlight
 // ─────────────────────────────────────────────────────────────────────────────
 
 final class ShotCardView: UIView {
@@ -550,28 +636,25 @@ final class ShotCardView: UIView {
         self.onTap = onTap
         super.init(frame: .zero)
 
-        backgroundColor   = UIColor(red: 18/255, green: 18/255, blue: 28/255, alpha: 1)
+        backgroundColor    = UIColor(red: 18/255, green: 18/255, blue: 28/255, alpha: 1)
         layer.cornerRadius = 16
         layer.borderWidth  = 1
         layer.borderColor  = UIColor.white.withAlphaComponent(0.1).cgColor
         clipsToBounds      = true
 
-        // ── Image / illustration ─────────────────────────────────────────
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
         imageView.tintColor   = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Try named asset first (for custom illustrations), fall back to SF Symbol
         if let namedImage = UIImage(named: imageName) {
             imageView.image = namedImage
         } else {
-            let cfg   = UIImage.SymbolConfiguration(pointSize: 56, weight: .light)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 56, weight: .light)
             imageView.image = UIImage(systemName: fallbackSymbol, withConfiguration: cfg)
         }
         addSubview(imageView)
 
-        // ── Label ─────────────────────────────────────────────────────────
         let nameLabel = UILabel()
         nameLabel.text          = label
         nameLabel.textColor     = .white
@@ -593,14 +676,12 @@ final class ShotCardView: UIView {
             nameLabel.heightAnchor.constraint(equalToConstant: 36),
         ])
 
-        // Tap gesture
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
     }
     required init?(coder: NSCoder) { fatalError() }
 
     @objc private func handleTap() {
-        // Brief press animation matching screenshot feel
         UIView.animate(withDuration: 0.08, animations: {
             self.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
             self.backgroundColor = UIColor(red: 40/255, green: 40/255, blue: 58/255, alpha: 1)
@@ -613,7 +694,6 @@ final class ShotCardView: UIView {
         }
     }
 
-    // Highlight on touch down
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
         UIView.animate(withDuration: 0.08) {
