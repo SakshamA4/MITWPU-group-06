@@ -15,6 +15,18 @@ struct OriginalColorComponent: Component {
     let color: UIColor
 }
 
+struct CharacterPoseComponent: Component {
+    let modelFileName: String
+
+    // Only these exact model names are standing poses that support Walk.
+    // Add new standing model names here as your cast grows.
+    private static let standingModelNames: Set<String> = ["man1", "woman1"]
+
+    var isStandingPose: Bool {
+        Self.standingModelNames.contains(modelFileName.lowercased())
+    }
+}
+
 struct CategoryComponent: Component {
     let toolType: ToolType
 }

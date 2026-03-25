@@ -880,7 +880,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 entity.position = [randomX, finalY, randomZ]
 
                 entity.components.set(CategoryComponent(toolType: toolType))
-                entity.components.set(EntityIDComponent(id: UUID()))
+
+                // Stamp pose info so the action menu can gate Walk to standing poses only.
+                if toolType == .character {
+                    entity.components.set(CharacterPoseComponent(modelFileName: item.modelFileName))
+                }
+                
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
