@@ -1017,26 +1017,40 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 worldPoint: hitWorld, arcCentre: arcCentreW, axis: axis)
 
             // Compute shortest angular delta from last frame, then accumulate.
-            // This is what allows the total to exceed ±π.
+            // This allows the total to exceed ±π (multi-turn support).
             var delta = rawAngle - arcDragLastAngle
             if delta >  .pi { delta -= 2 * .pi }
             if delta < -.pi { delta += 2 * .pi }
 
-            // Only end handle is draggable (start is always fixed at 0°)
-            guard role == .end else { return }
-
             let currentTotal = RotationPathRenderer.totalRadiansOf(clip)
-            let newTotal     = currentTotal + delta
+            let currentStart = RotationPathRenderer.startAngleOf(clip)
 
-            // Live visual update
-            RotationPathRenderer.updateEndAngle(visual: visual, totalRadians: newTotal)
+            switch role {
 
-            // Write back — preserve UUID
-            timeline.clips[clipIdx] = AnimationClip(
-                preservingID: clip,
-                fromValue: axis.simdAxis,
-                toValue:   SIMD3<Float>(newTotal, 0, 0)
-            )
+            case .end:
+                // End handle: totalRadians changes, startAngle is fixed.
+                let newTotal = currentTotal + delta
+                RotationPathRenderer.updateEndAngle(
+                    visual: visual, startAngle: currentStart, totalRadians: newTotal)
+                timeline.clips[clipIdx] = AnimationClip(
+                    preservingID: clip,
+                    fromValue: axis.simdAxis,
+                    toValue:   SIMD3<Float>(newTotal, currentStart, 0)
+                )
+
+            case .start:
+                // Start handle: startAngle shifts, totalRadians stays constant so
+                // the arc span (and the actual rotation during playback) is unchanged.
+                // The end handle rides along — only the visual reference rotates.
+                let newStart = currentStart + delta
+                RotationPathRenderer.updateStartAngle(
+                    visual: visual, startAngle: newStart, totalRadians: currentTotal)
+                timeline.clips[clipIdx] = AnimationClip(
+                    preservingID: clip,
+                    fromValue: axis.simdAxis,
+                    toValue:   SIMD3<Float>(currentTotal, newStart, 0)
+                )
+            }
 
             arcDragLastAngle = rawAngle
             return
