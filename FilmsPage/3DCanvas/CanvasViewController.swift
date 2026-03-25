@@ -776,6 +776,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
                 // 3. Components & Light Attachment
                 entity.components.set(CategoryComponent(toolType: toolType))
+
+                // Stamp pose info so the action menu can gate Walk to standing poses only.
+                if toolType == .character {
+                    entity.components.set(CharacterPoseComponent(modelFileName: item.modelFileName))
+                }
+                
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 

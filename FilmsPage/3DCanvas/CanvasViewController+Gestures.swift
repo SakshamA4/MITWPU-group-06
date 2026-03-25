@@ -317,7 +317,8 @@ extension CanvasViewController {
             self?.interactionMode = .rotate
             self?.presentAnimationPrompt(type: .rotate)
         })
-        if entity.components[CategoryComponent.self]?.toolType == .character {
+        if entity.components[CategoryComponent.self]?.toolType == .character,
+           entity.components[CharacterPoseComponent.self]?.isStandingPose == true {
             alert.addAction(UIAlertAction(title: "Walk (Path + Animation)", style: .default) { [weak self] _ in
                 self?.interactionMode = .move
                 self?.animateWalk()
