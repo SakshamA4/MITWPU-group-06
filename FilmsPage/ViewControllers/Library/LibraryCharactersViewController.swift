@@ -52,17 +52,37 @@ class LibraryCharactersViewController: UIViewController {
         // IMPORTANT: disable self-sizing
         layout.estimatedItemSize = .zero
 
-        let columns: CGFloat = 3
+//        let columns: CGFloat = 3
+//        let spacing: CGFloat = 35
+//        let sideInset: CGFloat = 46
+////        let verticalInset: CGFloat = 40
+//
+//        let width = charactersCollectionView.bounds.width
+//        guard width > 0 else { return }
+//
+//        let totalSpacing = spacing * (columns - 1) + sideInset * 2
+//        let itemWidth = floor((width - totalSpacing) / columns)
+//        let itemHeight = itemWidth * 0.67
+//
+//        layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
+//        layout.minimumInteritemSpacing = spacing
+//        layout.minimumLineSpacing = spacing
+//        layout.sectionInset = UIEdgeInsets(top: 0,
+//                                           left: sideInset,
+//                                           bottom: 0,
+//                                           right: sideInset)
+        let columns: CGFloat = 4
         let spacing: CGFloat = 35
-        let sideInset: CGFloat = 46
-//        let verticalInset: CGFloat = 40
+        let sideInset: CGFloat = 75
 
         let width = charactersCollectionView.bounds.width
         guard width > 0 else { return }
 
         let totalSpacing = spacing * (columns - 1) + sideInset * 2
         let itemWidth = floor((width - totalSpacing) / columns)
-        let itemHeight = itemWidth * 0.67
+
+        // ✅ Make it square like lights
+        let itemHeight = itemWidth
 
         layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
         layout.minimumInteritemSpacing = spacing
