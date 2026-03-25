@@ -1418,7 +1418,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 let nextClip = timeline.clips[nextIdx]
                 guard nextClip.entityName == thisClip.entityName,
                       var nextPath = nextClip.motionPath else { continue }
-                let delta2 = newPos - path.start + (newPos - path.start)
+                let delta2 = delta  // 'delta' was computed before path.start was updated above
                 nextPath.start    += delta2; nextPath.end      += delta2
                 nextPath.control1 += delta2; nextPath.control2 += delta2
                 // FIX 10: Throttle cascade rebuild

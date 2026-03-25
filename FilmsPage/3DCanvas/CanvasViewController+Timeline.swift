@@ -146,23 +146,23 @@ extension CanvasViewController {
     }
 
     
-    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
-
-        // Only position clips with motion paths are relevant
-        guard clip.track == .position, clip.motionPath != nil else {
-            return false
-        }
-
-        // Find ANY earlier motion path for this entity
-        let hasPreviousPath = timeline.clips.contains {
-            $0.entityName == clip.entityName &&
-            $0.motionPath != nil &&
-            $0.startTime < clip.startTime
-        }
-
-        // Show start handle ONLY if this is the FIRST path
-        return !hasPreviousPath
-    }
+//    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
+//
+//        // Only position clips with motion paths are relevant
+//        guard clip.track == .position, clip.motionPath != nil else {
+//            return false
+//        }
+//
+//        // Find ANY earlier motion path for this entity
+//        let hasPreviousPath = timeline.clips.contains {
+//            $0.entityName == clip.entityName &&
+//            $0.motionPath != nil &&
+//            $0.startTime < clip.startTime
+//        }
+//
+//        // Show start handle ONLY if this is the FIRST path
+//        return !hasPreviousPath
+//    }
 
 
 

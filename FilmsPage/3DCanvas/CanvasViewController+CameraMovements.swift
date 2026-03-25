@@ -199,11 +199,18 @@ extension CanvasViewController {
         degrees:      Float,
         axis:         RotationAxis
     ) {
-        if baseTransforms[cameraEntity.name] == nil {
-            baseTransforms[cameraEntity.name] = cameraEntity.transform
+        var cameraRoot: Entity = cameraEntity
+        var cur: Entity? = cameraEntity.parent
+        while let p = cur {
+            if p.name.hasPrefix("SceneCameraRoot_") { cameraRoot = p; break }
+            cur = p.parent
+        }
+
+        if baseTransforms[cameraRoot.name] == nil {
+            baseTransforms[cameraRoot.name] = cameraRoot.transform
         }
         let clip = AnimationClip(
-            entityName: cameraEntity.name,
+            entityName: cameraRoot.name,
             type:       .rotate,
             track:      .rotation,
             easing:     .easeInOut,
@@ -213,7 +220,7 @@ extension CanvasViewController {
             toValue:    SIMD3<Float>(degrees * (.pi / 180), 0, 0)
         )
         timeline.addClip(clip)
-        if let entity = arView.scene.findEntity(named: cameraEntity.name) {
+        if let entity = arView.scene.findEntity(named: cameraRoot.name) {
             showRotationArc(for: clip, on: entity)
         }
         debugPrintTimeline()
@@ -226,11 +233,20 @@ extension CanvasViewController {
         startTime: Float,
         duration: Float
     ) {
-        if baseTransforms[cameraEntity.name] == nil {
-            baseTransforms[cameraEntity.name] = cameraEntity.transform
+        // Resolve to the SceneCameraRoot_ so entityName matches what the timeline
+        // and entity-drag code uses. The tapped entity may be the visual model child.
+        var cameraRoot: Entity = cameraEntity
+        var cur: Entity? = cameraEntity.parent
+        while let p = cur {
+            if p.name.hasPrefix("SceneCameraRoot_") { cameraRoot = p; break }
+            cur = p.parent
         }
 
-        let motionPath = generateCameraMovementPath(preset: preset, camera: cameraEntity)
+        if baseTransforms[cameraRoot.name] == nil {
+            baseTransforms[cameraRoot.name] = cameraRoot.transform
+        }
+
+        let motionPath = generateCameraMovementPath(preset: preset, camera: cameraRoot)
 
         let track:     AnimationTrack
         let fromValue: SIMD3<Float>
@@ -254,7 +270,7 @@ extension CanvasViewController {
         }
 
         let clip = AnimationClip(
-            entityName: cameraEntity.name,
+            entityName: cameraRoot.name,
             type:       track == .rotation ? .rotate : .move,
             track:      track,
             easing:     .easeInOut,
@@ -282,12 +298,19 @@ extension CanvasViewController {
         startTime: Float,
         duration: Float
     ) {
-        if baseTransforms[cameraEntity.name] == nil {
-            baseTransforms[cameraEntity.name] = cameraEntity.transform
+        var cameraRoot: Entity = cameraEntity
+        var cur: Entity? = cameraEntity.parent
+        while let p = cur {
+            if p.name.hasPrefix("SceneCameraRoot_") { cameraRoot = p; break }
+            cur = p.parent
         }
-        let pos = cameraEntity.position(relativeTo: nil)
+
+        if baseTransforms[cameraRoot.name] == nil {
+            baseTransforms[cameraRoot.name] = cameraRoot.transform
+        }
+        let pos = cameraRoot.position(relativeTo: nil)
         let clip = AnimationClip(
-            entityName: cameraEntity.name,
+            entityName: cameraRoot.name,
             type:       .move,
             track:      .position,
             easing:     .easeInOut,
@@ -307,8 +330,19 @@ extension CanvasViewController {
         preset: CameraMovementPreset,
         camera: Entity
     ) -> BezierMotionPath? {
-        let origin = camera.position(relativeTo: nil)
-        let rot    = camera.orientation(relativeTo: nil)
+        // IMPORTANT: `camera` may be the visual model child rather than the root
+        // entity tracked by entityName/timeline. Walk up to the entity whose name
+        // is registered in the timeline so path.start matches the tracked position.
+        // If the root is not a SceneCameraRoot_ we fall back to the passed entity.
+        var root: Entity = camera
+        var current: Entity? = camera.parent
+        while let p = current {
+            if p.name.hasPrefix("SceneCameraRoot_") { root = p; break }
+            current = p.parent
+        }
+
+        let origin = root.position(relativeTo: nil)
+        let rot    = root.orientation(relativeTo: nil)
 
         // The PerspectiveCamera child is rotated 180° around Y so it shoots
         // along +Z (toward the lens front). Use +Z as the camera's forward

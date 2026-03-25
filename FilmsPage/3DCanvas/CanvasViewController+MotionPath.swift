@@ -6,13 +6,32 @@ import ARKit
 
 extension CanvasViewController {
 
+    /// Returns true when the start handle sphere should be shown for a clip.
+    /// The start handle is shown only for the FIRST motion-path clip of an entity
+    /// (no earlier path clip for the same entity exists). Subsequent clips are
+    /// chained — their start is the previous clip's end, so showing a second
+    /// start handle would be redundant and confusing.
+    func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
+        guard clip.motionPath != nil else { return false }
+        let earlier = timeline.clips.filter {
+            $0.entityName == clip.entityName &&
+            $0.motionPath != nil &&
+            $0.startTime < clip.startTime
+        }
+        return earlier.isEmpty
+    }
+
     func makePathHandle(color: UIColor, name: String) -> ModelEntity {
         let mesh     = MeshResource.generateSphere(radius: 0.04)
         let material = SimpleMaterial(color: color, roughness: 0.2, isMetallic: true)
         let handle   = ModelEntity(mesh: mesh, materials: [material])
         handle.name  = name
 
-        let collision = CollisionComponent(shapes: [.generateSphere(radius: 0.15)])
+        // Collision radius slightly larger than visual (0.04) for comfortable tapping,
+        // but NOT 0.15 — that giant sphere overlaps camera model geometry and causes
+        // the entity body hit-test to return the camera root instead of the handle,
+        // which clears activeHandleEntity and drags all paths at once.
+        let collision = CollisionComponent(shapes: [.generateSphere(radius: 0.06)])
         handle.components.set(collision)
         handle.components.set(InputTargetComponent())
         return handle
