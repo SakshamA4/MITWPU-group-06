@@ -43,36 +43,36 @@ enum CameraMovementPreset: String, CaseIterable {
 
 enum StaticShotPreset: String, CaseIterable {
     case establishing = "Establishing Shot"
-    case wide         = "Wide Shot"
-    case medium       = "Medium Shot"
-    case closeUp      = "Close-up"
-    case insert       = "Insert/Cutaway"
+    case Zoomin         = "Zoom-in Shot"
+    case Zoomout       = "Zoom-out Shot"
+//    case closeUp      = "Close-up"
+//    case insert       = "Insert/Cutaway"
 
     var description: String {
         switch self {
         case .establishing: return "Sets up location and context."
-        case .wide:         return "Subject in full environment."
-        case .medium:       return "Waist-up framing."
-        case .closeUp:      return "Tight shot on face or detail."
-        case .insert:       return "Cut to a supporting detail."
+        case .Zoomin:         return "Moves closer to subject."
+        case .Zoomout:       return "Moves away from subject."
+//        case .closeUp:      return "Tight shot on face or detail."
+//        case .insert:       return "Cut to a supporting detail."
         }
     }
     var imageName: String {
         switch self {
-        case .establishing: return "shot_establishing"
-        case .wide:         return "shot_wide"
-        case .medium:       return "shot_medium"
-        case .closeUp:      return "shot_closeup"
-        case .insert:       return "shot_insert"
+        case .establishing: return "Establishing Shot"
+        case .Zoomin:         return "Zoom-in Shot"
+        case .Zoomout:       return "Zoom-out Shot"
+//        case .closeUp:      return "shot_closeup"
+//        case .insert:       return "shot_insert"
         }
     }
     var fallbackSFSymbol: String {
         switch self {
         case .establishing: return "mappin.and.ellipse"
-        case .wide:         return "rectangle.expand.vertical"
-        case .medium:       return "person.crop.rectangle"
-        case .closeUp:      return "magnifyingglass"
-        case .insert:       return "scissors"
+        case .Zoomin:         return "rectangle.expand.vertical"
+        case .Zoomout:       return "person.crop.rectangle"
+//        case .closeUp:      return "magnifyingglass"
+//        case .insert:       return "scissors"
         }
     }
 }
