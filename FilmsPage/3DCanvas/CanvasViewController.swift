@@ -685,11 +685,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
     }
 
-    deinit {
-        // Safety net: ensure the display link is gone even if viewWillDisappear was skipped.
-        displayLink?.invalidate()
-        displayLink = nil
-    }
+     deinit {
+         // Safety net: ensure the display link is gone even if viewWillDisappear was skipped.
+         displayLink?.invalidate()
+         displayLink = nil
+         
+         // FIX: Safety cleanup - evict scene from cache if commitExit() wasn't called normally.
+         // This catches edge cases where the VC is dismissed abnormally (e.g., navigation pop),
+         // ensuring the scene is cleared from the cache to prevent memory bloat.
+         if let sceneID = currentSceneID {
+             ScenePersistenceService.shared.evictScene(sceneID)
+             print("🗑️ Safety deinit: Scene \(sceneID.uuidString.prefix(8))... evicted from cache")
+         }
+     }
 
     // MARK: - UIGestureRecognizerDelegate
 
@@ -855,7 +863,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(); return }
                 if item.isBackground { spawnBackgroundPlane(item); return }
 
-                let entity = try await Entity(named: item.modelFileName)
+                // FIX: Use the model cache for spawned entities to track memory and enable eviction.
+                // This prevents memory accumulation when creating scenes with many of the same model.
+                let entity: Entity
+                if let currentID = currentSceneID,
+                   let cachedEntity = ScenePersistenceService.shared.getCachedModel(item.modelFileName, for: currentID) {
+                    // Cache hit: clone the cached entity
+                    entity = cachedEntity.clone(recursive: true)
+                } else {
+                    // Cache miss: load, cache, then clone
+                    let loaded = try await Entity(named: item.modelFileName)
+                    if let currentID = currentSceneID {
+                        ScenePersistenceService.shared.cacheSpawnedModel(loaded, item.modelFileName, for: currentID)
+                    }
+                    entity = loaded.clone(recursive: true)
+                }
 
                 // Normalise
                 let bounds = entity.visualBounds(relativeTo: nil)

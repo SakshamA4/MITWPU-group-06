@@ -975,28 +975,39 @@ final class ScenePersistenceService {
             vc.timeline.addClip(clip)
         }
     }
-    
-    // MARK: - Cache Management & Diagnostics
-    
-    /// Evicts a specific scene from the model cache to free memory.
-    func evictScene(_ sceneID: UUID) {
-        modelCacheManager.evictScene(sceneID)
-    }
-    
-    /// Logs current cache statistics to console.
-    func logCacheStats() {
-        let stats = modelCacheManager.getStats()
-        let current = stats["currentMemory"] as? Int ?? 0
-        let max = stats["maxMemory"] as? Int ?? 0
-        let percent = stats["percentUsed"] as? String ?? "0"
-        let scenes = stats["scenesInCache"] as? Int ?? 0
-        let models = stats["totalModels"] as? Int ?? 0
-        
-        print("====== 📊 CACHE STATISTICS ======")
-        print("Memory: \(current / 1024 / 1024)MB / \(max / 1024 / 1024)MB (\(percent)%)")
-        print("Scenes: \(scenes), Models: \(models)")
-        print("==================================")
-    }
+     
+     // MARK: - Cache Management & Diagnostics
+     
+     /// Retrieves a cached model for the given scene (used by spawnEntity).
+     func getCachedModel(_ fileName: String, for sceneID: UUID) -> Entity? {
+         return modelCacheManager.getModel(fileName, for: sceneID)
+     }
+     
+     /// Caches a model for the given scene (used by spawnEntity).
+     func cacheSpawnedModel(_ entity: Entity, _ fileName: String, for sceneID: UUID) {
+         let estimatedSize = estimateEntitySize(entity)
+         modelCacheManager.cacheModel(entity, fileName, for: sceneID, estimatedSize: estimatedSize)
+     }
+     
+     /// Evicts a specific scene from the model cache to free memory.
+     func evictScene(_ sceneID: UUID) {
+         modelCacheManager.evictScene(sceneID)
+     }
+     
+     /// Logs current cache statistics to console.
+     func logCacheStats() {
+         let stats = modelCacheManager.getStats()
+         let current = stats["currentMemory"] as? Int ?? 0
+         let max = stats["maxMemory"] as? Int ?? 0
+         let percent = stats["percentUsed"] as? String ?? "0"
+         let scenes = stats["scenesInCache"] as? Int ?? 0
+         let models = stats["totalModels"] as? Int ?? 0
+         
+         print("====== 📊 CACHE STATISTICS ======")
+         print("Memory: \(current / 1024 / 1024)MB / \(max / 1024 / 1024)MB (\(percent)%)")
+         print("Scenes: \(scenes), Models: \(models)")
+         print("==================================")
+     }
     
     // MARK: - resolveModelFileName
 

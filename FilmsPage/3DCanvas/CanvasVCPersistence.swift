@@ -128,30 +128,38 @@ extension CanvasViewController {
 
     // MARK: - Commit exit
 
-    /// Updates metadata and dismisses. No RealityKit access — safe to call any time.
-    func commitExit() {
-        let currentID = currentSceneID ?? currentSceneObject?.id ?? UUID()
+     /// Updates metadata and dismisses. No RealityKit access — safe to call any time.
+     func commitExit() {
+         let currentID = currentSceneID ?? currentSceneObject?.id ?? UUID()
 
-        let isTemplate = ScenesDataStore.shared.currentTemplates.contains { $0.id == currentID }
+         let isTemplate = ScenesDataStore.shared.currentTemplates.contains { $0.id == currentID }
 
-        if isTemplate {
-            ScenesDataStore.shared.saveTemplateNote(id: currentID, notes: sceneNotes)
-        } else {
-            let updatedRecent = ScenesModel(
-                id:    currentID,
-                name:  sceneName,
-                image: sceneImageName ?? "Image",
-                notes: sceneNotes
-            )
-            ScenesDataStore.shared.addToRecent(scene: updatedRecent)
-        }
-        
-        // FIX: Reset the scene load flag so that if this scene is reopened later,
-        // it will load properly. Without this, reopening a scene would skip loading
-        // because hasSceneBeenLoaded would still be true.
-        hasSceneBeenLoaded = false
+         if isTemplate {
+             ScenesDataStore.shared.saveTemplateNote(id: currentID, notes: sceneNotes)
+         } else {
+             let updatedRecent = ScenesModel(
+                 id:    currentID,
+                 name:  sceneName,
+                 image: sceneImageName ?? "Image",
+                 notes: sceneNotes
+             )
+             ScenesDataStore.shared.addToRecent(scene: updatedRecent)
+         }
+         
+         // FIX: Reset the scene load flag so that if this scene is reopened later,
+         // it will load properly. Without this, reopening a scene would skip loading
+         // because hasSceneBeenLoaded would still be true.
+         hasSceneBeenLoaded = false
+         
+         // FIX: Explicitly evict the scene from cache on exit to prevent memory accumulation.
+         // This ensures that when the user exits a scene, all its models are immediately
+         // removed from the cache, allowing the app to support 7-8+ scenes without memory bloat.
+         if let sceneID = currentSceneID {
+             ScenePersistenceService.shared.evictScene(sceneID)
+             print("🗑️ Scene \(sceneID.uuidString.prefix(8))... evicted from cache on exit")
+         }
 
-        dismiss(animated: true)
-    }
+         dismiss(animated: true)
+     }
 }
 
