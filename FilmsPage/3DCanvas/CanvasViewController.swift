@@ -674,9 +674,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     /// orphaned preview clones.
     @MainActor
     func cleanupPreviewARView() {
-        guard let previewView = objc_getAssociatedObject(self, &Self.previewARViewKey) as? ARView else {
-            return
-        }
+        // Access the previewARView computed property from the Camera extension
+        // to clean up any clones that accumulated during preview updates
+        let previewView = self.previewARView
         
         print("🧹 Cleaning up preview ARView...")
         previewView.scene.anchors.forEach { anchor in

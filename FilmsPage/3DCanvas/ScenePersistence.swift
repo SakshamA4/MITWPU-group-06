@@ -598,39 +598,40 @@ final class ScenePersistenceService {
         vc.activeRotationArcs.values.forEach { $0.root.removeFromParent() }
         vc.activeRotationArcs.removeAll()
         
-        // FIX: Clean up preview ARView clones to prevent memory accumulation
-        // when switching between scenes (shot preview timer adds clones continuously).
-        vc.cleanupPreviewARView()
-        
-        // FIX: Release GPU texture memory by clearing TextureResource references
-        // in BackgroundComponents before removing entities from the scene graph.
-        // TextureResource GPU memory is freed when the reference is deallocated.
-        let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
-        vc.mainAnchor?.children
-            .filter { !keep.contains($0.name) }
-            .forEach { entity in
-                if let modelEntity = entity as? ModelEntity,
-                   var bgComp = modelEntity.components[CanvasViewController.BackgroundComponent.self] {
-                    bgComp.textureResource = nil  // Release GPU texture reference
-                    modelEntity.components.set(bgComp)
-                    print("🧹 Released texture for background: \(entity.name)")
-                }
-            }
+         // FIX: Clean up preview ARView clones to prevent memory accumulation
+         // when switching between scenes (shot preview timer adds clones continuously).
+         vc.cleanupPreviewARView()
+         
+         // System entities to keep throughout the scene lifecycle
+         let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+         
+         // FIX: Release GPU texture memory by clearing TextureResource references
+         // in BackgroundComponents before removing entities from the scene graph.
+         // TextureResource GPU memory is freed when the reference is deallocated.
+         vc.mainAnchor?.children
+             .filter { !keep.contains($0.name) }
+             .forEach { entity in
+                 if let modelEntity = entity as? ModelEntity,
+                    var bgComp = modelEntity.components[CanvasViewController.BackgroundComponent.self] {
+                     bgComp.textureResource = nil  // Release GPU texture reference
+                     modelEntity.components.set(bgComp)
+                     print("🧹 Released texture for background: \(entity.name)")
+                 }
+             }
 
-        // FIX 2 + FIX 6: Remove recursively bottom-up so nested entities (e.g. camera visuals
-        // with child lights) are detached from their parents before the root is removed.
-        // RealityKit's removeFromParent() only unlinks the immediate parent link; orphaned
-        // sub-trees would linger in memory without explicit recursive removal.
-        // "PathContainer" is kept — its PathRoot_ children are already removed above via
-        // the activeMotionPaths loop, so the container itself is empty after this point.
-        let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
-        func removeRecursively(_ entity: Entity) {
-            for child in entity.children { removeRecursively(child) }
-            entity.removeFromParent()
-        }
-        vc.mainAnchor?.children
-            .filter { !keep.contains($0.name) }
-            .forEach { removeRecursively($0) }
+         // FIX 2 + FIX 6: Remove recursively bottom-up so nested entities (e.g. camera visuals
+         // with child lights) are detached from their parents before the root is removed.
+         // RealityKit's removeFromParent() only unlinks the immediate parent link; orphaned
+         // sub-trees would linger in memory without explicit recursive removal.
+         // "PathContainer" is kept — its PathRoot_ children are already removed above via
+         // the activeMotionPaths loop, so the container itself is empty after this point.
+         func removeRecursively(_ entity: Entity) {
+             for child in entity.children { removeRecursively(child) }
+             entity.removeFromParent()
+         }
+         vc.mainAnchor?.children
+             .filter { !keep.contains($0.name) }
+             .forEach { removeRecursively($0) }
 
         vc.timeline.clips.removeAll()
         vc.baseTransforms.removeAll()
