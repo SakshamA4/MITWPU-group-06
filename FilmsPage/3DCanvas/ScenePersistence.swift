@@ -122,13 +122,12 @@ final class ScenePersistenceService {
 
     static let shared = ScenePersistenceService()
 
-    // FIX 4: Cache loaded USDZ Entity prototypes so that repeated loads of the
-    // same model file (e.g. re-opening a scene or undo/redo spawns) reuse one
-    // deserialized copy instead of re-parsing the asset every time.
-    private var modelCache: [String: Entity] = [:]
+    // FIX: Scene-scoped LRU model cache manager (replaces old global cache)
+    // Manages model lifecycle with automatic memory eviction.
+    private let modelCacheManager = ModelCacheManager()
 
     @objc private func clearModelCacheOnWarning() {
-        modelCache.removeAll()
+        modelCacheManager.clearAll()
     }
 
     private init() {
@@ -455,6 +454,8 @@ final class ScenePersistenceService {
         }
 
         // Phase 2 – clean slate
+        // FIX: Evict LRU scene from cache if memory pressure detected
+        modelCacheManager.evictLRUSceneIfNeeded()
         clearSceneState(vc: vc)
 
         // FIX 8: Suppress intermediate sidebar rebuilds during load.
@@ -555,6 +556,9 @@ final class ScenePersistenceService {
 
         vc.refreshSidebarContent()
         print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
+        
+        // FIX: Log memory diagnostics for debugging and tuning
+        logCacheStats()
 
         // Phase 9.5 – serialised collision shape generation (FIX E).
         //
@@ -593,6 +597,25 @@ final class ScenePersistenceService {
 
         vc.activeRotationArcs.values.forEach { $0.root.removeFromParent() }
         vc.activeRotationArcs.removeAll()
+        
+        // FIX: Clean up preview ARView clones to prevent memory accumulation
+        // when switching between scenes (shot preview timer adds clones continuously).
+        vc.cleanupPreviewARView()
+        
+        // FIX: Release GPU texture memory by clearing TextureResource references
+        // in BackgroundComponents before removing entities from the scene graph.
+        // TextureResource GPU memory is freed when the reference is deallocated.
+        let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        vc.mainAnchor?.children
+            .filter { !keep.contains($0.name) }
+            .forEach { entity in
+                if let modelEntity = entity as? ModelEntity,
+                   var bgComp = modelEntity.components[CanvasViewController.BackgroundComponent.self] {
+                    bgComp.textureResource = nil  // Release GPU texture reference
+                    modelEntity.components.set(bgComp)
+                    print("🧹 Released texture for background: \(entity.name)")
+                }
+            }
 
         // FIX 2 + FIX 6: Remove recursively bottom-up so nested entities (e.g. camera visuals
         // with child lights) are detached from their parents before the root is removed.
@@ -794,6 +817,7 @@ final class ScenePersistenceService {
 
             var material       = UnlitMaterial()
             var restoredImage: UIImage?
+            var textureResource: TextureResource?  // FIX: Track texture for cleanup
 
             // Check backgroundImagePath from the JSON record first,
             // then fall back to backgroundImageCache (populated by a previous session's
@@ -836,6 +860,7 @@ final class ScenePersistenceService {
                      )
                      material.color.texture = .init(texture)
                      restoredImage = image
+                     textureResource = texture  // FIX: Store reference for cleanup
                      print("✅ Background texture restored: \(record.name)")
                 } catch {
                     // Texture upload failed — show a magenta placeholder so the user
@@ -863,10 +888,13 @@ final class ScenePersistenceService {
             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
                 e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
             }
+            
+            // FIX: Store textureResource reference for cleanup when scene is cleared
             e.components.set(CanvasViewController.BackgroundComponent(
                 width:       w,
                 height:      h,
-                cachedImage: restoredImage   // retained so future save() calls can extract JPEG data
+                cachedImage: restoredImage,      // retained so future save() calls can extract JPEG data
+                textureResource: textureResource  // FIX: Track for cleanup
             ))
             e.components.set(CategoryComponent(toolType: .background))
             e.components.set(InputTargetComponent())
@@ -878,14 +906,15 @@ final class ScenePersistenceService {
 
         // ── Regular 3D model ───────────────────────────────────────────────────
         do {
-            // FIX 4: Reuse a cached prototype and clone it — avoids re-parsing
-            // the USDZ asset on every load of the same model.
+            // FIX: Use scene-scoped LRU cache manager instead of global cache.
+            // This allows fast revisits to the same scene while evicting old scenes automatically.
             let entity: Entity
-            if let cached = modelCache[record.modelFileName] {
+            if let cached = modelCacheManager.getModel(record.modelFileName, for: sceneID) {
                 entity = cached.clone(recursive: true)
             } else {
                 let loaded = try await Entity(named: record.modelFileName)
-                modelCache[record.modelFileName] = loaded
+                let estimatedSize = estimateEntitySize(loaded)
+                modelCacheManager.cacheModel(loaded, record.modelFileName, for: sceneID, estimatedSize: estimatedSize)
                 entity = loaded.clone(recursive: true)
             }
             entity.name = record.name
@@ -945,7 +974,29 @@ final class ScenePersistenceService {
             vc.timeline.addClip(clip)
         }
     }
-
+    
+    // MARK: - Cache Management & Diagnostics
+    
+    /// Evicts a specific scene from the model cache to free memory.
+    func evictScene(_ sceneID: UUID) {
+        modelCacheManager.evictScene(sceneID)
+    }
+    
+    /// Logs current cache statistics to console.
+    func logCacheStats() {
+        let stats = modelCacheManager.getStats()
+        let current = stats["currentMemory"] as? Int ?? 0
+        let max = stats["maxMemory"] as? Int ?? 0
+        let percent = stats["percentUsed"] as? String ?? "0"
+        let scenes = stats["scenesInCache"] as? Int ?? 0
+        let models = stats["totalModels"] as? Int ?? 0
+        
+        print("====== 📊 CACHE STATISTICS ======")
+        print("Memory: \(current / 1024 / 1024)MB / \(max / 1024 / 1024)MB (\(percent)%)")
+        print("Scenes: \(scenes), Models: \(models)")
+        print("==================================")
+    }
+    
     // MARK: - resolveModelFileName
 
     /// Strips the uniquifying suffix from an entity display name so we can

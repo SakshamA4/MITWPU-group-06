@@ -549,6 +549,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         var width: Float
         var height: Float
         var cachedImage: UIImage?   // retained reference to the original UIImage
+        var textureResource: TextureResource?  // FIX: Track GPU texture for cleanup
     }
 
     var pathEditToolbar: UIView?
@@ -665,6 +666,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
          }
      }
 
+
+    // MARK: - Preview ARView Cleanup
+    
+    /// Cleans up all cloned entities in the offscreen preview ARView.
+    /// Called when loading a new scene to prevent memory accumulation from
+    /// orphaned preview clones.
+    @MainActor
+    func cleanupPreviewARView() {
+        guard let previewView = objc_getAssociatedObject(self, &Self.previewARViewKey) as? ARView else {
+            return
+        }
+        
+        print("🧹 Cleaning up preview ARView...")
+        previewView.scene.anchors.forEach { anchor in
+            anchor.children.forEach { $0.removeFromParent() }
+            anchor.removeFromParent()
+        }
+    }
 
     deinit {
         // Safety net: ensure the display link is gone even if viewWillDisappear was skipped.
