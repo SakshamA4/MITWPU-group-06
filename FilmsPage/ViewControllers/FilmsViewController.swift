@@ -99,7 +99,10 @@ class FilmsViewController: UIViewController {
 
             // Outer side inset (matches your original 12pt leading/trailing section inset)
             // plus 10pt item content inset on each side = visually ~22pt from screen edge
-            let sectionInset: CGFloat = 12
+            
+            let labelLeading: CGFloat = self.FilmsPageTitleLabel.convert(CGPoint.zero, to: self.view).x
+            let sectionInset: CGFloat = max(labelLeading, 10)
+            //let sectionInset: CGFloat = 12
             let itemInset:    CGFloat = 10        // applied per-item (left + right)
             let interGroup:   CGFloat = 50        // vertical gap between rows (your original)
 

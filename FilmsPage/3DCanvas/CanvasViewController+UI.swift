@@ -764,7 +764,7 @@ extension CanvasViewController {
         )
         
         NSLayoutConstraint.activate([
-            sidebarView.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            sidebarView.topAnchor.constraint(equalTo: view.topAnchor),
             sidebarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             sidebarView.widthAnchor.constraint(equalToConstant: sidebarWidth),
             sidebarLeadingConstraint,
