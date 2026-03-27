@@ -212,8 +212,13 @@ extension CanvasViewController {
     @objc func toggleRotationMode(_ button: UIButton) {
         interactionMode = (interactionMode == .move) ? .rotate : .move
 
-        button.backgroundColor =
-            interactionMode == .rotate ? .systemOrange : .systemBlue
+        if interactionMode == .rotate {
+            button.setImage(UIImage(systemName: "rotate.3d"), for: .normal)
+            button.backgroundColor = .systemOrange
+        } else {
+            button.setImage(UIImage(systemName: "move.3d"), for: .normal)
+            button.backgroundColor = .systemBlue
+        }
 
         // Immediately swap gizmo ↔ rings on the currently selected entity
         updateGizmoMode()
@@ -522,7 +527,7 @@ extension CanvasViewController {
         
         //         4. ROTATE BUTTON (Bottom-Left - Blue Button)
         let rotateBtn = UIButton(type: .system)
-        rotateBtn.setImage(UIImage(systemName: "rotate.right"), for: .normal)
+        rotateBtn.setImage(UIImage(systemName: "move.3d"), for: .normal)
         rotateBtn.tintColor = .white
         rotateBtn.backgroundColor = .systemBlue
         rotateBtn.layer.cornerRadius = 22
