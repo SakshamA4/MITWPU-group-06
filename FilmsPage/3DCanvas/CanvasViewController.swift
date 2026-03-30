@@ -239,10 +239,6 @@ func applyEasing(_ t: Float, easing: EasingType) -> Float {
 
 class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
-    // MARK: - AR Mode
-    var isARModeActive: Bool = false
-    weak var arModeButton: UIButton?
-
     // MARK: - NEW Properties
 
     //Ata

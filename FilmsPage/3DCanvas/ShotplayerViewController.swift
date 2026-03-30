@@ -60,8 +60,6 @@ final class ShotPlayerViewController: UIViewController {
      var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
      private var isPlaying        = false
-     private var snapshotInFlight: UIImage?
-     private var snapshotPending  = false
      private var displayLink: CADisplayLink?
      private var playStart: CFTimeInterval = 0
      private var currentTime: Float = 0
@@ -71,14 +69,8 @@ final class ShotPlayerViewController: UIViewController {
      // ISSUE 1: Snapshot cache keyed by camera name
      private var snapshotCache: [String: UIImage] = [:]
      
-     // Frame caching for shot duration - cached frames keyed by (shotIndex, frameIndex)
-     private var shotFrameCache: [Int: [UIImage]] = [:]  // shotIndex -> [frames]
-     private var framesCachingProgress: [Int: Int] = [:]  // shotIndex -> framesGenerated
-     private var isCachingFrames = false
-     
-     // ISSUE 3: Double-buffer rendering
-     private var frameBuffer: [UIImage?] = [nil, nil]  // two slots
-     private var displaySlot: Int = 0  // which slot is being displayed
+     // Tracks whether a snapshot capture is currently in-flight
+     private var snapshotPending = false
 
      private var is13inch: Bool {
          let s = UIScreen.main.bounds
@@ -272,12 +264,9 @@ final class ShotPlayerViewController: UIViewController {
      override func viewWillDisappear(_ animated: Bool) {
          super.viewWillDisappear(animated)
          stopPlayback(); evaluateTimeline?(0)
-         frameImageView.image = nil; snapshotInFlight = nil
+         frameImageView.image = nil
          // ISSUE 1: Clear cache to release memory
          snapshotCache.removeAll()
-         // Clear frame cache to free memory
-         shotFrameCache.removeAll()
-         framesCachingProgress.removeAll()
          // ISSUE 2: Clear prepareForCapture to release closure references
          prepareForCapture = nil
      }
@@ -547,10 +536,6 @@ final class ShotPlayerViewController: UIViewController {
              loadingSpinner.stopAnimating()
          }
          
-         // Pre-cache frames for this shot's duration
-         // Generate frames at 12 FPS (every 0.083s) for smooth playback
-         preCacheFramesForShot(at: currentIndex)
-         
          captureFrame(at: shot.startTime, force: true)
      }
 
@@ -565,16 +550,8 @@ final class ShotPlayerViewController: UIViewController {
     private func captureFrame(at masterTime: Float, force: Bool = false) {
         evaluateTimeline?(masterTime)
 
-        // Display any buffered frame from the previous slot
-        if let img = snapshotInFlight {
-            frameImageView.image      = img
-            framePlaceholder.isHidden = true
-            snapshotInFlight          = nil
-            loadingSpinner.stopAnimating()
-        }
-
         let now = CACurrentMediaTime()
-        let minInterval: CFTimeInterval = isPlaying ? 1.0 / 24.0 : 0
+        let minInterval: CFTimeInterval = isPlaying ? 1.0 / 15.0 : 0
         guard force || (now - lastSnapshotTime) >= minInterval else { return }
         guard !snapshotPending else { return }
 
@@ -592,7 +569,7 @@ final class ShotPlayerViewController: UIViewController {
             doCapture = { cb in capture(camItem, cb) }
         } else {
             doCapture = { [weak self] cb in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) {
                     self?.arView?.snapshot(saveToHDR: false, completion: cb)
                 }
             }
@@ -602,7 +579,9 @@ final class ShotPlayerViewController: UIViewController {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 if let img = img {
-                    self.snapshotInFlight = img
+                    self.frameImageView.image = img
+                    self.framePlaceholder.isHidden = true
+                    self.loadingSpinner.stopAnimating()
                     // ISSUE 1: Update cache with freshest image
                     let camName = camItem?.cameraRoot.name ?? ""
                     self.snapshotCache[camName] = img
@@ -623,86 +602,8 @@ final class ShotPlayerViewController: UIViewController {
 
      // MARK: - Frame Caching for Shot Duration
      
-     /// Pre-cache frames for the shot duration to enable smooth playback without buffering
-     /// Generates frames at 12 FPS (every 0.083s) for the full shot duration
-     private func preCacheFramesForShot(at shotIndex: Int) {
-         guard shotIndex < shots.count else { return }
-         
-         // Skip if already cached
-         if shotFrameCache[shotIndex] != nil {
-             return
-         }
-         
-         isCachingFrames = true
-         framesCachingProgress[shotIndex] = 0
-         
-         let shot = shots[shotIndex]
-         let frameDuration: Float = 1.0 / 12.0  // 12 FPS for smooth playback
-         let numFrames = Int(ceil(shot.duration / frameDuration))
-         var cachedFrames: [UIImage] = []
-         var frameIndex = 0
-         
-         let camItem = cameraItem(for: shot)
-         
-         // Recursive function to capture frames sequentially
-         func captureNextFrame() {
-             guard frameIndex < numFrames else {
-                 // All frames cached
-                 shotFrameCache[shotIndex] = cachedFrames
-                 framesCachingProgress.removeValue(forKey: shotIndex)
-                 isCachingFrames = false
-                 print("✅ Cached \(numFrames) frames for \(shot.displayName)")
-                 return
-             }
-             
-             let frameTime = Float(frameIndex) * frameDuration
-             let masterTime = shot.startTime + frameTime
-             
-             evaluateTimeline?(masterTime)
-             prepareForCapture?(camItem)
-             
-             let doCapture: (@escaping (UIImage?) -> Void) -> Void
-             if let capture = captureFrameAsync {
-                 doCapture = { cb in capture(camItem, cb) }
-             } else {
-                 doCapture = { [weak self] cb in
-                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
-                         self?.arView?.snapshot(saveToHDR: false, completion: cb)
-                     }
-                 }
-             }
-             
-             doCapture { [weak self] img in
-                 guard let self = self else { return }
-                 if let img = img {
-                     cachedFrames.append(img)
-                     framesCachingProgress[shotIndex] = frameIndex + 1
-                 }
-                 frameIndex += 1
-                 
-                 // Small delay between captures to prevent overwhelming the system
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) {
-                     captureNextFrame()
-                 }
-             }
-         }
-         
-         // Start capturing frames
-         captureNextFrame()
-     }
-     
-     /// Get cached frame for current playback time
-     /// Falls back to live capture if frame not yet cached
-     private func getCachedFrame(for shotIndex: Int, at localTime: Float) -> UIImage? {
-         guard let frames = shotFrameCache[shotIndex] else { return nil }
-         guard !frames.isEmpty else { return nil }
-         
-         let frameDuration: Float = 1.0 / 12.0  // Same FPS as caching
-         let frameIndex = Int(localTime / frameDuration)
-         guard frameIndex >= 0 && frameIndex < frames.count else { return nil }
-         
-         return frames[frameIndex]
-     }
+
+
 
      private func startPlayback() {
          stopPlayback()
@@ -752,14 +653,7 @@ final class ShotPlayerViewController: UIViewController {
          scrubStartLbl.text  = fmt(currentTime)
          hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(duration))  "
 
-         // Try to use cached frame first, fall back to live capture
-         if let cachedFrame = getCachedFrame(for: currentIndex, at: currentTime) {
-             frameImageView.image = cachedFrame
-             framePlaceholder.isHidden = true
-         } else {
-             // Fallback: capture live (shouldn't happen once frames are cached)
-             captureFrame(at: currentShot.startTime + currentTime)
-         }
+         captureFrame(at: currentShot.startTime + currentTime)
      }
 
 

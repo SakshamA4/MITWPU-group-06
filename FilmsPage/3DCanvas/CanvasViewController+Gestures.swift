@@ -76,7 +76,7 @@ extension CanvasViewController {
     // ── 2-finger pitch ────────────────────────────────────────────────────────
 
     @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
-        guard !isARModeActive, editorMode == .edit else { return }
+        guard editorMode == .edit else { return }
         let translation = gesture.translation(in: arView)
         pitch += Float(translation.y) * 0.005
         pitch  = max(-1.4, min(1.4, pitch))
@@ -87,7 +87,7 @@ extension CanvasViewController {
     // ── Twist — yaw (empty) or entity Y-rotation (selected) ──────────────────
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
-        guard !isARModeActive, editorMode == .edit else { return }
+        guard editorMode == .edit else { return }
 
         // Two-finger twist always rotates the camera (yaw), never the entity.
         // Entity rotation is only via the rotation rings or the outer ring gizmo.
@@ -106,11 +106,6 @@ extension CanvasViewController {
 
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
-
-        if isARModeActive {
-            placeSceneOnRealSurface(at: location)
-            return
-        }
 
         pathEditToolbar?.removeFromSuperview()
         pathEditToolbar = nil
@@ -194,7 +189,7 @@ extension CanvasViewController {
     // ── Double tap — focus/frame entity ──────────────────────────────────────
 
     @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        guard !isARModeActive, editorMode == .edit else { return }
+        guard editorMode == .edit else { return }
         let location = gesture.location(in: arView)
         let hits     = arView.hitTest(location)
         let objectHit = hits.first { hit in
@@ -217,7 +212,6 @@ extension CanvasViewController {
     }
 
     func frameEntityAnimated(_ entity: Entity) {
-        guard !isARModeActive else { return }
         let bounds     = entity.visualBounds(relativeTo: nil)
         let targetPos  = (bounds.min + bounds.max) * 0.5
         let maxDim     = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))

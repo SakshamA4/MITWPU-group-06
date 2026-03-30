@@ -577,28 +577,11 @@ extension CanvasViewController {
         //                view.addSubview(undoBtn)
         //                view.addSubview(redoBtn)
       
-        
-        // AR MODE BUTTON
-        let arButton = UIButton(type: .system)
-        let arIconCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
-        arButton.setImage(UIImage(systemName: "arkit", withConfiguration: arIconCfg), for: .normal)
-        arButton.tintColor = .systemGray
-        arButton.backgroundColor = UIColor.systemBackground
-        arButton.layer.cornerRadius = 16
-        arButton.clipsToBounds = true
-        arButton.translatesAutoresizingMaskIntoConstraints = false
-        self.arModeButton = arButton
-//        arButton.addAction(UIAction { [weak self] _ in
-//            guard let self = self else { return }
-//            self.isARModeActive.toggle()
-//            self.toggleARMode(isOn: self.isARModeActive)
-//        }, for: .touchUpInside)
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
-        view.addSubview(arButton)
 
         
         //undo redo
@@ -649,11 +632,6 @@ extension CanvasViewController {
             viewModeControl.heightAnchor.constraint(equalToConstant: 32),
             viewModeControl.widthAnchor.constraint(equalToConstant: 120),
 
-            // AR Button (bottom-right, left of 2D/3D control)
-            arButton.trailingAnchor.constraint(equalTo: viewModeControl.leadingAnchor, constant: -12),
-            arButton.centerYAnchor.constraint(equalTo: viewModeControl.centerYAnchor),
-            arButton.widthAnchor.constraint(equalToConstant: 44),
-            arButton.heightAnchor.constraint(equalToConstant: 44),
 
             // Rotate Button (Bottom Left)
             rotateBtn.leadingAnchor.constraint(

@@ -7,8 +7,6 @@ import Combine
 extension CanvasViewController {
 
     func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
-        // In AR mode the real device camera moves — no editor orbit needed
-        if isARModeActive { return }
         let translation = gesture.translation(in: arView)
         
         yaw -= Float(translation.x) * 0.005
@@ -24,7 +22,7 @@ extension CanvasViewController {
         if gesture.state == .began {
             saveCurrentStateToUndo()
         }
-        guard editorMode == .edit, !isARModeActive else {
+        guard editorMode == .edit else {
             gesture.scale = 1.0
             return
         }
@@ -109,7 +107,6 @@ extension CanvasViewController {
     // Moves the orbit pivot to the entity's world position so the camera
     // naturally orbits around the object the user just tapped.
     func pivotCameraToEntity(_ entity: Entity) {
-        guard !isARModeActive else { return }
         // World-space position becomes the new orbit center
         cameraTarget = entity.position(relativeTo: nil)
         updateEditorCamera()
@@ -121,7 +118,6 @@ extension CanvasViewController {
     // Moves the orbit pivot to the handle so fine-grained path editing
     // doesn't fight a distant orbit center.
     func pivotCameraToHandle(_ handle: Entity) {
-        guard !isARModeActive else { return }
         cameraTarget = handle.position(relativeTo: nil)
         updateEditorCamera()
     }
@@ -131,7 +127,6 @@ extension CanvasViewController {
     // Centers the view on an entity and pulls the camera back to a distance
     // proportional to the object's bounding box — like Blender's numpad period.
     func frameEntity(_ entity: Entity) {
-        guard !isARModeActive else { return }
 
         // 1. Compute the world-space bounding box
         let bounds = entity.visualBounds(relativeTo: nil)
@@ -157,7 +152,6 @@ extension CanvasViewController {
     // Scale is proportional to `distance` so panning near large scenes
     // moves further per pixel than panning close to a small object.
     func panCameraTarget(translation: CGPoint) {
-        guard !isARModeActive else { return }
 
         // Camera right vector — derived from yaw only so it stays level
         let cameraRight   = SIMD3<Float>(cos(yaw), 0, -sin(yaw))
