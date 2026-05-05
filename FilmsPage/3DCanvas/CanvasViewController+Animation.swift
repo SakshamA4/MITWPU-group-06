@@ -292,6 +292,9 @@ extension CanvasViewController {
             track     = .rotation
             fromValue = axis.simdAxis
             toValue   = SIMD3<Float>(degrees * (.pi / 180), 0, 0)
+            
+        case .zoom:
+            track = .fov
         }
 
         if baseTransforms[entity.name] == nil {
@@ -300,6 +303,7 @@ extension CanvasViewController {
 
         let clip = AnimationClip(
             entityName: entity.name,
+            entityID:   entity.components[EntityIDComponent.self]?.id,
             type:       type,
             track:      track,
             easing:     type == .walk ? .linear : .easeInOut,

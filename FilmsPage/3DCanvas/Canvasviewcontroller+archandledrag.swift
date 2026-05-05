@@ -131,6 +131,7 @@ extension CanvasViewController {
 
         timeline.clips[clipIdx] = AnimationClip(
             entityName: old.entityName,
+            entityID:   old.entityID,
             type:       old.type,
             track:      old.track,
             easing:     old.easing,

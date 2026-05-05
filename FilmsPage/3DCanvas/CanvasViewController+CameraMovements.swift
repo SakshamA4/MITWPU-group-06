@@ -158,11 +158,16 @@ extension CanvasViewController {
                 )
             }
         } else {
+            var isZoom = false
+            if case .static_(let p) = selection, (p == .Zoomin || p == .Zoomout) {
+                isZoom = true
+            }
             card = AnimationInputCard(mode: .addShot(
                 shotName:     shotName,
-                defaultStart: timeline.duration
+                defaultStart: timeline.duration,
+                isZoom:       isZoom
             ))
-            card.onConfirm = { [weak self] startTime, duration, _, _ in
+            card.onConfirm = { [weak self] startTime, duration, zoomAmount, _ in
                 guard let self, duration > 0 else { return }
                 switch selection {
                 case .movement(let preset):
@@ -170,7 +175,7 @@ extension CanvasViewController {
                                                    startTime: startTime, duration: duration)
                 case .static_(let preset):
                     self.applyStaticShotPreset(preset, to: cameraEntity,
-                                               startTime: startTime, duration: duration)
+                                               startTime: startTime, duration: duration, zoomAmount: zoomAmount)
                 }
             }
         }
@@ -207,6 +212,7 @@ extension CanvasViewController {
 
         let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
+            entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
             type:       .rotate,
             track:      .rotation,
             easing:     .easeInOut,
@@ -288,6 +294,7 @@ extension CanvasViewController {
 
         let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
+            entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
             type:       track == .rotation ? .rotate : .move,
             track:      track,
             easing:     .easeInOut,
@@ -325,7 +332,8 @@ extension CanvasViewController {
         _ preset: StaticShotPreset,
         to cameraEntity: Entity,
         startTime: Float,
-        duration: Float
+        duration: Float,
+        zoomAmount: Float = 0
     ) {
         var cameraRoot: Entity = cameraEntity
         var cur: Entity? = cameraEntity.parent
@@ -342,17 +350,39 @@ extension CanvasViewController {
         let pos = lastMotionPathEndPosition(for: cameraRoot.name)
                 ?? cameraRoot.position(relativeTo: nil)
 
-        let candidateClip = AnimationClip(
-            entityName: cameraRoot.name,
-            type:       .move,
-            track:      .position,
-            easing:     .easeInOut,
-            startTime:  startTime,
-            duration:   duration,
-            fromValue:  .zero,
-            toValue:    .zero,
-            motionPath: BezierMotionPath(start: pos, control1: pos, control2: pos, end: pos)
-        )
+        let candidateClip: AnimationClip
+        switch preset {
+        case .establishing:
+            candidateClip = AnimationClip(
+                entityName: cameraRoot.name,
+                entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
+                type:       .move,
+                track:      .position,
+                easing:     .easeInOut,
+                startTime:  startTime,
+                duration:   duration,
+                fromValue:  .zero,
+                toValue:    .zero,
+                motionPath: BezierMotionPath(start: pos, control1: pos, control2: pos, end: pos)
+            )
+            
+        case .Zoomin, .Zoomout:
+            let startFOV: Float = preset == .Zoomout ? (zoomAmount > 0 ? 30.0 : 30.0) : 60.0
+            let endFOV:   Float = zoomAmount > 0 ? zoomAmount : (preset == .Zoomin ? 30.0 : 60.0)
+            
+            candidateClip = AnimationClip(
+                entityName: cameraRoot.name,
+                entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
+                type:       .zoom,
+                track:      .fov,
+                easing:     .easeInOut,
+                startTime:  startTime,
+                duration:   duration,
+                fromValue:  SIMD3<Float>(startFOV, 0, 0),
+                toValue:    SIMD3<Float>(endFOV, 0, 0),
+                motionPath: nil
+            )
+        }
 
         // ── Conflict check ────────────────────────────────────────────────────
         if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {

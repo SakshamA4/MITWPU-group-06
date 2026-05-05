@@ -32,9 +32,10 @@ final class ShotPlayerViewController: UIViewController {
          sceneName: String,
          arView: ARView?,
          evaluateTimeline: ((Float) -> Void)?,
-         captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
-                              @escaping (UIImage?) -> Void) -> Void)? = nil,
-         cameraItems: [CanvasViewController.SceneCameraItem] = []) {
+          captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
+                               @escaping (UIImage?) -> Void) -> Void)? = nil,
+          captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)? = nil,
+          cameraItems: [CanvasViewController.SceneCameraItem] = []) {
         self.shots             = shots
         self.currentIndex      = startIndex
         self.playAll           = playAll
@@ -42,6 +43,7 @@ final class ShotPlayerViewController: UIViewController {
         self.arView            = arView
         self.evaluateTimeline  = evaluateTimeline
         self.captureFrameAsync = captureFrameAsync
+        self.captureAtTime     = captureAtTime
         self.cameraItems       = cameraItems
         super.init(nibName: nil, bundle: nil)
     }
@@ -56,6 +58,7 @@ final class ShotPlayerViewController: UIViewController {
     var evaluateTimeline: ((Float) -> Void)?
     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
                              @escaping (UIImage?) -> Void) -> Void)?
+    var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
      var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
@@ -65,20 +68,7 @@ final class ShotPlayerViewController: UIViewController {
      private var displayLink: CADisplayLink?
      private var playStart: CFTimeInterval = 0
      private var currentTime: Float = 0
-     private var lastSnapshotTime: CFTimeInterval = 0
      private var currentShot: Shot { shots[currentIndex] }
-     
-     // ISSUE 1: Snapshot cache keyed by camera name
-     private var snapshotCache: [String: UIImage] = [:]
-     
-     // Frame caching for shot duration - cached frames keyed by (shotIndex, frameIndex)
-     private var shotFrameCache: [Int: [UIImage]] = [:]  // shotIndex -> [frames]
-     private var framesCachingProgress: [Int: Int] = [:]  // shotIndex -> framesGenerated
-     private var isCachingFrames = false
-     
-     // ISSUE 3: Double-buffer rendering
-     private var frameBuffer: [UIImage?] = [nil, nil]  // two slots
-     private var displaySlot: Int = 0  // which slot is being displayed
 
      private var is13inch: Bool {
          let s = UIScreen.main.bounds
@@ -263,6 +253,31 @@ final class ShotPlayerViewController: UIViewController {
         if playAll { startPlayback() }
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Reparent ARView into previewContainer for live playback at 60fps
+        if let arView = arView {
+            arView.removeFromSuperview()
+            previewContainer.insertSubview(arView, at: 0)
+            arView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                arView.topAnchor.constraint(equalTo: previewContainer.topAnchor),
+                arView.leadingAnchor.constraint(equalTo: previewContainer.leadingAnchor),
+                arView.trailingAnchor.constraint(equalTo: previewContainer.trailingAnchor),
+                arView.bottomAnchor.constraint(equalTo: previewContainer.bottomAnchor)
+            ])
+            frameImageView.isHidden = true
+            framePlaceholder.isHidden = true
+            loadingSpinner.stopAnimating()
+            
+            // Re-apply active camera since reparenting might reset rendering state
+            let camItem = cameraItem(for: currentShot)
+            prepareForCapture?(camItem)
+            evaluateTimeline?(currentShot.startTime + currentTime)
+        }
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         [prevBtn, nextBtn].forEach { $0.layer.cornerRadius = $0.bounds.height / 2 }
@@ -272,13 +287,20 @@ final class ShotPlayerViewController: UIViewController {
      override func viewWillDisappear(_ animated: Bool) {
          super.viewWillDisappear(animated)
          stopPlayback(); evaluateTimeline?(0)
+         
+         // Restore ARView to CanvasViewController's hierarchy
+         if let arView = arView, let canvasVC = self.navigationController?.viewControllers.first(where: { String(describing: type(of: $0)).contains("CanvasViewController") }) as? UIViewController {
+             arView.removeFromSuperview()
+             canvasVC.view.insertSubview(arView, at: 0)
+             arView.translatesAutoresizingMaskIntoConstraints = true
+             arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+             arView.frame = canvasVC.view.bounds
+         }
+         
          frameImageView.image = nil; snapshotInFlight = nil
-         // ISSUE 1: Clear cache to release memory
-         snapshotCache.removeAll()
-         // Clear frame cache to free memory
-         shotFrameCache.removeAll()
-         framesCachingProgress.removeAll()
-         // ISSUE 2: Clear prepareForCapture to release closure references
+         
+         // Revert to editor camera when returning to the canvas/breakdown
+         prepareForCapture?(nil)
          prepareForCapture = nil
      }
 
@@ -502,9 +524,9 @@ final class ShotPlayerViewController: UIViewController {
     }
 
 
-     private func syncToCurrentShot() {
-         let shot   = currentShot
-         let accent = stripColors[currentIndex % stripColors.count]
+    private func syncToCurrentShot() {
+        let shot   = currentShot
+        let accent = stripColors[currentIndex % stripColors.count]
 
          title = "\(sceneName)  ·  \(shot.displayName)"
 
@@ -521,9 +543,9 @@ final class ShotPlayerViewController: UIViewController {
 
          hudShotLbl.text = "  \(shot.displayName)  "
          hudCamLbl.text  = "  \(shot.cleanCameraName)  "
-         hudTimeLbl.text = "  00:00 / \(fmt(shot.duration))  "
+        hudTimeLbl.text = "  00:00 / \(fmt(shot.duration))  "
 
-         setHeaderSpacing()
+        setHeaderSpacing()
 
          filmStrip.reloadData()
          if currentIndex < shots.count {
@@ -532,27 +554,10 @@ final class ShotPlayerViewController: UIViewController {
                  at: .centeredHorizontally, animated: true)
          }
          
-         // ISSUE 1: Populate cache from previewImage for all cameras at sync time
-         for item in cameraItems {
-             if let previewImg = item.previewImage {
-                 snapshotCache[item.cameraRoot.name] = previewImg
-             }
-         }
-         
-         // ISSUE 1: Try to show cached snapshot immediately if available
          let camItem = cameraItem(for: shot)
-         if let cachedImg = snapshotCache[camItem?.cameraRoot.name ?? ""] {
-             frameImageView.image = cachedImg
-             framePlaceholder.isHidden = true
-             loadingSpinner.stopAnimating()
-         }
-         
-         // Pre-cache frames for this shot's duration
-         // Generate frames at 12 FPS (every 0.083s) for smooth playback
-         preCacheFramesForShot(at: currentIndex)
-         
-         captureFrame(at: shot.startTime, force: true)
-     }
+         prepareForCapture?(camItem)
+         evaluateTimeline?(shot.startTime)
+    }
 
     private func setHeaderSpacing() {
         let attrs: [NSAttributedString.Key: Any] = [
@@ -562,156 +567,21 @@ final class ShotPlayerViewController: UIViewController {
     }
 
 
-    private func captureFrame(at masterTime: Float, force: Bool = false) {
-        evaluateTimeline?(masterTime)
-
-        // Display any buffered frame from the previous slot
-        if let img = snapshotInFlight {
-            frameImageView.image      = img
-            framePlaceholder.isHidden = true
-            snapshotInFlight          = nil
-            loadingSpinner.stopAnimating()
-        }
-
-        let now = CACurrentMediaTime()
-        let minInterval: CFTimeInterval = isPlaying ? 1.0 / 24.0 : 0
-        guard force || (now - lastSnapshotTime) >= minInterval else { return }
-        guard !snapshotPending else { return }
-
-        lastSnapshotTime = now
-        if !isPlaying { loadingSpinner.startAnimating() }
-
-        let camItem = cameraItem(for: currentShot)
-        snapshotPending = true
-        
-        // ISSUE 2: Call prepareForCapture before capturing to hide gizmos, etc.
-        prepareForCapture?(camItem)
-
-        let doCapture: (@escaping (UIImage?) -> Void) -> Void
-        if let capture = captureFrameAsync {
-            doCapture = { cb in capture(camItem, cb) }
-        } else {
-            doCapture = { [weak self] cb in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
-                    self?.arView?.snapshot(saveToHDR: false, completion: cb)
-                }
-            }
-        }
-
-        doCapture { [weak self] img in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let img = img {
-                    self.snapshotInFlight = img
-                    // ISSUE 1: Update cache with freshest image
-                    let camName = camItem?.cameraRoot.name ?? ""
-                    self.snapshotCache[camName] = img
-                }
-                self.snapshotPending = false
-            }
-        }
-    }
-
      private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
-         cameraItems.first { $0.cameraRoot.name == shot.cameraName }
-         ?? cameraItems.first {
-             $0.cameraRoot.name.contains(shot.cameraName) ||
-             shot.cameraName.contains($0.cameraRoot.name)
+         if let camID = shot.cameraID {
+             if let item = cameraItems.first(where: { $0.id == camID }) { return item }
          }
-         ?? cameraItems.first { _ in true }
+         return cameraItems.first { $0.cameraRoot.name == shot.cameraName }
      }
 
-     // MARK: - Frame Caching for Shot Duration
-     
-     /// Pre-cache frames for the shot duration to enable smooth playback without buffering
-     /// Generates frames at 12 FPS (every 0.083s) for the full shot duration
-     private func preCacheFramesForShot(at shotIndex: Int) {
-         guard shotIndex < shots.count else { return }
-         
-         // Skip if already cached
-         if shotFrameCache[shotIndex] != nil {
-             return
-         }
-         
-         isCachingFrames = true
-         framesCachingProgress[shotIndex] = 0
-         
-         let shot = shots[shotIndex]
-         let frameDuration: Float = 1.0 / 12.0  // 12 FPS for smooth playback
-         let numFrames = Int(ceil(shot.duration / frameDuration))
-         var cachedFrames: [UIImage] = []
-         var frameIndex = 0
-         
-         let camItem = cameraItem(for: shot)
-         
-         // Recursive function to capture frames sequentially
-         func captureNextFrame() {
-             guard frameIndex < numFrames else {
-                 // All frames cached
-                 shotFrameCache[shotIndex] = cachedFrames
-                 framesCachingProgress.removeValue(forKey: shotIndex)
-                 isCachingFrames = false
-                 print("✅ Cached \(numFrames) frames for \(shot.displayName)")
-                 return
-             }
-             
-             let frameTime = Float(frameIndex) * frameDuration
-             let masterTime = shot.startTime + frameTime
-             
-             evaluateTimeline?(masterTime)
-             prepareForCapture?(camItem)
-             
-             let doCapture: (@escaping (UIImage?) -> Void) -> Void
-             if let capture = captureFrameAsync {
-                 doCapture = { cb in capture(camItem, cb) }
-             } else {
-                 doCapture = { [weak self] cb in
-                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
-                         self?.arView?.snapshot(saveToHDR: false, completion: cb)
-                     }
-                 }
-             }
-             
-             doCapture { [weak self] img in
-                 guard let self = self else { return }
-                 if let img = img {
-                     cachedFrames.append(img)
-                     framesCachingProgress[shotIndex] = frameIndex + 1
-                 }
-                 frameIndex += 1
-                 
-                 // Small delay between captures to prevent overwhelming the system
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) {
-                     captureNextFrame()
-                 }
-             }
-         }
-         
-         // Start capturing frames
-         captureNextFrame()
-     }
-     
-     /// Get cached frame for current playback time
-     /// Falls back to live capture if frame not yet cached
-     private func getCachedFrame(for shotIndex: Int, at localTime: Float) -> UIImage? {
-         guard let frames = shotFrameCache[shotIndex] else { return nil }
-         guard !frames.isEmpty else { return nil }
-         
-         let frameDuration: Float = 1.0 / 12.0  // Same FPS as caching
-         let frameIndex = Int(localTime / frameDuration)
-         guard frameIndex >= 0 && frameIndex < frames.count else { return nil }
-         
-         return frames[frameIndex]
-     }
-
-     private func startPlayback() {
-         stopPlayback()
-         isPlaying = true
-         playStart = CACurrentMediaTime() - CFTimeInterval(currentTime)
-         updatePlayIcon()
-         displayLink = CADisplayLink(target: self, selector: #selector(tick))
-         displayLink?.add(to: .main, forMode: .common)
-     }
+    private func startPlayback() {
+        stopPlayback()
+        isPlaying = true
+        playStart = CACurrentMediaTime() - CFTimeInterval(currentTime)
+        updatePlayIcon()
+        displayLink = CADisplayLink(target: self, selector: #selector(tick))
+        displayLink?.add(to: .main, forMode: .common)
+    }
 
     private func stopPlayback() {
         displayLink?.invalidate(); displayLink = nil
@@ -752,14 +622,7 @@ final class ShotPlayerViewController: UIViewController {
          scrubStartLbl.text  = fmt(currentTime)
          hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(duration))  "
 
-         // Try to use cached frame first, fall back to live capture
-         if let cachedFrame = getCachedFrame(for: currentIndex, at: currentTime) {
-             frameImageView.image = cachedFrame
-             framePlaceholder.isHidden = true
-         } else {
-             // Fallback: capture live (shouldn't happen once frames are cached)
-             captureFrame(at: currentShot.startTime + currentTime)
-         }
+         evaluateTimeline?(currentShot.startTime + currentTime)
      }
 
 
@@ -770,9 +633,7 @@ final class ShotPlayerViewController: UIViewController {
         scrubStartLbl.text  = fmt(currentTime)
         hudTimeLbl.text     = "  \(fmt(currentTime)) / \(fmt(currentShot.duration))  "
         if isPlaying { playStart = CACurrentMediaTime() - CFTimeInterval(currentTime) }
-        // ISSUE 3: Cancel in-flight capture by setting snapshotPending = false before force capture
-        snapshotPending = false
-        captureFrame(at: currentShot.startTime + currentTime, force: true)
+        evaluateTimeline?(currentShot.startTime + currentTime)
     }
 
     @objc private func scrubTouchDown() { stopPlayback() }
@@ -863,10 +724,13 @@ final class ShotPlayerViewController: UIViewController {
     }
 
     private func exportFrame(png: Bool) {
-        guard let img = frameImageView.image else { showAlert("No frame captured."); return }
-        let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
-        guard let d = data, let out = UIImage(data: d) else { return }
-        presentShareSheet([out])
+        guard let arView = arView else { showAlert("No frame captured."); return }
+        arView.snapshot(saveToHDR: false) { [weak self] img in
+            guard let img = img else { self?.showAlert("Failed to capture frame."); return }
+            let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
+            guard let d = data, let out = UIImage(data: d) else { return }
+            self?.presentShareSheet([out])
+        }
     }
 
     private func ensureExportOverlay() {
