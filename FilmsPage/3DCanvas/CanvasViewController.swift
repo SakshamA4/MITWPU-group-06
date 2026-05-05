@@ -1304,7 +1304,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             lastPanLocation = location
 
             // New world position of the target
-            let newWorldPos = worldOrigin + delta3D
+            var newWorldPos = worldOrigin + delta3D
+
+            // Clamp Y so entity bottom never goes below ground (Y=0)
+            // Skip for lights and cameras — they need to float freely in 3D space.
+            let skipYClamp: Bool = {
+                if let cat = target.components[CategoryComponent.self] {
+                    return cat.toolType == .light || cat.toolType == .camera
+                }
+                return target.name.hasPrefix("SceneCamera") || target.name.contains("Light")
+            }()
+            if !skipYClamp {
+                let clampBounds = target.visualBounds(relativeTo: target)
+                let minAllowedY = -clampBounds.min.y
+                newWorldPos.y = max(minAllowedY, newWorldPos.y)
+            }
 
             if isMovingHandle {
                 target.setPosition(newWorldPos, relativeTo: nil)
@@ -1726,6 +1740,19 @@ extension CanvasViewController {
             }
         }
         
+        // Clamp Y floor — entity bottom must not go below ground
+        // Skip for lights and cameras — they need to float freely.
+        let skipYClamp: Bool = {
+            if let cat = entity.components[CategoryComponent.self] {
+                return cat.toolType == .light || cat.toolType == .camera
+            }
+            return entity.name.hasPrefix("SceneCamera") || entity.name.contains("Light")
+        }()
+        if !skipYClamp {
+            let clampBounds = entity.visualBounds(relativeTo: entity)
+            resolved.y = max(-clampBounds.min.y, resolved.y)
+        }
+
         return resolved
     }
 
