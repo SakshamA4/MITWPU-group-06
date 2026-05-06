@@ -313,6 +313,10 @@ extension CanvasViewController {
             var translation = baseTransform.translation
             var rotation = baseTransform.rotation
             var scale = baseTransform.scale
+            var fov: Float? = nil
+            if let pc = entity as? PerspectiveCamera {
+                fov = baseFOVs[entityName] ?? pc.camera.fieldOfViewInDegrees
+            }
             
             // Sort clips by start time (important!)
             let sortedClips = clips.sorted { $0.startTime < $1.startTime }
@@ -365,6 +369,10 @@ extension CanvasViewController {
                     
                 case .scale:
                     scale *= value
+                    
+                case .fov:
+                    let scalarVal = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
+                    fov = scalarVal
                 }
             }
             
@@ -373,6 +381,10 @@ extension CanvasViewController {
                 rotation: rotation,
                 translation: translation
             )
+            
+            if let pc = entity as? PerspectiveCamera, let f = fov {
+                pc.camera.fieldOfViewInDegrees = f
+            }
         }
     }
 
@@ -438,6 +450,9 @@ extension CanvasViewController {
                     clip.toValue,
                     SIMD3<Float>(repeating: eased)
                 )
+                
+            case .fov:
+                break
             }
         }
         
@@ -527,6 +542,7 @@ extension CanvasViewController {
         selectedEntity = nil
         
         baseTransforms.removeAll()
+        baseFOVs.removeAll()
         timelineEntityCache.removeAll()
 
         // Snapshot only the user scene entities under MainAnchor.
@@ -540,6 +556,9 @@ extension CanvasViewController {
             .forEach {
                 baseTransforms[$0.name] = $0.transform
                 timelineEntityCache[$0.name] = $0
+                if let pc = $0 as? PerspectiveCamera {
+                    baseFOVs[$0.name] = pc.camera.fieldOfViewInDegrees
+                }
             }
     }
 
@@ -556,7 +575,13 @@ extension CanvasViewController {
         for (name, transform) in baseTransforms {
             mainAnchor?.findEntity(named: name)?.transform = transform
         }
+        for (name, fov) in baseFOVs {
+            if let pc = mainAnchor?.findEntity(named: name) as? PerspectiveCamera {
+                pc.camera.fieldOfViewInDegrees = fov
+            }
+        }
         baseTransforms.removeAll()
+        baseFOVs.removeAll()
         timelineEntityCache.removeAll()
     }
 

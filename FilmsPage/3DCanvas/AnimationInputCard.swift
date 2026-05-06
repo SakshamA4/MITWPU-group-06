@@ -37,7 +37,7 @@ enum AnimationCardMode {
     /// Edit timing for a move path clip
     case editMoveTiming(currentStart: Float, currentDuration: Float)
     /// Add a camera shot (movement or static) — shows shot name, start time, duration
-    case addShot(shotName: String, defaultStart: Float)
+    case addShot(shotName: String, defaultStart: Float, isZoom: Bool)
 }
 
 final class AnimationInputCard: UIViewController {
@@ -47,6 +47,7 @@ final class AnimationInputCard: UIViewController {
     /// Called when the user confirms.
     /// - addMove/addRotate:  (startTime, duration, degrees, axis)
     /// - editRotate:         (0, 0, degrees, axis) — caller ignores startTime/duration
+    /// - addShot:            (startTime, duration, zoomAmount, .y)
     var onConfirm: ((Float, Float, Float, RotationAxis) -> Void)?
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ final class AnimationInputCard: UIViewController {
     private var startField:    LabelledField?
     private var durationField: LabelledField?
     private var degreesField:  LabelledField?
+    private var zoomField:     LabelledField?
     private var axisPicker:    AxisSegmentedControl?
 
     // ── Drag-to-dismiss state ─────────────────────────────────────────────────
@@ -306,7 +308,7 @@ final class AnimationInputCard: UIViewController {
             stack.addArrangedSubview(sf)
             stack.addArrangedSubview(df)
 
-        case .addShot(_, let defaultStart):
+        case .addShot(let shotName, let defaultStart, let isZoom):
             let sf = LabelledField(
                 label: "Start Time",
                 hint:  "seconds — when this shot begins on the timeline",
@@ -323,6 +325,17 @@ final class AnimationInputCard: UIViewController {
             durationField = df
             stack.addArrangedSubview(sf)
             stack.addArrangedSubview(df)
+            
+            if isZoom {
+                let zf = LabelledField(
+                    label: "Target FOV",
+                    hint:  "Field of View in degrees (lower = zoomed in, 60 = normal)",
+                    icon:  "magnifyingglass",
+                    value: shotName.contains("in") ? "30" : "60",
+                    keyboard: .numberPad)
+                zoomField = zf
+                stack.addArrangedSubview(zf)
+            }
         }
 
         // ── Confirm button ───────────────────────────────────────────────────
@@ -438,7 +451,7 @@ final class AnimationInputCard: UIViewController {
             return ("Edit Rotation", "rotate.3d", appRed)
         case .editMoveTiming:
             return ("Edit Move Timing", "clock.arrow.2.circlepath", softBlue)
-        case .addShot(let shotName, _):
+        case .addShot(let shotName, _, _):
             return (shotName, "video.fill", appRed)
         }
     }
@@ -481,7 +494,14 @@ final class AnimationInputCard: UIViewController {
 
         let startTime = Float(startField?.textField.text ?? "0") ?? 0
         let duration  = Float(durationField?.textField.text ?? "1") ?? 1
-        let degrees   = Float(degreesField?.textField.text ?? "90") ?? 90
+        
+        var mainValue: Float = 90
+        if let degText = degreesField?.textField.text, let d = Float(degText) {
+            mainValue = d
+        } else if let zoomText = zoomField?.textField.text, let z = Float(zoomText) {
+            mainValue = z
+        }
+        
         let axis      = selectedAxis
 
         guard duration > 0 else {
@@ -491,7 +511,7 @@ final class AnimationInputCard: UIViewController {
 
         animateOut {
             self.dismiss(animated: false) {
-                self.onConfirm?(startTime, duration, degrees, axis)
+                self.onConfirm?(startTime, duration, mainValue, axis)
             }
         }
     }

@@ -337,6 +337,7 @@ final class ScenePersistenceService {
                 id:           clip.id.uuidString,
                 entityName:   clip.entityName,
                 entityID:     {
+                    if let id = clip.entityID { return id.uuidString }
                     // Persist the entity's stable UUID alongside the name for future use.
                     if let entity = vc.mainAnchor?.findEntity(named: clip.entityName) {
                         return entity.components[CanvasViewController.EntityIDComponent.self]?.id.uuidString
@@ -526,9 +527,10 @@ final class ScenePersistenceService {
         }
 
         // Phase 6 – seed baseTransforms
-        for record in doc.animationClips where vc.baseTransforms[record.entityName] == nil {
-            if let entity = vc.mainAnchor?.findEntity(named: record.entityName) {
-                vc.baseTransforms[record.entityName] = entity.transform
+        for record in doc.animationClips {
+            guard let entity = resolveEntity(for: record, in: vc) else { continue }
+            if vc.baseTransforms[entity.name] == nil {
+                vc.baseTransforms[entity.name] = entity.transform
             }
         }
 
@@ -947,6 +949,16 @@ final class ScenePersistenceService {
                 let easing = EasingType(rawValue: record.easing)
             else { continue }
 
+            let resolvedEntity = resolveEntity(for: record, in: vc)
+            let resolvedName = resolvedEntity?.name ?? record.entityName
+            let resolvedID: UUID? = {
+                if let entityID = record.entityID, let uuid = UUID(uuidString: entityID) { return uuid }
+                if let entityID = resolvedEntity?.components[CanvasViewController.EntityIDComponent.self]?.id {
+                    return entityID
+                }
+                return nil
+            }()
+
             var motionPath: BezierMotionPath?
             if let ps  = record.pathStart,
                let pc1 = record.pathControl1,
@@ -962,7 +974,8 @@ final class ScenePersistenceService {
 
             let clip = AnimationClip(
                 id:         UUID(uuidString: record.id) ?? UUID(),
-                entityName: record.entityName,
+                entityName: resolvedName,
+                entityID:   resolvedID,
                 type:       type,
                 track:      track,
                 easing:     easing,
@@ -974,6 +987,24 @@ final class ScenePersistenceService {
             )
             vc.timeline.addClip(clip)
         }
+    }
+
+    private func resolveEntity(for record: AnimationClipRecord, in vc: CanvasViewController) -> Entity? {
+        guard let anchor = vc.mainAnchor else { return nil }
+        if let entityID = record.entityID, let uuid = UUID(uuidString: entityID) {
+            if let found = findEntity(with: uuid, in: anchor) { return found }
+        }
+        return anchor.findEntity(named: record.entityName)
+    }
+
+    private func findEntity(with id: UUID, in root: Entity) -> Entity? {
+        if let comp = root.components[CanvasViewController.EntityIDComponent.self], comp.id == id {
+            return root
+        }
+        for child in root.children {
+            if let found = findEntity(with: id, in: child) { return found }
+        }
+        return nil
     }
      
      // MARK: - Cache Management & Diagnostics

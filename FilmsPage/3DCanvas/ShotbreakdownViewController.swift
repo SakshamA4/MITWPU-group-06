@@ -15,6 +15,7 @@ struct Shot {
     let id: UUID
     let index: Int
     let cameraName: String
+    let cameraID: UUID?
     let startTime: Float
     let duration: Float
     var thumbnail: UIImage?
@@ -35,14 +36,25 @@ struct Shot {
 // MARK: - Shot Derivation
 
 struct ShotDerived {
-    static func derive(from timeline: Timeline, cameraNames: [String]) -> [Shot] {
+    static func derive(from timeline: Timeline, cameraItems: [CanvasViewController.SceneCameraItem]) -> [Shot] {
         let totalDuration = timeline.duration
         guard totalDuration > 0 else { return [] }
 
-        // FIX: Filter ONLY for clips that exactly match camera entity names.
-        // Only show shots that are assigned to an actual camera — no props or other entities.
+        let cameraNameSet = Set(cameraItems.map { $0.cameraRoot.name })
+        var cameraIDMap: [UUID: CanvasViewController.SceneCameraItem] = [:]
+        var cameraNameMap: [String: CanvasViewController.SceneCameraItem] = [:]
+        for item in cameraItems {
+            cameraIDMap[item.id] = item
+            if cameraNameMap[item.cameraRoot.name] == nil {
+                cameraNameMap[item.cameraRoot.name] = item
+            }
+        }
+
+        // FIX: Filter ONLY for clips that match an actual camera by ID or name.
+        // If no camera exists, hide the shot.
         let cameraClips = timeline.clips.filter { clip in
-            cameraNames.contains(clip.entityName)
+            if let id = clip.entityID, cameraIDMap[id] != nil { return true }
+            return cameraNameSet.contains(clip.entityName)
         }
 
         if cameraClips.isEmpty {
@@ -56,11 +68,19 @@ struct ShotDerived {
         let sortedClips = cameraClips.sorted { $0.startTime < $1.startTime }
 
         // Create a shot for each clip with its own index
-        return sortedClips.enumerated().map { (index, clip) in
-            Shot(
+        return sortedClips.enumerated().compactMap { (index, clip) in
+            let cameraItem: CanvasViewController.SceneCameraItem?
+            if let id = clip.entityID {
+                cameraItem = cameraIDMap[id]
+            } else {
+                cameraItem = cameraNameMap[clip.entityName]
+            }
+            guard let item = cameraItem else { return nil }
+            return Shot(
                 id: UUID(),
                 index: index,
-                cameraName: clip.entityName,
+                cameraName: item.cameraRoot.name,
+                cameraID: item.id,
                 startTime: clip.startTime,
                 duration: clip.duration,
                 thumbnail: nil
@@ -82,16 +102,19 @@ class ShotBreakdownViewController: UIViewController {
      // MARK: - Public API
      var sceneName: String  = "Scene"
      var timeline: Timeline = Timeline()
-     var cameraNames: [String] = []
-     weak var arView: ARView?
-     var evaluateTimeline: ((Float) -> Void)?
-     var cameraItems: [CanvasViewController.SceneCameraItem] = []
-     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
-     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
+    weak var arView: ARView?
+    var evaluateTimeline: ((Float) -> Void)?
+    var cameraItems: [CanvasViewController.SceneCameraItem] = []
+    var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
+    var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
+    var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
     // MARK: - State
     private var shots: [Shot] = []
     private var thumbnailsGenerated = false
+    private var isCapturingThumbnail = false
+    private var thumbnailQueue: [Int] = []
+    private var thumbnailCache: [String: UIImage] = [:]
 
     // MARK: - UI Elements
 
@@ -158,7 +181,7 @@ class ShotBreakdownViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = bgColor
-        shots = ShotDerived.derive(from: timeline, cameraNames: cameraNames)
+        shots = ShotDerived.derive(from: timeline, cameraItems: cameraItems)
         setupNav()
         setupLayout()
         refresh()
@@ -166,7 +189,13 @@ class ShotBreakdownViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if !thumbnailsGenerated { captureThumbnails(); thumbnailsGenerated = true }
+        if !thumbnailsGenerated {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self = self else { return }
+                self.captureThumbnails()
+                self.thumbnailsGenerated = true
+            }
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -175,6 +204,9 @@ class ShotBreakdownViewController: UIViewController {
         // Note: arView is weak, so we don't need to nullify it on pop
         // Reset timeline to t=0 so entities return to initial state
         evaluateTimeline?(0)
+        thumbnailQueue.removeAll()
+        isCapturingThumbnail = false
+        thumbnailCache.removeAll()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -348,68 +380,70 @@ class ShotBreakdownViewController: UIViewController {
     //   4. store thumbnail, reload cell
 
     private func captureThumbnails() {
-        guard let evaluate = evaluateTimeline else { return }
-        let count = shots.count
-        var capturedCount = 0
-        let lock = NSLock() // Thread-safe counter
+        guard !shots.isEmpty else { return }
+        thumbnailQueue = Array(shots.indices)
+        captureNextThumbnailIfNeeded()
+    }
 
-        // Capture all thumbnails in parallel with a small staggered delay
-        for (index, _) in shots.enumerated() {
-            let shot = shots[index]
-            let delayOffset = Double(index) * 0.02 // Stagger by 20ms to avoid GPU spike
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + delayOffset) { [weak self] in
-                guard let self = self else { return }
-                
-                // Scrub timeline to shot time
-                evaluate(shot.startTime)
-                
-                // Wait a minimal amount for scene to update (33ms = one frame at 30fps)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
-                    guard let self = self else { return }
-                    
-                    // Find matching camera item
-                    let camItem = self.cameraItems.first {
-                        $0.cameraRoot.name == shot.cameraName
-                    } ?? self.cameraItems.first {
-                        $0.cameraRoot.name.contains(shot.cameraName) ||
-                        shot.cameraName.contains($0.cameraRoot.name)
-                    } ?? self.cameraItems.first { _ in true }
-                    
-                    let doCapture = self.captureFrameAsync ?? { _, cb in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) {
-                            self.arView?.snapshot(saveToHDR: false, completion: cb)
-                        }
-                    }
-                    
-                    doCapture(camItem) { [weak self] img in
-                        DispatchQueue.main.async {
-                            guard let self = self else { return }
-                            if let img = img {
-                                self.shots[index].thumbnail = img
-                                let ip = IndexPath(item: index, section: 0)
-                                if index < self.collectionView.numberOfItems(inSection: 0) {
-                                    self.collectionView.reloadItems(at: [ip])
-                                }
-                            }
-                            
-                            // Track completion and reset timeline when all done
-                            lock.lock()
-                            capturedCount += 1
-                            let allCaptured = (capturedCount == count)
-                            lock.unlock()
-                            
-                            if allCaptured {
-                                // Restore timeline to start after all captures
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                    evaluate(0)
-                                }
-                            }
-                        }
-                    }
-                }
+    private func captureNextThumbnailIfNeeded() {
+        guard !isCapturingThumbnail else { return }
+        guard let index = thumbnailQueue.first else {
+            evaluateTimeline?(0)
+            return
+        }
+
+        isCapturingThumbnail = true
+        thumbnailQueue.removeFirst()
+
+        let shot = shots[index]
+        let cacheKey = thumbnailCacheKey(for: shot)
+        if let cached = thumbnailCache[cacheKey] {
+            shots[index].thumbnail = cached
+            reloadThumbnail(at: index)
+            isCapturingThumbnail = false
+            captureNextThumbnailIfNeeded()
+            return
+        }
+
+        let camItem = cameraItem(for: shot)
+        let doCaptureAtTime = captureAtTime ?? { [weak self] time, _, cb in
+            self?.evaluateTimeline?(time)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
+                self?.arView?.snapshot(saveToHDR: false, completion: cb)
             }
         }
+
+        doCaptureAtTime(shot.startTime, camItem) { [weak self] img in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let img = img {
+                    self.thumbnailCache[cacheKey] = img
+                    self.shots[index].thumbnail = img
+                    self.reloadThumbnail(at: index)
+                }
+                self.isCapturingThumbnail = false
+                self.captureNextThumbnailIfNeeded()
+            }
+        }
+    }
+
+    private func reloadThumbnail(at index: Int) {
+        let ip = IndexPath(item: index, section: 0)
+        if index < collectionView.numberOfItems(inSection: 0) {
+            collectionView.reloadItems(at: [ip])
+        }
+    }
+
+    private func thumbnailCacheKey(for shot: Shot) -> String {
+        let camID = shot.cameraID?.uuidString ?? shot.cameraName
+        return "\(sceneName)_\(camID)_\(shot.startTime)"
+    }
+
+    private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
+        if let camID = shot.cameraID {
+            return cameraItems.first { $0.id == camID }
+        }
+        return cameraItems.first { $0.cameraRoot.name == shot.cameraName }
     }
 
     // MARK: - Actions
@@ -432,8 +466,10 @@ class ShotBreakdownViewController: UIViewController {
              arView: arView,
              evaluateTimeline: evaluateTimeline,
              captureFrameAsync: captureFrameAsync,
+              captureAtTime: captureAtTime,
              cameraItems: cameraItems
          )
+         vc.prepareForCapture = self.prepareForCapture
          navigationController?.pushViewController(vc, animated: true)
      }
  }

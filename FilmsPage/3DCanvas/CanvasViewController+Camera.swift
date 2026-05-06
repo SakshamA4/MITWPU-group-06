@@ -202,6 +202,8 @@ extension CanvasViewController {
         let cameraRoot = Entity()
         cameraRoot.name = "SceneCameraRoot_\(index)"
         cameraRoot.components.set(CategoryComponent(toolType: .camera))
+        let cameraID = UUID()
+        cameraRoot.components.set(EntityIDComponent(id: cameraID))
 
         let camera = PerspectiveCamera()
         camera.name = "SceneCamera_\(index)"
@@ -221,7 +223,7 @@ extension CanvasViewController {
         cameraToVisualMap[camera] = cameraRoot
         cameraCounter += 1
         sceneCameraItems.append(SceneCameraItem(
-            id: UUID(),
+            id: cameraID,
             camera: camera,
             cameraRoot: cameraRoot,
             displayName: "Camera \(cameraCounter)"
@@ -462,10 +464,10 @@ extension CanvasViewController {
 
     // MARK: Timer callback — kick off serial snapshot chain
 
-    private func updateAllCameraPreviews() {
-        guard !sceneCameraItems.isEmpty else { return }
-        snapshotPreviewCamera(at: 0)
-    }
+     private func updateAllCameraPreviews() {
+         guard !sceneCameraItems.isEmpty else { return }
+         snapshotPreviewCamera(at: 0)
+     }
 
     // MARK: Serial snapshot chain
 
@@ -475,6 +477,25 @@ extension CanvasViewController {
 
          let item = sceneCameraItems[index]
          let indexPath = IndexPath(item: index, section: 0)
+         captureCameraPreviewImage(for: item) { [weak self] image in
+             guard let self = self, let image = image else { return }
+             self.sceneCameraItems[index].previewImage = image
+             if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
+                 cell.updatePreview(image: image, name: "Camera \(index + 1)")
+             }
+             self.snapshotPreviewCamera(at: index + 1)
+         }
+     }
+
+     func captureCameraPreviewImage(
+         for item: SceneCameraItem,
+         completion: @escaping (UIImage?) -> Void
+     ) {
+         guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else {
+             completion(nil)
+             return
+         }
+
          let offscreen = previewARView
 
          // 1. Clone the entire scene into the offscreen view
@@ -493,53 +514,41 @@ extension CanvasViewController {
 
          // 3. Hide all OTHER scene camera visuals (keep them enabled for rendering, hide their geometry)
          clonedAnchor.forEachDescendant { entity in
-             // Hide camera visual geometry for other cameras
              let cameraRootName = entity.name
              if cameraRootName.hasPrefix("SceneCameraRoot_"),
                 cameraRootName != item.cameraRoot.name {
-                 // Keep this camera enabled for rendering, but hide its visual
                  entity.children.forEach { child in
                      if !(child is PerspectiveCamera) { child.isEnabled = false }
                  }
              }
          }
 
-         // 4. Hide editor overlays (same as setActiveCamera)
-         //    Hide gizmo root
+         // 4. Hide editor overlays
          clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("GizmoRoot") {
-                 entity.isEnabled = false
-             }
+             if entity.name.hasPrefix("GizmoRoot") { entity.isEnabled = false }
          }
 
          // 5. Hide all motion paths
          clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("PathRoot_") {
-                 entity.isEnabled = false
-             }
+             if entity.name.hasPrefix("PathRoot_") { entity.isEnabled = false }
          }
 
          // 6. Hide all rotation arcs
          clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("RotationArc_") {
-                 entity.isEnabled = false
-             }
+             if entity.name.hasPrefix("RotationArc_") { entity.isEnabled = false }
          }
 
          // 7. Disable ALL scene cameras, then enable only the target camera for rendering
          clonedAnchor.forEachDescendant { entity in
-             if let cam = entity as? PerspectiveCamera {
-                 cam.isEnabled = false
-             }
+             if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
          }
 
          if let targetCam = clonedAnchor.findEntity(named: item.camera.name) as? PerspectiveCamera {
              targetCam.isEnabled = true
          } else {
-             // Fallback: create a camera at the target's world transform
              let fallback = PerspectiveCamera()
              fallback.transform = item.camera.transform
-             if let parent = item.camera.parent {
+             if item.camera.parent != nil {
                  let worldPos  = item.camera.position(relativeTo: nil)
                  let worldOri  = item.camera.orientation(relativeTo: nil)
                  fallback.position    = worldPos
@@ -549,15 +558,8 @@ extension CanvasViewController {
              clonedAnchor.addChild(fallback)
          }
 
-         // 8. Snapshot
-         offscreen.snapshot(saveToHDR: false) { [weak self] image in
-             guard let self = self, let image = image else { return }
-             DispatchQueue.main.async {
-                 if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
-                     cell.updatePreview(image: image, name: "Camera \(index + 1)")
-                 }
-                 self.snapshotPreviewCamera(at: index + 1)
-             }
+         offscreen.snapshot(saveToHDR: false) { image in
+             DispatchQueue.main.async { completion(image) }
          }
      }
 

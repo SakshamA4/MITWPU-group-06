@@ -52,6 +52,7 @@ enum AnimationType: String, Codable {
     case move
     case rotate
     case walk
+    case zoom
 }
 
 enum EasingType: String, Codable {
@@ -65,6 +66,7 @@ enum AnimationTrack: String, Codable {
     case position
     case rotation
     case scale
+    case fov
 }
 
 // MARK: - AnimationClip
@@ -76,6 +78,7 @@ struct AnimationClip: Identifiable, Codable {
 
     let id: UUID
     let entityName: String
+    let entityID: UUID?
     let type: AnimationType
     let track: AnimationTrack
     let easing: EasingType
@@ -106,6 +109,7 @@ struct AnimationClip: Identifiable, Codable {
     init(
         id: UUID = UUID(),
         entityName: String,
+        entityID: UUID? = nil,
         type: AnimationType,
         track: AnimationTrack,
         easing: EasingType,
@@ -117,6 +121,7 @@ struct AnimationClip: Identifiable, Codable {
     ) {
         self.id         = id
         self.entityName = entityName
+        self.entityID   = entityID
         self.type       = type
         self.track      = track
         self.easing     = easing
@@ -135,10 +140,12 @@ struct AnimationClip: Identifiable, Codable {
         toValue: SIMD3<Float>? = nil,
         startTime: Float? = nil,
         duration: Float? = nil,
-        motionPath: BezierMotionPath? = nil
+        motionPath: BezierMotionPath? = nil,
+        entityID: UUID? = nil
     ) {
         self.id         = existing.id
         self.entityName = existing.entityName
+        self.entityID   = entityID ?? existing.entityID
         self.type       = existing.type
         self.track      = existing.track
         self.easing     = existing.easing
@@ -477,7 +484,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
      enum PlaybackState { case stopped; case playing; case paused }
      var playbackState: PlaybackState = .stopped
 
-     var baseTransforms: [String: Transform] = [:]
      var selectedPathClipID: UUID?
      
      // ISSUE 4 & 5: Stored constraint references for camera panel layout
@@ -525,6 +531,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Animation Fix helpers
     var lastUndoTime: TimeInterval = 0
     var pathRebuildFrameCount: Int = 0
+    var timelineEntityCache: [String: Entity] = [:]
+    var baseTransforms: [String: Transform] = [:]
+    var baseFOVs: [String: Float] = [:]
     var activeWalkControllers: [String: AnimationPlaybackController] = [:]
 
     // MARK: - Editor Mode
@@ -536,8 +545,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     enum InteractionMode { case move; case rotate; case none }
     var interactionMode: InteractionMode = .move
-
-    var timelineEntityCache: [String: Entity] = [:]
 
     var backgroundImageCache: [String: UIImage] = [:]
 

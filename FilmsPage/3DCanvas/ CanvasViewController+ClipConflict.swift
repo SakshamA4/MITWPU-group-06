@@ -189,6 +189,7 @@ extension CanvasViewController {
 
             let shifted = AnimationClip(
                 entityName: clip.entityName,
+                entityID:   clip.entityID,
                 type:       clip.type,
                 track:      clip.track,
                 easing:     clip.easing,
@@ -219,6 +220,7 @@ extension CanvasViewController {
         let oldID  = conflicting.id
         let merged = AnimationClip(
             entityName: conflicting.entityName,
+            entityID:   conflicting.entityID,
             type:       conflicting.type,
             track:      conflicting.track,
             easing:     conflicting.easing,

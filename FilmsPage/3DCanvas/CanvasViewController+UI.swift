@@ -875,7 +875,6 @@ extension CanvasViewController {
         let vc = ShotBreakdownViewController()
         vc.sceneName        = self.sceneName
         vc.timeline         = self.timeline
-        vc.cameraNames      = self.sceneCameraItems.map { $0.cameraRoot.name }
         vc.arView           = self.arView                    // ← new
          vc.evaluateTimeline = { [weak self] t in             // ← new
             self?.evaluateTimeline(at: t)
@@ -946,4 +945,3 @@ extension CanvasViewController: UIColorPickerViewControllerDelegate {
 extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     // Implementations are in CanvasViewController+Camera.swift
 }
-
