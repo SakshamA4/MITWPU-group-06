@@ -289,6 +289,13 @@ extension CanvasViewController {
                     self.showColorPicker(for: modelEntity)
                 }
 
+            case .editMaterial:
+                // Open full material editor for wall/ground entities
+                menu.removeFromSuperview()
+                if let modelEntity = entity as? ModelEntity {
+                    self.presentMaterialEditor(for: modelEntity)
+                }
+
             // ── Camera entity actions ───────────────────────────────────────
             case .addShot:
                 menu.removeFromSuperview()

@@ -195,7 +195,7 @@ extension CanvasViewController {
     }
 
     
-    func spawnSceneCamera() {
+    func spawnSceneCamera(modelName: String = "cam1", displayName: String = "DSLR") {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 
         let index = sceneCameras.count
@@ -204,6 +204,8 @@ extension CanvasViewController {
         cameraRoot.components.set(CategoryComponent(toolType: .camera))
         let cameraID = UUID()
         cameraRoot.components.set(EntityIDComponent(id: cameraID))
+        // Persist which visual model asset this camera uses
+        cameraRoot.components.set(CameraVisualComponent(modelName: modelName, displayName: displayName))
 
         let camera = PerspectiveCamera()
         camera.name = "SceneCamera_\(index)"
@@ -234,11 +236,17 @@ extension CanvasViewController {
         setCameraPanelExpanded(true, animated: true)
         setupCameraPanelSwipeGestures()
 
-        // Load the cam1 model asset asynchronously.
+        // Load the visual model asset asynchronously.
         // Falls back to the procedural mesh visual if the asset is not found.
+        loadCameraVisualModel(modelName, onto: cameraRoot, camera: camera)
+    }
+
+    /// Loads a camera visual model asset and attaches it to a camera root entity.
+    /// Shared between `spawnSceneCamera()` and the persistence restore path.
+    func loadCameraVisualModel(_ modelName: String, onto cameraRoot: Entity, camera: PerspectiveCamera) {
         Task { @MainActor in
             do {
-                let model = try await Entity(named: "cam1")
+                let model = try await Entity(named: modelName)
 
                 // Add to scene FIRST — collision shape generation needs the
                 // entity in the render graph or Metal validation will abort
@@ -259,7 +267,9 @@ extension CanvasViewController {
                     scaledBounds.center.y,
                     scaledBounds.min.z
                 )
+                print("📷 Loaded camera visual model: \(modelName)")
             } catch {
+                print("⚠️ Camera model '\(modelName)' not found, using procedural fallback")
                 let fallback = self.makeCameraVisual()
                 cameraRoot.addChild(fallback)
                 fallback.generateCollisionShapes(recursive: true)

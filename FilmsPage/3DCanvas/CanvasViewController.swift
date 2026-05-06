@@ -559,15 +559,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         var textureResource: TextureResource?  // FIX: Track GPU texture for cleanup
     }
 
+    /// Tracks which 3D model asset (e.g. "cam1") provides the camera's visual
+    /// representation. Persisted so the exact same model is restored on load.
+    struct CameraVisualComponent: Component {
+        var modelName: String          // e.g. "cam1"
+        var displayName: String        // e.g. "DSLR"
+    }
+
     var pathEditToolbar: UIView?
 
     struct WallComponent: Component {
         var width: Float = 1.5
         var height: Float = 1.2
+        var thickness: Float = 0.05
         var colorR: Float = 0.83
         var colorG: Float = 0.83
         var colorB: Float = 0.83
         var colorA: Float = 1.0
+
+        /// Cinematic material configuration. nil = legacy color-only mode.
+        var materialConfig: CinematicMaterialConfig?
 
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
@@ -586,6 +597,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         var colorG: Float = 0.33
         var colorB: Float = 0.33
         var colorA: Float = 1.0
+
+        /// Cinematic material configuration. nil = legacy color-only mode.
+        var materialConfig: CinematicMaterialConfig?
 
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
@@ -848,26 +862,34 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 let checkName = (customName ?? item.modelFileName).lowercased()
 
                 if checkName.contains("ground") {
-                    if let spawnedEntity = spawnGround() {
-                        refreshSidebarContent()
-                        // Show color picker on main thread
+                    if isRestoring {
+                        // Restoring from save: use legacy path
+                        if let spawnedEntity = spawnGround() {
+                            refreshSidebarContent()
+                        }
+                    } else {
+                        // New creation: show cinematic creation sheet
                         DispatchQueue.main.async { [weak self] in
-                            self?.showColorPickerForNewSpawn(spawnedEntity)
+                            self?.presentGroundCreationSheet()
                         }
                     }
                     return
                 }
                 if checkName.contains("wall") || item.modelFileName == "cube" {
-                    if let spawnedEntity = spawnWall() {
-                        refreshSidebarContent()
-                        // Show color picker on main thread
+                    if isRestoring {
+                        // Restoring from save: use legacy path
+                        if let spawnedEntity = spawnWall() {
+                            refreshSidebarContent()
+                        }
+                    } else {
+                        // New creation: show cinematic creation sheet
                         DispatchQueue.main.async { [weak self] in
-                            self?.showColorPickerForNewSpawn(spawnedEntity)
+                            self?.presentWallCreationSheet()
                         }
                     }
                     return
                 }
-                if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(); return }
+                if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(modelName: item.modelFileName, displayName: item.title); return }
                 if item.isBackground { spawnBackgroundPlane(item); return }
 
                 // FIX: Use the model cache for spawned entities to track memory and enable eviction.

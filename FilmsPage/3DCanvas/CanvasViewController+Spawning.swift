@@ -294,6 +294,7 @@ extension CanvasViewController {
 
     // MARK: Wall / Ground
 
+    /// Legacy wall spawn (color-only, for backward compat).
     func spawnWall(color: UIColor? = nil) -> ModelEntity? {
         guard let anchor = mainAnchor else { return nil }
 
@@ -324,6 +325,50 @@ extension CanvasViewController {
         return wallRoot as? ModelEntity
     }
 
+    /// Cinematic wall spawn with material configuration.
+    func spawnCinematicWall(width: Float, height: Float, thickness: Float,
+                            materialConfig: CinematicMaterialConfig) -> ModelEntity? {
+        guard let anchor = mainAnchor else { return nil }
+
+        let wallRoot = ModelEntity()
+        wallRoot.name = {
+            let base     = "Wall"
+            let existing = anchor.children.filter {
+                $0.name == base || $0.name.hasPrefix(base + "_")
+            }.count
+            return existing == 0 ? base : "\(base)_\(existing + 1)"
+        }()
+
+        var wallComp = WallComponent()
+        wallComp.width = width
+        wallComp.height = height
+        wallComp.thickness = thickness
+        wallComp.materialConfig = materialConfig
+        wallComp.uiColor = materialConfig.tintColor
+
+        // Start with a simple material placeholder; async material applied below
+        let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: materialConfig)
+        wallRoot.model = ModelComponent(
+            mesh: MeshResource.generateBox(width: width, height: height, depth: thickness),
+            materials: [simpleMat]
+        )
+        wallRoot.position = [0, height / 2, -2]
+        wallRoot.generateCollisionShapes(recursive: true)
+        wallRoot.components.set(InputTargetComponent())
+        wallRoot.components.set(CategoryComponent(toolType: .wall))
+        wallRoot.components.set(wallComp)
+
+        anchor.addChild(wallRoot)
+
+        // Apply full PBR material asynchronously
+        Task { @MainActor in
+            await CinematicMaterialManager.shared.applyMaterial(materialConfig, to: wallRoot)
+        }
+
+        return wallRoot as? ModelEntity
+    }
+
+    /// Legacy ground spawn (color-only, for backward compat).
      func spawnGround(color: UIColor? = nil) -> ModelEntity? {
          guard let anchor = mainAnchor else { return nil }
 
@@ -354,20 +399,82 @@ extension CanvasViewController {
          return ground as? ModelEntity
      }
 
+    /// Cinematic ground spawn with material configuration.
+    func spawnCinematicGround(size: Float, materialConfig: CinematicMaterialConfig) -> ModelEntity? {
+        guard let anchor = mainAnchor else { return nil }
+
+        let ground = ModelEntity()
+        ground.name = {
+            let base     = "Ground"
+            let existing = anchor.children.filter {
+                $0.name == base || $0.name.hasPrefix(base + "_")
+            }.count
+            return existing == 0 ? base : "\(base)_\(existing + 1)"
+        }()
+
+        var groundComp = GroundComponent(width: size, depth: size)
+        groundComp.materialConfig = materialConfig
+        groundComp.uiColor = materialConfig.tintColor
+
+        let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: materialConfig)
+        ground.model = ModelComponent(
+            mesh: MeshResource.generatePlane(width: size, depth: size),
+            materials: [simpleMat]
+        )
+        ground.position = [0, 0, 0]
+        ground.generateCollisionShapes(recursive: true)
+        ground.components.set(InputTargetComponent())
+        ground.components.set(CategoryComponent(toolType: .wall))
+        ground.components.set(groundComp)
+
+        anchor.addChild(ground)
+
+        // Apply full PBR material asynchronously
+        Task { @MainActor in
+            await CinematicMaterialManager.shared.applyMaterial(materialConfig, to: ground)
+        }
+
+        return ground as? ModelEntity
+    }
+
      // MARK: - Color Management
 
      func applyColor(_ color: UIColor, to entity: ModelEntity) {
          // Update the visual material and component color for walls
          if var comp = entity.components[WallComponent.self] {
-             entity.model?.materials = [SimpleMaterial(color: color, roughness: 0.6, isMetallic: false)]
-             comp.uiColor = color
-             entity.components.set(comp)
+             if let config = comp.materialConfig {
+                 // Cinematic wall — update tint and re-apply material
+                 var updated = config
+                 updated.tintColor = color
+                 comp.materialConfig = updated
+                 comp.uiColor = color
+                 entity.components.set(comp)
+                 Task { @MainActor in
+                     await CinematicMaterialManager.shared.applyMaterial(updated, to: entity)
+                 }
+             } else {
+                 // Legacy wall — simple color
+                 entity.model?.materials = [SimpleMaterial(color: color, roughness: 0.6, isMetallic: false)]
+                 comp.uiColor = color
+                 entity.components.set(comp)
+             }
          }
          // Update the visual material and component color for ground
          else if var comp = entity.components[GroundComponent.self] {
-             entity.model?.materials = [SimpleMaterial(color: color, roughness: 1.0, isMetallic: false)]
-             comp.uiColor = color
-             entity.components.set(comp)
+             if let config = comp.materialConfig {
+                 var updated = config
+                 updated.tintColor = color
+                 comp.materialConfig = updated
+                 comp.uiColor = color
+                 entity.components.set(comp)
+                 Task { @MainActor in
+                     await CinematicMaterialManager.shared.applyMaterial(updated, to: entity)
+                 }
+             } else {
+                 entity.model?.materials = [SimpleMaterial(color: color, roughness: 1.0, isMetallic: false)]
+                 comp.uiColor = color
+                 entity.components.set(comp)
+             }
          }
      }
 

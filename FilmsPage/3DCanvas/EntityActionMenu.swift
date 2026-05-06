@@ -28,6 +28,7 @@ class EntityActionMenu: UIView {
         case rotate         // standard: add rotate animation
         case addMovement    // standard: open animation-type picker (Move / Rotate)
         case changeColour   // standard: open color picker (walls/ground only)
+        case editMaterial   // standard: open material editor (walls/ground only)
         case addShot        // camera:   open shot/movement picker
         case lock
         case delete
@@ -99,10 +100,12 @@ class EntityActionMenu: UIView {
         switch mode {
 
         case .standard:
-            // Add Movement | [Change Colour] | Lock | Delete
+            // Add Movement | [Edit Material] | [Change Colour] | Lock | Delete
             addMenuButton(title: "Add Movement", action: .addMovement)
             addSeparator()
             if showColorOption {
+                addMenuButton(title: "Edit Material", action: .editMaterial)
+                addSeparator()
                 addMenuButton(title: "Change Colour", action: .changeColour)
                 addSeparator()
             }
