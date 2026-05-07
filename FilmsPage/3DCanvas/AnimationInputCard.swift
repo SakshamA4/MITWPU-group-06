@@ -38,6 +38,8 @@ enum AnimationCardMode {
     case editMoveTiming(currentStart: Float, currentDuration: Float)
     /// Add a camera shot (movement or static) — shows shot name, start time, duration
     case addShot(shotName: String, defaultStart: Float, isZoom: Bool)
+    /// Edit a camera shot (timing only) — same layout as addShot
+    case editShot(title: String, currentStart: Float, currentDuration: Float)
 }
 
 final class AnimationInputCard: UIViewController {
@@ -336,6 +338,24 @@ final class AnimationInputCard: UIViewController {
                 zoomField = zf
                 stack.addArrangedSubview(zf)
             }
+
+        case .editShot(let title, let start, let duration):
+            let sf = LabelledField(
+                label: "Start Time",
+                hint:  "seconds — when this shot begins on the timeline",
+                icon:  "clock",
+                value: String(format: "%.2f", start),
+                keyboard: .decimalPad)
+            let df = LabelledField(
+                label: "Duration",
+                hint:  "seconds — how long this shot lasts",
+                icon:  "timer",
+                value: String(format: "%.2f", duration),
+                keyboard: .decimalPad)
+            startField    = sf
+            durationField = df
+            stack.addArrangedSubview(sf)
+            stack.addArrangedSubview(df)
         }
 
         // ── Confirm button ───────────────────────────────────────────────────
@@ -453,6 +473,8 @@ final class AnimationInputCard: UIViewController {
             return ("Edit Move Timing", "clock.arrow.2.circlepath", softBlue)
         case .addShot(let shotName, _, _):
             return (shotName, "video.fill", appRed)
+        case .editShot(let title, _, _):
+            return (title, "video.fill", appRed)
         }
     }
 
@@ -464,7 +486,8 @@ final class AnimationInputCard: UIViewController {
         case .addShot:         label = "Add Shot to Timeline"
         case .editRotate,
              .editRotateFull,
-             .editMoveTiming:  label = "Apply"
+             .editMoveTiming,
+             .editShot:        label = "Apply"
         }
 
         var config = UIButton.Configuration.filled()

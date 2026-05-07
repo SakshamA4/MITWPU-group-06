@@ -19,6 +19,7 @@ struct Shot {
     let startTime: Float
     let duration: Float
     var thumbnail: UIImage?
+    let clipID: UUID
 
     var displayName: String { "Shot \(index + 1)" }
     var shortLabel: String  { "\(index + 1)" }
@@ -83,7 +84,8 @@ struct ShotDerived {
                 cameraID: item.id,
                 startTime: clip.startTime,
                 duration: clip.duration,
-                thumbnail: nil
+                thumbnail: nil,
+                clipID: clip.id
             )
         }
     }
@@ -108,6 +110,12 @@ class ShotBreakdownViewController: UIViewController {
     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
+    var fetchTimeline: (() -> Timeline)?
+    var commitClipTimingChange: ((AnimationClip, UUID, Int) -> Void)?
+    var shiftSubsequentClips: ((String, Float, Float) -> Void)?
+    var mergeConflictingClip: ((AnimationClip, Float, Float) -> Void)?
+    var deleteTimelineClip: ((UUID) -> Void)?
+    var clipConflictCheck: ((AnimationClip, UUID) -> AnimationClip?)?
 
     // MARK: - State
     private var shots: [Shot] = []
@@ -161,6 +169,9 @@ class ShotBreakdownViewController: UIViewController {
         cv.register(ShotCardCell.self, forCellWithReuseIdentifier: ShotCardCell.reuseID)
         cv.dataSource = self
         cv.delegate = self
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        longPress.minimumPressDuration = 0.45
+        cv.addGestureRecognizer(longPress)
         cv.translatesAutoresizingMaskIntoConstraints = false
         return cv
     }()
@@ -371,6 +382,14 @@ class ShotBreakdownViewController: UIViewController {
         rebuildTimelineStrip()
     }
 
+    private func refreshShotsFromTimeline() {
+        if let latest = fetchTimeline?() {
+            timeline = latest
+        }
+        shots = ShotDerived.derive(from: timeline, cameraItems: cameraItems)
+        refresh()
+    }
+
     // MARK: - Camera POV Thumbnail Capture
     //
     // Sequential capture: for each shot we:
@@ -434,9 +453,14 @@ class ShotBreakdownViewController: UIViewController {
         }
     }
 
+    private func reloadThumbnail(for shot: Shot) {
+        guard let index = shots.firstIndex(where: { $0.clipID == shot.clipID }) else { return }
+        reloadThumbnail(at: index)
+    }
+
     private func thumbnailCacheKey(for shot: Shot) -> String {
         let camID = shot.cameraID?.uuidString ?? shot.cameraName
-        return "\(sceneName)_\(camID)_\(shot.startTime)"
+        return "\(sceneName)_\(camID)_\(shot.clipID.uuidString)"
     }
 
     private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
@@ -455,6 +479,128 @@ class ShotBreakdownViewController: UIViewController {
     @objc private func playAllTapped() {
         guard !shots.isEmpty else { return }
         openPlayer(index: 0, playAll: true)
+    }
+
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        let point = gesture.location(in: collectionView)
+        guard let ip = collectionView.indexPathForItem(at: point) else { return }
+        showShotActionSheet(for: ip.item, at: point)
+    }
+
+    private func showShotActionSheet(for index: Int, at point: CGPoint) {
+        guard shots.indices.contains(index) else { return }
+        let shot = shots[index]
+        let alert = UIAlertController(title: shot.displayName, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.deleteShot(shot)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let pop = alert.popoverPresentationController {
+            pop.sourceView = collectionView
+            pop.sourceRect = collectionView.layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.frame
+                ?? CGRect(x: point.x, y: point.y, width: 1, height: 1)
+        }
+        present(alert, animated: true)
+    }
+
+    private func deleteShot(_ shot: Shot) {
+        deleteTimelineClip?(shot.clipID)
+        thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
+        refreshShotsFromTimeline()
+    }
+
+    private func presentShotEditor(for shot: Shot) {
+        guard let clipIndex = timeline.clips.firstIndex(where: { $0.id == shot.clipID }) else { return }
+        let clip = timeline.clips[clipIndex]
+
+        let title = "Edit \(shot.displayName)"
+        let card = AnimationInputCard(mode: .editShot(
+            title: title,
+            currentStart: clip.startTime,
+            currentDuration: clip.duration
+        ))
+
+        card.onConfirm = { [weak self] startTime, duration, _, _ in
+            guard let self else { return }
+
+            let candidate = AnimationClip(
+                preservingID: clip,
+                startTime: startTime,
+                duration: duration
+            )
+
+            if let conflict = self.clipConflictCheck?(candidate, clip.id) {
+                self.presentClipConflictResolution(
+                    editedClip: candidate,
+                    replacingID: clip.id,
+                    conflicting: conflict,
+                    clipIndex: clipIndex,
+                    originalEndTime: clip.startTime + clip.duration
+                )
+            } else {
+                self.commitClipTimingChange?(candidate, clip.id, clipIndex)
+                self.handleClipUpdateCompletion(updatedClip: candidate)
+            }
+        }
+
+        present(card, animated: false)
+    }
+
+    private func presentClipConflictResolution(
+        editedClip: AnimationClip,
+        replacingID: UUID,
+        conflicting: AnimationClip,
+        clipIndex: Int,
+        originalEndTime: Float
+    ) {
+        let alert = UIAlertController(
+            title: "Animation Timing Conflict",
+            message: "The updated animation timing overlaps with another animation for this entity. Choose how you want to resolve the conflict.",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        alert.addAction(UIAlertAction(title: "Shift Following Animations", style: .default) { [weak self] _ in
+            guard let self else { return }
+            self.commitClipTimingChange?(editedClip, replacingID, clipIndex)
+
+            let originalGap   = conflicting.startTime - originalEndTime
+            let editedEnd     = editedClip.startTime + editedClip.duration
+            let newClipBStart = editedEnd + originalGap
+            let shiftDelta    = newClipBStart - conflicting.startTime
+
+            if shiftDelta > 0.0001 {
+                self.shiftSubsequentClips?(editedClip.entityName, conflicting.startTime, shiftDelta)
+            }
+            self.handleClipUpdateCompletion(updatedClip: editedClip)
+        })
+
+        alert.addAction(UIAlertAction(title: "Merge Animations", style: .default) { [weak self] _ in
+            guard let self else { return }
+            self.commitClipTimingChange?(editedClip, replacingID, clipIndex)
+
+            let editedEnd   = editedClip.startTime + editedClip.duration
+            let originalEnd = conflicting.startTime + conflicting.duration
+            let newDuration = max(0, originalEnd - editedEnd)
+
+            self.mergeConflictingClip?(conflicting, editedEnd, newDuration)
+            self.handleClipUpdateCompletion(updatedClip: editedClip)
+        })
+
+        present(alert, animated: true)
+    }
+
+    private func handleClipUpdateCompletion(updatedClip: AnimationClip) {
+        refreshShotsFromTimeline()
+        if let shot = shots.first(where: { $0.clipID == updatedClip.id }) {
+            thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
+            shots.firstIndex(where: { $0.clipID == updatedClip.id }).map { index in
+                thumbnailQueue.append(index)
+                captureNextThumbnailIfNeeded()
+            }
+        }
     }
 
      private func openPlayer(index: Int, playAll: Bool) {
@@ -489,7 +635,11 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
              withReuseIdentifier: ShotCardCell.reuseID, for: ip) as? ShotCardCell else {
              return UICollectionViewCell()
          }
-         cell.configure(with: shots[ip.item], accentColor: stripColors[ip.item % stripColors.count])
+         let shot = shots[ip.item]
+         cell.onEdit = { [weak self] in
+             self?.presentShotEditor(for: shot)
+         }
+         cell.configure(with: shot, accentColor: stripColors[ip.item % stripColors.count])
          return cell
      }
 
@@ -527,6 +677,8 @@ final class ShotCardCell: UICollectionViewCell {
     private let placeholderIcon = UIImageView()
     private let gradientLayer   = CAGradientLayer()
     private let pressOverlay    = UIView()
+    private let editButton      = UIButton(type: .system)
+    var onEdit: (() -> Void)?
 
     // ── Number badge (top-left) ────────────────────────────────────────────────
     private let badge    = UIView()
@@ -595,6 +747,16 @@ final class ShotCardCell: UICollectionViewCell {
         thumbContainer.addSubview(placeholderIcon)
         thumbContainer.addSubview(pressOverlay)
         contentView.addSubview(thumbContainer)
+
+        let editCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        editButton.setImage(UIImage(systemName: "pencil", withConfiguration: editCfg), for: .normal)
+        editButton.tintColor = UIColor.white.withAlphaComponent(0.85)
+        editButton.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        editButton.layer.cornerRadius = 12
+        editButton.clipsToBounds = true
+        editButton.translatesAutoresizingMaskIntoConstraints = false
+        editButton.addAction(UIAction { [weak self] _ in self?.onEdit?() }, for: .touchUpInside)
+        thumbContainer.addSubview(editButton)
 
         // ── Play circle (center of thumbnail, shown when no thumb yet) ─
         playCircle.backgroundColor = UIColor.black.withAlphaComponent(0.45)
@@ -680,6 +842,11 @@ final class ShotCardCell: UICollectionViewCell {
             playIcon.centerYAnchor.constraint(equalTo: playCircle.centerYAnchor),
             playIcon.widthAnchor.constraint(equalToConstant: 14),
             playIcon.heightAnchor.constraint(equalToConstant: 14),
+
+            editButton.topAnchor.constraint(equalTo: thumbContainer.topAnchor, constant: 8),
+            editButton.trailingAnchor.constraint(equalTo: thumbContainer.trailingAnchor, constant: -8),
+            editButton.widthAnchor.constraint(equalToConstant: 24),
+            editButton.heightAnchor.constraint(equalToConstant: 24),
 
             // Badge — top-left
             badge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),

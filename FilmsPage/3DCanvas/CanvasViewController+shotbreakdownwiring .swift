@@ -63,10 +63,45 @@ extension CanvasViewController {
               self.captureFrameFromCamera(item, completion: completion)
           }
 
-          vc.captureAtTime = { [weak self] time, item, completion in
-              guard let self = self else { completion(nil); return }
-              self.captureFrameAtTime(time, cameraItem: item, completion: completion)
-          }
+       vc.captureAtTime = { [weak self] time, item, completion in
+           guard let self = self else { completion(nil); return }
+           self.captureFrameAtTime(time, cameraItem: item, completion: completion)
+       }
+
+       vc.fetchTimeline = { [weak self] in
+           self?.timeline ?? Timeline()
+       }
+
+       vc.clipConflictCheck = { [weak self] edited, replacingID in
+           self?.detectClipConflict(editedClip: edited, replacingID: replacingID)
+       }
+
+       vc.commitClipTimingChange = { [weak self] newClip, oldClipID, clipIndex in
+           self?.commitClipTimingChange(newClip: newClip, oldClipID: oldClipID, clipIndex: clipIndex)
+       }
+
+       vc.shiftSubsequentClips = { [weak self] entityName, startingAfter, delta in
+           self?.shiftSubsequentClips(entityName: entityName, startingAfter: startingAfter, delta: delta)
+       }
+
+       vc.mergeConflictingClip = { [weak self] conflicting, newStart, newDuration in
+           self?.mergeConflictingClip(conflicting: conflicting, newStartTime: newStart, newDuration: newDuration)
+       }
+
+       vc.deleteTimelineClip = { [weak self] clipID in
+           guard let self else { return }
+           if let idx = self.timeline.clips.firstIndex(where: { $0.id == clipID }) {
+               let clip = self.timeline.clips[idx]
+               if let visual = self.activeMotionPaths[clipID] {
+                   visual.startHandle?.removeFromParent()
+                   visual.root.removeFromParent()
+               }
+               self.activeMotionPaths.removeValue(forKey: clipID)
+               self.hideRotationArc(for: clipID)
+               self.timeline.clips.remove(at: idx)
+               self.refreshSidebarContent()
+           }
+       }
          
          // ISSUE 2: Set prepareForCapture closure to hide gizmos, paths, and camera lens before capture
          vc.prepareForCapture = { [weak self] item in
