@@ -79,7 +79,7 @@ extension CanvasViewController {
         guard !isARModeActive, editorMode == .edit else { return }
         let translation = gesture.translation(in: arView)
         pitch += Float(translation.y) * 0.005
-        pitch  = max(-1.4, min(1.4, pitch))
+        pitch  = max(0.05, min(1.4, pitch))
         gesture.setTranslation(.zero, in: arView)
         updateEditorCamera()
     }
@@ -373,6 +373,16 @@ extension CanvasViewController {
             newPosition.y   = startPos.y
         } else {
             newPosition.y = startPos.y + (dy * 2.0)
+            let skipYClamp: Bool = {
+                if let cat = entity.components[CategoryComponent.self] {
+                    return cat.toolType == .light || cat.toolType == .camera
+                }
+                return entity.name.hasPrefix("SceneCamera") || entity.name.contains("Light")
+            }()
+            if !skipYClamp {
+                let bounds = entity.visualBounds(relativeTo: entity)
+                newPosition.y = max(-bounds.min.y, newPosition.y)
+            }
         }
         let clampedPosition = clampPositionAvoidingOverlap(entity: entity, proposedPosition: newPosition)
         entity.position = clampedPosition

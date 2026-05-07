@@ -13,7 +13,7 @@ extension CanvasViewController {
         
         yaw -= Float(translation.x) * 0.005
         pitch += Float(translation.y) * 0.005
-        pitch = max(-1.0, min(1.4, pitch))
+        pitch = max(0.05, min(1.4, pitch))
         
         updateEditorCamera()
         gesture.setTranslation(.zero, in: arView)
@@ -94,7 +94,9 @@ extension CanvasViewController {
         let z = distance * cos(pitch) * cos(yaw)
         
         // Apply position relative to the orbit pivot (cameraTarget)
-        camera.position = [x, y, z] + cameraTarget
+        var camPos = SIMD3<Float>(x, y, z) + cameraTarget
+        camPos.y = max(0.1, camPos.y)
+        camera.position = camPos
         
         // Always look at the current pivot point
         camera.look(at: cameraTarget, from: camera.position, relativeTo: nil)
@@ -172,6 +174,7 @@ extension CanvasViewController {
         cameraTarget -= cameraRight   *  Float(translation.x) * scale
         // Negate forward*(-Y) so dragging down moves scene toward camera
         cameraTarget -= cameraForward * -Float(translation.y) * scale
+        cameraTarget.y = max(0, cameraTarget.y)
 
         updateEditorCamera()
     }
