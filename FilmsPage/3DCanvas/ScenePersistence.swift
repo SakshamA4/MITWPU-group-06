@@ -56,6 +56,7 @@ struct EntityRecord: Codable {
     let transform: CodableTransform
     let wallWidth: Float?
     let wallHeight: Float?
+    let wallThickness: Float?
     let wallColorR: Float?
     let wallColorG: Float?
     let wallColorB: Float?
@@ -69,6 +70,10 @@ struct EntityRecord: Codable {
     let bgWidth: Float?
     let bgHeight: Float?
     let backgroundImagePath: String?
+    /// Cinematic material config for walls/ground. nil = legacy color-only.
+    let materialConfig: CinematicMaterialConfig?
+    /// Camera visual model asset name (e.g. "cam1"). nil for non-camera entities.
+    let cameraModelName: String?
 }
 
 // MARK: - AnimationClipRecord
@@ -241,7 +246,7 @@ final class ScenePersistenceService {
              let isBackground  = entity.components[CategoryComponent.self]?.toolType == .background
              let modelFileName = resolveModelFileName(entity: entity)
 
-             var wallWidth: Float?;   var wallHeight: Float?
+             var wallWidth: Float?;   var wallHeight: Float?;   var wallThickness: Float?
              var wallColorR: Float?;  var wallColorG: Float?
              var wallColorB: Float?;  var wallColorA: Float?
              var groundWidth: Float?; var groundDepth: Float?
@@ -249,19 +254,28 @@ final class ScenePersistenceService {
              var groundColorB: Float?; var groundColorA: Float?
              var bgWidth: Float?;     var bgHeight: Float?
              var backgroundImagePath: String?
+             var materialConfig: CinematicMaterialConfig?
+             var cameraModelName: String?
+
+             // Extract camera visual model name from CameraVisualComponent
+             if let camVisual = entity.components[CanvasViewController.CameraVisualComponent.self] {
+                 cameraModelName = camVisual.modelName
+             }
 
              if let model = entity as? ModelEntity {
 
                  if let w = model.components[CanvasViewController.WallComponent.self] {
-                     wallWidth = w.width; wallHeight = w.height
+                     wallWidth = w.width; wallHeight = w.height; wallThickness = w.thickness
                      wallColorR = w.colorR; wallColorG = w.colorG
                      wallColorB = w.colorB; wallColorA = w.colorA
+                     materialConfig = w.materialConfig
                  }
 
                  if let g = model.components[CanvasViewController.GroundComponent.self] {
                      groundWidth = g.width; groundDepth = g.depth
                      groundColorR = g.colorR; groundColorG = g.colorG
                      groundColorB = g.colorB; groundColorA = g.colorA
+                     materialConfig = g.materialConfig
                  }
 
                 // Background image extraction.
@@ -314,13 +328,16 @@ final class ScenePersistenceService {
                  isBackground:        isBackground,
                  transform:           CodableTransform(entity.transform),
                  wallWidth:           wallWidth,   wallHeight:   wallHeight,
+                 wallThickness:       wallThickness,
                  wallColorR:          wallColorR,  wallColorG:   wallColorG,
                  wallColorB:          wallColorB,  wallColorA:   wallColorA,
                  groundWidth:         groundWidth, groundDepth:  groundDepth,
                  groundColorR:        groundColorR, groundColorG: groundColorG,
                  groundColorB:        groundColorB, groundColorA: groundColorA,
                  bgWidth:             bgWidth,     bgHeight:     bgHeight,
-                 backgroundImagePath: backgroundImagePath
+                 backgroundImagePath: backgroundImagePath,
+                 materialConfig:      materialConfig,
+                 cameraModelName:     cameraModelName
              ))
         }
 
@@ -687,6 +704,7 @@ final class ScenePersistenceService {
          if record.name.lowercased().contains("wall") || record.modelFileName == "cube" {
              let w = record.wallWidth  ?? 1.5
              let h = record.wallHeight ?? 1.2
+             let th = record.wallThickness ?? 0.05
              let e = ModelEntity()
              e.name  = record.name
              if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
@@ -694,17 +712,31 @@ final class ScenePersistenceService {
              }
              
              // Create wall component with saved color, fallback to light gray defaults
-             var wallComp = CanvasViewController.WallComponent(width: w, height: h)
+             var wallComp = CanvasViewController.WallComponent(width: w, height: h, thickness: th)
              if let r = record.wallColorR, let g = record.wallColorG,
                 let b = record.wallColorB, let a = record.wallColorA {
                  wallComp.colorR = r; wallComp.colorG = g
                  wallComp.colorB = b; wallComp.colorA = a
              }
-             
-             e.model = ModelComponent(
-                 mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
-                 materials: [SimpleMaterial(color: wallComp.uiColor, roughness: 0.6, isMetallic: false)]
-             )
+             wallComp.materialConfig = record.materialConfig
+
+             // Use cinematic material if available, else legacy SimpleMaterial
+             if let config = record.materialConfig {
+                 let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: config)
+                 e.model = ModelComponent(
+                     mesh:      MeshResource.generateBox(width: w, height: h, depth: th),
+                     materials: [simpleMat]
+                 )
+                 // Apply full PBR material asynchronously
+                 Task { @MainActor in
+                     await CinematicMaterialManager.shared.applyMaterial(config, to: e)
+                 }
+             } else {
+                 e.model = ModelComponent(
+                     mesh:      MeshResource.generateBox(width: w, height: h, depth: th),
+                     materials: [SimpleMaterial(color: wallComp.uiColor, roughness: 0.6, isMetallic: false)]
+                 )
+             }
              e.components.set(CategoryComponent(toolType: .wall))
              e.components.set(wallComp)
              e.components.set(InputTargetComponent())
@@ -730,11 +762,24 @@ final class ScenePersistenceService {
                  groundComp.colorR = r; groundComp.colorG = g
                  groundComp.colorB = b; groundComp.colorA = a
              }
-             
-             e.model = ModelComponent(
-                 mesh:      MeshResource.generatePlane(width: w, depth: d),
-                 materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
-             )
+             groundComp.materialConfig = record.materialConfig
+
+             // Use cinematic material if available, else legacy SimpleMaterial
+             if let config = record.materialConfig {
+                 let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: config)
+                 e.model = ModelComponent(
+                     mesh:      MeshResource.generatePlane(width: w, depth: d),
+                     materials: [simpleMat]
+                 )
+                 Task { @MainActor in
+                     await CinematicMaterialManager.shared.applyMaterial(config, to: e)
+                 }
+             } else {
+                 e.model = ModelComponent(
+                     mesh:      MeshResource.generatePlane(width: w, depth: d),
+                     materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
+                 )
+             }
              e.components.set(CategoryComponent(toolType: .wall))
              e.components.set(groundComp)
              e.components.set(InputTargetComponent())
@@ -777,17 +822,29 @@ final class ScenePersistenceService {
             root.name = "SceneCamera_\(displayNumber)_\(cameraID.uuidString)"
 
              root.components.set(CategoryComponent(toolType: .camera))
-             let visual = vc.makeCameraVisual()
-             visual.components.set(InputTargetComponent())
-             let cam       = PerspectiveCamera()
-             cam.name = "PerspCam_\(cameraID.uuidString)"
-             cam.isEnabled = false
-             root.addChild(visual)
-             root.addChild(cam)
-             root.transform = t
-             anchor.addChild(root)
-             vc.sceneCameras.append(cam)
-             vc.cameraToVisualMap[cam] = root
+
+              // Restore the camera visual model name. Default to "cam1" for
+              // legacy saves that didn't persist the model name.
+              let cameraModelName = record.cameraModelName ?? "cam1"
+              root.components.set(CanvasViewController.CameraVisualComponent(
+                  modelName: cameraModelName,
+                  displayName: displayName
+              ))
+              print("📷 Restoring camera '\(displayName)' with model: \(cameraModelName)")
+
+              let cam = PerspectiveCamera()
+              cam.name = "PerspCam_\(cameraID.uuidString)"
+              cam.isEnabled = false
+              cam.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+              root.addChild(cam)
+              root.transform = t
+              anchor.addChild(root)
+
+              // Load the correct visual model asset (same one used at creation time)
+              vc.loadCameraVisualModel(cameraModelName, onto: root, camera: cam)
+
+              vc.sceneCameras.append(cam)
+              vc.cameraToVisualMap[cam] = root
              vc.sceneCameraItems.append(
                  CanvasViewController.SceneCameraItem(
                      id:          cameraID,
