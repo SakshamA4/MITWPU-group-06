@@ -61,6 +61,8 @@ final class ShotPlayerViewController: UIViewController {
     var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
      var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
+     var enterPlaybackMode:  (() -> Void)?
+     var exitPlaybackMode:   (() -> Void)?
 
      private var isPlaying        = false
      private var snapshotInFlight: UIImage?
@@ -255,7 +257,11 @@ final class ShotPlayerViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+
+        // Snapshot scene entity transforms + FOVs BEFORE the ARView is reparented,
+        // so baseTransforms/baseFOVs reflect the true pre-playback state.
+        enterPlaybackMode?()
+
         // Reparent ARView into previewContainer for live playback at 60fps
         if let arView = arView {
             arView.removeFromSuperview()
@@ -270,8 +276,8 @@ final class ShotPlayerViewController: UIViewController {
             frameImageView.isHidden = true
             framePlaceholder.isHidden = true
             loadingSpinner.stopAnimating()
-            
-            // Re-apply active camera since reparenting might reset rendering state
+
+            // Re-apply active camera and evaluate initial shot position
             let camItem = cameraItem(for: currentShot)
             prepareForCapture?(camItem)
             evaluateTimeline?(currentShot.startTime + currentTime)
@@ -286,22 +292,28 @@ final class ShotPlayerViewController: UIViewController {
 
      override func viewWillDisappear(_ animated: Bool) {
          super.viewWillDisappear(animated)
-         stopPlayback(); evaluateTimeline?(0)
-         
+         stopPlayback()
+         evaluateTimeline?(0)
+
          // Restore ARView to CanvasViewController's hierarchy
-         if let arView = arView, let canvasVC = self.navigationController?.viewControllers.first(where: { String(describing: type(of: $0)).contains("CanvasViewController") }) as? UIViewController {
+         if let arView = arView,
+            let canvasVC = navigationController?.viewControllers
+                .first(where: { String(describing: type(of: $0)).contains("CanvasViewController") }) {
              arView.removeFromSuperview()
              canvasVC.view.insertSubview(arView, at: 0)
              arView.translatesAutoresizingMaskIntoConstraints = true
              arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
              arView.frame = canvasVC.view.bounds
          }
-         
+
          frameImageView.image = nil; snapshotInFlight = nil
-         
-         // Revert to editor camera when returning to the canvas/breakdown
+
+         // Revert scene to pre-playback state and restore editor camera
+         exitPlaybackMode?()
          prepareForCapture?(nil)
          prepareForCapture = nil
+         enterPlaybackMode = nil
+         exitPlaybackMode  = nil
      }
 
     override func viewWillTransition(to size: CGSize,

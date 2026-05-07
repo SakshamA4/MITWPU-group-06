@@ -58,6 +58,14 @@ extension CanvasViewController {
              self?.evaluateTimeline(at: t)
          }
 
+         vc.enterPlaybackMode = { [weak self] in
+             self?.enterShotPlaybackMode()
+         }
+
+         vc.exitPlaybackMode = { [weak self] in
+             self?.exitShotPlaybackMode()
+         }
+
           vc.captureFrameAsync = { [weak self] item, completion in
               guard let self = self else { completion(nil); return }
               self.captureFrameFromCamera(item, completion: completion)

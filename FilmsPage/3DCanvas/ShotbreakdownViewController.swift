@@ -111,6 +111,8 @@ class ShotBreakdownViewController: UIViewController {
     var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
     var fetchTimeline: (() -> Timeline)?
+    var enterPlaybackMode: (() -> Void)?
+    var exitPlaybackMode:  (() -> Void)?
     var commitClipTimingChange: ((AnimationClip, UUID, Int) -> Void)?
     var shiftSubsequentClips: ((String, Float, Float) -> Void)?
     var mergeConflictingClip: ((AnimationClip, Float, Float) -> Void)?
@@ -615,7 +617,9 @@ class ShotBreakdownViewController: UIViewController {
               captureAtTime: captureAtTime,
              cameraItems: cameraItems
          )
-         vc.prepareForCapture = self.prepareForCapture
+         vc.prepareForCapture  = self.prepareForCapture
+         vc.enterPlaybackMode  = self.enterPlaybackMode
+         vc.exitPlaybackMode   = self.exitPlaybackMode
          navigationController?.pushViewController(vc, animated: true)
      }
  }

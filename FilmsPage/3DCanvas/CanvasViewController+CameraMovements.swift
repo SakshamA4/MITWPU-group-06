@@ -367,9 +367,23 @@ extension CanvasViewController {
             )
             
         case .Zoomin, .Zoomout:
-            let startFOV: Float = preset == .Zoomout ? (zoomAmount > 0 ? 30.0 : 30.0) : 60.0
-            let endFOV:   Float = zoomAmount > 0 ? zoomAmount : (preset == .Zoomin ? 30.0 : 60.0)
-            
+            // Read the camera's actual current FOV so the animation starts exactly
+            // from the lens's current field of view, not a hard-coded value.
+            let currentCamera = cameraRoot.children.compactMap { $0 as? PerspectiveCamera }.first
+            let currentFOV: Float = currentCamera?.camera.fieldOfViewInDegrees ?? 60.0
+
+            // Zoom In  → FOV decreases (telephoto / narrower angle of view)
+            // Zoom Out → FOV increases (wide-angle / broader angle of view)
+            // zoomAmount is the target FOV chosen by the user in AnimationInputCard.
+            // If unset (0), fall back to sensible per-direction defaults.
+            let endFOV: Float
+            if zoomAmount > 0 {
+                endFOV = zoomAmount
+            } else {
+                endFOV = (preset == .Zoomin) ? max(currentFOV * 0.5, 20.0)
+                                             : min(currentFOV * 1.5, 90.0)
+            }
+
             candidateClip = AnimationClip(
                 entityName: cameraRoot.name,
                 entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
@@ -378,8 +392,8 @@ extension CanvasViewController {
                 easing:     .easeInOut,
                 startTime:  startTime,
                 duration:   duration,
-                fromValue:  SIMD3<Float>(startFOV, 0, 0),
-                toValue:    SIMD3<Float>(endFOV, 0, 0),
+                fromValue:  SIMD3<Float>(currentFOV, 0, 0),
+                toValue:    SIMD3<Float>(endFOV,     0, 0),
                 motionPath: nil
             )
         }
@@ -396,7 +410,11 @@ extension CanvasViewController {
             )
         } else {
             timeline.addClip(candidateClip)
-            showMotionPath(for: candidateClip)
+            // Only show a motion-path overlay for clips that actually have a path
+            // (FOV / zoom clips have motionPath == nil, so skip showMotionPath for them)
+            if candidateClip.motionPath != nil {
+                showMotionPath(for: candidateClip)
+            }
         }
         debugPrintTimeline()
     }

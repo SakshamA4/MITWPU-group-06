@@ -329,11 +329,17 @@ final class AnimationInputCard: UIViewController {
             stack.addArrangedSubview(df)
             
             if isZoom {
+                // Zoom In  → target FOV lower  than current (e.g. 30° = telephoto)
+                // Zoom Out → target FOV higher than current (e.g. 80° = wide angle)
+                let isZoomIn = shotName.lowercased().contains("in")
+                let defaultTarget = isZoomIn ? "30" : "80"
                 let zf = LabelledField(
                     label: "Target FOV",
-                    hint:  "Field of View in degrees (lower = zoomed in, 60 = normal)",
+                    hint:  isZoomIn
+                        ? "Field of View in degrees — lower = more zoomed in (e.g. 20–50°)"
+                        : "Field of View in degrees — higher = more zoomed out / wider (e.g. 70–90°)",
                     icon:  "magnifyingglass",
-                    value: shotName.contains("in") ? "30" : "60",
+                    value: defaultTarget,
                     keyboard: .numberPad)
                 zoomField = zf
                 stack.addArrangedSubview(zf)
