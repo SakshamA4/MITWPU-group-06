@@ -783,6 +783,10 @@ final class ScenePersistenceService {
              e.components.set(CategoryComponent(toolType: .wall))
              e.components.set(groundComp)
              e.components.set(InputTargetComponent())
+             // Explicit box collision with slight thickness for reliable hit-testing
+             e.collision = CollisionComponent(shapes: [
+                 .generateBox(width: w, height: 0.05, depth: d)
+             ])
              e.transform = t
              anchor.addChild(e)
              return

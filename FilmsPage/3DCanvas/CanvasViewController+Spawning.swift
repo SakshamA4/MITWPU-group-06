@@ -390,7 +390,12 @@ extension CanvasViewController {
              materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
          )
          ground.position = [0, 0, 0]
-         ground.generateCollisionShapes(recursive: true)
+         // Use an explicit box collision shape with slight thickness (5cm)
+         // so the ground is reliably hittable from any camera angle.
+         // generateCollisionShapes on a zero-thickness plane is unreliable at oblique angles.
+         ground.collision = CollisionComponent(shapes: [
+             .generateBox(width: 4, height: 0.05, depth: 4)
+         ])
          ground.components.set(InputTargetComponent())
          ground.components.set(CategoryComponent(toolType: .wall))
          ground.components.set(groundComp)
@@ -422,7 +427,11 @@ extension CanvasViewController {
             materials: [simpleMat]
         )
         ground.position = [0, 0, 0]
-        ground.generateCollisionShapes(recursive: true)
+        // Use an explicit box collision shape with slight thickness
+        // so the ground is reliably hittable from any camera angle.
+        ground.collision = CollisionComponent(shapes: [
+            .generateBox(width: size, height: 0.05, depth: size)
+        ])
         ground.components.set(InputTargetComponent())
         ground.components.set(CategoryComponent(toolType: .wall))
         ground.components.set(groundComp)
