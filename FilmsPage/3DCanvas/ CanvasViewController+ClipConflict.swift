@@ -29,8 +29,16 @@ extension CanvasViewController {
     ) -> AnimationClip? {
         let editedEnd = editedClip.startTime + editedClip.duration
 
+        // COMPOUND SHOT FIX: filter to clips on the SAME entity AND the SAME TRACK.
+        // A .position clip and a .rotation clip on the same camera that overlap in
+        // time is intentional (dolly + pan = compound shot) and must NOT be flagged.
+        // Only two clips on the same track of the same entity are a genuine conflict.
         let siblings = timeline.clips
-            .filter { $0.entityName == editedClip.entityName && $0.id != replacingID }
+            .filter {
+                $0.entityName == editedClip.entityName &&
+                $0.track      == editedClip.track &&    // ← same-track only
+                $0.id         != replacingID
+            }
             .sorted { $0.startTime < $1.startTime }
 
         return siblings.first {

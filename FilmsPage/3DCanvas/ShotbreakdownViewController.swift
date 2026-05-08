@@ -19,11 +19,22 @@ struct Shot {
     let startTime: Float
     let duration: Float
     var thumbnail: UIImage?
-    let clipID: UUID
+    /// All clip UUIDs that make up this shot (may be > 1 for compound shots).
+    /// The primary clip is always first (position/dolly track takes priority;
+    /// rotation track is secondary; other tracks follow).
+    let clipIDs: [UUID]
+
+    /// Backwards-compatible accessor — the primary clip ID (first in clipIDs).
+    /// Always valid because derive() guarantees clipIDs is non-empty.
+    var clipID: UUID { clipIDs[0] }
 
     var displayName: String { "Shot \(index + 1)" }
     var shortLabel: String  { "\(index + 1)" }
     var endTime: Float      { startTime + duration }
+
+    /// True when more than one animation track is active simultaneously
+    /// (e.g. dolly-in + pan, or crane + tilt).
+    var isCompound: Bool { clipIDs.count > 1 }
 
     var cleanCameraName: String {
         cameraName
@@ -42,7 +53,7 @@ struct ShotDerived {
         guard totalDuration > 0 else { return [] }
 
         let cameraNameSet = Set(cameraItems.map { $0.cameraRoot.name })
-        var cameraIDMap: [UUID: CanvasViewController.SceneCameraItem] = [:]
+        var cameraIDMap:   [UUID: CanvasViewController.SceneCameraItem] = [:]
         var cameraNameMap: [String: CanvasViewController.SceneCameraItem] = [:]
         for item in cameraItems {
             cameraIDMap[item.id] = item
@@ -51,41 +62,118 @@ struct ShotDerived {
             }
         }
 
-        // FIX: Filter ONLY for clips that match an actual camera by ID or name.
-        // If no camera exists, hide the shot.
+        // Filter to clips that belong to a known camera (by ID or by entity name).
         let cameraClips = timeline.clips.filter { clip in
             if let id = clip.entityID, cameraIDMap[id] != nil { return true }
             return cameraNameSet.contains(clip.entityName)
         }
+        guard !cameraClips.isEmpty else { return [] }
 
-        if cameraClips.isEmpty {
-            // No camera clips → no shots to show
-            // (User must add cameras and animate them to see shots)
-            return []
+        // ── Compound shot merging ────────────────────────────────────────────────
+        //
+        // Two clips belong to the same compound shot when they:
+        //   • target the same camera (by ID or by name)
+        //   • overlap in time (one clip's window intersects the other's)
+        //
+        // Strategy: group all camera clips into temporal buckets per camera,
+        // then union-find overlapping windows within each camera's clips.
+        //
+        // We represent each group as a set of clip UUIDs. The group's time window
+        // is the union of all its clips' windows (max end, min start).
+
+        // Step 1 – resolve each clip to its camera item.
+        struct TaggedClip {
+            let clip: AnimationClip
+            let item: CanvasViewController.SceneCameraItem
+        }
+        let tagged: [TaggedClip] = cameraClips.compactMap { clip in
+            if let id = clip.entityID, let item = cameraIDMap[id] {
+                return TaggedClip(clip: clip, item: item)
+            }
+            if let item = cameraNameMap[clip.entityName] {
+                return TaggedClip(clip: clip, item: item)
+            }
+            return nil
         }
 
-        // FIX: Create ONE SHOT PER CLIP, no merging
-        // Sort clips chronologically by start time
-        let sortedClips = cameraClips.sorted { $0.startTime < $1.startTime }
+        // Step 2 – group by camera, then merge overlapping time windows.
+        // Clips overlap when: clipA.startTime < clipB.endTime && clipB.startTime < clipA.endTime
+        var cameraGroups: [UUID: [TaggedClip]] = [:]
+        for tc in tagged {
+            cameraGroups[tc.item.id, default: []].append(tc)
+        }
 
-        // Create a shot for each clip with its own index
-        return sortedClips.enumerated().compactMap { (index, clip) in
-            let cameraItem: CanvasViewController.SceneCameraItem?
-            if let id = clip.entityID {
-                cameraItem = cameraIDMap[id]
-            } else {
-                cameraItem = cameraNameMap[clip.entityName]
+        // Each element of `shots` is an array of TaggedClips that form one shot.
+        var shotGroups: [[TaggedClip]] = []
+
+        for (_, clips) in cameraGroups {
+            // Sort by startTime so we process chronologically.
+            let sorted = clips.sorted { $0.clip.startTime < $1.clip.startTime }
+
+            // Greedy interval merge: accumulate a running window; flush when a
+            // new clip doesn't overlap the running window.
+            var currentGroup: [TaggedClip] = []
+            var windowEnd: Float = -Float.infinity
+
+            for tc in sorted {
+                let clipStart = tc.clip.startTime
+                let clipEnd   = tc.clip.startTime + tc.clip.duration
+
+                if currentGroup.isEmpty || clipStart < windowEnd {
+                    // Overlaps (or first clip) — extend the running group.
+                    currentGroup.append(tc)
+                    windowEnd = max(windowEnd, clipEnd)
+                } else {
+                    // Gap detected — flush current group, start a new one.
+                    shotGroups.append(currentGroup)
+                    currentGroup = [tc]
+                    windowEnd = clipEnd
+                }
             }
-            guard let item = cameraItem else { return nil }
+            if !currentGroup.isEmpty { shotGroups.append(currentGroup) }
+        }
+
+        // Step 3 – sort shot groups chronologically, then build Shot values.
+        // For compound shots the Shot's startTime/duration spans the union of
+        // all clips (so the player scrubber covers the full compound move).
+        // clipIDs are ordered: position tracks first, rotation tracks second,
+        // other tracks last — so clipID (the primary) is always position/dolly.
+        let trackPriority: (AnimationTrack) -> Int = { track in
+            switch track {
+            case .position: return 0
+            case .rotation: return 1
+            case .fov:      return 2
+            case .scale:    return 3
+            }
+        }
+
+        let sortedGroups = shotGroups.sorted { groupA, groupB in
+            let aStart = groupA.map { $0.clip.startTime }.min() ?? 0
+            let bStart = groupB.map { $0.clip.startTime }.min() ?? 0
+            return aStart < bStart
+        }
+
+        return sortedGroups.enumerated().compactMap { (index, group) in
+            guard let item = group.first?.item else { return nil }
+
+            let groupStart    = group.map { $0.clip.startTime }.min() ?? 0
+            let groupEnd      = group.map { $0.clip.startTime + $0.clip.duration }.max() ?? 0
+            let groupDuration = groupEnd - groupStart
+
+            // Order clip IDs by track priority so the primary (position) clip is first.
+            let orderedIDs = group
+                .sorted { trackPriority($0.clip.track) < trackPriority($1.clip.track) }
+                .map { $0.clip.id }
+
             return Shot(
-                id: UUID(),
-                index: index,
+                id:         UUID(),
+                index:      index,
                 cameraName: item.cameraRoot.name,
-                cameraID: item.id,
-                startTime: clip.startTime,
-                duration: clip.duration,
-                thumbnail: nil,
-                clipID: clip.id
+                cameraID:   item.id,
+                startTime:  groupStart,
+                duration:   groupDuration,
+                thumbnail:  nil,
+                clipIDs:    orderedIDs
             )
         }
     }
@@ -472,13 +560,17 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func reloadThumbnail(for shot: Shot) {
-        guard let index = shots.firstIndex(where: { $0.clipID == shot.clipID }) else { return }
+        // Match by any clipID in the compound set (a shot may have multiple clips).
+        guard let index = shots.firstIndex(where: { $0.id == shot.id }) else { return }
         reloadThumbnail(at: index)
     }
 
     private func thumbnailCacheKey(for shot: Shot) -> String {
+        // For compound shots, key includes ALL clip UUIDs (sorted for stability)
+        // so the same compound shot always maps to the same cache entry.
         let camID = shot.cameraID?.uuidString ?? shot.cameraName
-        return "\(sceneName)_\(camID)_\(shot.clipID.uuidString)"
+        let clipKey = shot.clipIDs.map { $0.uuidString }.sorted().joined(separator: "-")
+        return "\(sceneName)_\(camID)_\(clipKey)"
     }
 
     private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
@@ -523,7 +615,8 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func deleteShot(_ shot: Shot) {
-        deleteTimelineClip?(shot.clipID)
+        // For compound shots, delete every constituent clip so none are orphaned.
+        shot.clipIDs.forEach { deleteTimelineClip?($0) }
         thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
         refreshShotsFromTimeline()
     }
@@ -612,9 +705,10 @@ class ShotBreakdownViewController: UIViewController {
 
     private func handleClipUpdateCompletion(updatedClip: AnimationClip) {
         refreshShotsFromTimeline()
-        if let shot = shots.first(where: { $0.clipID == updatedClip.id }) {
+        // Match by any clipID in the compound set, not just the primary.
+        if let shot = shots.first(where: { $0.clipIDs.contains(updatedClip.id) }) {
             thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
-            shots.firstIndex(where: { $0.clipID == updatedClip.id }).map { index in
+            if let index = shots.firstIndex(where: { $0.id == shot.id }) {
                 thumbnailQueue.append(index)
                 captureNextThumbnailIfNeeded()
             }
@@ -908,7 +1002,11 @@ final class ShotCardCell: UICollectionViewCell {
     func configure(with shot: Shot, accentColor: UIColor) {
         badgeLbl.text     = shot.shortLabel
         shotNameLbl.text  = shot.displayName
-        camNameLbl.text   = shot.cleanCameraName
+        // Append a ⊕ symbol to the camera name for compound shots so the user
+        // can distinguish multi-track shots (dolly+pan, crane+tilt, etc.) at a glance.
+        camNameLbl.text   = shot.isCompound
+            ? "\(shot.cleanCameraName)  ⊕"
+            : shot.cleanCameraName
         badge.backgroundColor  = accentColor
         accentBar.backgroundColor = accentColor.withAlphaComponent(0.8)
 
