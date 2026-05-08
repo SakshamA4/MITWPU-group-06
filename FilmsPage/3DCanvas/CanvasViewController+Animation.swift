@@ -389,15 +389,31 @@ extension CanvasViewController {
         }
     }
 
+    /// Recursively searches the entity and all its descendants for a node
+    /// that has at least one available animation. This handles models like
+    /// Lewis_walks where the animation clip lives on a child node rather
+    /// than the top-level root entity that was added to MainAnchor.
+    private func findAnimationBearingEntity(in entity: Entity) -> Entity? {
+        if !entity.availableAnimations.isEmpty { return entity }
+        for child in entity.children {
+            if let found = findAnimationBearingEntity(in: child) { return found }
+        }
+        return nil
+    }
+
     private func startWalkCycle(on entity: Entity) {
-        print("🚶 startWalkCycle: \(entity.name) | anims: \(entity.availableAnimations.count)")
-        guard let anim = entity.availableAnimations.first else {
-            print("⚠️ No availableAnimations on \(entity.name) — skeleton cycle skipped")
+        // Search the full hierarchy — some models (e.g. Lewis_walks) store
+        // their animation on a child node, not the root entity.
+        guard let animEntity = findAnimationBearingEntity(in: entity) else {
+            print("⚠️ No availableAnimations anywhere in hierarchy of \(entity.name) — skeleton cycle skipped")
             return
         }
+        print("🚶 startWalkCycle: \(entity.name) | animating node: \(animEntity.name) | anims: \(animEntity.availableAnimations.count)")
+        guard let anim = animEntity.availableAnimations.first else { return }
+
         // separateAnimatedValue: true → bones animate, root position stays
         // under our bezier control
-        let controller = entity.playAnimation(
+        let controller = animEntity.playAnimation(
             anim.repeat(),
             transitionDuration: 0.3,
             separateAnimatedValue: true,
@@ -405,7 +421,7 @@ extension CanvasViewController {
         )
         entity.components.set(WalkAnimationComponent(controller: controller))
         activeWalkControllers[entity.name] = controller
-        print("✅ Walk cycle started on \(entity.name)")
+        print("✅ Walk cycle started on \(entity.name) via \(animEntity.name)")
     }
 
     func stopWalkCycle(on entity: Entity) {
@@ -420,6 +436,22 @@ extension CanvasViewController {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
         for child in anchor.children { stopWalkCycle(on: child) }
         activeWalkControllers.removeAll()
+    }
+
+    /// Recursively pauses any auto-playing animations on the entity or any of
+    /// its descendants. Called on spawn so Mixamo models don't auto-walk in place.
+    func pauseAllAnimations(in entity: Entity) {
+        if !entity.availableAnimations.isEmpty {
+            let ctrl = entity.playAnimation(
+                entity.availableAnimations[0].repeat(count: 1),
+                transitionDuration: 0,
+                startsPaused: true
+            )
+            ctrl.pause()
+        }
+        for child in entity.children {
+            pauseAllAnimations(in: child)
+        }
     }
 
     // MARK: - Face Direction of Travel
