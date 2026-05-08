@@ -125,6 +125,8 @@ class ShotBreakdownViewController: UIViewController {
     private var isCapturingThumbnail = false
     private var thumbnailQueue: [Int] = []
     private var thumbnailCache: [String: UIImage] = [:]
+    private var exportService: VideoExportService?
+    private var progressOverlay: ExportProgressOverlay?
 
     // MARK: - UI Elements
 
@@ -251,11 +253,15 @@ class ShotBreakdownViewController: UIViewController {
             image: UIImage(systemName: "chevron.left"),
             style: .plain, target: self, action: #selector(backTapped))
 
-        let playAllBtn = makeNavButton(title: "▶  Play All")
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: playAllBtn)
+        let playAllBtn = makeNavButton(title: "▶  Play All", action: #selector(playAllTapped))
+        let exportAllBtn = makeNavButton(title: "⬆  Export All", action: #selector(exportAllTapped))
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(customView: playAllBtn),
+            UIBarButtonItem(customView: exportAllBtn),
+        ]
     }
 
-    private func makeNavButton(title: String) -> UIButton {
+    private func makeNavButton(title: String, action: Selector) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.title = title
         config.baseBackgroundColor = accentRed
@@ -268,7 +274,7 @@ class ShotBreakdownViewController: UIViewController {
             return a
         }
         let btn = UIButton(configuration: config)
-        btn.addTarget(self, action: #selector(playAllTapped), for: .touchUpInside)
+        btn.addTarget(self, action: action, for: .touchUpInside)
         return btn
     }
 
@@ -481,6 +487,76 @@ class ShotBreakdownViewController: UIViewController {
     @objc private func playAllTapped() {
         guard !shots.isEmpty else { return }
         openPlayer(index: 0, playAll: true)
+    }
+
+    @objc private func exportAllTapped() {
+        guard !shots.isEmpty else { return }
+        let sheet = ExportSettingsSheet(mode: .allShots)
+        sheet.onExport = { [weak self] settings in
+            self?.beginExportAll(settings: settings)
+        }
+        present(sheet, animated: true)
+    }
+
+    private func beginExportAll(settings: ExportSettings) {
+        // Enter playback mode to snapshot base transforms
+        enterPlaybackMode?()
+
+        let service = VideoExportService()
+        self.exportService = service
+
+        service.evaluateTimeline = evaluateTimeline
+        service.prepareForCapture = prepareForCapture
+        service.captureFrameAsync = captureFrameAsync
+        service.cameraItemForShot = { [weak self] shot in
+            self?.cameraItem(for: shot)
+        }
+
+        // Show progress overlay
+        let overlay = ExportProgressOverlay()
+        self.progressOverlay = overlay
+        overlay.onCancel = { [weak self] in
+            self?.exportService?.cancel()
+            self?.progressOverlay?.dismiss {
+                self?.exitPlaybackMode?()
+                self?.evaluateTimeline?(0)
+            }
+        }
+        overlay.show(in: view)
+
+        service.onProgress = { [weak self] progress in
+            self?.progressOverlay?.update(with: progress)
+        }
+
+        service.onComplete = { [weak self] url, error in
+            guard let self = self else { return }
+            self.progressOverlay?.dismiss()
+            self.progressOverlay = nil
+            self.exportService = nil
+
+            // Exit playback mode and reset timeline
+            self.exitPlaybackMode?()
+            self.evaluateTimeline?(0)
+
+            if let url = url {
+                let haptic = UINotificationFeedbackGenerator()
+                haptic.notificationOccurred(.success)
+                let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                if let pop = vc.popoverPresentationController {
+                    pop.sourceView = self.view
+                    pop.sourceRect = CGRect(x: self.view.bounds.midX, y: 60, width: 1, height: 1)
+                }
+                self.present(vc, animated: true)
+            } else if let error = error {
+                let alert = UIAlertController(title: "Export Failed",
+                                              message: error.localizedDescription,
+                                              preferredStyle: .alert)
+                alert.addAction(.init(title: "OK", style: .default))
+                self.present(alert, animated: true)
+            }
+        }
+
+        service.exportAllShots(shots, settings: settings)
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {

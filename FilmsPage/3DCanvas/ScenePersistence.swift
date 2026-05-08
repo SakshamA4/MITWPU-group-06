@@ -565,6 +565,20 @@ final class ScenePersistenceService {
             vc.showMotionPath(for: clip)
         }
 
+        // Phase 8b – rotation arc visuals.
+        // Rotation clips store axis + angle data but the arc visualization is
+        // transient (not serialized). Rebuild it here so arcs are visible on load.
+        let rotationClips = vc.timeline.clips.filter { $0.track == .rotation }
+        for (index, clip) in rotationClips.enumerated() {
+            if index > 0 {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+            if let entity = vc.mainAnchor?.findEntity(named: clip.entityName) {
+                vc.showRotationArc(for: clip, on: entity)
+                print("🔄 Restored rotation arc for '\(clip.entityName)'")
+            }
+        }
+
         // Phase 9 – single sidebar refresh
         vc.isBatchLoading = false   // FIX 8: re-enable before the final refresh
         // Phase 6: restore sky if one was saved

@@ -229,21 +229,6 @@ final class ShotPlayerViewController: UIViewController {
         return v
     }()
 
-    private lazy var exportOverlay: UIView = {
-        let v = UIView(); v.backgroundColor = UIColor.black.withAlphaComponent(0.80)
-        v.isHidden = true; v.translatesAutoresizingMaskIntoConstraints = false; return v
-    }()
-    private lazy var exportLabel: UILabel = {
-        let l = UILabel(); l.font = .systemFont(ofSize: 13, weight: .semibold)
-        l.textColor = .white; l.textAlignment = .center; l.numberOfLines = 2
-        l.translatesAutoresizingMaskIntoConstraints = false; return l
-    }()
-    private lazy var exportProgress: UIProgressView = {
-        let p = UIProgressView(progressViewStyle: .default)
-        p.progressTintColor = accentRed; p.trackTintColor = UIColor(white: 1, alpha: 0.13)
-        p.translatesAutoresizingMaskIntoConstraints = false; return p
-    }()
-    private var exportOverlayAdded = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -727,7 +712,9 @@ final class ShotPlayerViewController: UIViewController {
         let sheet = UIAlertController(title: shot.displayName,
                                       message: shot.cleanCameraName,
                                       preferredStyle: .actionSheet)
-        sheet.addAction(.init(title: "Export MP4",        style: .default) { [weak self] _ in self?.renderAndExportMP4() })
+        sheet.addAction(.init(title: "Export MP4", style: .default) { [weak self] _ in
+            self?.showExportSettings()
+        })
         sheet.addAction(.init(title: "Export JPEG Frame", style: .default) { [weak self] _ in self?.exportFrame(png: false) })
         sheet.addAction(.init(title: "Export PNG Frame",  style: .default) { [weak self] _ in self?.exportFrame(png: true) })
         sheet.addAction(.init(title: "Cancel", style: .cancel))
@@ -745,107 +732,62 @@ final class ShotPlayerViewController: UIViewController {
         }
     }
 
-    private func ensureExportOverlay() {
-        guard !exportOverlayAdded else { return }
-        exportOverlayAdded = true
-        view.addSubview(exportOverlay)
-        exportOverlay.addSubview(exportLabel)
-        exportOverlay.addSubview(exportProgress)
-        NSLayoutConstraint.activate([
-            exportOverlay.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            exportOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            exportOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            exportOverlay.heightAnchor.constraint(equalTo: previewContainer.heightAnchor),
-            exportLabel.centerXAnchor.constraint(equalTo: exportOverlay.centerXAnchor),
-            exportLabel.centerYAnchor.constraint(equalTo: exportOverlay.centerYAnchor, constant: -14),
-            exportProgress.topAnchor.constraint(equalTo: exportLabel.bottomAnchor, constant: 14),
-            exportProgress.leadingAnchor.constraint(equalTo: exportOverlay.leadingAnchor, constant: 40),
-            exportProgress.trailingAnchor.constraint(equalTo: exportOverlay.trailingAnchor, constant: -40),
-        ])
-    }
+    // MARK: - MP4 Export (VideoExportService)
 
-    private func setExportState(visible: Bool, text: String = "", progress: Float = 0) {
-        ensureExportOverlay()
-        exportOverlay.isHidden = !visible
-        exportLabel.text = text; exportProgress.progress = progress
-    }
+    private var exportService: VideoExportService?
+    private var exportProgressOverlay: ExportProgressOverlay?
 
-    private func renderAndExportMP4() {
+    private func showExportSettings() {
         stopPlayback()
-        let shot = currentShot; let fps: Int32 = 24
-        let totalFrames = max(1, Int(ceil(shot.duration * Float(fps))))
-
-        let outURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Shot\(shot.index + 1)_\(Int(Date().timeIntervalSince1970)).mp4")
-        try? FileManager.default.removeItem(at: outURL)
-
-        let size = frameImageView.image.map { $0.size } ?? CGSize(width: 1280, height: 720)
-        guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: .mp4) else {
-            showAlert("Could not create video writer."); return
+        let settingsSheet = ExportSettingsSheet(mode: .singleShot)
+        settingsSheet.onExport = { [weak self] settings in
+            self?.beginShotExport(settings: settings)
         }
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: size.width, AVVideoHeightKey: size.height,
-        ])
-        videoInput.expectsMediaDataInRealTime = false
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
-                kCVPixelBufferWidthKey  as String: size.width,
-                kCVPixelBufferHeightKey as String: size.height,
-            ])
-        writer.add(videoInput)
-        writer.startWriting(); writer.startSession(atSourceTime: .zero)
-        setExportState(visible: true, text: "Preparing…", progress: 0)
-        renderNextFrame(index: 0, total: totalFrames, fps: fps, shot: shot,
-                        writer: writer, input: videoInput, adaptor: adaptor,
-                        size: size, outURL: outURL)
+        present(settingsSheet, animated: true)
     }
 
-    private func renderNextFrame(index: Int, total: Int, fps: Int32,
-                                  shot: Shot, writer: AVAssetWriter,
-                                  input: AVAssetWriterInput,
-                                  adaptor: AVAssetWriterInputPixelBufferAdaptor,
-                                  size: CGSize, outURL: URL) {
-        guard index < total else {
-            input.markAsFinished()
-            writer.finishWriting { [weak self] in
-                DispatchQueue.main.async {
-                    self?.setExportState(visible: false)
-                    if writer.status == .completed { self?.presentShareSheet([outURL]) }
-                    else { self?.showAlert("MP4 export failed: \(writer.error?.localizedDescription ?? "unknown")") }
-                }
-            }
-            return
-        }
-        setExportState(visible: true,
-                       text: "Rendering \(shot.displayName)… \(index + 1)/\(total)",
-                       progress: Float(index) / Float(total))
+    private func beginShotExport(settings: ExportSettings) {
+        let service = VideoExportService()
+        self.exportService = service
 
-        let masterTime = shot.startTime + Float(index) / Float(fps)
-        evaluateTimeline?(masterTime)
-        let camItem = cameraItem(for: shot)
-        // ISSUE 2: Call prepareForCapture before each frame capture in export path
-        prepareForCapture?(camItem)
-        
-        let doCapture: (@escaping (UIImage?) -> Void) -> Void
-        if let capture = captureFrameAsync { doCapture = { cb in capture(camItem, cb) } }
-        else { doCapture = { [weak self] cb in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) {
-                self?.arView?.snapshot(saveToHDR: false, completion: cb) }
-        }}
-        doCapture { [weak self] image in
+        service.evaluateTimeline = evaluateTimeline
+        service.prepareForCapture = prepareForCapture
+        service.captureFrameAsync = captureFrameAsync
+        service.cameraItemForShot = { [weak self] shot in
+            self?.cameraItem(for: shot)
+        }
+
+        // Show progress overlay
+        let overlay = ExportProgressOverlay()
+        self.exportProgressOverlay = overlay
+        overlay.onCancel = { [weak self] in
+            self?.exportService?.cancel()
+            self?.exportProgressOverlay?.dismiss()
+            self?.exportProgressOverlay = nil
+            self?.exportService = nil
+        }
+        overlay.show(in: view)
+
+        service.onProgress = { [weak self] progress in
+            self?.exportProgressOverlay?.update(with: progress)
+        }
+
+        service.onComplete = { [weak self] url, error in
             guard let self = self else { return }
-            if let img = image, let pb = img.toPixelBuffer(size: size) {
-                while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
-                adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(index), timescale: fps))
-            }
-            DispatchQueue.main.async {
-                self.renderNextFrame(index: index + 1, total: total, fps: fps, shot: shot,
-                                     writer: writer, input: input, adaptor: adaptor,
-                                     size: size, outURL: outURL)
+            self.exportProgressOverlay?.dismiss()
+            self.exportProgressOverlay = nil
+            self.exportService = nil
+
+            if let url = url {
+                let haptic = UINotificationFeedbackGenerator()
+                haptic.notificationOccurred(.success)
+                self.presentShareSheet([url])
+            } else if let error = error {
+                self.showAlert("Export failed: \(error.localizedDescription)")
             }
         }
+
+        service.exportShot(currentShot, settings: settings)
     }
 
     private func presentShareSheet(_ items: [Any]) {
