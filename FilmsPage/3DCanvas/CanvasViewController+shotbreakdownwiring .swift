@@ -10,28 +10,43 @@ extension CanvasViewController {
 
     // MARK: - Camera POV Capture  (used by Shot Breakdown & Shot Player)
     //
-    // FIX: Uses the offscreen clone approach (same as snapshotPreviewCamera in
-    // CanvasViewController_Camera.swift) instead of switching cameras on the live
-    // arView. Switching camera entities on a .nonAR ARView does not change what
-    // snapshot() renders. The offscreen clone guarantees the correct POV.
+    // IMPORTANT: RealityKit's ARView.snapshot() only works reliably when the ARView
+    // is part of a live window/view hierarchy. The off-screen clone approach returns
+    // black images because the GPU compositor has no surface to render into.
     //
-    // BUG FIX: In RealityKit, arView.scene and previewARView.scene can share
-    // underlying resources. Calling removeAll() on the offscreen scene would
-    // silently also remove anchors from the live scene. Now we use a dedicated
-    // named anchor (__ShotPreviewClone__) that we can safely remove in isolation.
+    // The correct approach for thumbnails: briefly activate the target camera on the
+    // live arView, evaluate entity positions, wait 2 render frames, snapshot, then
+    // immediately restore the previous camera. The transition is ~100ms and invisible
+    // to the user since the shot breakdown VC is on top.
 
      func captureFrameFromCamera(
          _ item: SceneCameraItem?,
          completion: @escaping (UIImage?) -> Void
      ) {
-         guard let item = item else {
-             DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) { [weak self] in
-                 self?.arView.snapshot(saveToHDR: false, completion: completion)
-             }
-             return
+         // Remember who was active so we can restore after capture
+         let previousCamera = activeCamera
+
+         if let item = item {
+             setActiveCamera(item.camera)
+         } else {
+             activateEditorCamera()
          }
 
-         captureCameraPreviewImage(for: item, completion: completion)
+         // Give RealityKit 2 render frames to composite the new camera view
+         DispatchQueue.main.asyncAfter(deadline: .now() + 0.066) { [weak self] in
+             guard let self = self else { completion(nil); return }
+             self.arView.snapshot(saveToHDR: false) { [weak self] image in
+                 // Restore original camera immediately after snapshot
+                 DispatchQueue.main.async {
+                     if let prev = self?.sceneCameras.first(where: { $0 === previousCamera }) {
+                         self?.setActiveCamera(prev)
+                     } else {
+                         self?.activateEditorCamera()
+                     }
+                     completion(image)
+                 }
+             }
+         }
      }
 
      func captureFrameAtTime(
@@ -39,10 +54,10 @@ extension CanvasViewController {
          cameraItem: SceneCameraItem?,
          completion: @escaping (UIImage?) -> Void
      ) {
+         // Position all entities at the requested timeline time.
          evaluateTimeline(at: time)
-         DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
-             self?.captureFrameFromCamera(cameraItem, completion: completion)
-         }
+         // Capture from the correct camera POV on the live arView.
+         captureFrameFromCamera(cameraItem, completion: completion)
      }
 
      // MARK: - Shot Breakdown Entry Point

@@ -447,7 +447,7 @@ extension CanvasViewController {
         if let existing = objc_getAssociatedObject(self, &PreviewARViewKey.key) as? ARView {
             return existing
         }
-        let av = ARView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        let av = ARView(frame: CGRect(x: 0, y: 0, width: 480, height: 270))
         av.cameraMode = .nonAR
         // Match the main arView's rendering settings so PBR materials are lit correctly
         // and the background matches (white, like the main scene).
@@ -508,8 +508,11 @@ extension CanvasViewController {
 
          let offscreen = previewARView
 
-         // 1. Clone the entire scene into the offscreen view
-         offscreen.scene.anchors.removeAll()
+         // Remove only the previous preview clone (NOT removeAll which can silently
+         // affect the live arView scene due to shared underlying RealityKit resources).
+         if let old = offscreen.scene.anchors.first(where: { $0.name == "PreviewAnchor" }) {
+             offscreen.scene.removeAnchor(old)
+         }
 
          let clonedAnchor = mainAnchor.clone(recursive: true)
          clonedAnchor.name = "PreviewAnchor"
@@ -522,7 +525,7 @@ extension CanvasViewController {
              }
          }
 
-         // 3. Hide all OTHER scene camera visuals (keep them enabled for rendering, hide their geometry)
+         // 3. Hide all OTHER scene camera visuals
          clonedAnchor.forEachDescendant { entity in
              let cameraRootName = entity.name
              if cameraRootName.hasPrefix("SceneCameraRoot_"),
@@ -535,20 +538,12 @@ extension CanvasViewController {
 
          // 4. Hide editor overlays
          clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("GizmoRoot") { entity.isEnabled = false }
-         }
-
-         // 5. Hide all motion paths
-         clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("PathRoot_") { entity.isEnabled = false }
-         }
-
-         // 6. Hide all rotation arcs
-         clonedAnchor.forEachDescendant { entity in
+             if entity.name.hasPrefix("GizmoRoot")     { entity.isEnabled = false }
+             if entity.name.hasPrefix("PathRoot_")     { entity.isEnabled = false }
              if entity.name.hasPrefix("RotationArc_") { entity.isEnabled = false }
          }
 
-         // 7. Disable ALL scene cameras, then enable only the target camera for rendering
+         // 5. Disable ALL cameras in the clone; enable only the target camera
          clonedAnchor.forEachDescendant { entity in
              if let cam = entity as? PerspectiveCamera { cam.isEnabled = false }
          }
@@ -557,14 +552,11 @@ extension CanvasViewController {
              targetCam.isEnabled = true
          } else {
              let fallback = PerspectiveCamera()
-             fallback.transform = item.camera.transform
-             if item.camera.parent != nil {
-                 let worldPos  = item.camera.position(relativeTo: nil)
-                 let worldOri  = item.camera.orientation(relativeTo: nil)
-                 fallback.position    = worldPos
-                 fallback.orientation = worldOri
-             }
-             fallback.isEnabled = true
+             let worldPos  = item.camera.position(relativeTo: nil)
+             let worldOri  = item.camera.orientation(relativeTo: nil)
+             fallback.position    = worldPos
+             fallback.orientation = worldOri
+             fallback.isEnabled   = true
              clonedAnchor.addChild(fallback)
          }
 

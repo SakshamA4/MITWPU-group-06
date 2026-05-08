@@ -213,13 +213,13 @@ class ShotBreakdownViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // BUG FIX: Clean up the offscreen preview clone so it doesn't affect the live scene
-        // Note: arView is weak, so we don't need to nullify it on pop
-        // Reset timeline to t=0 so entities return to initial state
-        evaluateTimeline?(0)
+        // Drain any pending thumbnail work so callbacks don't fire after pop.
         thumbnailQueue.removeAll()
         isCapturingThumbnail = false
         thumbnailCache.removeAll()
+        // Restore all entities to their pre-playback state and reset the timeline.
+        evaluateTimeline?(0)
+        exitPlaybackMode?()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -394,14 +394,22 @@ class ShotBreakdownViewController: UIViewController {
 
     // MARK: - Camera POV Thumbnail Capture
     //
-    // Sequential capture: for each shot we:
-    //   1. evaluateTimeline at shot.startTime  →  positions all entities
-    //   2. find the matching SceneCameraItem
-    //   3. captureFrameAsync(camItem) → actual POV image
-    //   4. store thumbnail, reload cell
+    // Strategy: enter playback mode once (snapshots baseTransforms so evaluateTimeline
+    // can move entities to each shot's start position), capture each thumbnail serially
+    // on the offscreen previewARView WITHOUT touching the live scene's active camera,
+    // then exit playback mode to restore editor state.
+    //
+    // The "prepareForCapture" closure (which calls setActiveCamera on the live scene)
+    // is intentionally NOT called here — it causes visible camera switches on the main
+    // arView and races with the offscreen snapshot.
 
     private func captureThumbnails() {
         guard !shots.isEmpty else { return }
+
+        // Snapshot entity base transforms once so evaluateTimeline can position them
+        // at each shot's start time without clobbering each other.
+        enterPlaybackMode?()
+
         thumbnailQueue = Array(shots.indices)
         captureNextThumbnailIfNeeded()
     }
@@ -409,7 +417,9 @@ class ShotBreakdownViewController: UIViewController {
     private func captureNextThumbnailIfNeeded() {
         guard !isCapturingThumbnail else { return }
         guard let index = thumbnailQueue.first else {
+            // All thumbnails done — restore scene to t=0
             evaluateTimeline?(0)
+            exitPlaybackMode?()
             return
         }
 
@@ -427,9 +437,15 @@ class ShotBreakdownViewController: UIViewController {
         }
 
         let camItem = cameraItem(for: shot)
+
+        // Use captureAtTime if wired (evaluates timeline position + off-screen capture).
+        // Fallback: evaluate manually + snapshot the live arView after a settle delay.
+        // NOTE: prepareForCapture (live camera switch) is intentionally skipped here.
         let doCaptureAtTime = captureAtTime ?? { [weak self] time, _, cb in
             self?.evaluateTimeline?(time)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
+            // Give RealityKit two render frames (~66 ms) to propagate the new entity
+            // transforms before snapshotting — 33 ms is not reliable on older hardware.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.066) { [weak self] in
                 self?.arView?.snapshot(saveToHDR: false, completion: cb)
             }
         }
