@@ -29,6 +29,7 @@ class EntityActionMenu: UIView {
         case addMovement    // standard: open animation-type picker (Move / Rotate)
         case changeColour   // standard: open color picker (walls/ground only)
         case editMaterial   // standard: open material editor (walls/ground only)
+        case lightSettings  // standard: open light control panel (lights only)
         case addShot        // camera:   open shot/movement picker
         case lock
         case delete
@@ -43,6 +44,7 @@ class EntityActionMenu: UIView {
     private var mode: MenuMode = .standard
     private var isCurrentlyLocked: Bool = false
     private var showColorOption: Bool = false
+    private var showLightOption: Bool = false
 
     private let stackView: UIStackView = {
         let sv = UIStackView()
@@ -76,10 +78,11 @@ class EntityActionMenu: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     // ── Configuration — MUST be called before addSubview ─────────────────────
-    func configure(mode: MenuMode, isLocked: Bool, showColorOption: Bool = false) {
+    func configure(mode: MenuMode, isLocked: Bool, showColorOption: Bool = false, showLightOption: Bool = false) {
         self.mode = mode
         self.isCurrentlyLocked = isLocked
         self.showColorOption = showColorOption
+        self.showLightOption = showLightOption
         buildButtons()
     }
 
@@ -103,6 +106,10 @@ class EntityActionMenu: UIView {
             // Add Movement | [Edit Material] | [Change Colour] | Lock | Delete
             addMenuButton(title: "Add Movement", action: .addMovement)
             addSeparator()
+            if showLightOption {
+                addMenuButton(title: "Light Settings", action: .lightSettings)
+                addSeparator()
+            }
             if showColorOption {
                 addMenuButton(title: "Edit Material", action: .editMaterial)
                 addSeparator()

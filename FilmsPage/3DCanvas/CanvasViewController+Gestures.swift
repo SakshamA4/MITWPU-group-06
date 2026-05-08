@@ -257,8 +257,11 @@ extension CanvasViewController {
         let isGround = entity.components[CanvasViewController.GroundComponent.self] != nil
         let showColorOption = isWall || isGround
 
+        // ── Check if entity is a light (has LightConfigComponent) ────────────
+        let isLight = entity.components[LightConfigComponent.self] != nil
+
         let menu = EntityActionMenu()
-        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption)
+        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
         NSLayoutConstraint.activate([
@@ -294,6 +297,25 @@ extension CanvasViewController {
                 menu.removeFromSuperview()
                 if let modelEntity = entity as? ModelEntity {
                     self.presentMaterialEditor(for: modelEntity)
+                }
+
+            case .lightSettings:
+                // Open light control panel for light entities
+                menu.removeFromSuperview()
+                if var config = entity.components[LightConfigComponent.self] {
+                    let panelVC = LightControlPanelViewController(
+                        entity: entity,
+                        config: config
+                    ) { [weak self] updatedConfig in
+                        guard let self else { return }
+                        // This fires on every slider drag — updates the live 3D scene in real time
+                        self.updateLightProperties(for: entity, config: updatedConfig)
+                    }
+                    if let sheet = panelVC.sheetPresentationController {
+                        sheet.detents              = [.medium()]
+                        sheet.prefersGrabberVisible = true
+                    }
+                    self.present(panelVC, animated: true)
                 }
 
             // ── Camera entity actions ───────────────────────────────────────

@@ -857,6 +857,25 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             return
         }
 
+        // Light count guard — RealityKit allows maximum 8 dynamic lights per scene
+        if toolType == .light {
+            let activeLights = mainAnchor?.children.filter {
+                $0.components[LightConfigComponent.self] != nil
+            }.count ?? 0
+            guard activeLights < 8 else {
+                DispatchQueue.main.async {
+                    let alert = UIAlertController(
+                        title:   "Light Limit Reached",
+                        message: "RealityKit supports a maximum of 8 lights per scene.",
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+                return
+            }
+        }
+
         Task {
             do {
                 let checkName = (customName ?? item.modelFileName).lowercased()
@@ -959,12 +978,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
-                if item.title.lowercased() == "light" || item.modelFileName == "Spotlight" {
-                    addRealLightToModel(entity)
-                } else if item.title.lowercased() == "light" || item.modelFileName == "LED Panel" {
-                    addLEDPanel(to: entity)
-                } else if item.title.lowercased() == "lantern" || item.modelFileName == "Lantern" {
-                    addLantern(to: entity)
+                // Light attachment — model filename matched against data store.
+                // This fixes: (1) dead-branch bug on LED Panel title check,
+                // (2) Lantern modelFileName mismatch ("Lantern" vs "Lantern 2"),
+                // (3) fragile title string matching.
+                if toolType == .light,
+                   let lightItem = LightsDataStore.find(byModelFileName: item.modelFileName) {
+                    let config = LightConfigComponent.from(lightItem.defaultConfig, kind: lightItem.lightKind)
+                    attachLight(to: entity, config: config)
                 }
 
                 // FIX: use cached mainAnchor

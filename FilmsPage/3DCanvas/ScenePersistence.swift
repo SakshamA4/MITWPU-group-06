@@ -74,6 +74,15 @@ struct EntityRecord: Codable {
     let materialConfig: CinematicMaterialConfig?
     /// Camera visual model asset name (e.g. "cam1"). nil for non-camera entities.
     let cameraModelName: String?
+    // Light persistence — nil for non-light entities
+    var lightKind: String?
+    var lightIntensity: Float?
+    var lightColorTempKelvin: Float?
+    var lightInnerAngleDeg: Float?
+    var lightOuterAngleDeg: Float?
+    var lightAttenuationRadius: Float?
+    var lightShadowEnabled: Bool?
+    var lightModelScale: Float?
 }
 
 // MARK: - AnimationClipRecord
@@ -224,6 +233,7 @@ final class ScenePersistenceService {
             "Gizmo_Arrow_Y", "PlaneHandle", "Gizmo_Plane_XZ",
             "LED_Guts_Group", "Lantern_Guts_Group",
             "DynamicPointLight", "LanternInternalLight",
+            "LightCore", "LensGlow", "BeamCone",    // NEW — new architecture children
             "ProceduralSky"
         ]
 
@@ -337,7 +347,15 @@ final class ScenePersistenceService {
                  bgWidth:             bgWidth,     bgHeight:     bgHeight,
                  backgroundImagePath: backgroundImagePath,
                  materialConfig:      materialConfig,
-                 cameraModelName:     cameraModelName
+                 cameraModelName:     cameraModelName,
+                 lightKind:           entity.components[LightConfigComponent.self]?.lightKind.rawValue,
+                 lightIntensity:      entity.components[LightConfigComponent.self]?.intensity,
+                 lightColorTempKelvin: entity.components[LightConfigComponent.self]?.colorTemperatureKelvin,
+                 lightInnerAngleDeg:  entity.components[LightConfigComponent.self]?.innerAngleDeg,
+                 lightOuterAngleDeg:  entity.components[LightConfigComponent.self]?.outerAngleDeg,
+                 lightAttenuationRadius: entity.components[LightConfigComponent.self]?.attenuationRadius,
+                 lightShadowEnabled:  entity.components[LightConfigComponent.self]?.shadowEnabled,
+                 lightModelScale:     entity.components[LightConfigComponent.self]?.modelScale
              ))
         }
 
@@ -985,9 +1003,26 @@ final class ScenePersistenceService {
             entity.components.set(CategoryComponent(toolType: toolType))
             entity.components.set(InputTargetComponent())
 
-            if record.modelFileName == "Spotlight"           { vc.addRealLightToModel(entity) }
-            else if record.modelFileName.contains("LED")     { vc.addLEDPanel(to: entity) }
-            else if record.modelFileName.contains("Lantern") { vc.addLantern(to: entity) }
+            // Light attachment — new architecture with persisted config support
+            if let kindRaw = record.lightKind,
+               let kind = LightKind(rawValue: kindRaw) {
+                // Build config from persisted values — user's custom intensity/color/angles restored
+                let config = LightConfigComponent(
+                    lightKind:              kind,
+                    intensity:              record.lightIntensity ?? 200_000,
+                    colorTemperatureKelvin: record.lightColorTempKelvin ?? 5600,
+                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
+                    shadowEnabled:          record.lightShadowEnabled ?? false,
+                    modelScale:             record.lightModelScale ?? 0.01
+                )
+                vc.attachLight(to: entity, config: config)
+            } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {
+                // Fallback for scenes saved before this update — no lightKind in JSON
+                let config = LightConfigComponent.from(lightItem.defaultConfig, kind: lightItem.lightKind)
+                vc.attachLight(to: entity, config: config)
+            }
 
             entity.transform = t
             anchor.addChild(entity)

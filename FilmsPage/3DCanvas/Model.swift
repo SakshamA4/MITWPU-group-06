@@ -6,6 +6,47 @@
 //
 
 import UIKit
+import RealityKit
+
+// MARK: - LightConfigComponent (ECS)
+
+/// Central ECS component for light properties.
+/// Stored on the model entity at spawn time via `entity.components.set(config)`.
+/// Single source of truth — spawn reads from it, UI reads from it, persistence reads from it.
+struct LightConfigComponent: Component, Codable {
+    var lightKind: LightKind
+    var intensity: Float
+    var colorTemperatureKelvin: Float
+    var innerAngleDeg: Float            // 0 if not applicable (point light)
+    var outerAngleDeg: Float            // 0 if not applicable (point light)
+    var attenuationRadius: Float
+    var shadowEnabled: Bool
+    var modelScale: Float               // stored so attachLight() can derive counter-scale
+
+    // Derived — not stored
+    var uiColor: UIColor { .fromKelvin(colorTemperatureKelvin) }
+    var counterScale: Float { 1.0 / modelScale }  // child entities must be scaled by this
+
+    static func from(_ config: LightConfig, kind: LightKind) -> LightConfigComponent {
+        LightConfigComponent(
+            lightKind:              kind,
+            intensity:              config.intensity,
+            colorTemperatureKelvin: config.colorTemperatureKelvin,
+            innerAngleDeg:          config.innerAngleDeg,
+            outerAngleDeg:          config.outerAngleDeg,
+            attenuationRadius:      config.attenuationRadius,
+            shadowEnabled:          config.shadowEnabled,
+            modelScale:             config.modelScale
+        )
+    }
+
+    // Codable — exclude computed properties
+    enum CodingKeys: String, CodingKey {
+        case lightKind, intensity, colorTemperatureKelvin
+        case innerAngleDeg, outerAngleDeg, attenuationRadius
+        case shadowEnabled, modelScale
+    }
+}
 
 struct SpawnPose {
     let title: String
