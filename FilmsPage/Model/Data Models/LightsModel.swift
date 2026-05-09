@@ -10,6 +10,73 @@ enum LightKind: String, Codable, CaseIterable {
     case point   // PointLight — omnidirectional (Lantern model)
 }
 
+// MARK: - Gobo Pattern
+
+/// Shadow-casting pattern projected by a spotlight via a cookie mesh.
+enum GoboPattern: String, Codable, CaseIterable {
+    case none
+    case venetianBlinds
+    case windowFrame
+    case leaves
+    case dots
+
+    var textureName: String? {
+        switch self {
+        case .none:            return nil
+        case .venetianBlinds:  return "gobo_blinds"
+        case .windowFrame:     return "gobo_window"
+        case .leaves:          return "gobo_leaves"
+        case .dots:            return "gobo_dots"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .none:            return "None"
+        case .venetianBlinds:  return "Blinds"
+        case .windowFrame:     return "Window"
+        case .leaves:          return "Leaves"
+        case .dots:            return "Dots"
+        }
+    }
+}
+
+// MARK: - Reflector Type
+
+/// Named presets that set inner/outer angle pairs to simulate real-world reflectors.
+enum ReflectorType: String, Codable, CaseIterable {
+    case standard     // default focused spot
+    case parabolic    // very tight, theatrical
+    case openFace     // wide flood, no reflector feel
+    case fresnel      // soft edge, classic film look
+
+    var innerAngle: Float {
+        switch self {
+        case .standard:  return 10
+        case .parabolic: return 5
+        case .openFace:  return 45
+        case .fresnel:   return 20
+        }
+    }
+    var outerAngle: Float {
+        switch self {
+        case .standard:  return 30
+        case .parabolic: return 15
+        case .openFace:  return 80
+        case .fresnel:   return 45
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .standard:  return "Standard"
+        case .parabolic: return "Parabolic"
+        case .openFace:  return "Open Face"
+        case .fresnel:   return "Fresnel"
+        }
+    }
+}
+
 // MARK: - Light Config
 
 /// All mutable light properties in one value type.
@@ -23,6 +90,9 @@ struct LightConfig {
     var shadowEnabled: Bool              // SpotLight only — PointLight cannot cast shadows in RealityKit
     var modelScale: Float                // the scale this model is spawned at (e.g. 0.01)
                                          // used to derive child counter-scale = 1.0 / modelScale
+    var reflectorType: ReflectorType = .standard
+    var activeGobo: GoboPattern = .none
+    var diffuserAmount: Float = 0.0      // 0.0 = hard edge, 1.0 = full silk diffusion
 }
 
 // MARK: - Light Item
@@ -56,11 +126,11 @@ struct LightsDataStore {
             modelFileName: "LED Panel",
             lightKind: .panel,
             defaultConfig: LightConfig(
-                intensity: 200_000,
-                colorTemperatureKelvin: 5600,    // daylight white — matches current .white
-                innerAngleDeg: 65,
-                outerAngleDeg: 110,
-                attenuationRadius: 10,
+                intensity: 400_000,
+                colorTemperatureKelvin: 5600,
+                innerAngleDeg: 50,
+                outerAngleDeg: 100,
+                attenuationRadius: 6,
                 shadowEnabled: false,
                 modelScale: 0.01
             )
@@ -72,12 +142,12 @@ struct LightsDataStore {
             modelFileName: "Lantern 2",
             lightKind: .point,
             defaultConfig: LightConfig(
-                intensity: 100_000,
-                colorTemperatureKelvin: 2700,    // warm tungsten — matches current .systemYellow
-                innerAngleDeg: 0,                // unused for point light
-                outerAngleDeg: 0,                // unused for point light
-                attenuationRadius: 5,
-                shadowEnabled: false,            // PointLight cannot cast shadows in RealityKit — engine limit
+                intensity: 500_000,
+                colorTemperatureKelvin: 2700,
+                innerAngleDeg: 0,
+                outerAngleDeg: 0,
+                attenuationRadius: 6,
+                shadowEnabled: false,
                 modelScale: 0.0025
             )
         ),
@@ -88,12 +158,12 @@ struct LightsDataStore {
             modelFileName: "Spotlight",
             lightKind: .spot,
             defaultConfig: LightConfig(
-                intensity: 200_000,
+                intensity: 300_000,
                 colorTemperatureKelvin: 5600,
-                innerAngleDeg: 10,
-                outerAngleDeg: 30,
-                attenuationRadius: 5,       // was 20 — large values corrupt shadow map in non-AR mode
-                shadowEnabled: false,        // was true — shadows are opt-in to avoid scene corruption
+                innerAngleDeg: 15,
+                outerAngleDeg: 35,
+                attenuationRadius: 4,
+                shadowEnabled: false,
                 modelScale: 0.01
             )
         )
@@ -110,6 +180,18 @@ struct LightsDataStore {
     static func find(byModelFileName name: String) -> LightItem? {
         items.first { $0.modelFileName == name }
     }
+}
+
+// MARK: - Diffuser Helper
+
+/// Applies diffusion by adjusting the inner/outer angle ratio.
+/// diffuserAmount 0.0 → hard edge (inner close to outer)
+/// diffuserAmount 1.0 → full silk (inner = 10% of outer — very soft gradual falloff)
+func applyDiffuser(to config: inout LightConfigComponent) {
+    let hardInner = config.outerAngleDeg - 5.0
+    let softInner = config.outerAngleDeg * 0.1
+    config.innerAngleDeg = hardInner + (softInner - hardInner) * config.diffuserAmount
+    config.innerAngleDeg = max(1.0, config.innerAngleDeg)
 }
 
 // MARK: - UIColor Kelvin Extension

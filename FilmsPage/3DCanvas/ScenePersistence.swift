@@ -83,6 +83,9 @@ struct EntityRecord: Codable {
     var lightAttenuationRadius: Float?
     var lightShadowEnabled: Bool?
     var lightModelScale: Float?
+    var lightReflectorType: String?
+    var lightActiveGobo: String?
+    var lightDiffuserAmount: Float?
 }
 
 // MARK: - AnimationClipRecord
@@ -233,7 +236,8 @@ final class ScenePersistenceService {
             "Gizmo_Arrow_Y", "PlaneHandle", "Gizmo_Plane_XZ",
             "LED_Guts_Group", "Lantern_Guts_Group",
             "DynamicPointLight", "LanternInternalLight",
-            "LightCore", "LensGlow", "BeamCone",    // NEW — new architecture children
+            "LightCore", "LensGlow", "BeamCone", "GlowAnchor",    // light architecture children
+            "GoboCookie", "DiffuseFill",                            // light modifier children
             "ProceduralSky"
         ]
 
@@ -355,7 +359,10 @@ final class ScenePersistenceService {
                  lightOuterAngleDeg:  entity.components[LightConfigComponent.self]?.outerAngleDeg,
                  lightAttenuationRadius: entity.components[LightConfigComponent.self]?.attenuationRadius,
                  lightShadowEnabled:  entity.components[LightConfigComponent.self]?.shadowEnabled,
-                 lightModelScale:     entity.components[LightConfigComponent.self]?.modelScale
+                 lightModelScale:     entity.components[LightConfigComponent.self]?.modelScale,
+                 lightReflectorType:  entity.components[LightConfigComponent.self]?.reflectorType.rawValue,
+                 lightActiveGobo:     entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
+                 lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount
              ))
         }
 
@@ -1015,7 +1022,10 @@ final class ScenePersistenceService {
                     outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
                     attenuationRadius:      record.lightAttenuationRadius ?? 10,
                     shadowEnabled:          record.lightShadowEnabled ?? false,
-                    modelScale:             record.lightModelScale ?? 0.01
+                    modelScale:             record.lightModelScale ?? 0.01,
+                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0
                 )
                 vc.attachLight(to: entity, config: config)
             } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {

@@ -22,6 +22,9 @@ struct LightConfigComponent: Component, Codable {
     var attenuationRadius: Float
     var shadowEnabled: Bool
     var modelScale: Float               // stored so attachLight() can derive counter-scale
+    var reflectorType: ReflectorType = .standard
+    var activeGobo: GoboPattern = .none
+    var diffuserAmount: Float = 0.0     // 0.0 = hard edge, 1.0 = full silk
 
     // Derived — not stored
     var uiColor: UIColor { .fromKelvin(colorTemperatureKelvin) }
@@ -36,15 +39,54 @@ struct LightConfigComponent: Component, Codable {
             outerAngleDeg:          config.outerAngleDeg,
             attenuationRadius:      config.attenuationRadius,
             shadowEnabled:          config.shadowEnabled,
-            modelScale:             config.modelScale
+            modelScale:             config.modelScale,
+            reflectorType:          config.reflectorType,
+            activeGobo:             config.activeGobo,
+            diffuserAmount:         config.diffuserAmount
         )
     }
 
-    // Codable — exclude computed properties
+    // Codable — exclude computed properties, use defaults for new optional fields
     enum CodingKeys: String, CodingKey {
         case lightKind, intensity, colorTemperatureKelvin
         case innerAngleDeg, outerAngleDeg, attenuationRadius
         case shadowEnabled, modelScale
+        case reflectorType, activeGobo, diffuserAmount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lightKind              = try c.decode(LightKind.self, forKey: .lightKind)
+        intensity              = try c.decode(Float.self, forKey: .intensity)
+        colorTemperatureKelvin = try c.decode(Float.self, forKey: .colorTemperatureKelvin)
+        innerAngleDeg          = try c.decode(Float.self, forKey: .innerAngleDeg)
+        outerAngleDeg          = try c.decode(Float.self, forKey: .outerAngleDeg)
+        attenuationRadius      = try c.decode(Float.self, forKey: .attenuationRadius)
+        shadowEnabled          = try c.decode(Bool.self, forKey: .shadowEnabled)
+        modelScale             = try c.decode(Float.self, forKey: .modelScale)
+        // New fields — backward compatible with older saves (default if missing)
+        reflectorType  = try c.decodeIfPresent(ReflectorType.self, forKey: .reflectorType) ?? .standard
+        activeGobo     = try c.decodeIfPresent(GoboPattern.self, forKey: .activeGobo) ?? .none
+        diffuserAmount = try c.decodeIfPresent(Float.self, forKey: .diffuserAmount) ?? 0.0
+    }
+
+    init(lightKind: LightKind, intensity: Float, colorTemperatureKelvin: Float,
+         innerAngleDeg: Float, outerAngleDeg: Float, attenuationRadius: Float,
+         shadowEnabled: Bool, modelScale: Float,
+         reflectorType: ReflectorType = .standard,
+         activeGobo: GoboPattern = .none,
+         diffuserAmount: Float = 0.0) {
+        self.lightKind = lightKind
+        self.intensity = intensity
+        self.colorTemperatureKelvin = colorTemperatureKelvin
+        self.innerAngleDeg = innerAngleDeg
+        self.outerAngleDeg = outerAngleDeg
+        self.attenuationRadius = attenuationRadius
+        self.shadowEnabled = shadowEnabled
+        self.modelScale = modelScale
+        self.reflectorType = reflectorType
+        self.activeGobo = activeGobo
+        self.diffuserAmount = diffuserAmount
     }
 }
 

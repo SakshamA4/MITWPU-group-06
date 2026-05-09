@@ -14,6 +14,36 @@ struct DropShadowComponent: Component {}
 extension CanvasViewController {
 
     // ─────────────────────────────────────────────────────────────────────────
+    // MARK: - Safe bounds (excludes light children that corrupt visualBounds)
+    //
+    // The SpotLight/PointLight children use counter-scale (e.g. 100x) which
+    // makes visualBounds return enormous values, crashing the gizmo system.
+    // This helper temporarily disables those children before reading bounds.
+    // ─────────────────────────────────────────────────────────────────────────
+    private static let lightChildNames: Set<String> = [
+        "LightCore", "LensGlow", "BeamCone", "GlowAnchor",
+        "DiffuseFill", "GoboCookie"
+    ]
+
+    func modelOnlyBounds(for entity: Entity, relativeTo ref: Entity?) -> BoundingBox {
+        // 1. Find and disable light children
+        var hidden: [Entity] = []
+        for name in Self.lightChildNames {
+            if let child = entity.findEntity(named: name), child.isEnabled {
+                child.isEnabled = false
+                hidden.append(child)
+            }
+        }
+        // 2. Compute bounds with only the model mesh
+        let bounds = entity.visualBounds(relativeTo: ref)
+        // 3. Re-enable
+        for child in hidden {
+            child.isEnabled = true
+        }
+        return bounds
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // MARK: - Ring builder
     //
     // The previous approach used look(at:) on cylinder segments which caused
@@ -299,7 +329,7 @@ extension CanvasViewController {
         // bounding box so it always sits at the base regardless of pivot point.
         // This fixes walls and backgrounds where the pivot is at the centre.
         let entityPos  = entity.position(relativeTo: anchor)
-        let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
+        let boundsMinY = modelOnlyBounds(for: entity, relativeTo: nil).min.y
         gizmo.position = SIMD3<Float>(entityPos.x, boundsMinY, entityPos.z)
         gizmo.isEnabled = true
 
@@ -339,7 +369,7 @@ extension CanvasViewController {
         guard let entity = trackEntity else { return }
 
         let entityPos  = entity.position(relativeTo: anchor)
-        let boundsMinY = entity.visualBounds(relativeTo: nil).min.y
+        let boundsMinY = modelOnlyBounds(for: entity, relativeTo: nil).min.y
         // For handles (small spheres) place gizmo at the handle centre, not bounds bottom
         let gizmoY     = activeHandleEntity != nil ? entityPos.y : boundsMinY
         gizmo.position = SIMD3<Float>(entityPos.x, gizmoY, entityPos.z)
@@ -373,7 +403,7 @@ extension CanvasViewController {
         // For small entities (path handles, radius ~0.035m) visualBounds.min.y ≈
         // worldPos.y - 0.035 which can fail the guard below. Use worldPos.y directly
         // for small entities; bounding-box bottom for normal scene objects.
-        let bounds       = entity.visualBounds(relativeTo: nil)
+        let bounds       = modelOnlyBounds(for: entity, relativeTo: nil)
         let isSmall      = bounds.extents.y < 0.15
         let baseY: Float = isSmall ? worldPos.y : bounds.min.y
         let groundY: Float = 0.0
@@ -492,7 +522,7 @@ extension CanvasViewController {
         let clampedSize    = max(0.15, desiredSize)
 
         // The gizmo's internal radius (what it actually built the rings at)
-        let bounds         = entity.visualBounds(relativeTo: entity)
+        let bounds         = modelOnlyBounds(for: entity, relativeTo: entity)
         let maxDim         = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
         let internalRadius = max(maxDim * 0.75, 0.0001)
 
@@ -814,7 +844,7 @@ extension CanvasViewController {
             let camToEntity      = simd_distance(camPos, entity.position(relativeTo: nil))
             let desiredSize      = min(camToEntity * 0.15, 0.6)
             let clampedSize      = max(0.15, desiredSize)
-            let bounds           = entity.visualBounds(relativeTo: entity)
+            let bounds           = modelOnlyBounds(for: entity, relativeTo: entity)
             let maxDim           = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
             let internalRadius   = max(maxDim * 0.75, 0.0001)
             let entityWorldScale = max(entity.scale(relativeTo: nil).x, 0.0001)

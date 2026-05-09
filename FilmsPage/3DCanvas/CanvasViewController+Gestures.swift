@@ -218,7 +218,7 @@ extension CanvasViewController {
 
     func frameEntityAnimated(_ entity: Entity) {
         guard !isARModeActive else { return }
-        let bounds     = entity.visualBounds(relativeTo: nil)
+        let bounds     = modelOnlyBounds(for: entity, relativeTo: nil)
         let targetPos  = (bounds.min + bounds.max) * 0.5
         let maxDim     = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
         let targetDist = max(1.5, min(15.0, maxDim * 3.0))
@@ -409,7 +409,7 @@ extension CanvasViewController {
                 return entity.name.hasPrefix("SceneCamera") || entity.name.contains("Light")
             }()
             if !skipYClamp {
-                let bounds = entity.visualBounds(relativeTo: entity)
+                let bounds = modelOnlyBounds(for: entity, relativeTo: entity)
                 newPosition.y = max(-bounds.min.y, newPosition.y)
             }
         }

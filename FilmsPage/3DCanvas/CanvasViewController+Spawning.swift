@@ -258,213 +258,169 @@ extension CanvasViewController {
 
     // MARK: - Unified Light Attachment (New Architecture)
 
-    /// Attaches a RealityKit light to the given model entity using physically correct
-    /// counter-scaling and geometry-derived positioning from the model's visual bounds.
     func attachLight(to model: Entity, config: LightConfigComponent) {
-        // Remove pre-existing light children to prevent doubling on restore
-        model.findEntity(named: "LightCore")?.removeFromParent()
-        model.findEntity(named: "LensGlow")?.removeFromParent()
-        model.findEntity(named: "BeamCone")?.removeFromParent()
 
-        // READ THE MODEL'S ACTUAL BOUNDS in its own local space
-        // This gives us the true geometry extents — no guessing positions
-        let bounds = model.visualBounds(relativeTo: model)
+        // ── 1. CLEAN UP ────────────────────────────────────────────────────
+        for name in ["LightCore", "LensGlow", "BeamCone", "GlowAnchor",
+                     "DiffuseFill", "GoboCookie", "LED_Guts_Group",
+                     "Lantern_Guts_Group", "LanternInternalLight"] {
+            model.findEntity(named: name)?.removeFromParent()
+        }
 
-        // Counter-scale: derived from model scale — 0.01 model → 100 child scale
-        let cs = config.counterScale   // e.g. 100 for Spotlight/LED, 400 for Lantern
+        // ── 2. READ BOUNDS — relativeTo: model = LOCAL space ───────────────
+        let b = model.visualBounds(relativeTo: model)
+        print("LIGHT [\(config.lightKind)] bounds: min=\(b.min) max=\(b.max) center=\(b.center) extents=\(b.extents)")
 
-        // Debug: Print bounds once to verify axis orientation for each model
-        // Remove after confirming positions are correct on device
-        print("💡 [\(config.lightKind)] bounds center: \(bounds.center)  extents: \(bounds.extents)  min: \(bounds.min)  max: \(bounds.max)")
+        // ── 3. COUNTER-SCALE — ONLY for RealityKit light entities ──────────
+        let cs: Float = 1.0 / config.modelScale
 
         switch config.lightKind {
 
+        // ════════════════════════════════════════════════════════════════════
+        // LANTERN — PointLight inside the glass cylinder at 55% height
+        // ════════════════════════════════════════════════════════════════════
         case .point:
-            // LANTERN — light comes from INSIDE the glass cylinder
-            // bounds.center = geometric middle = inside the glass chamber
             let point = PointLight()
             point.name                    = "LightCore"
             point.light.intensity         = config.intensity
             point.light.color             = config.uiColor
             point.light.attenuationRadius = config.attenuationRadius
             point.scale    = SIMD3(repeating: cs)
-            // Place at the geometric center of the model — inside the glass chamber
-            point.position = bounds.center
+            point.position = SIMD3<Float>(
+                b.center.x,
+                b.min.y + (b.extents.y * 0.55),
+                b.center.z
+            )
             model.addChild(point)
 
-            // Glow sphere — inside the glass, TRANSPARENT (present for ECS but invisible)
-            // The glow entity exists so persistence and updateLightProperties can find it,
-            // but alpha=0 means it doesn't render as a giant visible ball
-            var glowMat = PhysicallyBasedMaterial()
-            glowMat.baseColor       = .init(tint: .clear)
-            glowMat.emissiveColor   = .init(color: config.uiColor)
-            glowMat.emissiveIntensity = 8.0
-            glowMat.blending = .transparent(opacity: .init(floatLiteral: 0.0))
-            // Small radius — fits inside the glass cylinder
-            let glowRadius = min(bounds.extents.x, bounds.extents.z) * 0.15
-            let glow = ModelEntity(
-                mesh: .generateSphere(radius: glowRadius),
-                materials: [glowMat]
-            )
-            glow.name     = "LensGlow"
-            glow.position = bounds.center  // same as the light — inside the glass
-            model.addChild(glow)
-
-        case .panel:
-            // LED PANEL — light comes from the FRONT FACE (the LED grid side)
-            // bounds.max.z = the frontmost face of the panel in local space
-            let spot = SpotLight()
-            spot.name                      = "LightCore"
-            spot.light.intensity           = config.intensity
-            spot.light.innerAngleInDegrees = config.innerAngleDeg
-            spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
-            spot.light.attenuationRadius   = config.attenuationRadius
-            // NO shadow for panel — soft area lights don't cast hard shadows
-            spot.scale    = SIMD3(repeating: cs)
-
-            // Front face position: center X and Y, maximum Z (front of panel)
-            let panelFrontPos = SIMD3<Float>(
-                bounds.center.x,
-                bounds.center.y,
-                bounds.max.z
-            )
-            spot.position = panelFrontPos
-            // Aim: forward along +Z from the front face
-            spot.look(at: SIMD3(panelFrontPos.x, panelFrontPos.y, panelFrontPos.z + 500),
-                      from: panelFrontPos,
-                      relativeTo: model)
-            model.addChild(spot)
-
-            // NO visible glow sphere for panel — the model's LED circles
-            // already provide the visual emissive surface (they are white in the texture).
-            // Adding a sphere here is what caused the giant white ball in testing.
-
-        case .spot:
-            // SPOTLIGHT — light comes from the LENS FACE (front circular face)
-            // bounds.max.z = front of spotlight where the fresnel lens is
-            let spot = SpotLight()
-            spot.name                      = "LightCore"
-            spot.light.intensity           = config.intensity
-            spot.light.innerAngleInDegrees = config.innerAngleDeg
-            spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
-            spot.light.attenuationRadius   = config.attenuationRadius
-            spot.scale    = SIMD3(repeating: cs)
-
-            // Shadow — explicit near/far planes to prevent depth buffer corruption
-            if config.shadowEnabled {
-                var shadow = SpotLightComponent.Shadow()
-                spot.shadow = shadow
+            // Make the lantern model GLOW from within.
+            func makeEntityGlow(_ entity: Entity, color: UIColor) {
+                if let me = entity as? ModelEntity {
+                    var newMaterials: [any RealityKit.Material] = []
+                    for mat in me.model?.materials ?? [] {
+                        var pbr = PhysicallyBasedMaterial()
+                        if let existingPBR = mat as? PhysicallyBasedMaterial {
+                            pbr = existingPBR
+                        }
+                        pbr.emissiveColor     = .init(color: color)
+                        pbr.emissiveIntensity = 4.0
+                        newMaterials.append(pbr)
+                    }
+                    if !newMaterials.isEmpty {
+                        me.model?.materials = newMaterials
+                    }
+                }
+                for child in entity.children {
+                    makeEntityGlow(child, color: color)
+                }
             }
+            makeEntityGlow(model, color: config.uiColor)
 
-            let lensFacePos = SIMD3<Float>(
-                bounds.center.x,
-                bounds.center.y,
-                bounds.max.z
+        // ════════════════════════════════════════════════════════════════════
+        // SPOTLIGHT — lens faces -X in local space (beam was opposite lens with +X)
+        // NO BeamCone — it caused gizmo crashes from extreme bounds
+        // ════════════════════════════════════════════════════════════════════
+        case .spot:
+            let spot = SpotLight()
+            spot.name                      = "LightCore"
+            spot.light.intensity           = config.intensity
+            spot.light.innerAngleInDegrees = config.innerAngleDeg
+            spot.light.outerAngleInDegrees = config.outerAngleDeg
+            spot.light.color               = config.uiColor
+            spot.light.attenuationRadius   = config.attenuationRadius
+            spot.shadow                    = nil
+            spot.scale    = SIMD3(repeating: cs)
+            spot.position = SIMD3<Float>(b.center.x, b.center.y, b.center.z)
+
+            // Lens faces -X — flipped from +X because beam was going opposite lens
+            spot.look(
+                at:   SIMD3<Float>(b.center.x - 500, b.center.y, b.center.z),
+                from: SIMD3<Float>(b.center.x, b.center.y, b.center.z),
+                relativeTo: model
             )
-            spot.position = lensFacePos
-            // Aim: forward out of the lens along +Z
-            spot.look(at: SIMD3(lensFacePos.x, lensFacePos.y, lensFacePos.z + 500),
-                      from: lensFacePos,
-                      relativeTo: model)
             model.addChild(spot)
 
-            // Beam cone — sized from angle, placed at lens face
-            let coneHeight: Float = 3.0 * cs
-            let halfAngle = (config.outerAngleDeg / 2.0) * Float.pi / 180.0
-            let coneRadius = tan(halfAngle) * coneHeight
-            var beamMat = UnlitMaterial(
-                color: config.uiColor.withAlphaComponent(0.12)
-            )
-            beamMat.blending = .transparent(opacity: .init(floatLiteral: 0.12))
-            let beam = ModelEntity(
-                mesh: MeshResource.generateCone(height: coneHeight, radius: coneRadius),
-                materials: [beamMat]
-            )
-            beam.name        = "BeamCone"
-            // generateCone tip points +Y — rotate so tip points back toward lens
-            beam.orientation = simd_quaternion(-.pi / 2, SIMD3<Float>(1, 0, 0))
-            beam.position    = SIMD3(
-                lensFacePos.x,
-                lensFacePos.y,
-                lensFacePos.z + (coneHeight / 2)
-            )
-            model.addChild(beam)
+        // ════════════════════════════════════════════════════════════════════
+        // LED PANEL — panel face aimed forward-down from panel head
+        // ════════════════════════════════════════════════════════════════════
+        case .panel:
+            let panelHeadY = b.max.y - (b.extents.y * 0.12)
 
-            // Lens glow — TRANSPARENT (present for ECS but invisible to avoid giant ball)
-            // The sphere is positioned at the lens face so updateLightProperties can find it
-            var pbr = PhysicallyBasedMaterial()
-            pbr.baseColor         = .init(tint: .clear)
-            pbr.emissiveColor     = .init(color: config.uiColor)
-            pbr.emissiveIntensity = 6.0
-            pbr.blending = .transparent(opacity: .init(floatLiteral: 0.0))
-            let lensRadius = min(bounds.extents.x, bounds.extents.y) * 0.25
-            let glow = ModelEntity(
-                mesh: .generateSphere(radius: lensRadius),
-                materials: [pbr]
-            )
-            glow.name     = "LensGlow"
-            glow.position = lensFacePos
-            model.addChild(glow)
-        }
+            let spot = SpotLight()
+            spot.name                      = "LightCore"
+            spot.light.intensity           = config.intensity
+            spot.light.innerAngleInDegrees = config.innerAngleDeg
+            spot.light.outerAngleInDegrees = config.outerAngleDeg
+            spot.light.color               = config.uiColor
+            spot.light.attenuationRadius   = config.attenuationRadius
+            spot.shadow                    = nil
+            spot.scale    = SIMD3(repeating: cs)
+            spot.position = SIMD3<Float>(b.center.x, panelHeadY, b.center.z)
 
-        // Store config on the entity — this is what the UI and persistence read
+            // Try +Z forward with downward angle (since -Z put light at feet)
+            spot.look(
+                at:   SIMD3<Float>(b.center.x, panelHeadY - 200, b.center.z + 500),
+                from: SIMD3<Float>(b.center.x, panelHeadY, b.center.z),
+                relativeTo: model
+            )
+            model.addChild(spot)
+
+        } // end switch
+
         model.components.set(config)
     }
 
     /// Updates live RealityKit light properties without respawning.
-    /// Called on every slider/picker change in the Light Control Panel.
     func updateLightProperties(for entity: Entity, config: LightConfigComponent) {
-        // Update the RealityKit light entity
-        if let lightCore = entity.findEntity(named: "LightCore") {
-            switch config.lightKind {
-            case .spot, .panel:
-                if let spot = lightCore as? SpotLight {
-                    spot.light.intensity           = config.intensity
-                    spot.light.innerAngleInDegrees = config.innerAngleDeg
-                    spot.light.outerAngleInDegrees = config.outerAngleDeg
-                    spot.light.color               = config.uiColor
-                    spot.light.attenuationRadius   = config.attenuationRadius
+        guard let lightCore = entity.findEntity(named: "LightCore") else { return }
 
-                    // Shadow — safe configuration with explicit bounds
-                    if config.shadowEnabled {
-                        var shadow = SpotLightComponent.Shadow()
-                        spot.shadow = shadow
-                    } else {
-                        spot.shadow = nil
-                    }
+        switch config.lightKind {
+        case .spot, .panel:
+            guard let spot = lightCore as? SpotLight else { return }
+            spot.light.intensity           = config.intensity
+            spot.light.innerAngleInDegrees = config.innerAngleDeg
+            spot.light.outerAngleInDegrees = config.outerAngleDeg
+            spot.light.color               = config.uiColor
+            spot.light.attenuationRadius   = config.attenuationRadius
 
-                    // Regenerate beam cone to match new angle (spotlight only)
-                    if config.lightKind == .spot,
-                       let beam = entity.findEntity(named: "BeamCone") as? ModelEntity {
-                        let cs = config.counterScale
-                        let coneHeight: Float = 3.0 * cs
-                        let halfAngle = (config.outerAngleDeg / 2.0) * .pi / 180.0
-                        let coneRadius = tan(halfAngle) * coneHeight
-                        beam.model?.mesh = .generateCone(height: coneHeight, radius: coneRadius)
-                    }
-                }
-            case .point:
-                if let point = lightCore as? PointLight {
-                    point.light.intensity         = config.intensity
-                    point.light.color             = config.uiColor
-                    point.light.attenuationRadius = config.attenuationRadius
-                }
+            if config.shadowEnabled {
+                var shadow       = SpotLightComponent.Shadow()
+                shadow.depthBias = 0.01
+                spot.shadow      = shadow
+                spot.light.attenuationRadius = min(config.attenuationRadius, 6.0)
+            } else {
+                spot.shadow = nil
             }
+
+
+        case .point:
+            guard let point = lightCore as? PointLight else { return }
+            point.light.intensity         = config.intensity
+            point.light.color             = config.uiColor
+            point.light.attenuationRadius = config.attenuationRadius
+
+            // Re-apply emissive when color changes
+            func updateEmissive(_ e: Entity) {
+                if let me = e as? ModelEntity {
+                    var newMaterials: [any RealityKit.Material] = []
+                    for mat in me.model?.materials ?? [] {
+                        var pbr = PhysicallyBasedMaterial()
+                        if let existingPBR = mat as? PhysicallyBasedMaterial {
+                            pbr = existingPBR
+                        }
+                        pbr.emissiveColor     = .init(color: config.uiColor)
+                        pbr.emissiveIntensity = 4.0
+                        newMaterials.append(pbr)
+                    }
+                    if !newMaterials.isEmpty {
+                        me.model?.materials = newMaterials
+                    }
+                }
+                for child in e.children { updateEmissive(child) }
+            }
+            updateEmissive(entity)
         }
 
-        // Update lens glow color (only for types that have one — not panel)
-        if let glow = entity.findEntity(named: "LensGlow") as? ModelEntity {
-            var pbr = PhysicallyBasedMaterial()
-            pbr.baseColor       = .init(tint: .clear)
-            pbr.emissiveColor   = .init(color: config.uiColor)
-            pbr.emissiveIntensity = 6.0
-            pbr.blending = .transparent(opacity: .init(floatLiteral: 0.0))
-            glow.model?.materials = [pbr]
-        }
-
-        // Write updated config back to ECS — this is what persistence will read on save
         entity.components.set(config)
     }
 

@@ -948,7 +948,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     entity.scale   = SIMD3<Float>(repeating: scale)
                 }
 
-                // Position
+                // Position — compute from CLEAN bounds BEFORE attachLight adds children
                 let randomX    = Float.random(in: -1...1)
                 let randomZ    = Float.random(in: -1...1)
                 let finalBounds = entity.visualBounds(relativeTo: nil)
@@ -978,10 +978,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
-                // Light attachment — model filename matched against data store.
-                // This fixes: (1) dead-branch bug on LED Panel title check,
-                // (2) Lantern modelFileName mismatch ("Lantern" vs "Lantern 2"),
-                // (3) fragile title string matching.
+                // Light attachment — AFTER position is set from clean bounds.
+                // attachLight adds children that would corrupt visualBounds if called before.
                 if toolType == .light,
                    let lightItem = LightsDataStore.find(byModelFileName: item.modelFileName) {
                     let config = LightConfigComponent.from(lightItem.defaultConfig, kind: lightItem.lightKind)
