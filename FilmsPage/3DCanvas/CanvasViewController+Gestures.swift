@@ -188,6 +188,7 @@ extension CanvasViewController {
             hideGizmo()
             hideRotationGizmo()
             hideAnimationPanel()
+            refreshSidebarContent()
         }
     }
 

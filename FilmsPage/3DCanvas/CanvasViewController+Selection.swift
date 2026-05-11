@@ -93,26 +93,30 @@ extension CanvasViewController {
 
     
     func selectEntityFromSidebar(named name: String) {
-        
         guard let entity = mainAnchor?.findEntity(named: name) else { return }
-        
-        self.selectedEntity = entity
-        self.refreshSidebarContent()
-        
-        // Focus the camera on the selected entity so it's easy to find on canvas
-        frameEntityAnimated(entity)
-        
-        if let screenPosition = arView.project(entity.position(relativeTo: nil))
-        {
-            
-            currentActionMenu?.removeFromSuperview()
-            
-            showActionMenu(at: screenPosition)
-            
-            if let animation = entity.availableAnimations.first {
-                entity.playAnimation(animation.repeat(count: 1))
-            }
+
+        // Clear previous selection visual state
+        if let previous = selectedEntity, previous != entity {
+            setEntityTransparency(previous, alpha: 1.0)
         }
+
+        // Dismiss any stale action menus
+        currentActionMenu?.removeFromSuperview()
+        currentActionMenu = nil
+
+        // Select the entity
+        selectedEntity     = entity
+        activeHandleEntity = nil
+        setEntityTransparency(entity, alpha: 0.9)
+
+        // Show gizmos (move/rotate based on current interactionMode)
+        updateGizmoMode()
+
+        // Focus the camera on the selected entity
+        frameEntityAnimated(entity)
+
+        // Refresh sidebar highlight
+        refreshSidebarContent()
     }
 
 }

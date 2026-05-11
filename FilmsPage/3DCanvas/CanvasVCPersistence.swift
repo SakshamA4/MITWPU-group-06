@@ -20,6 +20,16 @@ extension CanvasViewController {
         guard !hasSceneBeenLoaded else { return }
         hasSceneBeenLoaded = true
 
+        // BUG 7 FIX: Auto-save whenever the app is backgrounded so that changes
+        // are never lost if iOS kills the process before the user taps "Save & Exit".
+        // The observer is removed in commitExit() so it doesn't fire after the VC is gone.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(autoSaveOnBackground),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+
         // Show a loading overlay so the user sees feedback while the scene deserialises.
         // The overlay is removed by the load completion path in ScenePersistence.swift,
         // but we also remove it here as a safety net after a short delay.
@@ -49,6 +59,31 @@ extension CanvasViewController {
             await ScenePersistenceService.shared.load(into: self, sceneID: id)
             // Remove the loading overlay once the scene is fully loaded.
             view.viewWithTag(7771)?.removeFromSuperview()
+        }
+    }
+
+    // MARK: - Auto-save (BUG 7 FIX)
+
+    /// Silently saves the scene when the app moves to the background.
+    /// Runs the full save pipeline so nothing is lost if iOS kills the process.
+    /// No UI overlay is shown — the save runs invisibly in the background.
+    @objc private func autoSaveOnBackground() {
+        guard let id = currentSceneID else { return }
+        // Capture thumbnail only if the view is still on screen.
+        if viewIfLoaded?.window != nil {
+            arView.snapshot(saveToHDR: false) { [weak self] thumbnailImage in
+                guard let self = self else { return }
+                let filename = ScenePersistenceService.shared.saveThumbnail(thumbnailImage, sceneID: id)
+                if let filename = filename { self.sceneImageName = filename }
+                ScenePersistenceService.shared.save(canvas: self, sceneID: id) { success in
+                    print(success ? "✅ Auto-saved on background" : "❌ Auto-save failed")
+                }
+            }
+        } else {
+            // View not visible (e.g. shot breakdown is on top) — save without thumbnail.
+            ScenePersistenceService.shared.save(canvas: self, sceneID: id) { success in
+                print(success ? "✅ Auto-saved on background (no thumbnail)" : "❌ Auto-save failed")
+            }
         }
     }
 
@@ -150,6 +185,15 @@ extension CanvasViewController {
          // it will load properly. Without this, reopening a scene would skip loading
          // because hasSceneBeenLoaded would still be true.
          hasSceneBeenLoaded = false
+
+         // BUG 7 FIX: Remove the auto-save observer now that we are leaving the scene.
+         // Without this, the observer would remain registered on a dismissed VC and
+         // could fire against a torn-down scene graph.
+         NotificationCenter.default.removeObserver(
+             self,
+             name: UIApplication.willResignActiveNotification,
+             object: nil
+         )
          
          // FIX: Explicitly evict the scene from cache on exit to prevent memory accumulation.
          // This ensures that when the user exits a scene, all its models are immediately

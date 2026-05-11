@@ -133,6 +133,15 @@ struct CanvasSceneDocument: Codable {
     // nil = no sky; "sky_day" / "sky_sunset" / "sky_night" / "sky_image_1"
     var skyType: String?
     var baseTransforms: [String: CodableTransform]
+    /// UUID string of the SceneCameraItem that was active when the scene was saved.
+    /// nil means the editor camera was active — that is always the default restored on load.
+    /// Optional for backwards-compat with pre-fix saves.
+    var activeCameraID: String?
+    /// Base FOV (fieldOfViewInDegrees) for each camera-root entity, keyed by entity name.
+    /// Persisted so zoom clips always interpolate from the correct starting FOV after reload,
+    /// instead of silently falling back to the 60° default.
+    /// Optional for backwards-compat with pre-fix saves.
+    var baseFOVs: [String: Float]?
 }
 
 // MARK: - ScenePersistenceService
@@ -424,6 +433,27 @@ final class ScenePersistenceService {
             return nil
         }()
 
+        // BUG 6 FIX: Derive base FOVs from live camera entities so zoom clips restore
+        // to the correct starting FOV instead of always falling back to 60°.
+        let derivedBaseFOVs: [String: Float] = {
+            var fovMap: [String: Float] = [:]
+            guard let anchor = vc.mainAnchor else { return fovMap }
+            for child in anchor.children {
+                if let pc = child.children.compactMap({ $0 as? PerspectiveCamera }).first {
+                    fovMap[child.name] = pc.camera.fieldOfViewInDegrees
+                }
+            }
+            return fovMap
+        }()
+
+        // BUG 1 FIX: Capture which scene camera was active so we can restore the
+        // exact POV the user had when they last left the scene.
+        let savedActiveCameraID: String? = {
+            guard let active = vc.activeCamera,
+                  active !== vc.editorCamera else { return nil }
+            return vc.sceneCameraItems.first(where: { $0.camera === active })?.id.uuidString
+        }()
+
         let doc = CanvasSceneDocument(
             sceneID:           sceneID.uuidString,
             entities:          entityRecords,
@@ -435,7 +465,9 @@ final class ScenePersistenceService {
             cameraTargetY: vc.cameraTarget.y,
             cameraTargetZ: vc.cameraTarget.z,
             skyType: savedSkyType,
-            baseTransforms: vc.baseTransforms.mapValues { CodableTransform($0) }
+            baseTransforms: vc.baseTransforms.mapValues { CodableTransform($0) },
+            activeCameraID: savedActiveCameraID,
+            baseFOVs: derivedBaseFOVs.isEmpty ? nil : derivedBaseFOVs
         )
 
         let jsonURL = sceneFileURL(for: sceneID)
@@ -571,12 +603,37 @@ final class ScenePersistenceService {
             }
         }
 
+        // Phase 5c – BUG 1 FIX: Restore the active camera that was saved.
+        // clearSceneState() always resets to the editor camera; this re-activates
+        // whichever scene camera the user had selected when they last saved.
+        if let savedID = doc.activeCameraID,
+           let uuid = UUID(uuidString: savedID),
+           let item = vc.sceneCameraItems.first(where: { $0.id == uuid }) {
+            vc.setActiveCamera(item.camera)
+            print("📷 Restored active camera: \(item.displayName)")
+        }
+
         // Phase 6 – seed baseTransforms
         for record in doc.animationClips {
             guard let entity = resolveEntity(for: record, in: vc) else { continue }
             if vc.baseTransforms[entity.name] == nil {
                 vc.baseTransforms[entity.name] = entity.transform
             }
+        }
+
+        // Phase 6b – BUG 6 FIX: Restore saved base FOVs so zoom clips interpolate
+        // from the correct starting FOV instead of the 60° default.
+        if let savedFOVs = doc.baseFOVs {
+            for (entityName, fov) in savedFOVs {
+                vc.baseFOVs[entityName] = fov
+                // Also apply the saved FOV directly to the live PerspectiveCamera
+                // so the viewport immediately shows the correct field of view.
+                if let entity = vc.mainAnchor?.findEntity(named: entityName) {
+                    let cam = entity.children.compactMap { $0 as? PerspectiveCamera }.first
+                    cam?.camera.fieldOfViewInDegrees = fov
+                }
+            }
+            print("🔭 Restored base FOVs for \(savedFOVs.count) camera(s)")
         }
 
         // Phase 7 – animation clips
@@ -592,6 +649,21 @@ final class ScenePersistenceService {
             }
             vc.showMotionPath(for: clip)
         }
+
+        // Phase 8b – rotation arc visuals.
+        // Rotation clips store axis + angle data but the arc visualization is
+        // transient (not serialized). Rebuild it here so arcs are visible on load.
+        let rotationClips = vc.timeline.clips.filter { $0.track == .rotation }
+        for (index, clip) in rotationClips.enumerated() {
+            if index > 0 {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+            if let entity = vc.mainAnchor?.findEntity(named: clip.entityName) {
+                vc.showRotationArc(for: clip, on: entity)
+                print("🔄 Restored rotation arc for '\(clip.entityName)'")
+            }
+        }
+        print("🔄 Restored \(rotationClips.count) rotation arc(s)")
 
         // Phase 9 – single sidebar refresh
         vc.isBatchLoading = false   // FIX 8: re-enable before the final refresh
@@ -811,6 +883,10 @@ final class ScenePersistenceService {
              e.components.set(CategoryComponent(toolType: .wall))
              e.components.set(groundComp)
              e.components.set(InputTargetComponent())
+             // Explicit box collision with slight thickness for reliable hit-testing
+             e.collision = CollisionComponent(shapes: [
+                 .generateBox(width: w, height: 0.05, depth: d)
+             ])
              e.transform = t
              anchor.addChild(e)
              return
@@ -846,8 +922,11 @@ final class ScenePersistenceService {
             }()
             let displayName = "Camera \(displayNumber)"
 
-            // Always rebuild the root name in canonical format using the recovered number.
-            root.name = "SceneCamera_\(displayNumber)_\(cameraID.uuidString)"
+            // BUG 2 FIX: Restore the root name exactly as it was saved.
+            // Previously this rebuilt a new name ("SceneCamera_N_<UUID>") that no longer
+            // matched the clip entityNames ("SceneCameraRoot_N"), silently breaking
+            // ShotDerived.derive() and evaluateTimeline() after every reload.
+            root.name = record.name
 
              root.components.set(CategoryComponent(toolType: .camera))
 

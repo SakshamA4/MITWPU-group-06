@@ -19,11 +19,22 @@ struct Shot {
     let startTime: Float
     let duration: Float
     var thumbnail: UIImage?
-    let clipID: UUID
+    /// All clip UUIDs that make up this shot (may be > 1 for compound shots).
+    /// The primary clip is always first (position/dolly track takes priority;
+    /// rotation track is secondary; other tracks follow).
+    let clipIDs: [UUID]
+
+    /// Backwards-compatible accessor — the primary clip ID (first in clipIDs).
+    /// Always valid because derive() guarantees clipIDs is non-empty.
+    var clipID: UUID { clipIDs[0] }
 
     var displayName: String { "Shot \(index + 1)" }
     var shortLabel: String  { "\(index + 1)" }
     var endTime: Float      { startTime + duration }
+
+    /// True when more than one animation track is active simultaneously
+    /// (e.g. dolly-in + pan, or crane + tilt).
+    var isCompound: Bool { clipIDs.count > 1 }
 
     var cleanCameraName: String {
         cameraName
@@ -42,7 +53,7 @@ struct ShotDerived {
         guard totalDuration > 0 else { return [] }
 
         let cameraNameSet = Set(cameraItems.map { $0.cameraRoot.name })
-        var cameraIDMap: [UUID: CanvasViewController.SceneCameraItem] = [:]
+        var cameraIDMap:   [UUID: CanvasViewController.SceneCameraItem] = [:]
         var cameraNameMap: [String: CanvasViewController.SceneCameraItem] = [:]
         for item in cameraItems {
             cameraIDMap[item.id] = item
@@ -51,41 +62,118 @@ struct ShotDerived {
             }
         }
 
-        // FIX: Filter ONLY for clips that match an actual camera by ID or name.
-        // If no camera exists, hide the shot.
+        // Filter to clips that belong to a known camera (by ID or by entity name).
         let cameraClips = timeline.clips.filter { clip in
             if let id = clip.entityID, cameraIDMap[id] != nil { return true }
             return cameraNameSet.contains(clip.entityName)
         }
+        guard !cameraClips.isEmpty else { return [] }
 
-        if cameraClips.isEmpty {
-            // No camera clips → no shots to show
-            // (User must add cameras and animate them to see shots)
-            return []
+        // ── Compound shot merging ────────────────────────────────────────────────
+        //
+        // Two clips belong to the same compound shot when they:
+        //   • target the same camera (by ID or by name)
+        //   • overlap in time (one clip's window intersects the other's)
+        //
+        // Strategy: group all camera clips into temporal buckets per camera,
+        // then union-find overlapping windows within each camera's clips.
+        //
+        // We represent each group as a set of clip UUIDs. The group's time window
+        // is the union of all its clips' windows (max end, min start).
+
+        // Step 1 – resolve each clip to its camera item.
+        struct TaggedClip {
+            let clip: AnimationClip
+            let item: CanvasViewController.SceneCameraItem
+        }
+        let tagged: [TaggedClip] = cameraClips.compactMap { clip in
+            if let id = clip.entityID, let item = cameraIDMap[id] {
+                return TaggedClip(clip: clip, item: item)
+            }
+            if let item = cameraNameMap[clip.entityName] {
+                return TaggedClip(clip: clip, item: item)
+            }
+            return nil
         }
 
-        // FIX: Create ONE SHOT PER CLIP, no merging
-        // Sort clips chronologically by start time
-        let sortedClips = cameraClips.sorted { $0.startTime < $1.startTime }
+        // Step 2 – group by camera, then merge overlapping time windows.
+        // Clips overlap when: clipA.startTime < clipB.endTime && clipB.startTime < clipA.endTime
+        var cameraGroups: [UUID: [TaggedClip]] = [:]
+        for tc in tagged {
+            cameraGroups[tc.item.id, default: []].append(tc)
+        }
 
-        // Create a shot for each clip with its own index
-        return sortedClips.enumerated().compactMap { (index, clip) in
-            let cameraItem: CanvasViewController.SceneCameraItem?
-            if let id = clip.entityID {
-                cameraItem = cameraIDMap[id]
-            } else {
-                cameraItem = cameraNameMap[clip.entityName]
+        // Each element of `shots` is an array of TaggedClips that form one shot.
+        var shotGroups: [[TaggedClip]] = []
+
+        for (_, clips) in cameraGroups {
+            // Sort by startTime so we process chronologically.
+            let sorted = clips.sorted { $0.clip.startTime < $1.clip.startTime }
+
+            // Greedy interval merge: accumulate a running window; flush when a
+            // new clip doesn't overlap the running window.
+            var currentGroup: [TaggedClip] = []
+            var windowEnd: Float = -Float.infinity
+
+            for tc in sorted {
+                let clipStart = tc.clip.startTime
+                let clipEnd   = tc.clip.startTime + tc.clip.duration
+
+                if currentGroup.isEmpty || clipStart < windowEnd {
+                    // Overlaps (or first clip) — extend the running group.
+                    currentGroup.append(tc)
+                    windowEnd = max(windowEnd, clipEnd)
+                } else {
+                    // Gap detected — flush current group, start a new one.
+                    shotGroups.append(currentGroup)
+                    currentGroup = [tc]
+                    windowEnd = clipEnd
+                }
             }
-            guard let item = cameraItem else { return nil }
+            if !currentGroup.isEmpty { shotGroups.append(currentGroup) }
+        }
+
+        // Step 3 – sort shot groups chronologically, then build Shot values.
+        // For compound shots the Shot's startTime/duration spans the union of
+        // all clips (so the player scrubber covers the full compound move).
+        // clipIDs are ordered: position tracks first, rotation tracks second,
+        // other tracks last — so clipID (the primary) is always position/dolly.
+        let trackPriority: (AnimationTrack) -> Int = { track in
+            switch track {
+            case .position: return 0
+            case .rotation: return 1
+            case .fov:      return 2
+            case .scale:    return 3
+            }
+        }
+
+        let sortedGroups = shotGroups.sorted { groupA, groupB in
+            let aStart = groupA.map { $0.clip.startTime }.min() ?? 0
+            let bStart = groupB.map { $0.clip.startTime }.min() ?? 0
+            return aStart < bStart
+        }
+
+        return sortedGroups.enumerated().compactMap { (index, group) in
+            guard let item = group.first?.item else { return nil }
+
+            let groupStart    = group.map { $0.clip.startTime }.min() ?? 0
+            let groupEnd      = group.map { $0.clip.startTime + $0.clip.duration }.max() ?? 0
+            let groupDuration = groupEnd - groupStart
+
+            // Order clip IDs by track priority so the primary (position) clip is first.
+            let orderedIDs = group
+                .sorted { trackPriority($0.clip.track) < trackPriority($1.clip.track) }
+                .map { $0.clip.id }
+
             return Shot(
-                id: UUID(),
-                index: index,
+                id:         UUID(),
+                index:      index,
                 cameraName: item.cameraRoot.name,
-                cameraID: item.id,
-                startTime: clip.startTime,
-                duration: clip.duration,
-                thumbnail: nil,
-                clipID: clip.id
+                cameraID:   item.id,
+                startTime:  groupStart,
+                duration:   groupDuration,
+                thumbnail:  nil,
+                clipIDs:    orderedIDs
             )
         }
     }
@@ -125,6 +213,8 @@ class ShotBreakdownViewController: UIViewController {
     private var isCapturingThumbnail = false
     private var thumbnailQueue: [Int] = []
     private var thumbnailCache: [String: UIImage] = [:]
+    private var exportService: VideoExportService?
+    private var progressOverlay: ExportProgressOverlay?
 
     // MARK: - UI Elements
 
@@ -213,13 +303,21 @@ class ShotBreakdownViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // BUG FIX: Clean up the offscreen preview clone so it doesn't affect the live scene
-        // Note: arView is weak, so we don't need to nullify it on pop
-        // Reset timeline to t=0 so entities return to initial state
-        evaluateTimeline?(0)
+        // Cancel any in-progress export and restore ARView
+        if exportService != nil {
+            exportService?.cancel()
+            exportService = nil
+            progressOverlay?.dismiss()
+            progressOverlay = nil
+            restoreARView()
+        }
+        // Drain any pending thumbnail work so callbacks don't fire after pop.
         thumbnailQueue.removeAll()
         isCapturingThumbnail = false
         thumbnailCache.removeAll()
+        // Restore all entities to their pre-playback state and reset the timeline.
+        evaluateTimeline?(0)
+        exitPlaybackMode?()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -251,11 +349,15 @@ class ShotBreakdownViewController: UIViewController {
             image: UIImage(systemName: "chevron.left"),
             style: .plain, target: self, action: #selector(backTapped))
 
-        let playAllBtn = makeNavButton(title: "▶  Play All")
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: playAllBtn)
+        let playAllBtn = makeNavButton(title: "▶  Play All", action: #selector(playAllTapped))
+        let exportAllBtn = makeNavButton(title: "⬆  Export All", action: #selector(exportAllTapped))
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(customView: playAllBtn),
+            UIBarButtonItem(customView: exportAllBtn),
+        ]
     }
 
-    private func makeNavButton(title: String) -> UIButton {
+    private func makeNavButton(title: String, action: Selector) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.title = title
         config.baseBackgroundColor = accentRed
@@ -268,7 +370,7 @@ class ShotBreakdownViewController: UIViewController {
             return a
         }
         let btn = UIButton(configuration: config)
-        btn.addTarget(self, action: #selector(playAllTapped), for: .touchUpInside)
+        btn.addTarget(self, action: action, for: .touchUpInside)
         return btn
     }
 
@@ -394,14 +496,22 @@ class ShotBreakdownViewController: UIViewController {
 
     // MARK: - Camera POV Thumbnail Capture
     //
-    // Sequential capture: for each shot we:
-    //   1. evaluateTimeline at shot.startTime  →  positions all entities
-    //   2. find the matching SceneCameraItem
-    //   3. captureFrameAsync(camItem) → actual POV image
-    //   4. store thumbnail, reload cell
+    // Strategy: enter playback mode once (snapshots baseTransforms so evaluateTimeline
+    // can move entities to each shot's start position), capture each thumbnail serially
+    // on the offscreen previewARView WITHOUT touching the live scene's active camera,
+    // then exit playback mode to restore editor state.
+    //
+    // The "prepareForCapture" closure (which calls setActiveCamera on the live scene)
+    // is intentionally NOT called here — it causes visible camera switches on the main
+    // arView and races with the offscreen snapshot.
 
     private func captureThumbnails() {
         guard !shots.isEmpty else { return }
+
+        // Snapshot entity base transforms once so evaluateTimeline can position them
+        // at each shot's start time without clobbering each other.
+        enterPlaybackMode?()
+
         thumbnailQueue = Array(shots.indices)
         captureNextThumbnailIfNeeded()
     }
@@ -409,7 +519,9 @@ class ShotBreakdownViewController: UIViewController {
     private func captureNextThumbnailIfNeeded() {
         guard !isCapturingThumbnail else { return }
         guard let index = thumbnailQueue.first else {
+            // All thumbnails done — restore scene to t=0
             evaluateTimeline?(0)
+            exitPlaybackMode?()
             return
         }
 
@@ -427,9 +539,15 @@ class ShotBreakdownViewController: UIViewController {
         }
 
         let camItem = cameraItem(for: shot)
+
+        // Use captureAtTime if wired (evaluates timeline position + off-screen capture).
+        // Fallback: evaluate manually + snapshot the live arView after a settle delay.
+        // NOTE: prepareForCapture (live camera switch) is intentionally skipped here.
         let doCaptureAtTime = captureAtTime ?? { [weak self] time, _, cb in
             self?.evaluateTimeline?(time)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
+            // Give RealityKit two render frames (~66 ms) to propagate the new entity
+            // transforms before snapshotting — 33 ms is not reliable on older hardware.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.066) { [weak self] in
                 self?.arView?.snapshot(saveToHDR: false, completion: cb)
             }
         }
@@ -456,13 +574,17 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func reloadThumbnail(for shot: Shot) {
-        guard let index = shots.firstIndex(where: { $0.clipID == shot.clipID }) else { return }
+        // Match by any clipID in the compound set (a shot may have multiple clips).
+        guard let index = shots.firstIndex(where: { $0.id == shot.id }) else { return }
         reloadThumbnail(at: index)
     }
 
     private func thumbnailCacheKey(for shot: Shot) -> String {
+        // For compound shots, key includes ALL clip UUIDs (sorted for stability)
+        // so the same compound shot always maps to the same cache entry.
         let camID = shot.cameraID?.uuidString ?? shot.cameraName
-        return "\(sceneName)_\(camID)_\(shot.clipID.uuidString)"
+        let clipKey = shot.clipIDs.map { $0.uuidString }.sorted().joined(separator: "-")
+        return "\(sceneName)_\(camID)_\(clipKey)"
     }
 
     private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
@@ -481,6 +603,155 @@ class ShotBreakdownViewController: UIViewController {
     @objc private func playAllTapped() {
         guard !shots.isEmpty else { return }
         openPlayer(index: 0, playAll: true)
+    }
+
+    @objc private func exportAllTapped() {
+        guard !shots.isEmpty else { return }
+        let sheet = ExportSettingsSheet(mode: .allShots)
+        sheet.onExport = { [weak self] settings in
+            self?.beginExportAll(settings: settings)
+        }
+        present(sheet, animated: true)
+    }
+
+    private func beginExportAll(settings: ExportSettings) {
+        print("🎬 [ExportAll] beginExportAll — \(shots.count) shots")
+
+        // ── 1. Fresh playback mode ──────────────────────────────────────
+        // Re-enter playback mode to ensure baseTransforms & baseFOVs are
+        // current. Thumbnail capture may have already exited playback mode.
+        exitPlaybackMode?()
+        enterPlaybackMode?()
+        print("🎬 [ExportAll] Playback mode entered — baseTransforms refreshed")
+
+        // ── 2. Reparent ARView into our view hierarchy ─────────────────
+        // RealityKit's ARView.snapshot() renders at the ARView's current
+        // pixel dimensions. The ARView MUST be full-sized for the GPU to
+        // produce a proper scene render. We place the container at the
+        // BACK of our view hierarchy (index 0) so the progress overlay
+        // covers it — the user never sees it, but the GPU can render.
+        let exportARContainer = UIView()
+        exportARContainer.tag = 9999  // Unique tag to find later
+        exportARContainer.frame = view.bounds
+        exportARContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.insertSubview(exportARContainer, at: 0)  // Behind everything
+
+        if let arView = arView {
+            let previousSuperview = arView.superview
+            let previousFrame = arView.frame
+            let previousAutoMask = arView.autoresizingMask
+            let previousTranslatesFlag = arView.translatesAutoresizingMaskIntoConstraints
+
+            arView.removeFromSuperview()
+            exportARContainer.addSubview(arView)
+            arView.translatesAutoresizingMaskIntoConstraints = true
+            arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            arView.frame = exportARContainer.bounds
+            print("🎬 [ExportAll] ARView reparented — size: \(exportARContainer.bounds.size)")
+
+            // Store restoration info
+            self.arViewPreviousSuperview = previousSuperview
+            self.arViewPreviousFrame = previousFrame
+            self.arViewPreviousAutoMask = previousAutoMask
+            self.arViewPreviousTranslatesFlag = previousTranslatesFlag
+        } else {
+            print("⚠️ [ExportAll] No arView available — export may produce black frames")
+        }
+
+        // ── 3. Configure export service ────────────────────────────────
+        let service = VideoExportService()
+        self.exportService = service
+
+        service.evaluateTimeline = evaluateTimeline
+        service.prepareForCapture = prepareForCapture
+        service.captureFrameAsync = captureFrameAsync
+        service.arView = arView  // Direct snapshot — now in our hierarchy!
+        service.cameraItemForShot = { [weak self] shot in
+            self?.cameraItem(for: shot)
+        }
+
+        // ── 4. Show progress overlay ───────────────────────────────────
+        let overlay = ExportProgressOverlay()
+        self.progressOverlay = overlay
+        overlay.onCancel = { [weak self] in
+            self?.exportService?.cancel()
+            self?.progressOverlay?.dismiss { [weak self] in
+                self?.restoreARView()
+                self?.exitPlaybackMode?()
+                self?.evaluateTimeline?(0)
+            }
+        }
+        overlay.show(in: view)
+
+        service.onProgress = { [weak self] progress in
+            self?.progressOverlay?.update(with: progress)
+        }
+
+        // ── 5. Completion handler ──────────────────────────────────────
+        service.onComplete = { [weak self] url, error in
+            guard let self = self else { return }
+            self.progressOverlay?.dismiss()
+            self.progressOverlay = nil
+            self.exportService = nil
+
+            // Restore ARView to its original parent (CanvasVC)
+            self.restoreARView()
+
+            // Exit playback mode and reset timeline
+            self.exitPlaybackMode?()
+            self.evaluateTimeline?(0)
+
+            if let url = url {
+                print("🎬 [ExportAll] Export succeeded — presenting share sheet")
+                let haptic = UINotificationFeedbackGenerator()
+                haptic.notificationOccurred(.success)
+                let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                if let pop = vc.popoverPresentationController {
+                    pop.sourceView = self.view
+                    pop.sourceRect = CGRect(x: self.view.bounds.midX, y: 60, width: 1, height: 1)
+                }
+                self.present(vc, animated: true)
+            } else if let error = error {
+                print("❌ [ExportAll] Export failed: \(error.localizedDescription)")
+                let alert = UIAlertController(title: "Export Failed",
+                                              message: error.localizedDescription,
+                                              preferredStyle: .alert)
+                alert.addAction(.init(title: "OK", style: .default))
+                self.present(alert, animated: true)
+            } else {
+                print("🚫 [ExportAll] Export cancelled")
+            }
+        }
+
+        // ── 6. Start export ────────────────────────────────────────────
+        service.exportAllShots(shots, settings: settings)
+    }
+
+    // MARK: - ARView Restoration (after Export All)
+
+    /// Stored state for restoring the ARView to its original parent after export.
+    private var arViewPreviousSuperview: UIView?
+    private var arViewPreviousFrame: CGRect = .zero
+    private var arViewPreviousAutoMask: UIView.AutoresizingMask = []
+    private var arViewPreviousTranslatesFlag: Bool = true
+
+    /// Restores the ARView back to the CanvasViewController's view hierarchy.
+    private func restoreARView() {
+        // Remove the temporary export container
+        view.viewWithTag(9999)?.removeFromSuperview()
+
+        guard let arView = arView else { return }
+
+        if let previousSuperview = arViewPreviousSuperview {
+            arView.removeFromSuperview()
+            previousSuperview.insertSubview(arView, at: 0)
+            arView.translatesAutoresizingMaskIntoConstraints = arViewPreviousTranslatesFlag
+            arView.autoresizingMask = arViewPreviousAutoMask
+            arView.frame = previousSuperview.bounds
+            print("🎬 [ExportAll] ARView restored to CanvasVC")
+        }
+
+        arViewPreviousSuperview = nil
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -507,7 +778,8 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func deleteShot(_ shot: Shot) {
-        deleteTimelineClip?(shot.clipID)
+        // For compound shots, delete every constituent clip so none are orphaned.
+        shot.clipIDs.forEach { deleteTimelineClip?($0) }
         thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
         refreshShotsFromTimeline()
     }
@@ -596,9 +868,10 @@ class ShotBreakdownViewController: UIViewController {
 
     private func handleClipUpdateCompletion(updatedClip: AnimationClip) {
         refreshShotsFromTimeline()
-        if let shot = shots.first(where: { $0.clipID == updatedClip.id }) {
+        // Match by any clipID in the compound set, not just the primary.
+        if let shot = shots.first(where: { $0.clipIDs.contains(updatedClip.id) }) {
             thumbnailCache.removeValue(forKey: thumbnailCacheKey(for: shot))
-            shots.firstIndex(where: { $0.clipID == updatedClip.id }).map { index in
+            if let index = shots.firstIndex(where: { $0.id == shot.id }) {
                 thumbnailQueue.append(index)
                 captureNextThumbnailIfNeeded()
             }
@@ -892,7 +1165,11 @@ final class ShotCardCell: UICollectionViewCell {
     func configure(with shot: Shot, accentColor: UIColor) {
         badgeLbl.text     = shot.shortLabel
         shotNameLbl.text  = shot.displayName
-        camNameLbl.text   = shot.cleanCameraName
+        // Append a ⊕ symbol to the camera name for compound shots so the user
+        // can distinguish multi-track shots (dolly+pan, crane+tilt, etc.) at a glance.
+        camNameLbl.text   = shot.isCompound
+            ? "\(shot.cleanCameraName)  ⊕"
+            : shot.cleanCameraName
         badge.backgroundColor  = accentColor
         accentBar.backgroundColor = accentColor.withAlphaComponent(0.8)
 
