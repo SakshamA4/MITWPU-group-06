@@ -6,14 +6,14 @@
 //
 
 import UIKit
-
-
+import UniformTypeIdentifiers
 class LibraryPropsViewController: UIViewController {
 
     @IBOutlet weak var propsCollectionView: UICollectionView!
 
     private let propService = PropService.shared
     private var props: [PropItem] = []
+    private var importCoordinator: PropImportCoordinator?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,6 +22,11 @@ class LibraryPropsViewController: UIViewController {
         propsCollectionView.backgroundColor = .clear
         props = propService.getProps()
         print(props)
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePropsUpdated), name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
+        
+        let importButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(importTapped))
+        navigationItem.rightBarButtonItem = importButton
 
         propsCollectionView.register(
             UINib(nibName: "LibraryPropsCollectionViewCell", bundle: nil),
@@ -73,6 +78,17 @@ class LibraryPropsViewController: UIViewController {
                                            bottom: 0,
                                            right: sideInset)
         layout.scrollDirection = .vertical
+    }
+    
+    @objc private func handlePropsUpdated() {
+        self.props = self.propService.getProps()
+        self.propsCollectionView.reloadData()
+    }
+    
+    @objc private func importTapped() {
+        let coordinator = PropImportCoordinator()
+        self.importCoordinator = coordinator
+        coordinator.start(presentingViewController: self)
     }
 }
 

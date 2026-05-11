@@ -20,7 +20,7 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
     private var filteredTemplates: [ScenesModel] = []
     private var filteredRecentScenes: [ScenesModel] = []
     private var currentSearchText: String = ""
-    private var savedSearchButton: UIBarButtonItem?
+    private var savedRightBarButtonItems: [UIBarButtonItem]?
     
     // Computed properties for search
     private var isSearching: Bool { !currentSearchText.isEmpty }
@@ -40,9 +40,8 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         setupObservers()
         setupSearchController()
         
-        // Save the search button and ensure it's visible initially
-        savedSearchButton = searchButton
-        navigationItem.rightBarButtonItem = searchButton
+        // Save the right bar button items and ensure they are visible initially
+        savedRightBarButtonItems = navigationItem.rightBarButtonItems
         
         refreshData() // Initial load
     }
@@ -55,7 +54,9 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         
         // Always hide search bar and show search button when view appears
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
     }
 
     @IBAction func searchAction(_ sender: Any) {
@@ -63,7 +64,7 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         navigationItem.searchController = searchController
         
         // Hide the search button by removing it from nav bar
-        navigationItem.rightBarButtonItem = nil
+        navigationItem.rightBarButtonItems = nil
         
         // Animate the search bar appearance
         UIView.animate(withDuration: 0.3) {
@@ -349,7 +350,9 @@ extension HomeViewController: UISearchBarDelegate {
         navigationItem.searchController = nil
         
         // Restore the search button to nav bar
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
     }
 }
 
@@ -367,6 +370,8 @@ extension HomeViewController: UISearchControllerDelegate {
     func didDismissSearchController(_ searchController: UISearchController) {
         // Restore the search button when search controller is dismissed
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
     }
 }

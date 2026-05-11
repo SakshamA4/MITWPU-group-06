@@ -458,6 +458,7 @@ extension CanvasViewController {
         
         // 1. TOP TOOLBAR (Floating)
         let toolbar = UIStackView()
+        toolbar.tag = 8804
         toolbar.axis = .horizontal
         toolbar.spacing = 6
         toolbar.alignment = .center
@@ -493,6 +494,7 @@ extension CanvasViewController {
         
         // 3. 2D / 3D BUTTONS (Bottom-Right)
         let viewModeControl = UISegmentedControl(items: ["2D", "3D"])
+        viewModeControl.tag = 8805
         viewModeControl.selectedSegmentIndex = 1
         viewModeControl.translatesAutoresizingMaskIntoConstraints = false
         viewModeControl.backgroundColor = UIColor.systemBackground
@@ -527,6 +529,7 @@ extension CanvasViewController {
         
         //         4. ROTATE BUTTON (Bottom-Left - Blue Button)
         let rotateBtn = UIButton(type: .system)
+        rotateBtn.tag = 8806
         rotateBtn.setImage(UIImage(systemName: "move.3d"), for: .normal)
         rotateBtn.tintColor = .white
         rotateBtn.backgroundColor = .systemBlue
@@ -578,27 +581,12 @@ extension CanvasViewController {
         //                view.addSubview(redoBtn)
       
         
-        // AR MODE BUTTON
-        let arButton = UIButton(type: .system)
-        let arIconCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
-        arButton.setImage(UIImage(systemName: "arkit", withConfiguration: arIconCfg), for: .normal)
-        arButton.tintColor = .systemGray
-        arButton.backgroundColor = UIColor.systemBackground
-        arButton.layer.cornerRadius = 16
-        arButton.clipsToBounds = true
-        arButton.translatesAutoresizingMaskIntoConstraints = false
-        self.arModeButton = arButton
-//        arButton.addAction(UIAction { [weak self] _ in
-//            guard let self = self else { return }
-//            self.isARModeActive.toggle()
-//            self.toggleARMode(isOn: self.isARModeActive)
-//        }, for: .touchUpInside)
+
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
-        view.addSubview(arButton)
 
         
         //undo redo
@@ -648,12 +636,6 @@ extension CanvasViewController {
             ),
             viewModeControl.heightAnchor.constraint(equalToConstant: 32),
             viewModeControl.widthAnchor.constraint(equalToConstant: 120),
-
-            // AR Button (bottom-right, left of 2D/3D control)
-            arButton.trailingAnchor.constraint(equalTo: viewModeControl.leadingAnchor, constant: -12),
-            arButton.centerYAnchor.constraint(equalTo: viewModeControl.centerYAnchor),
-            arButton.widthAnchor.constraint(equalToConstant: 44),
-            arButton.heightAnchor.constraint(equalToConstant: 44),
 
             // Rotate Button (Bottom Left)
             rotateBtn.leadingAnchor.constraint(

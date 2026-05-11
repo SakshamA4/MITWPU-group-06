@@ -248,7 +248,6 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - AR Mode
     var isARModeActive: Bool = false
-    weak var arModeButton: UIButton?
 
     // MARK: - NEW Properties
 
@@ -378,6 +377,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var currentAxis: GizmoAxis = .none
     var currentActionMenu: EntityActionMenu?
     weak var colorPickerTargetEntity: ModelEntity?
+    
+    var rightPanelTransitioningDelegate = RightPanelTransitioningDelegate()
 
      struct SceneCameraItem {
          let id: UUID          // Unique identifier for backend distinction
@@ -388,6 +389,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
          /// Assigned once at spawn time from the monotonically increasing `cameraCounter`
          /// so it never drifts after deletions or reloads.
          let displayName: String
+         /// Per-camera aspect ratio. Defaults to 16:9 for backward compatibility.
+         var aspectRatio: CameraAspectRatio = .default
      }
 
     var sceneCameraItems: [SceneCameraItem] = []
@@ -958,7 +961,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // FIX: Use the model cache for spawned entities to track memory and enable eviction.
                 // This prevents memory accumulation when creating scenes with many of the same model.
                 let entity: Entity
-                if let currentID = currentSceneID,
+                
+                if let customURL = item.customModelURL {
+                    // Load custom URL models synchronously or asynchronously? Entity(contentsOf:) doesn't have an async equivalent on older iOS versions, but `try await Entity(contentsOf:)` isn't a thing unless we use `Entity.loadAsync`.
+                    // Actually RealityKit has `Entity.load(contentsOf:)` or `Entity.loadAsync`. Let's use `Entity.load(contentsOf:)`.
+                    // Wait, `Entity.load(named:)` was used above, let's use `Entity.load(contentsOf: customURL)`.
+                    let loaded = try Entity.load(contentsOf: customURL)
+                    entity = loaded.clone(recursive: true)
+                } else if let currentID = currentSceneID,
                    let cachedEntity = ScenePersistenceService.shared.getCachedModel(item.modelFileName, for: currentID) {
                     // Cache hit: clone the cached entity
                     entity = cachedEntity.clone(recursive: true)
@@ -1017,6 +1027,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // Stamp pose info so the action menu can gate Walk to standing poses only.
                 if toolType == .character {
                     entity.components.set(CharacterPoseComponent(modelFileName: item.modelFileName))
+                }
+                
+                if let customURL = item.customModelURL {
+                    entity.components.set(CustomPropComponent(customModelURL: customURL))
                 }
                 
                 entity.generateCollisionShapes(recursive: true)

@@ -9,6 +9,18 @@
 
 import SwiftUI
 
+private enum Layout {
+    static let previewTopInset: CGFloat = 20
+    static let previewToFirstSectionSpacing: CGFloat = 24
+    static let interSectionSpacing: CGFloat = 28
+    static let separatorTopSpacing: CGFloat = 24
+    static let separatorBottomSpacing: CGFloat = 16
+    static let interSliderSpacing: CGFloat = 16
+    static let horizontalInset: CGFloat = 16
+    static let separatorHeight: CGFloat = 0.5
+    static let cornerRadius: CGFloat = 14
+}
+
 // MARK: - GroundCreationView
 
 struct GroundCreationView: View {
@@ -22,10 +34,12 @@ struct GroundCreationView: View {
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
+                    VStack(spacing: Layout.interSectionSpacing) {
 
                         // MARK: - Live Preview
                         previewSection
+                            .padding(.top, Layout.previewTopInset)
+                            .padding(.bottom, Layout.previewToFirstSectionSpacing - Layout.interSectionSpacing)
 
                         // MARK: - Size
                         sizeSection
@@ -41,20 +55,29 @@ struct GroundCreationView: View {
 
                         Spacer(minLength: 40)
                     }
-                    .padding(.top, 8)
                 }
             }
             .navigationTitle("New Ground")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { viewModel.cancel() }
-                        .foregroundColor(.secondary)
+                    Button(action: { viewModel.cancel() }) {
+                        Text("Cancel")
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color(UIColor.label))
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: { viewModel.confirm() }) {
                         Text("Create")
-                            .fontWeight(.semibold)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius))
                     }
                 }
             }
@@ -71,103 +94,96 @@ struct GroundCreationView: View {
                 isWall: false,
                 label: "Live Preview"
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Layout.horizontalInset)
         }
     }
 
     // MARK: - Size
 
     private var sizeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Size", icon: "arrow.up.left.and.arrow.down.right")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Size", showSeparator: false)
 
-            VStack(spacing: 14) {
-                SliderRow(label: "Ground Size", value: $viewModel.size,
+            VStack(spacing: Layout.interSliderSpacing) {
+                LabeledSliderView(label: "Ground Size", value: $viewModel.size,
                           range: 1...20, unit: "m")
             }
             .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Texture
 
     private var textureSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Environment", icon: "globe.americas.fill")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Environment", showSeparator: true)
 
-            TextureCategoryPicker(
-                categories: viewModel.categories,
-                allPresets: viewModel.availablePresets,
-                selectedCategory: $viewModel.selectedCategory,
-                selectedPresetID: Binding(
-                    get: { viewModel.selectedPresetID },
-                    set: { newID in
-                        if let preset = TexturePresetLibrary.preset(for: newID) {
-                            viewModel.selectPreset(preset)
+            VStack(spacing: 0) {
+                TextureCategoryPicker(
+                    categories: viewModel.categories,
+                    allPresets: viewModel.availablePresets,
+                    selectedCategory: $viewModel.selectedCategory,
+                    selectedPresetID: Binding(
+                        get: { viewModel.selectedPresetID },
+                        set: { newID in
+                            if let preset = TexturePresetLibrary.preset(for: newID) {
+                                viewModel.selectPreset(preset)
+                            }
                         }
-                    }
-                ),
-                tint: viewModel.tintColor
-            )
-
-            // Selected preset badge
-            if let preset = TexturePresetLibrary.preset(for: viewModel.selectedPresetID) {
-                HStack {
-                    Image(systemName: preset.icon)
-                        .foregroundColor(.green)
-                    Text(preset.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .transition(.opacity)
+                    ),
+                    tint: viewModel.tintColor
+                )
             }
+            .sectionCard()
         }
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Properties
 
     private var propertiesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Surface Properties", icon: "slider.horizontal.3")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Surface Properties", showSeparator: true)
 
-            VStack(spacing: 14) {
-                SliderRow(label: "Roughness", value: $viewModel.roughness,
+            VStack(spacing: Layout.interSliderSpacing) {
+                LabeledSliderView(label: "Roughness", value: $viewModel.roughness,
                           range: 0...1, unit: "")
-                SliderRow(label: "Metallic", value: $viewModel.metallic,
+                LabeledSliderView(label: "Metallic", value: $viewModel.metallic,
                           range: 0...1, unit: "")
-                SliderRow(label: "Tiling Scale", value: $viewModel.tilingScale,
+                LabeledSliderView(label: "Tiling Scale", value: $viewModel.tilingScale,
                           range: 0.25...4.0, unit: "×")
-                SliderRow(label: "Reflection", value: $viewModel.reflectionIntensity,
+                LabeledSliderView(label: "Reflection", value: $viewModel.reflectionIntensity,
                           range: 0...1, unit: "")
             }
             .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Tint
 
     private var tintSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Tint Color", icon: "paintpalette.fill")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Tint Color", showSeparator: true)
 
             ColorPicker("Surface Tint", selection: $viewModel.tintColor, supportsOpacity: false)
                 .padding(.horizontal, 4)
                 .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Helpers
 
-    private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.subheadline)
-                .foregroundColor(.green)
+    private func sectionHeader(_ title: String, showSeparator: Bool) -> some View {
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            if showSeparator {
+                Rectangle()
+                    .fill(Color(UIColor.separator))
+                    .frame(height: Layout.separatorHeight)
+                    .padding(.top, Layout.separatorTopSpacing)
+            }
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.semibold)

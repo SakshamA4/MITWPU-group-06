@@ -312,9 +312,16 @@ extension CanvasViewController {
                         // This fires on every slider drag — updates the live 3D scene in real time
                         self.updateLightProperties(for: entity, config: updatedConfig)
                     }
-                    if let sheet = panelVC.sheetPresentationController {
-                        sheet.detents              = [.medium()]
-                        sheet.prefersGrabberVisible = true
+                    
+                    if self.view.bounds.width >= 375 {
+                        panelVC.modalPresentationStyle = .custom
+                        panelVC.transitioningDelegate = self.rightPanelTransitioningDelegate
+                    } else {
+                        panelVC.modalPresentationStyle = .pageSheet
+                        if let sheet = panelVC.sheetPresentationController {
+                            sheet.detents = [.medium()]
+                            sheet.prefersGrabberVisible = true
+                        }
                     }
                     self.present(panelVC, animated: true)
                 }
@@ -323,6 +330,9 @@ extension CanvasViewController {
             case .addShot:
                 menu.removeFromSuperview()
                 self.presentShotPicker(for: entity)
+            case .aspectRatio:
+                menu.removeFromSuperview()
+                self.presentAspectRatioPicker(for: entity)
             case .lock:
                 let newState = !isCurrentlyLocked
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
@@ -369,6 +379,35 @@ extension CanvasViewController {
                 self?.animateWalk()
             })
         }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    // ── Aspect Ratio picker ──────────────────────────────────────────────────
+
+    func presentAspectRatioPicker(for entity: Entity) {
+        // Walk up to the camera root if needed
+        var cameraRoot: Entity = entity
+        while let parent = cameraRoot.parent, parent.name != "MainAnchor" { cameraRoot = parent }
+
+        // Find the camera and current ratio
+        let currentRatio = cameraRoot.components[CameraAspectComponent.self]?.aspectRatio ?? .default
+        guard let cameraItem = sceneCameraItems.first(where: { $0.cameraRoot === cameraRoot }) else { return }
+
+        let alert = UIAlertController(
+            title: "Aspect Ratio",
+            message: "Choose the framing ratio for this camera",
+            preferredStyle: .actionSheet
+        )
+
+        for ratio in CameraAspectRatio.allCases {
+            let prefix = ratio == currentRatio ? "✓ " : ""
+            alert.addAction(UIAlertAction(title: "\(prefix)\(ratio.displayName)", style: .default) { [weak self] _ in
+                guard let self = self else { return }
+                self.applyAspectRatio(ratio, to: cameraItem.camera, cameraRoot: cameraRoot)
+            })
+        }
+
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }

@@ -8,6 +8,7 @@ class ToolSheetViewController: UIViewController {
 
     private let titleLabel = UILabel()
     private let collectionView: UICollectionView
+    private var importCoordinator: PropImportCoordinator?
 
     init(tool: ToolType, onSelect: @escaping (SpawnItem) -> Void) {
         self.tool = tool
@@ -37,10 +38,16 @@ class ToolSheetViewController: UIViewController {
         setupTitle()
         setupCollection()
 
-        // Only show Plus button for Background tool
-        if tool == .background {
+        // Show Plus button for Background and Prop tools
+        if tool == .background || tool == .prop {
             setupPlusButton()
         }
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePropsUpdated), name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
+    }
+    
+    @objc private func handlePropsUpdated() {
+        self.collectionView.reloadData()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -88,16 +95,23 @@ class ToolSheetViewController: UIViewController {
     func setupPlusButton() {
         let plusButton = UIButton(type: .system)
         
-        let largeConfig = UIImage.SymbolConfiguration(pointSize: 44, weight: .light, scale: .default)
+        if tool == .prop {
+            plusButton.setImage(UIImage(systemName: "plus"), for: .normal)
+        } else {
+            let largeConfig = UIImage.SymbolConfiguration(pointSize: 44, weight: .light, scale: .default)
+            plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
+        }
         
-        plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
-        
-        plusButton.tintColor = .label
+        plusButton.tintColor = tool == .prop ? UIColor(named: "AccentColor") ?? .systemBlue : .label
         plusButton.translatesAutoresizingMaskIntoConstraints = false
         
         // Logic to open picker
         plusButton.addAction(UIAction { [weak self] _ in
-            self?.presentBackgroundImagePicker()
+            if self?.tool == .background {
+                self?.presentBackgroundImagePicker()
+            } else if self?.tool == .prop {
+                self?.presentPropImportPicker()
+            }
         }, for: .touchUpInside)
 
         view.addSubview(plusButton)
@@ -109,6 +123,12 @@ class ToolSheetViewController: UIViewController {
             plusButton.widthAnchor.constraint(equalToConstant: 60),
             plusButton.heightAnchor.constraint(equalToConstant: 60)
         ])
+    }
+    
+    func presentPropImportPicker() {
+        let coordinator = PropImportCoordinator()
+        self.importCoordinator = coordinator
+        coordinator.start(presentingViewController: self)
     }
     
     func presentBackgroundImagePicker() {

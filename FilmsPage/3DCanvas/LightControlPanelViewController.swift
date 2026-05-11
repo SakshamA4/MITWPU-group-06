@@ -63,6 +63,10 @@ class LightControlPanelViewController: UIViewController {
         view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         buildUI()
         populateFromConfig()
+        
+        // Let the presentation controller know roughly how tall the content is.
+        // It will be clamped by RightPanelPresentationController if it exceeds max bounds.
+        preferredContentSize = CGSize(width: 300, height: 600)
     }
 
     // MARK: - Logarithmic Intensity Mapping
@@ -77,6 +81,10 @@ class LightControlPanelViewController: UIViewController {
     // MARK: - Build UI
 
     private func buildUI() {
+        let header = buildHeader()
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
+
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
@@ -88,18 +96,21 @@ class LightControlPanelViewController: UIViewController {
         scrollView.addSubview(contentStack)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            header.heightAnchor.constraint(equalToConstant: 44),
+            
+            scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 16),
+            
+            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor),
             contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20),
         ])
-
-        // ── Header ──────────────────────────────────────────────────────
-        contentStack.addArrangedSubview(buildHeader())
 
         // ── Intensity ───────────────────────────────────────────────────
         contentStack.addArrangedSubview(buildSliderSection(
@@ -193,10 +204,15 @@ class LightControlPanelViewController: UIViewController {
 
         container.addArrangedSubview(UIView()) // flex spacer
 
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
         let doneBtn = UIButton(type: .system)
-        doneBtn.setTitle("Done", for: .normal)
-        doneBtn.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        doneBtn.tintColor = accent
+        doneBtn.setImage(UIImage(systemName: "xmark", withConfiguration: config), for: .normal)
+        doneBtn.tintColor = .white
+        doneBtn.backgroundColor = UIColor(white: 0.2, alpha: 1)
+        doneBtn.layer.cornerRadius = 16
+        doneBtn.translatesAutoresizingMaskIntoConstraints = false
+        doneBtn.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        doneBtn.heightAnchor.constraint(equalToConstant: 32).isActive = true
         doneBtn.addTarget(self, action: #selector(doneTapped), for: .touchUpInside)
         container.addArrangedSubview(doneBtn)
 

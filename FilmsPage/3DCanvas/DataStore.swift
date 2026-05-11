@@ -15,6 +15,10 @@ struct OriginalColorComponent: Component {
     let color: UIColor
 }
 
+struct CustomPropComponent: Component {
+    let customModelURL: URL
+}
+
 struct CharacterPoseComponent: Component {
     let modelFileName: String
 

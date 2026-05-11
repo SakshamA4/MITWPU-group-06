@@ -11,6 +11,15 @@ class PropService {
     static let shared = PropService()
     private let storageKey = StorageKeys.props
     private var isInitialized = false
+    
+    private let customPropsDirectory: URL = {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        let customDir = paths[0].appendingPathComponent("CustomProps")
+        if !FileManager.default.fileExists(atPath: customDir.path) {
+            try? FileManager.default.createDirectory(at: customDir, withIntermediateDirectories: true)
+        }
+        return customDir
+    }()
 
     private var props: [PropItem] = [] {
         didSet {
@@ -29,6 +38,26 @@ class PropService {
     
     func getProps() -> [PropItem] {
         return props
+    }
+    
+    func copyToCustomProps(sourceURL: URL) throws -> URL {
+        // Start accessing the security scoped resource since the URL comes from UIDocumentPickerViewController
+        let isSecured = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if isSecured {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+        
+        let fileName = sourceURL.lastPathComponent
+        let destinationURL = customPropsDirectory.appendingPathComponent(fileName)
+        
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        return destinationURL
     }
     
     func getProps(forFilmId filmId: UUID) -> [PropItem] {

@@ -42,10 +42,6 @@ extension CanvasViewController {
             config.planeDetection = [.horizontal]
             arView.session.run(config, options: [.resetTracking])
 
-            // 7. Update button appearance to "active"
-            arModeButton?.tintColor = .systemMint
-            arModeButton?.backgroundColor = UIColor.systemBackground
-
         } else {
             // Return to editor mode
             arView.session.pause()
@@ -64,9 +60,6 @@ extension CanvasViewController {
             // Keep blur/HDR off — editor looks better without them too
             arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
 
-            // Update button back to inactive appearance
-            arModeButton?.tintColor = .systemGreen
-            arModeButton?.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         }
     }
 

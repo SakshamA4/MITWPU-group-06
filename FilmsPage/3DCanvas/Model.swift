@@ -113,6 +113,7 @@ struct SpawnItem {
     var detailText: String? = nil
     var selectedPose: String? = nil
     var proceduralKind: ProceduralLightKind? = nil
+    var customModelURL: URL? = nil
 }
 
 // MARK: - BackgroundStore
@@ -164,7 +165,8 @@ extension SpawnItem {
             modelFileName: prop.modelFileName ?? "",
             isBackground:  false,
             UUId:          prop.id ?? UUID(),
-            detailText:    prop.description
+            detailText:    prop.description,
+            customModelURL: prop.localModelURL
         )
     }
 

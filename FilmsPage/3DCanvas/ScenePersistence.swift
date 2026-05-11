@@ -88,6 +88,10 @@ struct EntityRecord: Codable {
     var lightDiffuserAmount: Float?
     /// Procedural light kind (e.g. "practicalLantern"). nil for .usdz-based lights.
     var proceduralLightKind: String?
+    /// Path to user-imported custom model in the Documents/CustomProps directory.
+    var customModelPath: String?
+    /// Per-camera aspect ratio (e.g. "16:9"). nil for non-camera entities or legacy saves.
+    var cameraAspectRatio: String?
 }
 
 // MARK: - AnimationClipRecord
@@ -287,6 +291,12 @@ final class ScenePersistenceService {
                  cameraModelName = camVisual.modelName
              }
 
+             // Extract camera aspect ratio from CameraAspectComponent
+             var cameraAspectRatio: String?
+             if let camAspect = entity.components[CameraAspectComponent.self] {
+                 cameraAspectRatio = camAspect.aspectRatio.rawValue
+             }
+
              if let model = entity as? ModelEntity {
 
                  if let w = model.components[CanvasViewController.WallComponent.self] {
@@ -374,7 +384,9 @@ final class ScenePersistenceService {
                  lightReflectorType:  entity.components[LightConfigComponent.self]?.reflectorType.rawValue,
                  lightActiveGobo:     entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
-                 proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue
+                 proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
+                 customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
+                 cameraAspectRatio:   cameraAspectRatio
              ))
         }
 
@@ -937,7 +949,16 @@ final class ScenePersistenceService {
                   modelName: cameraModelName,
                   displayName: displayName
               ))
-              print("📷 Restoring camera '\(displayName)' with model: \(cameraModelName)")
+              // Restore per-camera aspect ratio (default to 16:9 for legacy saves)
+              let aspectRatio: CameraAspectRatio = {
+                  if let rawValue = record.cameraAspectRatio,
+                     let ratio = CameraAspectRatio(rawValue: rawValue) {
+                      return ratio
+                  }
+                  return .default
+              }()
+              root.components.set(CameraAspectComponent(aspectRatio: aspectRatio))
+              print("📷 Restoring camera '\(displayName)' with model: \(cameraModelName), aspect: \(aspectRatio.displayName)")
 
               let cam = PerspectiveCamera()
               cam.name = "PerspCam_\(cameraID.uuidString)"
@@ -957,7 +978,8 @@ final class ScenePersistenceService {
                      id:          cameraID,
                      camera:      cam,
                      cameraRoot:  root,
-                     displayName: displayName
+                     displayName: displayName,
+                     aspectRatio: aspectRatio
                  )
              )
              // Do NOT call vc.cameraCollectionView?.reloadData() here — see Phase 5 in load().
@@ -1115,7 +1137,15 @@ final class ScenePersistenceService {
             // FIX: Use scene-scoped LRU cache manager instead of global cache.
             // This allows fast revisits to the same scene while evicting old scenes automatically.
             let entity: Entity
-            if let cached = modelCacheManager.getModel(record.modelFileName, for: sceneID) {
+            
+            if let customPath = record.customModelPath {
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let customDir = documentsDirectory.appendingPathComponent("CustomProps")
+                let url = customDir.appendingPathComponent(customPath)
+                let loaded = try Entity.load(contentsOf: url)
+                entity = loaded.clone(recursive: true)
+                entity.components.set(CustomPropComponent(customModelURL: url))
+            } else if let cached = modelCacheManager.getModel(record.modelFileName, for: sceneID) {
                 entity = cached.clone(recursive: true)
             } else {
                 let loaded = try await Entity(named: record.modelFileName)

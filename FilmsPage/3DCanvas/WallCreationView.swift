@@ -9,6 +9,19 @@
 
 import SwiftUI
 
+private enum Layout {
+    static let previewTopInset: CGFloat = 20
+    static let previewToFirstSectionSpacing: CGFloat = 24
+    static let interSectionSpacing: CGFloat = 28
+    static let separatorTopSpacing: CGFloat = 24
+    static let separatorBottomSpacing: CGFloat = 16
+    static let interSliderSpacing: CGFloat = 16
+    static let horizontalInset: CGFloat = 16
+    static let internalPadding: CGFloat = 14
+    static let cornerRadius: CGFloat = 14
+    static let separatorHeight: CGFloat = 0.5
+}
+
 // MARK: - WallCreationView
 
 struct WallCreationView: View {
@@ -23,10 +36,12 @@ struct WallCreationView: View {
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
+                    VStack(spacing: Layout.interSectionSpacing) {
 
                         // MARK: - Live Preview
                         previewSection
+                            .padding(.top, Layout.previewTopInset)
+                            .padding(.bottom, Layout.previewToFirstSectionSpacing - Layout.interSectionSpacing)
 
                         // MARK: - Dimensions
                         dimensionsSection
@@ -43,20 +58,29 @@ struct WallCreationView: View {
                         // Bottom padding for safe area
                         Spacer(minLength: 40)
                     }
-                    .padding(.top, 8)
                 }
             }
             .navigationTitle("New Wall")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { viewModel.cancel() }
-                        .foregroundColor(.secondary)
+                    Button(action: { viewModel.cancel() }) {
+                        Text("Cancel")
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color(UIColor.label))
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: { viewModel.confirm() }) {
                         Text("Create")
-                            .fontWeight(.semibold)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius))
                     }
                 }
             }
@@ -73,148 +97,106 @@ struct WallCreationView: View {
                 isWall: true,
                 label: "Live Preview"
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Layout.horizontalInset)
         }
     }
 
     // MARK: - Dimensions Section
 
     private var dimensionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Dimensions", icon: "ruler.fill")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Dimensions", showSeparator: false)
 
-            VStack(spacing: 14) {
-                SliderRow(label: "Width", value: $viewModel.width,
+            VStack(spacing: Layout.interSliderSpacing) {
+                LabeledSliderView(label: "Width", value: $viewModel.width,
                           range: 0.5...6.0, unit: "m")
-                SliderRow(label: "Height", value: $viewModel.height,
+                LabeledSliderView(label: "Height", value: $viewModel.height,
                           range: 0.3...4.0, unit: "m")
-                SliderRow(label: "Thickness", value: $viewModel.thickness,
+                LabeledSliderView(label: "Thickness", value: $viewModel.thickness,
                           range: 0.02...0.3, unit: "m")
             }
             .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Texture Section
 
     private var textureSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Material", icon: "paintbrush.fill")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Material", showSeparator: true)
 
-            TextureCategoryPicker(
-                categories: viewModel.categories,
-                allPresets: viewModel.availablePresets,
-                selectedCategory: $viewModel.selectedCategory,
-                selectedPresetID: Binding(
-                    get: { viewModel.selectedPresetID },
-                    set: { newID in
-                        if let preset = TexturePresetLibrary.preset(for: newID) {
-                            viewModel.selectPreset(preset)
+            VStack(spacing: 0) {
+                TextureCategoryPicker(
+                    categories: viewModel.categories,
+                    allPresets: viewModel.availablePresets,
+                    selectedCategory: $viewModel.selectedCategory,
+                    selectedPresetID: Binding(
+                        get: { viewModel.selectedPresetID },
+                        set: { newID in
+                            if let preset = TexturePresetLibrary.preset(for: newID) {
+                                viewModel.selectPreset(preset)
+                            }
                         }
-                    }
-                ),
-                tint: viewModel.tintColor
-            )
-
-            // Selected preset name
-            if let preset = TexturePresetLibrary.preset(for: viewModel.selectedPresetID) {
-                HStack {
-                    Image(systemName: preset.icon)
-                        .foregroundColor(.blue)
-                    Text(preset.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    if preset.supportsTransparency {
-                        Label("Transparent", systemImage: "eye.fill")
-                            .font(.caption2)
-                            .foregroundColor(.cyan)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.cyan.opacity(0.15)))
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .transition(.opacity)
+                    ),
+                    tint: viewModel.tintColor
+                )
             }
+            .sectionCard()
         }
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Properties Section
 
     private var propertiesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Properties", icon: "slider.horizontal.3")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Properties", showSeparator: true)
 
-            VStack(spacing: 14) {
-                SliderRow(label: "Roughness", value: $viewModel.roughness,
+            VStack(spacing: Layout.interSliderSpacing) {
+                LabeledSliderView(label: "Roughness", value: $viewModel.roughness,
                           range: 0...1, unit: "")
-                SliderRow(label: "Metallic", value: $viewModel.metallic,
+                LabeledSliderView(label: "Metallic", value: $viewModel.metallic,
                           range: 0...1, unit: "")
-                SliderRow(label: "Opacity", value: $viewModel.opacity,
+                LabeledSliderView(label: "Opacity", value: $viewModel.opacity,
                           range: 0.05...1, unit: "")
-                SliderRow(label: "Tiling", value: $viewModel.tilingScale,
+                LabeledSliderView(label: "Tiling", value: $viewModel.tilingScale,
                           range: 0.25...4.0, unit: "×")
-                SliderRow(label: "Reflection", value: $viewModel.reflectionIntensity,
+                LabeledSliderView(label: "Reflection", value: $viewModel.reflectionIntensity,
                           range: 0...1, unit: "")
             }
             .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Tint Section
 
     private var tintSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Tint Color", icon: "paintpalette.fill")
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Tint Color", showSeparator: true)
 
             ColorPicker("Surface Tint", selection: $viewModel.tintColor, supportsOpacity: false)
                 .padding(.horizontal, 4)
                 .sectionCard()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.horizontalInset)
     }
 
     // MARK: - Helpers
 
-    private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.subheadline)
-                .foregroundColor(.blue)
+    private func sectionHeader(_ title: String, showSeparator: Bool) -> some View {
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            if showSeparator {
+                Rectangle()
+                    .fill(Color(UIColor.separator))
+                    .frame(height: Layout.separatorHeight)
+                    .padding(.top, Layout.separatorTopSpacing)
+            }
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
-        }
-    }
-}
-
-// MARK: - SliderRow
-
-struct SliderRow: View {
-    let label: String
-    @Binding var value: Float
-    let range: ClosedRange<Float>
-    let unit: String
-
-    var body: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(unit.isEmpty ? String(format: "%.2f", value) : String(format: "%.2f%@", value, unit))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                    .monospacedDigit()
-            }
-            Slider(value: $value, in: range)
-                .tint(.blue)
         }
     }
 }
@@ -224,9 +206,9 @@ struct SliderRow: View {
 private struct SectionCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(14)
+            .padding(Layout.internalPadding)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
                     .fill(Color(UIColor.secondarySystemGroupedBackground))
             )
     }

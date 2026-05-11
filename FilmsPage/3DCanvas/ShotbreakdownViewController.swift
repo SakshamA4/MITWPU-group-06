@@ -917,6 +917,11 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
              self?.presentShotEditor(for: shot)
          }
          cell.configure(with: shot, accentColor: stripColors[ip.item % stripColors.count])
+         
+         // Apply aspect ratio overlay
+         let ratio = cameraItem(for: shot)?.aspectRatio ?? .default
+         cell.updateAspectRatio(ratio)
+         
          return cell
      }
 
@@ -942,6 +947,11 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
 final class ShotCardCell: UICollectionViewCell {
 
     static let reuseID = "ShotCardCell"
+
+    private enum Constants {
+        static let aspectOverlayTag = 9300
+        static let barAlpha: CGFloat = 1.0
+    }
 
     // Palette (instance, not static — avoids repeated alloc)
     private let cardBg  = UIColor(red: 0.086, green: 0.086, blue: 0.141, alpha: 1)
@@ -981,6 +991,9 @@ final class ShotCardCell: UICollectionViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         gradientLayer.frame = thumbContainer.bounds
+        if let overlay = thumbContainer.viewWithTag(Constants.aspectOverlayTag) {
+            overlay.frame = thumbContainer.bounds
+        }
     }
 
     // MARK: - Build
@@ -1189,6 +1202,61 @@ final class ShotCardCell: UICollectionViewCell {
             placeholderIcon.isHidden = false
             playCircle.isHidden = false
         }
+    }
+
+    /// Draws pillarbox or letterbox bars over the thumbnail to indicate the camera's aspect ratio.
+    func updateAspectRatio(_ ratio: CameraAspectRatio) {
+        thumbContainer.viewWithTag(Constants.aspectOverlayTag)?.removeFromSuperview()
+
+        if ratio == .sixteenByNine { return }
+
+        let thumbSize = thumbContainer.bounds.size
+        guard thumbSize.width > 0, thumbSize.height > 0 else { return }
+
+        let cellRatio = Float(thumbSize.width / thumbSize.height)
+        let targetRatio = ratio.ratio
+
+        let overlay = UIView(frame: thumbContainer.bounds)
+        overlay.tag = Constants.aspectOverlayTag
+        overlay.isUserInteractionEnabled = false
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Insert directly above the image, below icons/overlays
+        thumbContainer.insertSubview(overlay, aboveSubview: thumbImageView)
+
+        if targetRatio < cellRatio {
+            // Pillarbox
+            let targetWidth = thumbSize.height * CGFloat(targetRatio)
+            let barWidth = (thumbSize.width - targetWidth) / 2.0
+
+            let leftBar = UIView(frame: CGRect(x: 0, y: 0, width: barWidth, height: thumbSize.height))
+            leftBar.backgroundColor = UIColor.black.withAlphaComponent(Constants.barAlpha)
+            leftBar.autoresizingMask = [.flexibleHeight, .flexibleRightMargin]
+            overlay.addSubview(leftBar)
+
+            let rightBar = UIView(frame: CGRect(x: thumbSize.width - barWidth, y: 0, width: barWidth, height: thumbSize.height))
+            rightBar.backgroundColor = UIColor.black.withAlphaComponent(Constants.barAlpha)
+            rightBar.autoresizingMask = [.flexibleHeight, .flexibleLeftMargin]
+            overlay.addSubview(rightBar)
+        } else {
+            // Letterbox
+            let targetHeight = thumbSize.width / CGFloat(targetRatio)
+            let barHeight = (thumbSize.height - targetHeight) / 2.0
+
+            let topBar = UIView(frame: CGRect(x: 0, y: 0, width: thumbSize.width, height: barHeight))
+            topBar.backgroundColor = UIColor.black.withAlphaComponent(Constants.barAlpha)
+            topBar.autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
+            overlay.addSubview(topBar)
+
+            let bottomBar = UIView(frame: CGRect(x: 0, y: thumbSize.height - barHeight, width: thumbSize.width, height: barHeight))
+            bottomBar.backgroundColor = UIColor.black.withAlphaComponent(Constants.barAlpha)
+            bottomBar.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
+            overlay.addSubview(bottomBar)
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        thumbContainer.viewWithTag(Constants.aspectOverlayTag)?.removeFromSuperview()
     }
 
     // MARK: - Press Animation

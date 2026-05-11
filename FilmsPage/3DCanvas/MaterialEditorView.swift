@@ -122,15 +122,15 @@ struct MaterialEditorView: View {
             sectionHeader("Surface", icon: "slider.horizontal.3")
 
             VStack(spacing: 14) {
-                SliderRow(label: "Roughness", value: $viewModel.roughness,
+                LabeledSliderView(label: "Roughness", value: $viewModel.roughness,
                           range: 0...1, unit: "")
-                SliderRow(label: "Metallic", value: $viewModel.metallic,
+                LabeledSliderView(label: "Metallic", value: $viewModel.metallic,
                           range: 0...1, unit: "")
-                SliderRow(label: "Opacity", value: $viewModel.opacity,
+                LabeledSliderView(label: "Opacity", value: $viewModel.opacity,
                           range: 0.05...1, unit: "")
-                SliderRow(label: "Tiling", value: $viewModel.tilingScale,
+                LabeledSliderView(label: "Tiling", value: $viewModel.tilingScale,
                           range: 0.25...4.0, unit: "×")
-                SliderRow(label: "Reflection", value: $viewModel.reflectionIntensity,
+                LabeledSliderView(label: "Reflection", value: $viewModel.reflectionIntensity,
                           range: 0...1, unit: "")
             }
             .sectionCard()

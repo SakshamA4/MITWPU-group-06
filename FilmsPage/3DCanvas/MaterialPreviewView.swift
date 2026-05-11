@@ -17,7 +17,7 @@ struct MaterialPreviewView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
-        scnView.backgroundColor = UIColor(white: 0.08, alpha: 1)
+        scnView.backgroundColor = UIColor.systemGray6
         scnView.antialiasingMode = .multisampling4X
         scnView.allowsCameraControl = false
         scnView.autoenablesDefaultLighting = false
@@ -117,6 +117,13 @@ struct MaterialPreviewView: UIViewRepresentable {
     }
 }
 
+private enum Layout {
+    static let previewHeight: CGFloat = 180
+    static let cardCornerRadius: CGFloat = 14
+    static let captionSpacing: CGFloat = 8
+    static let borderLineWidth: CGFloat = 1.0
+}
+
 // MARK: - MaterialPreviewCard
 
 /// A styled container wrapping MaterialPreviewView with a label.
@@ -126,19 +133,19 @@ struct MaterialPreviewCard: View {
     let label: String
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Layout.captionSpacing) {
             MaterialPreviewView(config: config, isWall: isWall)
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(height: Layout.previewHeight)
+                .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color(white: 0.3), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                        .strokeBorder(Color(UIColor.separator), lineWidth: Layout.borderLineWidth)
                 )
 
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.top, 6)
+                .fontWeight(.regular)
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
     }
 }

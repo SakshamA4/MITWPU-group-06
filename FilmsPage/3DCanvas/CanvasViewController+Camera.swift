@@ -75,6 +75,11 @@ extension CanvasViewController {
                     modelEntity.components.set(ground)
                     return   // skip camera zoom
                 }
+                
+                if modelEntity.components[CategoryComponent.self]?.toolType == .prop {
+                    modelEntity.scale *= capturedScale
+                    return
+                }
             }
 
             // ── No resizable entity selected — normal camera zoom ──────────────
@@ -195,7 +200,7 @@ extension CanvasViewController {
     }
 
     
-    func spawnSceneCamera(modelName: String = "cam1", displayName: String = "DSLR") {
+    func spawnSceneCamera(modelName: String = "cam1", displayName: String = "DSLR", aspectRatio: CameraAspectRatio = .default) {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 
         let index = sceneCameras.count
@@ -206,6 +211,7 @@ extension CanvasViewController {
         cameraRoot.components.set(EntityIDComponent(id: cameraID))
         // Persist which visual model asset this camera uses
         cameraRoot.components.set(CameraVisualComponent(modelName: modelName, displayName: displayName))
+        cameraRoot.components.set(CameraAspectComponent(aspectRatio: aspectRatio))
 
         let camera = PerspectiveCamera()
         camera.name = "SceneCamera_\(index)"
@@ -228,7 +234,8 @@ extension CanvasViewController {
             id: cameraID,
             camera: camera,
             cameraRoot: cameraRoot,
-            displayName: "Camera \(cameraCounter)"
+            displayName: "Camera \(cameraCounter)",
+            aspectRatio: aspectRatio
         ))
 
         cameraCollectionView?.reloadData()
@@ -375,9 +382,23 @@ extension CanvasViewController {
         showAllMotionPaths()
         showAllRotationArcs()
         hideExitCameraButton()
+        // Remove aspect ratio overlay — no scene camera is active in editor mode
+        removeLetterboxOverlay()
         // Restore gizmos in editor view
         gizmoRoot?.isEnabled = true
         rotationGizmo?.isEnabled = true
+        // Restore camera panel visibility in editor view
+        view.viewWithTag(8800)?.isHidden = false
+        view.viewWithTag(8803)?.isHidden = false
+        // Restore toolbars and buttons
+        navigationController?.setNavigationBarHidden(false, animated: true)
+        view.viewWithTag(8804)?.isHidden = false // toolbar
+        view.viewWithTag(8805)?.isHidden = false // viewModeControl
+        view.viewWithTag(8806)?.isHidden = false // rotateBtn
+        shotBreakdownBtn.isHidden = false
+        sidebarView.isHidden = false
+        layersButton.isHidden = false
+        movementToggleButton.isHidden = false
     }
 
     func setActiveCamera(_ camera: PerspectiveCamera) {
@@ -395,6 +416,9 @@ extension CanvasViewController {
             activeCameraRoot.children.forEach { child in
                 if !(child is PerspectiveCamera) { child.isEnabled = false }
             }
+            // Apply aspect ratio letterbox overlay
+            let ratio = activeCameraRoot.components[CameraAspectComponent.self]?.aspectRatio ?? .default
+            updateLetterboxOverlay(for: ratio)
         }
         // Hide gizmos and all editor overlays — they obstruct the camera preview
         gizmoRoot?.isEnabled = false
@@ -402,6 +426,103 @@ extension CanvasViewController {
         hideAllMotionPaths()
         hideAllRotationArcs()
         showExitCameraButton()
+        // Hide the camera panel and its pull tab when looking through a camera
+        view.viewWithTag(8800)?.isHidden = true
+        view.viewWithTag(8803)?.isHidden = true
+        // Hide all toolbars and buttons
+        navigationController?.setNavigationBarHidden(true, animated: true)
+        view.viewWithTag(8804)?.isHidden = true // toolbar
+        view.viewWithTag(8805)?.isHidden = true // viewModeControl
+        view.viewWithTag(8806)?.isHidden = true // rotateBtn
+        shotBreakdownBtn.isHidden = true
+        sidebarView.isHidden = true
+        layersButton.isHidden = true
+        movementToggleButton.isHidden = true
+    }
+
+    // MARK: - Aspect Ratio Application
+
+    private enum AspectRatioConstants {
+        static let letterboxTag = 9100
+        static let overlayOpacity: CGFloat = 1.0
+    }
+
+    /// Single entry point for applying an aspect ratio to a camera entity.
+    /// Updates the ECS component, the SceneCameraItem record, and refreshes previews.
+    func applyAspectRatio(
+        _ ratio: CameraAspectRatio,
+        to perspectiveCamera: PerspectiveCamera,
+        cameraRoot: Entity
+    ) {
+        // 1. Update ECS component
+        cameraRoot.components.set(CameraAspectComponent(aspectRatio: ratio))
+
+        // 2. Update SceneCameraItem record
+        if let idx = sceneCameraItems.firstIndex(where: { $0.camera === perspectiveCamera }) {
+            sceneCameraItems[idx].aspectRatio = ratio
+        }
+
+        // 3. If this camera is currently active, update the viewport overlay
+        if activeCamera === perspectiveCamera {
+            updateLetterboxOverlay(for: ratio)
+        }
+
+        // 4. Trigger preview refresh
+        cameraCollectionView?.reloadData()
+        startCameraPreviewUpdates()
+    }
+
+    /// Adds or updates a semi-transparent letterbox/pillarbox overlay on arView
+    /// so the user can see the framing for the active camera's aspect ratio.
+    func updateLetterboxOverlay(for ratio: CameraAspectRatio) {
+        // Remove any existing overlay
+        view.viewWithTag(AspectRatioConstants.letterboxTag)?.removeFromSuperview()
+
+        let viewSize = arView.bounds.size
+        guard viewSize.width > 0, viewSize.height > 0 else { return }
+
+        let viewRatio = Float(viewSize.width / viewSize.height)
+        let targetRatio = ratio.ratio
+
+        // If the ratios match closely, no overlay needed
+        if abs(viewRatio - targetRatio) < 0.01 { return }
+
+        let overlay = UIView()
+        overlay.tag = AspectRatioConstants.letterboxTag
+        overlay.isUserInteractionEnabled = false
+        overlay.frame = arView.bounds
+        view.addSubview(overlay)
+
+        if targetRatio < viewRatio {
+            // Pillarbox: target is narrower — add dark bars on left and right
+            let targetWidth = viewSize.height * CGFloat(targetRatio)
+            let barWidth = (viewSize.width - targetWidth) / 2.0
+
+            let leftBar = UIView(frame: CGRect(x: 0, y: 0, width: barWidth, height: viewSize.height))
+            leftBar.backgroundColor = UIColor.black.withAlphaComponent(AspectRatioConstants.overlayOpacity)
+            overlay.addSubview(leftBar)
+
+            let rightBar = UIView(frame: CGRect(x: viewSize.width - barWidth, y: 0, width: barWidth, height: viewSize.height))
+            rightBar.backgroundColor = UIColor.black.withAlphaComponent(AspectRatioConstants.overlayOpacity)
+            overlay.addSubview(rightBar)
+        } else {
+            // Letterbox: target is wider — add dark bars on top and bottom
+            let targetHeight = viewSize.width / CGFloat(targetRatio)
+            let barHeight = (viewSize.height - targetHeight) / 2.0
+
+            let topBar = UIView(frame: CGRect(x: 0, y: 0, width: viewSize.width, height: barHeight))
+            topBar.backgroundColor = UIColor.black.withAlphaComponent(AspectRatioConstants.overlayOpacity)
+            overlay.addSubview(topBar)
+
+            let bottomBar = UIView(frame: CGRect(x: 0, y: viewSize.height - barHeight, width: viewSize.width, height: barHeight))
+            bottomBar.backgroundColor = UIColor.black.withAlphaComponent(AspectRatioConstants.overlayOpacity)
+            overlay.addSubview(bottomBar)
+        }
+    }
+
+    /// Removes the letterbox overlay when exiting camera view.
+    func removeLetterboxOverlay() {
+        view.viewWithTag(AspectRatioConstants.letterboxTag)?.removeFromSuperview()
     }
 
     
@@ -458,6 +579,13 @@ extension CanvasViewController {
         return av
     }
 
+    /// Resizes the off-screen preview ARView to match a specific aspect ratio
+    /// so thumbnails render at the correct proportions.
+    func resizePreviewARView(for ratio: CameraAspectRatio) {
+        let size = ratio.snapshotSize
+        previewARView.frame = CGRect(origin: .zero, size: size)
+    }
+
     // MARK: Timer lifecycle
 
     func startCameraPreviewUpdates() {
@@ -487,6 +615,8 @@ extension CanvasViewController {
 
          let item = sceneCameraItems[index]
          let indexPath = IndexPath(item: index, section: 0)
+         // Resize the off-screen ARView to match this camera's aspect ratio
+         resizePreviewARView(for: item.aspectRatio)
          captureCameraPreviewImage(for: item) { [weak self] image in
              guard let self = self, let image = image else { return }
              self.sceneCameraItems[index].previewImage = image
@@ -659,6 +789,7 @@ extension CanvasViewController {
         let activeIndex = sceneCameraItems.firstIndex { $0.camera === activeCamera }
 
         activateEditorCamera()
+        removeLetterboxOverlay()
         cameraCollectionView?.reloadData()
 
         // Update the thumbnail for the camera the user just exited — it may have
@@ -697,6 +828,10 @@ extension CanvasViewController {
         } else {
             cell.label.text = name
         }
+        
+        // Apply aspect ratio bars over the thumbnail
+        cell.updateAspectRatio(item.aspectRatio)
+        
         return cell
     }
 

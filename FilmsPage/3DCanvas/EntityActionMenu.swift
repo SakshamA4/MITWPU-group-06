@@ -31,6 +31,7 @@ class EntityActionMenu: UIView {
         case editMaterial   // standard: open material editor (walls/ground only)
         case lightSettings  // standard: open light control panel (lights only)
         case addShot        // camera:   open shot/movement picker
+        case aspectRatio    // camera:   open aspect ratio picker
         case lock
         case delete
     }
@@ -121,12 +122,14 @@ class EntityActionMenu: UIView {
             addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
 
         case .camera:
-            // Add Shot | Lock | Delete
-            addMenuButton(title: "Add Shot",     action: .addShot)
+            // Add Shot | Aspect Ratio | Lock | Delete
+            addMenuButton(title: "Add Shot",       action: .addShot)
+            addSeparator()
+            addMenuButton(title: "Aspect Ratio",   action: .aspectRatio)
             addSeparator()
             addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
             addSeparator()
-            addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
+            addMenuButton(title: "Delete",         action: .delete, isDestructive: true)
         }
     }
 

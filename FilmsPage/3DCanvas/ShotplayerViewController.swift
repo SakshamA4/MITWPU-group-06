@@ -71,6 +71,8 @@ final class ShotPlayerViewController: UIViewController {
      private var playStart: CFTimeInterval = 0
      private var currentTime: Float = 0
      private var currentShot: Shot { shots[currentIndex] }
+     /// Dynamically updated constraint for the preview container's aspect ratio.
+     private var previewAspectConstraint: NSLayoutConstraint?
 
      private var is13inch: Bool {
          let s = UIScreen.main.bounds
@@ -273,6 +275,9 @@ final class ShotPlayerViewController: UIViewController {
         super.viewDidLayoutSubviews()
         [prevBtn, nextBtn].forEach { $0.layer.cornerRadius = $0.bounds.height / 2 }
         playBtn.layer.cornerRadius = playBtn.bounds.height / 2
+        // Re-apply aspect ratio overlay now that previewContainer has valid bounds
+        let camItem = cameraItem(for: currentShot)
+        updatePreviewAspectRatio(for: camItem)
     }
 
      override func viewWillDisappear(_ animated: Bool) {
@@ -413,8 +418,8 @@ final class ShotPlayerViewController: UIViewController {
             previewContainer.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             previewContainer.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             previewContainer.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            previewContainer.heightAnchor.constraint(
-                equalTo: previewContainer.widthAnchor, multiplier: 9.0 / 16.0),
+            // Aspect constraint is set dynamically in syncToCurrentShot()
+            // Start with a default 16:9 ratio
 
             frameImageView.topAnchor.constraint(equalTo: previewContainer.topAnchor),
             frameImageView.leadingAnchor.constraint(equalTo: previewContainer.leadingAnchor),
@@ -511,6 +516,91 @@ final class ShotPlayerViewController: UIViewController {
             filmStrip.trailingAnchor.constraint(equalTo: filmStripContainer.trailingAnchor),
             filmStrip.bottomAnchor.constraint(equalTo: filmStripContainer.bottomAnchor, constant: -6),
         ])
+
+        // Set fixed 16:9 container — never changes size.
+        // Aspect ratio is indicated by pillarbox/letterbox bars INSIDE the preview.
+        let fixed = previewContainer.heightAnchor.constraint(
+            equalTo: previewContainer.widthAnchor, multiplier: 9.0 / 16.0)
+        fixed.isActive = true
+        previewAspectConstraint = fixed
+    }
+
+    // MARK: - Per-Camera Aspect Ratio in Playback
+
+    private enum PlaybackOverlayConstants {
+        static let overlayTag = 9200
+        static let barAlpha: CGFloat = 1.0
+    }
+
+    /// Draws pillarbox or letterbox bars inside the preview container to indicate
+    /// the active camera's aspect ratio. The container itself stays fixed at 16:9
+    /// so the transport controls never shift off screen.
+    ///
+    /// Uses frame-based positioning (not Auto Layout) so bars are correctly
+    /// positioned immediately — the overlay's frame matches the container's bounds.
+    private func updatePreviewAspectRatio(for camItem: CanvasViewController.SceneCameraItem?) {
+        // Remove previous overlay
+        previewContainer.viewWithTag(PlaybackOverlayConstants.overlayTag)?.removeFromSuperview()
+
+        let ratio: CameraAspectRatio = {
+            if let item = camItem {
+                if let comp = item.cameraRoot.components[CameraAspectComponent.self] {
+                    return comp.aspectRatio
+                }
+                return item.aspectRatio
+            }
+            return .default
+        }()
+
+        // 16:9 matches the container — no bars needed
+        if ratio == .sixteenByNine { return }
+
+        let containerSize = previewContainer.bounds.size
+        guard containerSize.width > 0, containerSize.height > 0 else { return }
+
+        let containerRatio = Float(containerSize.width / containerSize.height)
+        let targetRatio = ratio.ratio
+
+        // Frame-based overlay so bars are positioned correctly immediately
+        let overlay = UIView(frame: previewContainer.bounds)
+        overlay.tag = PlaybackOverlayConstants.overlayTag
+        overlay.isUserInteractionEnabled = false
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        previewContainer.addSubview(overlay)
+
+        if targetRatio < containerRatio {
+            // Camera is narrower (e.g. 1:1, 4:3, 9:16) → pillarbox (bars on left & right)
+            let targetWidth = containerSize.height * CGFloat(targetRatio)
+            let barWidth = (containerSize.width - targetWidth) / 2.0
+
+            let leftBar = UIView(frame: CGRect(x: 0, y: 0, width: barWidth, height: containerSize.height))
+            leftBar.backgroundColor = UIColor.black.withAlphaComponent(PlaybackOverlayConstants.barAlpha)
+            leftBar.autoresizingMask = [.flexibleHeight, .flexibleRightMargin]
+            overlay.addSubview(leftBar)
+
+            let rightBar = UIView(frame: CGRect(
+                x: containerSize.width - barWidth, y: 0,
+                width: barWidth, height: containerSize.height))
+            rightBar.backgroundColor = UIColor.black.withAlphaComponent(PlaybackOverlayConstants.barAlpha)
+            rightBar.autoresizingMask = [.flexibleHeight, .flexibleLeftMargin]
+            overlay.addSubview(rightBar)
+        } else {
+            // Camera is wider (e.g. 2.35:1) → letterbox (bars on top & bottom)
+            let targetHeight = containerSize.width / CGFloat(targetRatio)
+            let barHeight = (containerSize.height - targetHeight) / 2.0
+
+            let topBar = UIView(frame: CGRect(x: 0, y: 0, width: containerSize.width, height: barHeight))
+            topBar.backgroundColor = UIColor.black.withAlphaComponent(PlaybackOverlayConstants.barAlpha)
+            topBar.autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
+            overlay.addSubview(topBar)
+
+            let bottomBar = UIView(frame: CGRect(
+                x: 0, y: containerSize.height - barHeight,
+                width: containerSize.width, height: barHeight))
+            bottomBar.backgroundColor = UIColor.black.withAlphaComponent(PlaybackOverlayConstants.barAlpha)
+            bottomBar.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
+            overlay.addSubview(bottomBar)
+        }
     }
 
     private func applyOrientation(to size: CGSize) {
@@ -554,6 +644,9 @@ final class ShotPlayerViewController: UIViewController {
          let camItem = cameraItem(for: shot)
          prepareForCapture?(camItem)
          evaluateTimeline?(shot.startTime)
+
+         // Update preview container aspect ratio to match camera
+         updatePreviewAspectRatio(for: camItem)
     }
 
     private func setHeaderSpacing() {
