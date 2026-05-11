@@ -263,7 +263,8 @@ extension CanvasViewController {
         // ── 1. CLEAN UP ────────────────────────────────────────────────────
         for name in ["LightCore", "LensGlow", "BeamCone", "GlowAnchor",
                      "DiffuseFill", "GoboCookie", "LED_Guts_Group",
-                     "Lantern_Guts_Group", "LanternInternalLight"] {
+                     "Lantern_Guts_Group", "LanternInternalLight",
+                     "LanternGlowFallback"] {
             model.findEntity(named: name)?.removeFromParent()
         }
 
@@ -276,51 +277,103 @@ extension CanvasViewController {
 
         switch config.lightKind {
 
-        // ════════════════════════════════════════════════════════════════════
-        // LANTERN — PointLight inside the glass cylinder at 55% height
-        // ════════════════════════════════════════════════════════════════════
+      
         case .point:
+            // Place point light in the center of the lantern
+            let glowY = b.min.y + (b.extents.y * 0.50)
+
             let point = PointLight()
             point.name                    = "LightCore"
             point.light.intensity         = config.intensity
             point.light.color             = config.uiColor
             point.light.attenuationRadius = config.attenuationRadius
-            point.scale    = SIMD3(repeating: cs)
-            point.position = SIMD3<Float>(
-                b.center.x,
-                b.min.y + (b.extents.y * 0.55),
-                b.center.z
-            )
+            point.scale                   = SIMD3(repeating: cs)
+            point.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
             model.addChild(point)
 
-            // Make the lantern model GLOW from within.
-            func makeEntityGlow(_ entity: Entity, color: UIColor) {
-                if let me = entity as? ModelEntity {
+            // --------------------------------------------------------
+            // Visible glowing bulb inside the lantern
+            // --------------------------------------------------------
+            let bulbRadius = min(b.extents.x, b.extents.z) * 0.12
+
+            let bulb = ModelEntity(
+                mesh: .generateSphere(radius: bulbRadius),
+                materials: [UnlitMaterial(color: config.uiColor)]
+            )
+
+            bulb.name = "LanternBulb"
+            bulb.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
+            model.addChild(bulb)
+
+            // --------------------------------------------------------
+            // Apply emissive glow to transparent glass materials
+            // --------------------------------------------------------
+            var glassFound = false   // <-- REQUIRED
+
+            func addGlassGlow(_ entity: Entity) {
+                if let me = entity as? ModelEntity, var mc = me.model {
                     var newMaterials: [any RealityKit.Material] = []
-                    for mat in me.model?.materials ?? [] {
-                        var pbr = PhysicallyBasedMaterial()
-                        if let existingPBR = mat as? PhysicallyBasedMaterial {
-                            pbr = existingPBR
+                    var changed = false
+
+                    for mat in mc.materials {
+                        if var pbr = mat as? PhysicallyBasedMaterial {
+                            if case .transparent = pbr.blending {
+                                pbr.emissiveColor     = .init(color: config.uiColor)
+                                pbr.emissiveIntensity = 3.0
+                                newMaterials.append(pbr)
+                                changed = true
+                                glassFound = true
+                                print("LANTERN: emissive applied to \(me.name)")
+                            } else {
+                                newMaterials.append(mat)
+                            }
+                        } else {
+                            newMaterials.append(mat)
                         }
-                        pbr.emissiveColor     = .init(color: color)
-                        pbr.emissiveIntensity = 4.0
-                        newMaterials.append(pbr)
                     }
-                    if !newMaterials.isEmpty {
-                        me.model?.materials = newMaterials
+
+                    if changed {
+                        mc.materials = newMaterials
+                        me.model = mc
                     }
                 }
+
                 for child in entity.children {
-                    makeEntityGlow(child, color: color)
+                    addGlassGlow(child)
                 }
             }
-            makeEntityGlow(model, color: config.uiColor)
 
+            addGlassGlow(model)
+
+            // --------------------------------------------------------
+            // Fallback: if no transparent glass materials were found,
+            // add an extra glowing sphere.
+            // --------------------------------------------------------
+            if !glassFound {
+                print("LANTERN: no transparent materials found — adding fallback glow sphere")
+
+                let glowRadius = min(b.extents.x, b.extents.z) * 0.15
+
+                let glow = ModelEntity(
+                    mesh: .generateSphere(radius: glowRadius),
+                    materials: [UnlitMaterial(color: config.uiColor)]
+                )
+
+                glow.name = "LanternGlowFallback"
+                glow.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
+
+                model.addChild(glow)
+            }
         // ════════════════════════════════════════════════════════════════════
-        // SPOTLIGHT — lens faces -X in local space (beam was opposite lens with +X)
+        // SPOTLIGHT — beam was 180° backwards, now flipped to -X
+        // SpotLight positioned at lens face, not model center
         // NO BeamCone — it caused gizmo crashes from extreme bounds
         // ════════════════════════════════════════════════════════════════════
         case .spot:
+            // Determine which axis has the largest extent — that's the lens barrel axis
+            let xExt = b.extents.x, yExt = b.extents.y, zExt = b.extents.z
+            print("SPOTLIGHT extents: X=\(xExt) Y=\(yExt) Z=\(zExt)")
+
             let spot = SpotLight()
             spot.name                      = "LightCore"
             spot.light.intensity           = config.intensity
@@ -330,21 +383,45 @@ extension CanvasViewController {
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale    = SIMD3(repeating: cs)
-            spot.position = SIMD3<Float>(b.center.x, b.center.y, b.center.z)
 
-            // Lens faces -X — flipped from +X because beam was going opposite lens
-            spot.look(
-                at:   SIMD3<Float>(b.center.x - 500, b.center.y, b.center.z),
-                from: SIMD3<Float>(b.center.x, b.center.y, b.center.z),
-                relativeTo: model
-            )
+            // Position at the lens face (min.x end of the barrel), not model center
+            let lensPos = SIMD3<Float>(b.min.x, b.center.y, b.center.z)
+            spot.position = lensPos
+
+            // Aim forward along +Z
+
+                spot.look(
+
+                    at: SIMD3<Float>(
+
+                        b.center.x,
+
+                        b.center.y,
+
+                        b.max.z + 500
+
+                    ),
+
+                    from: lensPos,
+
+                    relativeTo: model
+
+                )
+            print("SPOTLIGHT: lens at \(lensPos), aiming toward -X")
             model.addChild(spot)
 
         // ════════════════════════════════════════════════════════════════════
-        // LED PANEL — panel face aimed forward-down from panel head
+        // LED PANEL — SpotLight at panel head (85% height), aimed forward-down
+        // The panel head with 4×3 LED circles sits at the top of the tripod.
         // ════════════════════════════════════════════════════════════════════
         case .panel:
-            let panelHeadY = b.max.y - (b.extents.y * 0.12)
+            // Position the light near the top of the LED panel
+            let panelHeadY = b.min.y + (b.extents.y * 0.85)
+
+            let xExt = b.extents.x
+            let yExt = b.extents.y
+            let zExt = b.extents.z
+            print("LED PANEL extents: X=\(xExt) Y=\(yExt) Z=\(zExt) panelHeadY=\(panelHeadY)")
 
             let spot = SpotLight()
             spot.name                      = "LightCore"
@@ -354,15 +431,46 @@ extension CanvasViewController {
             spot.light.color               = config.uiColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
-            spot.scale    = SIMD3(repeating: cs)
-            spot.position = SIMD3<Float>(b.center.x, panelHeadY, b.center.z)
+            spot.scale                     = SIMD3(repeating: cs)
 
-            // Try +Z forward with downward angle (since -Z put light at feet)
+            // Light originates from the front face of the LED panel
+            let lensPos = SIMD3<Float>(
+                b.center.x,
+                panelHeadY,
+                b.min.z - 2.0
+            )
+            spot.position = lensPos
+
+            // Slight downward tilt
+            let aimDownY = panelHeadY - (b.extents.y * 0.15)
+
+            // Move beam slightly to the LEFT from the panel's perspective
+            // Increase this value if you want more left shift
+            let leftCorrection: Float = 500.0
+            
+            let forwardDistance: Float = 500.0
+            // Aim forward (-Z) and slightly left (-X)
+            let target = SIMD3<Float>(
+                b.center.x - leftCorrection,   // LEFT
+                aimDownY,                  // Slight downward tilt
+                b.min.z - forwardDistance             // Forward in front of panel
+            )
+            
+            
+            
             spot.look(
-                at:   SIMD3<Float>(b.center.x, panelHeadY - 200, b.center.z + 500),
-                from: SIMD3<Float>(b.center.x, panelHeadY, b.center.z),
+                at: target,
+                from: lensPos,
                 relativeTo: model
             )
+            // Debug
+
+            print("LED PANEL: lens at \(lensPos)")
+
+            print("LED PANEL: leftCorrection = \(leftCorrection)")
+
+            print("LED PANEL: aiming at \(target)")
+
             model.addChild(spot)
 
         } // end switch
@@ -393,32 +501,61 @@ extension CanvasViewController {
             }
 
 
-        case .point:
-            guard let point = lightCore as? PointLight else { return }
-            point.light.intensity         = config.intensity
-            point.light.color             = config.uiColor
-            point.light.attenuationRadius = config.attenuationRadius
+            // ============================================================
+            // UPDATE LANTERN LIGHT PROPERTIES
+            // ============================================================
+            case .point:
+                guard let point = lightCore as? PointLight else { return }
 
-            // Re-apply emissive when color changes
-            func updateEmissive(_ e: Entity) {
-                if let me = e as? ModelEntity {
-                    var newMaterials: [any RealityKit.Material] = []
-                    for mat in me.model?.materials ?? [] {
-                        var pbr = PhysicallyBasedMaterial()
-                        if let existingPBR = mat as? PhysicallyBasedMaterial {
-                            pbr = existingPBR
+                point.light.intensity         = config.intensity
+                point.light.color             = config.uiColor
+                point.light.attenuationRadius = config.attenuationRadius
+
+                // Update visible bulb color
+                if let bulb = entity.findEntity(named: "LanternBulb") as? ModelEntity {
+                    bulb.model?.materials = [
+                        UnlitMaterial(color: config.uiColor)
+                    ]
+                }
+
+                // Update glass emissive color
+                func updateGlassGlow(_ entity: Entity) {
+                    if let me = entity as? ModelEntity, var mc = me.model {
+                        var newMaterials: [any RealityKit.Material] = []
+                        var changed = false
+
+                        for mat in mc.materials {
+                            if var pbr = mat as? PhysicallyBasedMaterial {
+                                if case .transparent = pbr.blending {
+                                    pbr.emissiveColor     = .init(color: config.uiColor)
+                                    pbr.emissiveIntensity = 3.0
+                                    newMaterials.append(pbr)
+                                    changed = true
+                                } else {
+                                    newMaterials.append(mat)
+                                }
+                            } else {
+                                newMaterials.append(mat)
+                            }
                         }
-                        pbr.emissiveColor     = .init(color: config.uiColor)
-                        pbr.emissiveIntensity = 4.0
-                        newMaterials.append(pbr)
+
+                        if changed {
+                            mc.materials = newMaterials
+                            me.model = mc
+                        }
                     }
-                    if !newMaterials.isEmpty {
-                        me.model?.materials = newMaterials
+
+                    for child in entity.children {
+                        updateGlassGlow(child)
                     }
                 }
-                for child in e.children { updateEmissive(child) }
+
+                updateGlassGlow(entity)
+
+            // Update fallback glow sphere color if present
+            if let fb = entity.findEntity(named: "LanternGlowFallback") as? ModelEntity {
+                fb.model?.materials = [UnlitMaterial(color: config.uiColor)]
             }
-            updateEmissive(entity)
         }
 
         entity.components.set(config)
