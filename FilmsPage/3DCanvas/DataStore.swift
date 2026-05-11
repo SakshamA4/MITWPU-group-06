@@ -85,7 +85,7 @@ enum ToolType: CaseIterable {
                         
                         // 2. Filter for items that actually have a 3D model
                         // This ensures only "Spotlight" shows up, and the text-only ones are hidden
-                        let playableLights = allLights.filter { $0.modelFileName != nil }
+                        let playableLights = allLights.filter { $0.modelFileName != nil || $0.isProcedural }
 
                         // 3. Convert them to SpawnItems
                         return playableLights.map { SpawnItem(light: $0) }

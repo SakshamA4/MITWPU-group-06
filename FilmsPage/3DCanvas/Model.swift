@@ -25,12 +25,13 @@ struct LightConfigComponent: Component, Codable {
     var reflectorType: ReflectorType = .standard
     var activeGobo: GoboPattern = .none
     var diffuserAmount: Float = 0.0     // 0.0 = hard edge, 1.0 = full silk
+    var proceduralKind: ProceduralLightKind? = nil  // non-nil for procedural lights
 
     // Derived — not stored
     var uiColor: UIColor { .fromKelvin(colorTemperatureKelvin) }
     var counterScale: Float { 1.0 / modelScale }  // child entities must be scaled by this
 
-    static func from(_ config: LightConfig, kind: LightKind) -> LightConfigComponent {
+    static func from(_ config: LightConfig, kind: LightKind, proceduralKind: ProceduralLightKind? = nil) -> LightConfigComponent {
         LightConfigComponent(
             lightKind:              kind,
             intensity:              config.intensity,
@@ -42,7 +43,8 @@ struct LightConfigComponent: Component, Codable {
             modelScale:             config.modelScale,
             reflectorType:          config.reflectorType,
             activeGobo:             config.activeGobo,
-            diffuserAmount:         config.diffuserAmount
+            diffuserAmount:         config.diffuserAmount,
+            proceduralKind:         proceduralKind
         )
     }
 
@@ -52,6 +54,7 @@ struct LightConfigComponent: Component, Codable {
         case innerAngleDeg, outerAngleDeg, attenuationRadius
         case shadowEnabled, modelScale
         case reflectorType, activeGobo, diffuserAmount
+        case proceduralKind
     }
 
     init(from decoder: Decoder) throws {
@@ -68,6 +71,7 @@ struct LightConfigComponent: Component, Codable {
         reflectorType  = try c.decodeIfPresent(ReflectorType.self, forKey: .reflectorType) ?? .standard
         activeGobo     = try c.decodeIfPresent(GoboPattern.self, forKey: .activeGobo) ?? .none
         diffuserAmount = try c.decodeIfPresent(Float.self, forKey: .diffuserAmount) ?? 0.0
+        proceduralKind = try c.decodeIfPresent(ProceduralLightKind.self, forKey: .proceduralKind)
     }
 
     init(lightKind: LightKind, intensity: Float, colorTemperatureKelvin: Float,
@@ -75,7 +79,8 @@ struct LightConfigComponent: Component, Codable {
          shadowEnabled: Bool, modelScale: Float,
          reflectorType: ReflectorType = .standard,
          activeGobo: GoboPattern = .none,
-         diffuserAmount: Float = 0.0) {
+         diffuserAmount: Float = 0.0,
+         proceduralKind: ProceduralLightKind? = nil) {
         self.lightKind = lightKind
         self.intensity = intensity
         self.colorTemperatureKelvin = colorTemperatureKelvin
@@ -87,6 +92,7 @@ struct LightConfigComponent: Component, Codable {
         self.reflectorType = reflectorType
         self.activeGobo = activeGobo
         self.diffuserAmount = diffuserAmount
+        self.proceduralKind = proceduralKind
     }
 }
 
@@ -106,6 +112,7 @@ struct SpawnItem {
     var poses: [SpawnPose]? = nil
     var detailText: String? = nil
     var selectedPose: String? = nil
+    var proceduralKind: ProceduralLightKind? = nil
 }
 
 // MARK: - BackgroundStore
@@ -178,7 +185,8 @@ extension SpawnItem {
             imageName:     light.imageName,
             modelFileName: light.modelFileName ?? "",
             isBackground:  false,
-            detailText:    light.description
+            detailText:    light.description,
+            proceduralKind: light.proceduralKind
         )
     }
 

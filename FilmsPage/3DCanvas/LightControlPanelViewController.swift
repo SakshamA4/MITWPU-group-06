@@ -174,10 +174,18 @@ class LightControlPanelViewController: UIViewController {
         container.addArrangedSubview(spacer1)
 
         let titleLabel = UILabel()
-        switch config.lightKind {
-        case .spot:  titleLabel.text = "Spotlight"
-        case .panel: titleLabel.text = "LED Panel"
-        case .point: titleLabel.text = "Lantern"
+        if let procKind = config.proceduralKind {
+            switch procKind {
+            case .practicalLantern: titleLabel.text = "Practical Lantern"
+            case .fluorescentTube:  titleLabel.text = "Fluorescent Tube"
+            case .skyPanel:         titleLabel.text = "Sky Panel"
+            }
+        } else {
+            switch config.lightKind {
+            case .spot:  titleLabel.text = "Spotlight"
+            case .panel: titleLabel.text = "LED Panel"
+            case .point: titleLabel.text = "Lantern"
+            }
         }
         titleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
         titleLabel.textColor = .white

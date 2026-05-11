@@ -86,6 +86,8 @@ struct EntityRecord: Codable {
     var lightReflectorType: String?
     var lightActiveGobo: String?
     var lightDiffuserAmount: Float?
+    /// Procedural light kind (e.g. "practicalLantern"). nil for .usdz-based lights.
+    var proceduralLightKind: String?
 }
 
 // MARK: - AnimationClipRecord
@@ -362,7 +364,8 @@ final class ScenePersistenceService {
                  lightModelScale:     entity.components[LightConfigComponent.self]?.modelScale,
                  lightReflectorType:  entity.components[LightConfigComponent.self]?.reflectorType.rawValue,
                  lightActiveGobo:     entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
-                 lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount
+                 lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
+                 proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue
              ))
         }
 
@@ -986,6 +989,45 @@ final class ScenePersistenceService {
             e.generateCollisionShapes(recursive: true)
             e.transform = t
             anchor.addChild(e)
+            return
+        }
+
+        // ── Procedural light (no .usdz — rebuild geometry from primitives) ────
+        if let procKindRaw = record.proceduralLightKind,
+           let procKind = ProceduralLightKind(rawValue: procKindRaw) {
+
+            let colorTemp = record.lightColorTempKelvin ?? 5600
+            let entity = vc.buildProceduralLight(kind: procKind, colorTemp: colorTemp)
+            entity.name = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                entity.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
+            entity.components.set(CategoryComponent(toolType: .light))
+            entity.components.set(InputTargetComponent())
+
+            // Restore persisted light config
+            if let kindRaw = record.lightKind,
+               let kind = LightKind(rawValue: kindRaw) {
+                let config = LightConfigComponent(
+                    lightKind:              kind,
+                    intensity:              record.lightIntensity ?? 200_000,
+                    colorTemperatureKelvin: colorTemp,
+                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
+                    shadowEnabled:          record.lightShadowEnabled ?? false,
+                    modelScale:             record.lightModelScale ?? 1.0,
+                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
+                    proceduralKind:         procKind
+                )
+                vc.attachLight(to: entity, config: config)
+            }
+
+            entity.transform = t
+            anchor.addChild(entity)
+            print("✅ Restored procedural light: \(record.name) (\(procKindRaw))")
             return
         }
 

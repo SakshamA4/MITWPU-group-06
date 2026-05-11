@@ -911,6 +911,50 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(modelName: item.modelFileName, displayName: item.title); return }
                 if item.isBackground { spawnBackgroundPlane(item); return }
 
+                // ── Procedural light — no .usdz to load ──────────────────────
+                if toolType == .light, let kind = item.proceduralKind {
+                    let entity = buildProceduralLight(
+                        kind: kind,
+                        colorTemp: LightsDataStore.find(byProceduralKind: kind)?.defaultConfig.colorTemperatureKelvin ?? 5600
+                    )
+
+                    // Unique name
+                    let baseName = customName ?? item.title
+                    let uniqueName: String = {
+                        guard let anchor = mainAnchor else { return baseName }
+                        let existing = anchor.children.filter {
+                            $0.name == baseName || $0.name.hasPrefix(baseName + "_")
+                        }.count
+                        return existing == 0 ? baseName : "\(baseName)_\(existing + 1)"
+                    }()
+                    entity.name = uniqueName
+
+                    // Position — procedural geometry is in world metres, no normalisation needed
+                    let randomX = Float.random(in: -1...1)
+                    let randomZ = Float.random(in: -1...1)
+                    let verticalOffset: Float = (kind == .practicalLantern) ? 0.25 : 0.5
+                    entity.position = [randomX, verticalOffset, randomZ]
+
+                    entity.components.set(CategoryComponent(toolType: .light))
+                    entity.components.set(InputTargetComponent())
+
+                    // Attach light with full config
+                    if let lightItem = LightsDataStore.find(byProceduralKind: kind) {
+                        let config = LightConfigComponent.from(
+                            lightItem.defaultConfig,
+                            kind: lightItem.lightKind,
+                            proceduralKind: kind
+                        )
+                        attachLight(to: entity, config: config)
+                    }
+
+                    if let anchor = mainAnchor {
+                        anchor.addChild(entity)
+                        self.refreshSidebarContent()
+                    }
+                    return
+                }
+
                 // FIX: Use the model cache for spawned entities to track memory and enable eviction.
                 // This prevents memory accumulation when creating scenes with many of the same model.
                 let entity: Entity

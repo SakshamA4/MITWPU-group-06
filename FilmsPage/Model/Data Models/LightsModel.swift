@@ -10,6 +10,15 @@ enum LightKind: String, Codable, CaseIterable {
     case point   // PointLight — omnidirectional (Lantern model)
 }
 
+// MARK: - Procedural Light Kind
+
+/// Identifies lights built from RealityKit primitive geometry (no .usdz file).
+enum ProceduralLightKind: String, Codable, CaseIterable {
+    case practicalLantern
+    case fluorescentTube
+    case skyPanel
+}
+
 // MARK: - Gobo Pattern
 
 /// Shadow-casting pattern projected by a spotlight via a cookie mesh.
@@ -103,6 +112,8 @@ struct LightItem {
     let description: String
     var modelFileName: String? = nil
     var lightKind: LightKind = .spot
+    var isProcedural: Bool = false
+    var proceduralKind: ProceduralLightKind? = nil
     var defaultConfig: LightConfig = LightConfig(
         intensity: 200_000,
         colorTemperatureKelvin: 5600,
@@ -166,6 +177,63 @@ struct LightsDataStore {
                 shadowEnabled: false,
                 modelScale: 0.01
             )
+        ),
+
+        // ── Procedural lights (no .usdz — geometry built from RealityKit primitives) ──
+
+        LightItem(
+            name: "Practical Lantern",
+            imageName: "PracticalLantern_img",
+            description: "Round paper lantern practical — soft omnidirectional warm glow.",
+            modelFileName: nil,
+            lightKind: .point,
+            isProcedural: true,
+            proceduralKind: .practicalLantern,
+            defaultConfig: LightConfig(
+                intensity: 150_000,
+                colorTemperatureKelvin: 2700,
+                innerAngleDeg: 0,
+                outerAngleDeg: 0,
+                attenuationRadius: 4,
+                shadowEnabled: false,
+                modelScale: 1.0
+            )
+        ),
+        LightItem(
+            name: "Fluorescent Tube",
+            imageName: "FluorescentTube_img",
+            description: "Long horizontal strip light — soft cool linear wash.",
+            modelFileName: nil,
+            lightKind: .panel,
+            isProcedural: true,
+            proceduralKind: .fluorescentTube,
+            defaultConfig: LightConfig(
+                intensity: 200_000,
+                colorTemperatureKelvin: 6500,
+                innerAngleDeg: 60,
+                outerAngleDeg: 110,
+                attenuationRadius: 5,
+                shadowEnabled: false,
+                modelScale: 1.0
+            )
+        ),
+        LightItem(
+            name: "Sky Panel",
+            imageName: "SkyPanel_img",
+            description: "Large flat rectangular soft panel — powerful wide soft wash.",
+            modelFileName: nil,
+            lightKind: .panel,
+            isProcedural: true,
+            proceduralKind: .skyPanel,
+            defaultConfig: LightConfig(
+                intensity: 500_000,
+                colorTemperatureKelvin: 5600,
+                innerAngleDeg: 50,
+                outerAngleDeg: 100,
+                attenuationRadius: 8,
+                shadowEnabled: false,
+                modelScale: 1.0
+            )
         )
     ]
 
@@ -179,6 +247,12 @@ struct LightsDataStore {
     /// Used by the router and persistence fallback path.
     static func find(byModelFileName name: String) -> LightItem? {
         items.first { $0.modelFileName == name }
+    }
+
+    /// Look up a procedural light item by its kind.
+    /// Used by persistence restore path and spawn routing.
+    static func find(byProceduralKind kind: ProceduralLightKind) -> LightItem? {
+        items.first { $0.proceduralKind == kind }
     }
 }
 
