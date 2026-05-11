@@ -6,6 +6,17 @@
 //  Supports single-shot and multi-shot (Export All) rendering.
 //  Video-only, clean frames (no HUD overlays).
 //
+//  OPTIMIZATION NOTES:
+//  ───────────────────────────────────────────────────────────────────────
+//  • All scene evaluation + capture happens synchronously on the main thread
+//    so RealityKit's render pipeline is fully flushed before snapshot.
+//  • Pixel buffer creation + AVAssetWriter append happen on a background
+//    serial queue so the main thread is never blocked by I/O.
+//  • For the ShotPlayer path (ARView visible), we use arView.snapshot()
+//    directly — no scene cloning.
+//  • A generous inter-frame yield (2 render frames) ensures RealityKit
+//    has fully committed the scene state before capture.
+//  ───────────────────────────────────────────────────────────────────────
 
 import AVFoundation
 import UIKit
@@ -47,7 +58,6 @@ struct ExportSettings {
 
         var id: String { rawValue }
 
-        /// AVVideoCompressionProperties bitrate multiplier
         var compressionQuality: Float {
             switch self {
             case .high:   return 1.0
@@ -78,15 +88,19 @@ final class VideoExportService {
 
     // MARK: - Callbacks (set by caller before export)
 
-    /// Positions all entities at the given master time.
+    /// Positions all entities at the given master time. Called on main thread.
     var evaluateTimeline: ((Float) -> Void)?
 
-    /// Sets the active camera to the given item's POV.
+    /// Sets the active camera to the given item's POV. Called on main thread.
     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
 
-    /// Captures a frame from the given camera's POV.
+    /// Captures a frame. The closure captures from the live ARView directly.
+    /// For export we prefer the direct arView.snapshot path.
     var captureFrameAsync: ((CanvasViewController.SceneCameraItem?,
                              @escaping (UIImage?) -> Void) -> Void)?
+
+    /// Direct ARView reference for optimized snapshot path.
+    weak var arView: ARView?
 
     /// Camera item lookup by shot.
     var cameraItemForShot: ((Shot) -> CanvasViewController.SceneCameraItem?)?
@@ -101,6 +115,10 @@ final class VideoExportService {
 
     private var isCancelled = false
     private var writer: AVAssetWriter?
+
+    /// Background serial queue for pixel buffer creation + disk writes.
+    private let writeQueue = DispatchQueue(label: "com.filmspage.videoexport.write",
+                                            qos: .userInitiated)
 
     // MARK: - Public API
 
@@ -159,7 +177,7 @@ final class VideoExportService {
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: Int(bitrate),
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoMaxKeyFrameIntervalKey: fps * 2,  // keyframe every 2s
+                AVVideoMaxKeyFrameIntervalKey: fps * 2,
             ] as [String: Any],
         ]
 
@@ -179,103 +197,295 @@ final class VideoExportService {
         writer.startWriting()
         writer.startSession(atSourceTime: .zero)
 
-        // Begin sequential render
+        print("🎬 Export started: \(shots.count) shots, \(totalFrames) frames, \(settings.resolution.rawValue) @ \(settings.fps.rawValue)fps")
+
+        // ── Sequential frame render ──────────────────────────────────────────
+        //
+        // Pattern: main thread evaluates scene → waits 2 frames for RealityKit
+        // to flush → captures snapshot → sends image to background writeQueue
+        // for pixel buffer creation + AVAssetWriter append → signals main thread
+        // to render next frame.
+        //
+        // This avoids:
+        //  • Thread.sleep on main thread
+        //  • Scene cloning per frame
+        //  • Race conditions between evaluate and capture
+
         var globalFrameIndex = 0
+        var lastCamItem: CanvasViewController.SceneCameraItem?
 
         func renderShot(shotIdx: Int) {
+            guard !self.isCancelled else { self.finishCancelled(writer, outURL); return }
             guard shotIdx < shots.count else {
-                // All shots done — finalize
-                videoInput.markAsFinished()
-                writer.finishWriting { [weak self] in
-                    DispatchQueue.main.async {
-                        guard let self = self else { return }
-                        if self.isCancelled {
-                            try? FileManager.default.removeItem(at: outURL)
-                            self.onComplete?(nil, nil)
-                        } else if writer.status == .completed {
-                            self.onComplete?(outURL, nil)
-                        } else {
-                            self.onComplete?(nil, writer.error)
-                        }
-                    }
-                }
+                self.finishWriting(writer, videoInput, outURL)
                 return
             }
 
             let shot       = shots[shotIdx]
             let frameCount = shotFrameCounts[shotIdx]
+            let camItem    = self.cameraItemForShot?(shot)
+            lastCamItem    = camItem
 
-            // Set camera for this shot
-            let camItem = self.cameraItemForShot?(shot)
+            // Set camera once per shot (not per frame)
+            self.prepareForCapture?(camItem)
 
-            func renderFrame(localIdx: Int) {
-                guard !self.isCancelled else {
-                    videoInput.markAsFinished()
-                    writer.cancelWriting()
-                    try? FileManager.default.removeItem(at: outURL)
-                    DispatchQueue.main.async { self.onComplete?(nil, nil) }
-                    return
-                }
+            renderFrame(localIdx: 0, shot: shot, shotIdx: shotIdx,
+                        frameCount: frameCount, camItem: camItem,
+                        fps: fps, size: size, totalFrames: totalFrames,
+                        shots: shots, shotFrameCounts: shotFrameCounts,
+                        globalFrameIndex: &globalFrameIndex,
+                        videoInput: videoInput, adaptor: adaptor,
+                        writer: writer, outURL: outURL,
+                        nextShot: { renderShot(shotIdx: shotIdx + 1) })
+        }
 
-                guard localIdx < frameCount else {
-                    // This shot is done — move to next
-                    renderShot(shotIdx: shotIdx + 1)
-                    return
-                }
+        // Kick off on main thread
+        DispatchQueue.main.async { renderShot(shotIdx: 0) }
+    }
 
-                // Progress
-                let progress = ExportProgress(
-                    currentShotIndex: shotIdx,
-                    totalShots: shots.count,
-                    currentFrame: globalFrameIndex + 1,
-                    totalFrames: totalFrames,
-                    overallProgress: Float(globalFrameIndex) / Float(max(1, totalFrames)),
-                    shotName: shot.displayName
-                )
-                DispatchQueue.main.async { self.onProgress?(progress) }
+    // MARK: - Per-Frame Render (runs on main thread)
 
-                // Evaluate timeline at this frame's time
-                let masterTime = shot.startTime + Float(localIdx) / Float(fps)
-                DispatchQueue.main.async {
-                    self.evaluateTimeline?(masterTime)
-                    self.prepareForCapture?(camItem)
-                }
+    private func renderFrame(
+        localIdx: Int, shot: Shot, shotIdx: Int,
+        frameCount: Int, camItem: CanvasViewController.SceneCameraItem?,
+        fps: Int32, size: CGSize, totalFrames: Int,
+        shots: [Shot], shotFrameCounts: [Int],
+        globalFrameIndex: inout Int,
+        videoInput: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        writer: AVAssetWriter, outURL: URL,
+        nextShot: @escaping () -> Void
+    ) {
+        guard !isCancelled else { finishCancelled(writer, outURL); return }
+        guard localIdx < frameCount else { nextShot(); return }
 
-                // Capture frame (allow 1 frame for render pipeline to flush)
-                let captureDelay: TimeInterval = 0.016  // ~1 frame at 60fps
-                DispatchQueue.main.asyncAfter(deadline: .now() + captureDelay) { [weak self] in
+        // Capture the current global index by value (avoid inout in escaping closure)
+        let currentGlobalIdx = globalFrameIndex
+        globalFrameIndex += 1
+
+        // 1. Report progress
+        let progress = ExportProgress(
+            currentShotIndex: shotIdx,
+            totalShots: shots.count,
+            currentFrame: currentGlobalIdx + 1,
+            totalFrames: totalFrames,
+            overallProgress: Float(currentGlobalIdx) / Float(max(1, totalFrames)),
+            shotName: shot.displayName
+        )
+        onProgress?(progress)
+
+        // 2. Evaluate timeline (synchronous on main thread)
+        let masterTime = shot.startTime + Float(localIdx) / Float(fps)
+        evaluateTimeline?(masterTime)
+
+        // 3. Wait 2 render frames (~33ms) for RealityKit to fully commit the scene.
+        //    This is the key optimization — we do NOT block; we yield to the run loop.
+        let renderDelay: TimeInterval = 0.035
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + renderDelay) { [weak self] in
+            guard let self = self, !self.isCancelled else {
+                self?.finishCancelled(writer, outURL)
+                return
+            }
+
+            // 4. Capture frame using direct ARView snapshot (avoids scene cloning!)
+            self.captureCurrentFrame(camItem: camItem) { [weak self] image in
+                guard let self = self, !self.isCancelled else { return }
+
+                // 5. Pixel buffer creation + write on background queue
+                //    This frees the main thread immediately for the next frame.
+                self.writeQueue.async { [weak self] in
                     guard let self = self, !self.isCancelled else { return }
 
-                    let doCapture = self.captureFrameAsync ?? { _, cb in cb(nil) }
-                    doCapture(camItem) { [weak self] image in
-                        guard let self = self, !self.isCancelled else { return }
-
-                        if let img = image, let pb = self.createPixelBuffer(from: img, size: size) {
-                            // Wait for input to be ready
+                    if let img = image {
+                        if let pb = self.createPixelBuffer(from: img, size: size) {
+                            // Wait for writer to be ready (background queue — safe to block here)
+                            var waitCount = 0
                             while !videoInput.isReadyForMoreMediaData {
-                                Thread.sleep(forTimeInterval: 0.002)
+                                Thread.sleep(forTimeInterval: 0.005)
+                                waitCount += 1
+                                if waitCount > 200 { break }  // 1s timeout
                             }
-                            let pts = CMTime(value: CMTimeValue(globalFrameIndex), timescale: fps)
+                            let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
                             adaptor.append(pb, withPresentationTime: pts)
                         }
-
-                        globalFrameIndex += 1
-
-                        // Render next frame on main queue
-                        DispatchQueue.main.async {
-                            renderFrame(localIdx: localIdx + 1)
+                    } else {
+                        // Frame capture failed — append a black frame to maintain timing
+                        if let pb = self.createBlackPixelBuffer(size: size) {
+                            var waitCount = 0
+                            while !videoInput.isReadyForMoreMediaData {
+                                Thread.sleep(forTimeInterval: 0.005)
+                                waitCount += 1
+                                if waitCount > 200 { break }
+                            }
+                            let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
+                            adaptor.append(pb, withPresentationTime: pts)
                         }
+                    }
+
+                    // 6. Schedule next frame back on main thread
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        // Use a local mutable copy for the recursive call
+                        var nextGlobalIdx = currentGlobalIdx + 1
+                        // We already incremented before entering the closure,
+                        // so just pass the next local index
+                        self.renderFrameTrampoline(
+                            localIdx: localIdx + 1, shot: shot, shotIdx: shotIdx,
+                            frameCount: frameCount, camItem: camItem,
+                            fps: fps, size: size, totalFrames: totalFrames,
+                            shots: shots, shotFrameCounts: shotFrameCounts,
+                            globalFrameIndex: nextGlobalIdx,
+                            videoInput: videoInput, adaptor: adaptor,
+                            writer: writer, outURL: outURL,
+                            nextShot: nextShot
+                        )
                     }
                 }
             }
-
-            renderFrame(localIdx: 0)
         }
-
-        renderShot(shotIdx: 0)
     }
 
-    // MARK: - Pixel Buffer
+    /// Trampoline to avoid `inout` in escaping closures.
+    /// Takes globalFrameIndex by value and manages it internally.
+    private func renderFrameTrampoline(
+        localIdx: Int, shot: Shot, shotIdx: Int,
+        frameCount: Int, camItem: CanvasViewController.SceneCameraItem?,
+        fps: Int32, size: CGSize, totalFrames: Int,
+        shots: [Shot], shotFrameCounts: [Int],
+        globalFrameIndex: Int,
+        videoInput: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        writer: AVAssetWriter, outURL: URL,
+        nextShot: @escaping () -> Void
+    ) {
+        guard !isCancelled else { finishCancelled(writer, outURL); return }
+        guard localIdx < frameCount else { nextShot(); return }
+
+        let currentGlobalIdx = globalFrameIndex
+
+        // 1. Report progress
+        let progress = ExportProgress(
+            currentShotIndex: shotIdx,
+            totalShots: shots.count,
+            currentFrame: currentGlobalIdx + 1,
+            totalFrames: totalFrames,
+            overallProgress: Float(currentGlobalIdx) / Float(max(1, totalFrames)),
+            shotName: shot.displayName
+        )
+        onProgress?(progress)
+
+        // 2. Evaluate timeline
+        let masterTime = shot.startTime + Float(localIdx) / Float(fps)
+        evaluateTimeline?(masterTime)
+
+        // 3. Wait for render
+        let renderDelay: TimeInterval = 0.035
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + renderDelay) { [weak self] in
+            guard let self = self, !self.isCancelled else {
+                self?.finishCancelled(writer, outURL)
+                return
+            }
+
+            // 4. Capture
+            self.captureCurrentFrame(camItem: camItem) { [weak self] image in
+                guard let self = self, !self.isCancelled else { return }
+
+                // 5. Write on background
+                self.writeQueue.async { [weak self] in
+                    guard let self = self, !self.isCancelled else { return }
+
+                    let pb: CVPixelBuffer?
+                    if let img = image {
+                        pb = self.createPixelBuffer(from: img, size: size)
+                    } else {
+                        pb = self.createBlackPixelBuffer(size: size)
+                    }
+
+                    if let pb = pb {
+                        var waitCount = 0
+                        while !videoInput.isReadyForMoreMediaData {
+                            Thread.sleep(forTimeInterval: 0.005)
+                            waitCount += 1
+                            if waitCount > 200 { break }
+                        }
+                        let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
+                        adaptor.append(pb, withPresentationTime: pts)
+                    }
+
+                    // 6. Next frame
+                    DispatchQueue.main.async { [weak self] in
+                        self?.renderFrameTrampoline(
+                            localIdx: localIdx + 1, shot: shot, shotIdx: shotIdx,
+                            frameCount: frameCount, camItem: camItem,
+                            fps: fps, size: size, totalFrames: totalFrames,
+                            shots: shots, shotFrameCounts: shotFrameCounts,
+                            globalFrameIndex: currentGlobalIdx + 1,
+                            videoInput: videoInput, adaptor: adaptor,
+                            writer: writer, outURL: outURL,
+                            nextShot: nextShot
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Capture Strategy
+
+    /// Uses direct ARView.snapshot when possible (fast, no cloning).
+    /// Falls back to captureFrameAsync (which may clone the scene).
+    private func captureCurrentFrame(
+        camItem: CanvasViewController.SceneCameraItem?,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        // Prefer direct ARView snapshot — no scene cloning, much faster.
+        if let arView = arView {
+            arView.snapshot(saveToHDR: false) { image in
+                DispatchQueue.main.async { completion(image) }
+            }
+            return
+        }
+
+        // Fallback to the caller-provided capture closure.
+        if let capture = captureFrameAsync {
+            capture(camItem, completion)
+        } else {
+            completion(nil)
+        }
+    }
+
+    // MARK: - Finalization
+
+    private func finishWriting(_ writer: AVAssetWriter,
+                                _ input: AVAssetWriterInput,
+                                _ outURL: URL) {
+        input.markAsFinished()
+        writer.finishWriting { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if self.isCancelled {
+                    try? FileManager.default.removeItem(at: outURL)
+                    self.onComplete?(nil, nil)
+                } else if writer.status == .completed {
+                    print("✅ Export complete: \(outURL.lastPathComponent)")
+                    self.onComplete?(outURL, nil)
+                } else {
+                    print("❌ Export failed: \(writer.error?.localizedDescription ?? "unknown")")
+                    self.onComplete?(nil, writer.error)
+                }
+            }
+        }
+    }
+
+    private func finishCancelled(_ writer: AVAssetWriter, _ outURL: URL) {
+        writer.cancelWriting()
+        try? FileManager.default.removeItem(at: outURL)
+        DispatchQueue.main.async { self.onComplete?(nil, nil) }
+    }
+
+    // MARK: - Pixel Buffer Creation
 
     /// Optimized pixel buffer creation using BGRA (native Metal format).
     private func createPixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
@@ -311,6 +521,30 @@ final class VideoExportService {
         ) else { return nil }
 
         ctx.draw(cgImage, in: CGRect(origin: .zero, size: size))
+        return buf
+    }
+
+    /// Creates a black pixel buffer as fallback for failed captures.
+    private func createBlackPixelBuffer(size: CGSize) -> CVPixelBuffer? {
+        var pb: CVPixelBuffer?
+        let attrs: [String: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+        ]
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(size.width), Int(size.height),
+            kCVPixelFormatType_32BGRA,
+            attrs as CFDictionary,
+            &pb
+        )
+        guard status == kCVReturnSuccess, let buf = pb else { return nil }
+        CVPixelBufferLockBaseAddress(buf, [])
+        // Zero-fill = black
+        if let base = CVPixelBufferGetBaseAddress(buf) {
+            memset(base, 0, CVPixelBufferGetBytesPerRow(buf) * Int(size.height))
+        }
+        CVPixelBufferUnlockBaseAddress(buf, [])
         return buf
     }
 }

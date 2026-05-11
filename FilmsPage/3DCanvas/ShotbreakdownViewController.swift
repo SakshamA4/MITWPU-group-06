@@ -508,6 +508,7 @@ class ShotBreakdownViewController: UIViewController {
         service.evaluateTimeline = evaluateTimeline
         service.prepareForCapture = prepareForCapture
         service.captureFrameAsync = captureFrameAsync
+        service.arView = arView  // Direct snapshot — avoids expensive scene cloning
         service.cameraItemForShot = { [weak self] shot in
             self?.cameraItem(for: shot)
         }
