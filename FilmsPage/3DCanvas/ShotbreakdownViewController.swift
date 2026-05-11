@@ -303,6 +303,14 @@ class ShotBreakdownViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        // Cancel any in-progress export and restore ARView
+        if exportService != nil {
+            exportService?.cancel()
+            exportService = nil
+            progressOverlay?.dismiss()
+            progressOverlay = nil
+            restoreARView()
+        }
         // Drain any pending thumbnail work so callbacks don't fire after pop.
         thumbnailQueue.removeAll()
         isCapturingThumbnail = false
@@ -607,26 +615,68 @@ class ShotBreakdownViewController: UIViewController {
     }
 
     private func beginExportAll(settings: ExportSettings) {
-        // Enter playback mode to snapshot base transforms
-        enterPlaybackMode?()
+        print("🎬 [ExportAll] beginExportAll — \(shots.count) shots")
 
+        // ── 1. Fresh playback mode ──────────────────────────────────────
+        // Re-enter playback mode to ensure baseTransforms & baseFOVs are
+        // current. Thumbnail capture may have already exited playback mode.
+        exitPlaybackMode?()
+        enterPlaybackMode?()
+        print("🎬 [ExportAll] Playback mode entered — baseTransforms refreshed")
+
+        // ── 2. Reparent ARView into our view hierarchy ─────────────────
+        // RealityKit's ARView.snapshot() renders at the ARView's current
+        // pixel dimensions. The ARView MUST be full-sized for the GPU to
+        // produce a proper scene render. We place the container at the
+        // BACK of our view hierarchy (index 0) so the progress overlay
+        // covers it — the user never sees it, but the GPU can render.
+        let exportARContainer = UIView()
+        exportARContainer.tag = 9999  // Unique tag to find later
+        exportARContainer.frame = view.bounds
+        exportARContainer.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.insertSubview(exportARContainer, at: 0)  // Behind everything
+
+        if let arView = arView {
+            let previousSuperview = arView.superview
+            let previousFrame = arView.frame
+            let previousAutoMask = arView.autoresizingMask
+            let previousTranslatesFlag = arView.translatesAutoresizingMaskIntoConstraints
+
+            arView.removeFromSuperview()
+            exportARContainer.addSubview(arView)
+            arView.translatesAutoresizingMaskIntoConstraints = true
+            arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            arView.frame = exportARContainer.bounds
+            print("🎬 [ExportAll] ARView reparented — size: \(exportARContainer.bounds.size)")
+
+            // Store restoration info
+            self.arViewPreviousSuperview = previousSuperview
+            self.arViewPreviousFrame = previousFrame
+            self.arViewPreviousAutoMask = previousAutoMask
+            self.arViewPreviousTranslatesFlag = previousTranslatesFlag
+        } else {
+            print("⚠️ [ExportAll] No arView available — export may produce black frames")
+        }
+
+        // ── 3. Configure export service ────────────────────────────────
         let service = VideoExportService()
         self.exportService = service
 
         service.evaluateTimeline = evaluateTimeline
         service.prepareForCapture = prepareForCapture
         service.captureFrameAsync = captureFrameAsync
-        service.arView = arView  // Direct snapshot — avoids expensive scene cloning
+        service.arView = arView  // Direct snapshot — now in our hierarchy!
         service.cameraItemForShot = { [weak self] shot in
             self?.cameraItem(for: shot)
         }
 
-        // Show progress overlay
+        // ── 4. Show progress overlay ───────────────────────────────────
         let overlay = ExportProgressOverlay()
         self.progressOverlay = overlay
         overlay.onCancel = { [weak self] in
             self?.exportService?.cancel()
-            self?.progressOverlay?.dismiss {
+            self?.progressOverlay?.dismiss { [weak self] in
+                self?.restoreARView()
                 self?.exitPlaybackMode?()
                 self?.evaluateTimeline?(0)
             }
@@ -637,17 +687,22 @@ class ShotBreakdownViewController: UIViewController {
             self?.progressOverlay?.update(with: progress)
         }
 
+        // ── 5. Completion handler ──────────────────────────────────────
         service.onComplete = { [weak self] url, error in
             guard let self = self else { return }
             self.progressOverlay?.dismiss()
             self.progressOverlay = nil
             self.exportService = nil
 
+            // Restore ARView to its original parent (CanvasVC)
+            self.restoreARView()
+
             // Exit playback mode and reset timeline
             self.exitPlaybackMode?()
             self.evaluateTimeline?(0)
 
             if let url = url {
+                print("🎬 [ExportAll] Export succeeded — presenting share sheet")
                 let haptic = UINotificationFeedbackGenerator()
                 haptic.notificationOccurred(.success)
                 let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -657,15 +712,46 @@ class ShotBreakdownViewController: UIViewController {
                 }
                 self.present(vc, animated: true)
             } else if let error = error {
+                print("❌ [ExportAll] Export failed: \(error.localizedDescription)")
                 let alert = UIAlertController(title: "Export Failed",
                                               message: error.localizedDescription,
                                               preferredStyle: .alert)
                 alert.addAction(.init(title: "OK", style: .default))
                 self.present(alert, animated: true)
+            } else {
+                print("🚫 [ExportAll] Export cancelled")
             }
         }
 
+        // ── 6. Start export ────────────────────────────────────────────
         service.exportAllShots(shots, settings: settings)
+    }
+
+    // MARK: - ARView Restoration (after Export All)
+
+    /// Stored state for restoring the ARView to its original parent after export.
+    private var arViewPreviousSuperview: UIView?
+    private var arViewPreviousFrame: CGRect = .zero
+    private var arViewPreviousAutoMask: UIView.AutoresizingMask = []
+    private var arViewPreviousTranslatesFlag: Bool = true
+
+    /// Restores the ARView back to the CanvasViewController's view hierarchy.
+    private func restoreARView() {
+        // Remove the temporary export container
+        view.viewWithTag(9999)?.removeFromSuperview()
+
+        guard let arView = arView else { return }
+
+        if let previousSuperview = arViewPreviousSuperview {
+            arView.removeFromSuperview()
+            previousSuperview.insertSubview(arView, at: 0)
+            arView.translatesAutoresizingMaskIntoConstraints = arViewPreviousTranslatesFlag
+            arView.autoresizingMask = arViewPreviousAutoMask
+            arView.frame = previousSuperview.bounds
+            print("🎬 [ExportAll] ARView restored to CanvasVC")
+        }
+
+        arViewPreviousSuperview = nil
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {

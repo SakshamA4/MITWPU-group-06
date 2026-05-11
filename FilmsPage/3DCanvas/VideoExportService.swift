@@ -80,6 +80,20 @@ struct ExportProgress {
     let totalFrames: Int
     let overallProgress: Float   // 0.0 – 1.0
     let shotName: String
+    /// Optional status message (e.g. "Switching camera...")
+    let statusMessage: String?
+
+    init(currentShotIndex: Int, totalShots: Int, currentFrame: Int,
+         totalFrames: Int, overallProgress: Float, shotName: String,
+         statusMessage: String? = nil) {
+        self.currentShotIndex = currentShotIndex
+        self.totalShots = totalShots
+        self.currentFrame = currentFrame
+        self.totalFrames = totalFrames
+        self.overallProgress = overallProgress
+        self.shotName = shotName
+        self.statusMessage = statusMessage
+    }
 }
 
 // MARK: - VideoExportService
@@ -120,11 +134,19 @@ final class VideoExportService {
     private let writeQueue = DispatchQueue(label: "com.filmspage.videoexport.write",
                                             qos: .userInitiated)
 
+    /// Settle time after switching cameras between shots (allows RealityKit to
+    /// composite the new camera view). 200ms ≈ 6 render frames @ 30fps.
+    private let cameraSettleDelay: TimeInterval = 0.200
+
+    /// Per-frame render settle delay (2 render frames ≈ 35ms).
+    private let frameRenderDelay: TimeInterval = 0.035
+
     // MARK: - Public API
 
     func cancel() {
         isCancelled = true
         writer?.cancelWriting()
+        print("🚫 Export cancelled by user")
     }
 
     /// Export a single shot to MP4.
@@ -156,6 +178,7 @@ final class VideoExportService {
 
         // AVAssetWriter setup
         guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: .mp4) else {
+            print("❌ [Export] Could not create AVAssetWriter at \(outURL.path)")
             DispatchQueue.main.async { self.onComplete?(nil, NSError(domain: "Export", code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Could not create video writer."])) }
             return
@@ -197,7 +220,9 @@ final class VideoExportService {
         writer.startWriting()
         writer.startSession(atSourceTime: .zero)
 
-        print("🎬 Export started: \(shots.count) shots, \(totalFrames) frames, \(settings.resolution.rawValue) @ \(settings.fps.rawValue)fps")
+        print("🎬 [Export] Started: \(shots.count) shot(s), \(totalFrames) frames, \(settings.resolution.rawValue) @ \(settings.fps.rawValue)fps")
+        print("🎬 [Export] Output: \(outURL.lastPathComponent)")
+        print("🎬 [Export] Writer status: \(writer.status.rawValue)")
 
         // ── Sequential frame render ──────────────────────────────────────────
         //
@@ -212,143 +237,94 @@ final class VideoExportService {
         //  • Race conditions between evaluate and capture
 
         var globalFrameIndex = 0
-        var lastCamItem: CanvasViewController.SceneCameraItem?
 
+        // ── renderShot: called once per shot ──
         func renderShot(shotIdx: Int) {
             guard !self.isCancelled else { self.finishCancelled(writer, outURL); return }
             guard shotIdx < shots.count else {
+                // All shots rendered — finalize
+                print("🎬 [Export] All \(shots.count) shot(s) rendered. Finalizing...")
                 self.finishWriting(writer, videoInput, outURL)
+                return
+            }
+
+            // Check writer health before proceeding to next shot
+            guard writer.status == .writing else {
+                print("❌ [Export] Writer not in writing state (\(writer.status.rawValue)) before shot \(shotIdx). Error: \(writer.error?.localizedDescription ?? "none")")
+                self.failExport(writer, outURL, error: writer.error)
                 return
             }
 
             let shot       = shots[shotIdx]
             let frameCount = shotFrameCounts[shotIdx]
             let camItem    = self.cameraItemForShot?(shot)
-            lastCamItem    = camItem
 
-            // Set camera once per shot (not per frame)
+            print("🎬 [Export] ── Shot \(shotIdx + 1)/\(shots.count): \"\(shot.displayName)\" ──")
+            print("   Camera: \(shot.cameraName), Duration: \(shot.duration)s, Frames: \(frameCount)")
+            print("   StartTime: \(shot.startTime)s, GlobalFrameOffset: \(globalFrameIndex)")
+
+            // Report "switching camera" progress for multi-shot exports
+            if shots.count > 1 {
+                let progress = ExportProgress(
+                    currentShotIndex: shotIdx,
+                    totalShots: shots.count,
+                    currentFrame: globalFrameIndex,
+                    totalFrames: totalFrames,
+                    overallProgress: Float(globalFrameIndex) / Float(max(1, totalFrames)),
+                    shotName: shot.displayName,
+                    statusMessage: "Setting up camera…"
+                )
+                self.onProgress?(progress)
+            }
+
+            // Set camera for this shot
             self.prepareForCapture?(camItem)
 
-            renderFrame(localIdx: 0, shot: shot, shotIdx: shotIdx,
-                        frameCount: frameCount, camItem: camItem,
-                        fps: fps, size: size, totalFrames: totalFrames,
-                        shots: shots, shotFrameCounts: shotFrameCounts,
-                        globalFrameIndex: &globalFrameIndex,
-                        videoInput: videoInput, adaptor: adaptor,
-                        writer: writer, outURL: outURL,
-                        nextShot: { renderShot(shotIdx: shotIdx + 1) })
+            // Evaluate timeline at shot start so the scene is positioned correctly
+            // before we start capturing frames
+            self.evaluateTimeline?(shot.startTime)
+
+            // Settle delay: for multi-shot exports, give RealityKit time to
+            // composite the new camera view after switching. For single-shot,
+            // skip the extra delay since the camera was already active.
+            let needsSettle = shots.count > 1 && shotIdx > 0
+            let settleTime = needsSettle ? self.cameraSettleDelay : 0.0
+
+            print("   Settle delay: \(Int(settleTime * 1000))ms")
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + settleTime) { [weak self] in
+                guard let self = self, !self.isCancelled else {
+                    self?.finishCancelled(writer, outURL)
+                    return
+                }
+
+                self.renderFrameLoop(
+                    localIdx: 0, shot: shot, shotIdx: shotIdx,
+                    frameCount: frameCount, camItem: camItem,
+                    fps: fps, size: size, totalFrames: totalFrames,
+                    shots: shots, shotFrameCounts: shotFrameCounts,
+                    globalFrameIndex: globalFrameIndex,
+                    videoInput: videoInput, adaptor: adaptor,
+                    writer: writer, outURL: outURL,
+                    nextShot: { nextGlobalIdx in
+                        globalFrameIndex = nextGlobalIdx
+                        renderShot(shotIdx: shotIdx + 1)
+                    }
+                )
+            }
         }
 
         // Kick off on main thread
         DispatchQueue.main.async { renderShot(shotIdx: 0) }
     }
 
-    // MARK: - Per-Frame Render (runs on main thread)
+    // MARK: - Per-Frame Render Loop (runs on main thread)
+    //
+    // Unified render loop that avoids the original renderFrame/renderFrameTrampoline
+    // duplication. Uses a value-type globalFrameIndex (not inout) to avoid escaping
+    // closure issues.
 
-    private func renderFrame(
-        localIdx: Int, shot: Shot, shotIdx: Int,
-        frameCount: Int, camItem: CanvasViewController.SceneCameraItem?,
-        fps: Int32, size: CGSize, totalFrames: Int,
-        shots: [Shot], shotFrameCounts: [Int],
-        globalFrameIndex: inout Int,
-        videoInput: AVAssetWriterInput,
-        adaptor: AVAssetWriterInputPixelBufferAdaptor,
-        writer: AVAssetWriter, outURL: URL,
-        nextShot: @escaping () -> Void
-    ) {
-        guard !isCancelled else { finishCancelled(writer, outURL); return }
-        guard localIdx < frameCount else { nextShot(); return }
-
-        // Capture the current global index by value (avoid inout in escaping closure)
-        let currentGlobalIdx = globalFrameIndex
-        globalFrameIndex += 1
-
-        // 1. Report progress
-        let progress = ExportProgress(
-            currentShotIndex: shotIdx,
-            totalShots: shots.count,
-            currentFrame: currentGlobalIdx + 1,
-            totalFrames: totalFrames,
-            overallProgress: Float(currentGlobalIdx) / Float(max(1, totalFrames)),
-            shotName: shot.displayName
-        )
-        onProgress?(progress)
-
-        // 2. Evaluate timeline (synchronous on main thread)
-        let masterTime = shot.startTime + Float(localIdx) / Float(fps)
-        evaluateTimeline?(masterTime)
-
-        // 3. Wait 2 render frames (~33ms) for RealityKit to fully commit the scene.
-        //    This is the key optimization — we do NOT block; we yield to the run loop.
-        let renderDelay: TimeInterval = 0.035
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + renderDelay) { [weak self] in
-            guard let self = self, !self.isCancelled else {
-                self?.finishCancelled(writer, outURL)
-                return
-            }
-
-            // 4. Capture frame using direct ARView snapshot (avoids scene cloning!)
-            self.captureCurrentFrame(camItem: camItem) { [weak self] image in
-                guard let self = self, !self.isCancelled else { return }
-
-                // 5. Pixel buffer creation + write on background queue
-                //    This frees the main thread immediately for the next frame.
-                self.writeQueue.async { [weak self] in
-                    guard let self = self, !self.isCancelled else { return }
-
-                    if let img = image {
-                        if let pb = self.createPixelBuffer(from: img, size: size) {
-                            // Wait for writer to be ready (background queue — safe to block here)
-                            var waitCount = 0
-                            while !videoInput.isReadyForMoreMediaData {
-                                Thread.sleep(forTimeInterval: 0.005)
-                                waitCount += 1
-                                if waitCount > 200 { break }  // 1s timeout
-                            }
-                            let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
-                            adaptor.append(pb, withPresentationTime: pts)
-                        }
-                    } else {
-                        // Frame capture failed — append a black frame to maintain timing
-                        if let pb = self.createBlackPixelBuffer(size: size) {
-                            var waitCount = 0
-                            while !videoInput.isReadyForMoreMediaData {
-                                Thread.sleep(forTimeInterval: 0.005)
-                                waitCount += 1
-                                if waitCount > 200 { break }
-                            }
-                            let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
-                            adaptor.append(pb, withPresentationTime: pts)
-                        }
-                    }
-
-                    // 6. Schedule next frame back on main thread
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self = self else { return }
-                        // Use a local mutable copy for the recursive call
-                        var nextGlobalIdx = currentGlobalIdx + 1
-                        // We already incremented before entering the closure,
-                        // so just pass the next local index
-                        self.renderFrameTrampoline(
-                            localIdx: localIdx + 1, shot: shot, shotIdx: shotIdx,
-                            frameCount: frameCount, camItem: camItem,
-                            fps: fps, size: size, totalFrames: totalFrames,
-                            shots: shots, shotFrameCounts: shotFrameCounts,
-                            globalFrameIndex: nextGlobalIdx,
-                            videoInput: videoInput, adaptor: adaptor,
-                            writer: writer, outURL: outURL,
-                            nextShot: nextShot
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    /// Trampoline to avoid `inout` in escaping closures.
-    /// Takes globalFrameIndex by value and manages it internally.
-    private func renderFrameTrampoline(
+    private func renderFrameLoop(
         localIdx: Int, shot: Shot, shotIdx: Int,
         frameCount: Int, camItem: CanvasViewController.SceneCameraItem?,
         fps: Int32, size: CGSize, totalFrames: Int,
@@ -357,10 +333,24 @@ final class VideoExportService {
         videoInput: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         writer: AVAssetWriter, outURL: URL,
-        nextShot: @escaping () -> Void
+        nextShot: @escaping (Int) -> Void
     ) {
+        // ── Guard: cancellation ──
         guard !isCancelled else { finishCancelled(writer, outURL); return }
-        guard localIdx < frameCount else { nextShot(); return }
+
+        // ── Guard: shot complete → advance to next shot ──
+        guard localIdx < frameCount else {
+            print("   ✅ Shot \(shotIdx + 1) complete. globalFrame=\(globalFrameIndex)")
+            nextShot(globalFrameIndex)
+            return
+        }
+
+        // ── Guard: writer health ──
+        guard writer.status == .writing else {
+            print("❌ [Export] Writer failed at shot \(shotIdx + 1), frame \(localIdx). Status=\(writer.status.rawValue), Error: \(writer.error?.localizedDescription ?? "none")")
+            failExport(writer, outURL, error: writer.error)
+            return
+        }
 
         let currentGlobalIdx = globalFrameIndex
 
@@ -375,48 +365,78 @@ final class VideoExportService {
         )
         onProgress?(progress)
 
-        // 2. Evaluate timeline
+        // 2. Evaluate timeline at this frame's master time (synchronous on main thread)
         let masterTime = shot.startTime + Float(localIdx) / Float(fps)
         evaluateTimeline?(masterTime)
 
-        // 3. Wait for render
-        let renderDelay: TimeInterval = 0.035
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + renderDelay) { [weak self] in
+        // 3. Wait for RealityKit to commit the scene (2 render frames ≈ 35ms).
+        //    We yield to the run loop instead of blocking the main thread.
+        DispatchQueue.main.asyncAfter(deadline: .now() + frameRenderDelay) { [weak self] in
             guard let self = self, !self.isCancelled else {
                 self?.finishCancelled(writer, outURL)
                 return
             }
 
-            // 4. Capture
+            // 4. Capture frame using direct ARView snapshot (avoids scene cloning)
             self.captureCurrentFrame(camItem: camItem) { [weak self] image in
                 guard let self = self, !self.isCancelled else { return }
 
-                // 5. Write on background
+                // 5. Pixel buffer creation + write on background queue.
+                //    This frees the main thread immediately for the next frame.
                 self.writeQueue.async { [weak self] in
                     guard let self = self, !self.isCancelled else { return }
 
-                    let pb: CVPixelBuffer?
-                    if let img = image {
-                        pb = self.createPixelBuffer(from: img, size: size)
-                    } else {
-                        pb = self.createBlackPixelBuffer(size: size)
-                    }
-
-                    if let pb = pb {
-                        var waitCount = 0
-                        while !videoInput.isReadyForMoreMediaData {
-                            Thread.sleep(forTimeInterval: 0.005)
-                            waitCount += 1
-                            if waitCount > 200 { break }
+                    // Check writer status before attempting append
+                    guard writer.status == .writing else {
+                        print("❌ [Export] Writer not writing at frame \(currentGlobalIdx). Status=\(writer.status.rawValue)")
+                        DispatchQueue.main.async {
+                            self.failExport(writer, outURL, error: writer.error)
                         }
-                        let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
-                        adaptor.append(pb, withPresentationTime: pts)
+                        return
                     }
 
-                    // 6. Next frame
+                    // Use autorelease pool to prevent memory buildup during long exports
+                    autoreleasepool {
+                        let pb: CVPixelBuffer?
+                        if let img = image {
+                            pb = self.createPixelBuffer(from: img, size: size)
+                        } else {
+                            // Frame capture failed — append a black frame to maintain timing
+                            print("⚠️ [Export] Nil frame at globalIdx=\(currentGlobalIdx), using black fallback")
+                            pb = self.createBlackPixelBuffer(size: size)
+                        }
+
+                        if let pb = pb {
+                            // Wait for writer input to be ready (background queue — safe to block)
+                            var waitCount = 0
+                            while !videoInput.isReadyForMoreMediaData {
+                                Thread.sleep(forTimeInterval: 0.005)
+                                waitCount += 1
+                                if waitCount > 200 {
+                                    print("⚠️ [Export] Writer input stalled for 1s at frame \(currentGlobalIdx)")
+                                    break
+                                }
+                            }
+
+                            let pts = CMTime(value: CMTimeValue(currentGlobalIdx), timescale: fps)
+                            let success = adaptor.append(pb, withPresentationTime: pts)
+
+                            if !success {
+                                print("❌ [Export] Failed to append frame \(currentGlobalIdx) at pts=\(pts.seconds)s. Writer status=\(writer.status.rawValue), Error: \(writer.error?.localizedDescription ?? "none")")
+                            }
+
+                            // Log every 30th frame to avoid spam, but always log first/last
+                            if currentGlobalIdx == 0 || currentGlobalIdx % 30 == 0 || localIdx == frameCount - 1 {
+                                print("📝 [Export] Frame \(currentGlobalIdx)/\(totalFrames) | shot \(shotIdx + 1) localFrame \(localIdx)/\(frameCount) | pts=\(String(format: "%.3f", pts.seconds))s | ok=\(success)")
+                            }
+                        } else {
+                            print("❌ [Export] Could not create pixel buffer at frame \(currentGlobalIdx)")
+                        }
+                    }
+
+                    // 6. Schedule next frame back on main thread
                     DispatchQueue.main.async { [weak self] in
-                        self?.renderFrameTrampoline(
+                        self?.renderFrameLoop(
                             localIdx: localIdx + 1, shot: shot, shotIdx: shotIdx,
                             frameCount: frameCount, camItem: camItem,
                             fps: fps, size: size, totalFrames: totalFrames,
@@ -452,6 +472,7 @@ final class VideoExportService {
         if let capture = captureFrameAsync {
             capture(camItem, completion)
         } else {
+            print("⚠️ [Export] No arView and no captureFrameAsync — returning nil frame")
             completion(nil)
         }
     }
@@ -461,18 +482,22 @@ final class VideoExportService {
     private func finishWriting(_ writer: AVAssetWriter,
                                 _ input: AVAssetWriterInput,
                                 _ outURL: URL) {
+        print("🎬 [Export] Finalizing writer... status=\(writer.status.rawValue)")
         input.markAsFinished()
         writer.finishWriting { [weak self] in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 if self.isCancelled {
+                    print("🚫 [Export] Cancelled — cleaning up temp file")
                     try? FileManager.default.removeItem(at: outURL)
                     self.onComplete?(nil, nil)
                 } else if writer.status == .completed {
-                    print("✅ Export complete: \(outURL.lastPathComponent)")
+                    // Verify file exists and has content
+                    let fileSize = (try? FileManager.default.attributesOfItem(atPath: outURL.path)[.size] as? Int) ?? 0
+                    print("✅ [Export] Complete: \(outURL.lastPathComponent) (\(fileSize) bytes)")
                     self.onComplete?(outURL, nil)
                 } else {
-                    print("❌ Export failed: \(writer.error?.localizedDescription ?? "unknown")")
+                    print("❌ [Export] Failed: \(writer.error?.localizedDescription ?? "unknown")")
                     self.onComplete?(nil, writer.error)
                 }
             }
@@ -480,9 +505,23 @@ final class VideoExportService {
     }
 
     private func finishCancelled(_ writer: AVAssetWriter, _ outURL: URL) {
+        print("🚫 [Export] Finishing cancelled export — cleaning up")
         writer.cancelWriting()
         try? FileManager.default.removeItem(at: outURL)
         DispatchQueue.main.async { self.onComplete?(nil, nil) }
+    }
+
+    /// Called when the writer enters a failed state mid-export.
+    private func failExport(_ writer: AVAssetWriter, _ outURL: URL, error: Error?) {
+        guard !isCancelled else { return }  // Don't double-report
+        isCancelled = true  // Prevent further frame processing
+        print("❌ [Export] Writer failed — aborting. Error: \(error?.localizedDescription ?? "unknown")")
+        writer.cancelWriting()
+        try? FileManager.default.removeItem(at: outURL)
+        DispatchQueue.main.async {
+            self.onComplete?(nil, error ?? NSError(domain: "Export", code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "Video writer failed during export."]))
+        }
     }
 
     // MARK: - Pixel Buffer Creation

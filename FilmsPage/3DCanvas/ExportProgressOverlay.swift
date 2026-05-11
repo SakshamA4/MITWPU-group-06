@@ -202,7 +202,10 @@ final class ExportProgressOverlay: UIView {
         progressBar.setProgress(progress.overallProgress, animated: true)
         percentLabel.text = "\(Int(progress.overallProgress * 100))%"
 
-        if progress.totalShots > 1 {
+        // Show status message (e.g. "Setting up camera…") or rendering info
+        if let status = progress.statusMessage {
+            shotLabel.text = "\(progress.shotName) — \(status)"
+        } else if progress.totalShots > 1 {
             shotLabel.text = "Rendering \(progress.shotName) (\(progress.currentShotIndex + 1) of \(progress.totalShots))"
         } else {
             shotLabel.text = "Rendering \(progress.shotName)…"
