@@ -582,14 +582,13 @@ extension CanvasViewController {
 
             // Move beam slightly to the LEFT from the panel's perspective
             // Increase this value if you want more left shift
-            let leftCorrection: Float = 500.0
+            let leftCorrection: Float = 0.0
             
             let forwardDistance: Float = 500.0
-            // Aim forward (-Z) and slightly left (-X)
             let target = SIMD3<Float>(
-                b.center.x - leftCorrection,   // LEFT
-                aimDownY,                  // Slight downward tilt
-                b.min.z - forwardDistance             // Forward in front of panel
+                b.center.x,          // no left/right offset
+                aimDownY,
+                b.min.z - forwardDistance
             )
             
             
