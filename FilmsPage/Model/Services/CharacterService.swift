@@ -105,7 +105,7 @@ final class CharacterService {
                 name: "Man",
                 imageName: "man1_img",
                 pose: [
-                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "man1_img", modelFilename: "LewisR"),
+                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "man1_img", modelFilename: "SceneLew"),
                     CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Man1LyingIdle_img", modelFilename: "Man1LyingIdle"),
                     CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Man1SittingIdle_img", modelFilename: "Man1SittingIdle"),
                     CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Man1OnCall_img", modelFilename: "Man1OnCall")
