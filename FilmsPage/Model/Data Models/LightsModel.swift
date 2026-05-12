@@ -183,7 +183,7 @@ struct LightsDataStore {
 
         LightItem(
             name: "Practical Lantern",
-            imageName: "PracticalLantern_img",
+            imageName: "practical lantern",
             description: "Round paper lantern practical — soft omnidirectional warm glow.",
             modelFileName: nil,
             lightKind: .point,
@@ -201,7 +201,7 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Fluorescent Tube",
-            imageName: "FluorescentTube_img",
+            imageName: "Fluorescent tube",
             description: "Long horizontal strip light — soft cool linear wash.",
             modelFileName: nil,
             lightKind: .panel,
@@ -219,7 +219,7 @@ struct LightsDataStore {
         ),
         LightItem(
             name: "Sky Panel",
-            imageName: "SkyPanel_img",
+            imageName: "sky panel",
             description: "Large flat rectangular soft panel — powerful wide soft wash.",
             modelFileName: nil,
             lightKind: .panel,
