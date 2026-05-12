@@ -491,7 +491,7 @@ extension CanvasViewController {
         overlay.tag = AspectRatioConstants.letterboxTag
         overlay.isUserInteractionEnabled = false
         overlay.frame = arView.bounds
-        view.addSubview(overlay)
+        view.insertSubview(overlay, aboveSubview: arView)
 
         if targetRatio < viewRatio {
             // Pillarbox: target is narrower — add dark bars on left and right
