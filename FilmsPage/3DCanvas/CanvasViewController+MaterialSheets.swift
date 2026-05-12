@@ -39,6 +39,8 @@ extension CanvasViewController {
         let wallView = WallCreationView(viewModel: viewModel)
         let hostingController = UIHostingController(rootView: wallView)
         hostingController.modalPresentationStyle = .pageSheet
+        hostingController.overrideUserInterfaceStyle = .dark
+        hostingController.view.backgroundColor = .clear
 
         if let sheet = hostingController.sheetPresentationController {
             sheet.detents = [.large()]
@@ -74,6 +76,8 @@ extension CanvasViewController {
         let groundView = GroundCreationView(viewModel: viewModel)
         let hostingController = UIHostingController(rootView: groundView)
         hostingController.modalPresentationStyle = .pageSheet
+        hostingController.overrideUserInterfaceStyle = .dark
+        hostingController.view.backgroundColor = .clear
 
         if let sheet = hostingController.sheetPresentationController {
             sheet.detents = [.large()]
@@ -101,6 +105,8 @@ extension CanvasViewController {
         )
         let hostingController = UIHostingController(rootView: editorView)
         hostingController.modalPresentationStyle = .pageSheet
+        hostingController.overrideUserInterfaceStyle = .dark
+        hostingController.view.backgroundColor = .clear
 
         if let sheet = hostingController.sheetPresentationController {
             sheet.detents = [.medium(), .large()]

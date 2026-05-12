@@ -33,40 +33,26 @@ struct TextureThumbnailView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 72, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: ModalStyle.tileCornerRadius, style: .continuous))
                     } else {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color(white: 0.2))
+                        RoundedRectangle(cornerRadius: ModalStyle.tileCornerRadius, style: .continuous)
+                            .fill(Color(white: 0.15))
                             .frame(width: 72, height: 72)
-                            .overlay(
-                                Image(systemName: preset.icon)
-                                    .font(.title2)
-                                    .foregroundColor(.gray)
-                            )
                     }
 
                     // Selection ring
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2.5
-                            )
-                            .frame(width: 78, height: 78)
+                        RoundedRectangle(cornerRadius: ModalStyle.tileCornerRadius + 2, style: .continuous)
+                            .strokeBorder(Color.blue, lineWidth: 2)
+                            .frame(width: 76, height: 76)
                     }
                 }
-                .shadow(color: isSelected ? .blue.opacity(0.3) : .clear, radius: 6, y: 2)
                 .scaleEffect(isSelected ? 1.05 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
 
                 Text(preset.name)
-                    .font(.caption2)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                    .foregroundColor(isSelected ? .blue : .secondary)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(isSelected ? .primary : .secondary)
                     .lineLimit(1)
             }
         }

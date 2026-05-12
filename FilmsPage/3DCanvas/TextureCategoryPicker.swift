@@ -62,22 +62,16 @@ private struct CategoryChip: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 5) {
-                Image(systemName: category.icon)
-                    .font(.caption)
                 Text(category.rawValue)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.system(size: 13, weight: .semibold))
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .frame(height: 36)
             .background(
-                Capsule()
-                    .fill(isSelected
-                        ? AnyShapeStyle(LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing))
-                        : AnyShapeStyle(Color(UIColor.systemGray5))
-                    )
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? ModalStyle.buttonSelectedBackground : ModalStyle.buttonUnselectedBackground)
             )
-            .foregroundColor(isSelected ? .white : .secondary)
+            .foregroundColor(isSelected ? ModalStyle.buttonSelectedTextColor : ModalStyle.buttonUnselectedTextColor)
         }
         .buttonStyle(.plain)
         .scaleEffect(isSelected ? 1.03 : 1.0)

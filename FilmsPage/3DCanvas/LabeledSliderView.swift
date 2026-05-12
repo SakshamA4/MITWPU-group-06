@@ -17,18 +17,19 @@ struct LabeledSliderView: View {
         VStack(spacing: 4) {
             HStack {
                 Text(label)
-                    .font(.subheadline)
-                    .fontWeight(.regular)
-                    .foregroundColor(.secondary)
+                    .font(ModalStyle.controlLabelFont)
+                    .foregroundColor(Color(UIColor.secondaryLabel))
                 Spacer()
                 Text(unit.isEmpty ? String(format: "%.2f", value) : String(format: "%.2f%@", value, unit))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color(UIColor.secondaryLabel))
+                    .font(ModalStyle.controlValueFont)
+                    .foregroundColor(Color(UIColor.label))
                     .monospacedDigit()
             }
             Slider(value: $value, in: range)
-                .tint(.blue)
+                .tint(ModalStyle.sliderFilledColor)
+        }
+        .onAppear {
+            UISlider.appearance().maximumTrackTintColor = ModalStyle.sliderEmptyColor
         }
     }
 }

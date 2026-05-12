@@ -30,7 +30,7 @@ struct GroundCreationView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor.systemGroupedBackground)
+                ModalStyle.background
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -63,25 +63,24 @@ struct GroundCreationView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: { viewModel.cancel() }) {
                         Text("Cancel")
-                            .font(.body)
-                            .fontWeight(.medium)
-                            .foregroundColor(Color(UIColor.label))
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundColor(Color(UIColor.secondaryLabel))
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: { viewModel.confirm() }) {
                         Text("Create")
-                            .font(.body)
-                            .fontWeight(.medium)
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background(Color.blue)
-                            .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                 }
             }
         }
+        .preferredColorScheme(.dark)
         .navigationViewStyle(.stack)
     }
 
@@ -104,11 +103,10 @@ struct GroundCreationView: View {
         VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
             sectionHeader("Size", showSeparator: false)
 
-            VStack(spacing: Layout.interSliderSpacing) {
+            VStack(spacing: ModalStyle.interSliderSpacing) {
                 LabeledSliderView(label: "Ground Size", value: $viewModel.size,
                           range: 1...20, unit: "m")
             }
-            .sectionCard()
         }
         .padding(.horizontal, Layout.horizontalInset)
     }
@@ -135,7 +133,6 @@ struct GroundCreationView: View {
                     tint: viewModel.tintColor
                 )
             }
-            .sectionCard()
         }
         .padding(.horizontal, Layout.horizontalInset)
     }
@@ -156,7 +153,6 @@ struct GroundCreationView: View {
                 LabeledSliderView(label: "Reflection", value: $viewModel.reflectionIntensity,
                           range: 0...1, unit: "")
             }
-            .sectionCard()
         }
         .padding(.horizontal, Layout.horizontalInset)
     }
@@ -169,7 +165,6 @@ struct GroundCreationView: View {
 
             ColorPicker("Surface Tint", selection: $viewModel.tintColor, supportsOpacity: false)
                 .padding(.horizontal, 4)
-                .sectionCard()
         }
         .padding(.horizontal, Layout.horizontalInset)
     }
@@ -177,17 +172,12 @@ struct GroundCreationView: View {
     // MARK: - Helpers
 
     private func sectionHeader(_ title: String, showSeparator: Bool) -> some View {
-        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
-            if showSeparator {
-                Rectangle()
-                    .fill(Color(UIColor.separator))
-                    .frame(height: Layout.separatorHeight)
-                    .padding(.top, Layout.separatorTopSpacing)
-            }
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(ModalStyle.sectionLabelFont)
+                .kerning(ModalStyle.sectionLabelKerning)
+                .foregroundColor(ModalStyle.sectionLabelColor)
+                .padding(.top, ModalStyle.sectionSpacingTop)
         }
     }
 }

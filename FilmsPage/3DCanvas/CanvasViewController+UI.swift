@@ -872,9 +872,9 @@ extension CanvasViewController {
         picker.supportsAlpha = false
         
         // Set initial color from the entity
-        if let wallComp = entity.components[WallComponent.self] {
+        if let wallComp = entity.components[CanvasViewController.WallComponent.self] {
             picker.selectedColor = wallComp.uiColor
-        } else if let groundComp = entity.components[GroundComponent.self] {
+        } else if let groundComp = entity.components[CanvasViewController.GroundComponent.self] {
             picker.selectedColor = groundComp.uiColor
         }
         
