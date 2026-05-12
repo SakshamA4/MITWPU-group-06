@@ -608,7 +608,7 @@ extension CanvasViewController {
             // Pill position — floating above the bottom of the viewport
             pill.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             pill.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            pill.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            pill.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -56),
             pill.heightAnchor.constraint(equalToConstant: 44),
 
             // Blur fills the pill
