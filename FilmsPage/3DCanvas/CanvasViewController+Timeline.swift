@@ -193,8 +193,11 @@ extension CanvasViewController {
             playbackState = .playing
             
             playButton.isHidden = true
-            pauseButton.isHidden = false
-            stopButton.isHidden = false
+            pauseButton.isHidden = true
+            stopButton.isHidden = true
+            // Show pause inside pill, hide play
+            (view.viewWithTag(9503) as? UIButton)?.isHidden = false
+            (view.viewWithTag(9505) as? UIButton)?.isHidden = true
             
             return
         }
@@ -206,16 +209,28 @@ extension CanvasViewController {
         
         enterTimelineMode()
         
-        // Show timeline UI
-        timelineContainer.isHidden = false
+        // Show floating scrubber pill instead of the old timelineContainer
+        timelineContainer.isHidden = true
+        view.viewWithTag(9500)?.isHidden = false
         playButton.isHidden = true
-        pauseButton.isHidden = false
-        stopButton.isHidden = false
+        pauseButton.isHidden = true
+        stopButton.isHidden = true
+        // Show pause in pill, hide play-in-pill
+        (view.viewWithTag(9503) as? UIButton)?.isHidden = false
+        (view.viewWithTag(9505) as? UIButton)?.isHidden = true
         
         // Setup scrubber
         scrubber.minimumValue = 0
         scrubber.maximumValue = timeline.duration
         scrubber.value = 0
+        // Update floating pill time labels
+        if let elapsedLbl = view.viewWithTag(9501) as? UILabel {
+            elapsedLbl.text = "00:00"
+        }
+        if let remainLbl = view.viewWithTag(9502) as? UILabel {
+            let d = timeline.duration
+            remainLbl.text = String(format: "%02d:%02d", Int(d) / 60, Int(d) % 60)
+        }
         
         // Reset timeline time
         currentTimelineTime = 0
@@ -235,7 +250,10 @@ extension CanvasViewController {
         stopAllWalkCycles()
         
         pauseButton.isHidden = true
-        playButton.isHidden = false
+        playButton.isHidden = true
+        // Inside pill: show play, hide pause
+        (view.viewWithTag(9503) as? UIButton)?.isHidden = true
+        (view.viewWithTag(9505) as? UIButton)?.isHidden = false
         
     }
 
@@ -268,6 +286,15 @@ extension CanvasViewController {
         }
         
         scrubber.value = currentTimelineTime
+        // Update floating pill time labels
+        if let elapsedLbl = view.viewWithTag(9501) as? UILabel {
+            let t = currentTimelineTime
+            elapsedLbl.text = String(format: "%02d:%02d", Int(t) / 60, Int(t) % 60)
+        }
+        if let remainLbl = view.viewWithTag(9502) as? UILabel {
+            let r = max(0, timeline.duration - currentTimelineTime)
+            remainLbl.text = String(format: "%02d:%02d", Int(r) / 60, Int(r) % 60)
+        }
         evaluateTimeline(at: currentTimelineTime)
     }
 
@@ -286,9 +313,14 @@ extension CanvasViewController {
         exitTimelineMode()
         
         timelineContainer.isHidden = true
+        view.viewWithTag(9500)?.isHidden = true
         playButton.isHidden = false
         stopButton.isHidden = true
         pauseButton.isHidden = true
+        
+        // Reset pill buttons
+        (view.viewWithTag(9503) as? UIButton)?.isHidden = false
+        (view.viewWithTag(9505) as? UIButton)?.isHidden = true
         
         // Re-evaluate timeline at t = 0 so objects
         // snap back to their initial transforms
@@ -477,39 +509,161 @@ extension CanvasViewController {
 
     
     func setupScrubber() {
-        
+        // ── Floating pill container ──────────────────────────────────────
+        let pill = UIView()
+        pill.tag = 9500
+        pill.translatesAutoresizingMaskIntoConstraints = false
+        pill.clipsToBounds = true
+        pill.layer.cornerRadius = 22
+        pill.isHidden = true
+        view.addSubview(pill)
+
+        // Glass background
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        blur.isUserInteractionEnabled = false
+        pill.addSubview(blur)
+
+        // Border for extra polish
+        pill.layer.borderWidth = 0.5
+        pill.layer.borderColor = UIColor(white: 1, alpha: 0.12).cgColor
+
+        // ── Time labels ─────────────────────────────────────────────────
+        let elapsed = UILabel()
+        elapsed.tag = 9501
+        elapsed.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        elapsed.textColor = UIColor(white: 1, alpha: 0.70)
+        elapsed.text = "00:00"
+        elapsed.translatesAutoresizingMaskIntoConstraints = false
+
+        let remaining = UILabel()
+        remaining.tag = 9502
+        remaining.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        remaining.textColor = UIColor(white: 1, alpha: 0.40)
+        remaining.text = "00:00"
+        remaining.translatesAutoresizingMaskIntoConstraints = false
+
+        // ── Slider ──────────────────────────────────────────────────────
         scrubber = UISlider()
         scrubber.translatesAutoresizingMaskIntoConstraints = false
         scrubber.minimumValue = 0
         scrubber.maximumValue = 1
         scrubber.value = 0
-        
+        scrubber.minimumTrackTintColor = .white
+        scrubber.maximumTrackTintColor = UIColor(white: 1, alpha: 0.18)
+        // Small circular thumb matching native player
+        let thumbSize: CGFloat = 12
+        let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: thumbSize, height: thumbSize)).image { ctx in
+            UIColor.white.setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: thumbSize, height: thumbSize))
+        }
+        scrubber.setThumbImage(thumbImage, for: .normal)
+        let thumbSizeHL: CGFloat = 16
+        let thumbHL = UIGraphicsImageRenderer(size: CGSize(width: thumbSizeHL, height: thumbSizeHL)).image { ctx in
+            UIColor.white.setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: thumbSizeHL, height: thumbSizeHL))
+        }
+        scrubber.setThumbImage(thumbHL, for: .highlighted)
         scrubber.addTarget(
             self,
             action: #selector(scrubberChanged(_:)),
             for: .valueChanged
         )
-        
-        timelineContainer.addSubview(scrubber)
-        
+
+        // ── Pause / Play / Stop buttons inside pill ─────────────────────
+        let pillPauseBtn = UIButton(type: .system)
+        pillPauseBtn.tag = 9503
+        let pauseCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .bold)
+        pillPauseBtn.setImage(UIImage(systemName: "pause.fill", withConfiguration: pauseCfg), for: .normal)
+        pillPauseBtn.tintColor = .white
+        pillPauseBtn.translatesAutoresizingMaskIntoConstraints = false
+        pillPauseBtn.addTarget(self, action: #selector(pauseTimeline), for: .touchUpInside)
+
+        let pillStopBtn = UIButton(type: .system)
+        pillStopBtn.tag = 9504
+        let stopCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
+        pillStopBtn.setImage(UIImage(systemName: "stop.fill", withConfiguration: stopCfg), for: .normal)
+        pillStopBtn.tintColor = UIColor(red: 1.0, green: 0.38, blue: 0.38, alpha: 1.0)
+        pillStopBtn.translatesAutoresizingMaskIntoConstraints = false
+        pillStopBtn.addTarget(self, action: #selector(stopTimeline), for: .touchUpInside)
+
+        // Play button inside pill (shown when paused)
+        let pillPlayBtn = UIButton(type: .system)
+        pillPlayBtn.tag = 9505
+        let playCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .bold)
+        pillPlayBtn.setImage(UIImage(systemName: "play.fill", withConfiguration: playCfg), for: .normal)
+        pillPlayBtn.tintColor = .white
+        pillPlayBtn.translatesAutoresizingMaskIntoConstraints = false
+        pillPlayBtn.isHidden = true
+        pillPlayBtn.addTarget(self, action: #selector(playTimeline), for: .touchUpInside)
+
+        pill.addSubview(elapsed)
+        pill.addSubview(scrubber)
+        pill.addSubview(remaining)
+        pill.addSubview(pillPauseBtn)
+        pill.addSubview(pillPlayBtn)
+        pill.addSubview(pillStopBtn)
+
         NSLayoutConstraint.activate([
-            scrubber.leadingAnchor.constraint(
-                equalTo: timelineContainer.leadingAnchor,
-                constant: 16
-            ),
-            scrubber.trailingAnchor.constraint(
-                equalTo: timelineContainer.trailingAnchor,
-                constant: -16
-            ),
-            scrubber.centerYAnchor.constraint(
-                equalTo: timelineContainer.centerYAnchor
-            ),
+            // Pill position — floating above the bottom of the viewport
+            pill.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            pill.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            pill.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            pill.heightAnchor.constraint(equalToConstant: 44),
+
+            // Blur fills the pill
+            blur.topAnchor.constraint(equalTo: pill.topAnchor),
+            blur.leadingAnchor.constraint(equalTo: pill.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: pill.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: pill.bottomAnchor),
+
+            // Elapsed label
+            elapsed.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 14),
+            elapsed.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            elapsed.widthAnchor.constraint(equalToConstant: 38),
+
+            // Stop button (rightmost)
+            pillStopBtn.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -10),
+            pillStopBtn.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            pillStopBtn.widthAnchor.constraint(equalToConstant: 32),
+            pillStopBtn.heightAnchor.constraint(equalToConstant: 32),
+
+            // Pause button (to the left of stop)
+            pillPauseBtn.trailingAnchor.constraint(equalTo: pillStopBtn.leadingAnchor, constant: -4),
+            pillPauseBtn.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            pillPauseBtn.widthAnchor.constraint(equalToConstant: 32),
+            pillPauseBtn.heightAnchor.constraint(equalToConstant: 32),
+
+            // Play button (same position as pause, shown when paused)
+            pillPlayBtn.trailingAnchor.constraint(equalTo: pillStopBtn.leadingAnchor, constant: -4),
+            pillPlayBtn.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            pillPlayBtn.widthAnchor.constraint(equalToConstant: 32),
+            pillPlayBtn.heightAnchor.constraint(equalToConstant: 32),
+
+            // Remaining label (to the left of pause)
+            remaining.trailingAnchor.constraint(equalTo: pillPauseBtn.leadingAnchor, constant: -6),
+            remaining.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            remaining.widthAnchor.constraint(equalToConstant: 38),
+
+            // Slider
+            scrubber.leadingAnchor.constraint(equalTo: elapsed.trailingAnchor, constant: 8),
+            scrubber.trailingAnchor.constraint(equalTo: remaining.leadingAnchor, constant: -8),
+            scrubber.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
         ])
     }
 
     
     @objc func scrubberChanged(_ sender: UISlider) {
         let time = sender.value
+        // Update floating pill time labels during manual scrub
+        if let elapsedLbl = view.viewWithTag(9501) as? UILabel {
+            elapsedLbl.text = String(format: "%02d:%02d", Int(time) / 60, Int(time) % 60)
+        }
+        if let remainLbl = view.viewWithTag(9502) as? UILabel {
+            let r = max(0, scrubber.maximumValue - time)
+            remainLbl.text = String(format: "%02d:%02d", Int(r) / 60, Int(r) % 60)
+        }
+        currentTimelineTime = time
         evaluateTimeline(at: time)
     }
 
