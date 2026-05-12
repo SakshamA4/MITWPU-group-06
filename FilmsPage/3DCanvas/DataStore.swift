@@ -20,7 +20,7 @@ struct CharacterPoseComponent: Component {
 
     // Only these exact model names are standing poses that support Walk.
     // Add new standing model names here as your cast grows.
-    private static let standingModelNames: Set<String> = ["lewisr", "woman_walks"]
+    private static let standingModelNames: Set<String> = ["lewisr", "scene"]
 
     var isStandingPose: Bool {
         Self.standingModelNames.contains(modelFileName.lowercased())

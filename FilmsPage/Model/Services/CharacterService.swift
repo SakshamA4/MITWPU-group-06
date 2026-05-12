@@ -92,9 +92,9 @@ final class CharacterService {
             CharacterItem(
                 id: UUID(),
                 name: "Woman",
-                imageName: "woman1_img",
+                imageName: "MegWalkFix_img",
                 pose: [
-                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "woman1_img", modelFilename: "woman_walks"),
+                    CharacterPoseItem(id: UUID(), name: "Standing", imageName: "MegWalkFix_img", modelFilename: "Scene"),
                     CharacterPoseItem(id: UUID(), name: "Sitting", imageName: "Woman1Sit_img", modelFilename: "Woman1Sit"),
                     CharacterPoseItem(id: UUID(), name: "Lying", imageName: "Woman1MegLay_img", modelFilename: "Woman1MegLay"),
                     CharacterPoseItem(id: UUID(), name: "On a Call", imageName: "Woman1MegOnCall_img", modelFilename: "Woman1MegOnCall")
