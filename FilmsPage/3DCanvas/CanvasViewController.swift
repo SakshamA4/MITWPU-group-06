@@ -255,6 +255,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var activeRotationAxis: SIMD3<Float>?
     var lastPanLocation: CGPoint = .zero
     var lastDragPoint: SIMD3<Float>?
+
+    /// Camera-relative rotation solver — used by both handleRotationPan and
+    /// handlePan's rotation branch for consistent, camera-independent rotation.
+    let rotationSolver = CameraRelativeRotationSolver()
     /// Non-nil when the gizmo is sitting on a path handle instead of a scene entity
     var activeHandleEntity: Entity?
     
@@ -1044,19 +1048,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     attachLight(to: entity, config: config)
                 }
 
-                // FIX: use cached mainAnchor
                 if let anchor = mainAnchor {
                     anchor.addChild(entity)
-                    // Stop Mixamo's baked auto-animation on spawn.
+                    // Stop any baked auto-animation on spawn (Mixamo models often auto-play).
                     // Walk clips start it explicitly via applyWalkToEntity.
-                    if !entity.availableAnimations.isEmpty {
-                        let ctrl = entity.playAnimation(
-                            entity.availableAnimations[0].repeat(count: 1),
-                            transitionDuration: 0,
-                            startsPaused: true
-                        )
-                        ctrl.pause()
-                    }
+                    // FIX: Search the full hierarchy since some models (e.g. Lewis_walks)
+                    // store their animation on a child node, not the root entity.
+                    pauseAllAnimations(in: entity)
                     self.refreshSidebarContent()
                 }            } catch {
                 print("Failed to load \(item.modelFileName): \(error)")

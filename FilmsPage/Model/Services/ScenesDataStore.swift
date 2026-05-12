@@ -32,8 +32,8 @@ class ScenesDataStore {
     private var templates: [ScenesModel] = [
         ScenesModel(id: outdoorID,name: "Outdoor Scene", image: "outdoor"),
         ScenesModel(id: houseID,name: "House Scene", image: "scene1"),
-        ScenesModel(id: scene3ID,name: "Scene 3", image: "Image"),
-        ScenesModel(id: scene4ID,name: "Scene 4", image: "Image")
+        ScenesModel(id: scene3ID,name: "Diner Scene", image: "diner"),
+        ScenesModel(id: scene4ID,name: "Park Scene", image: "park")
     ]
     
     //Getters

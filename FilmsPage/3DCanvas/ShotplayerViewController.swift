@@ -199,6 +199,49 @@ final class ShotPlayerViewController: UIViewController {
         return l
     }()
 
+    private lazy var customNavBar: UIView = {
+        let v = UIView()
+        v.backgroundColor = bgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private lazy var navBackBtn: UIButton = {
+        let btn = UIButton(type: .system)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        btn.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
+        btn.tintColor = .white
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        return btn
+    }()
+
+    private lazy var navTitleLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 15, weight: .semibold)
+        l.textColor = .white
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private lazy var navExportBtn: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.title = "Export"
+        config.baseBackgroundColor = accentRed
+        config.baseForegroundColor = .white
+        config.cornerStyle = .capsule
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = UIFont.systemFont(ofSize: 13, weight: .bold)
+            return outgoing
+        }
+        let btn = UIButton(configuration: config)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
+        return btn
+    }()
+
     private lazy var filmStrip: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection    = .horizontal
@@ -235,7 +278,7 @@ final class ShotPlayerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = bgColor
-        setupNav()
+        navigationController?.setNavigationBarHidden(true, animated: false)
         buildLayout()
         applyOrientation(to: view.bounds.size)
         syncToCurrentShot()
@@ -375,6 +418,12 @@ final class ShotPlayerViewController: UIViewController {
         let sep2 = makeSep()   // below transport
         let sep3 = makeSep()   // below scrubber
 
+        // Add custom nav bar
+        view.addSubview(customNavBar)
+        customNavBar.addSubview(navBackBtn)
+        customNavBar.addSubview(navTitleLabel)
+        customNavBar.addSubview(navExportBtn)
+
         // Main scrollView wraps all content to ensure nothing is cut off
         view.addSubview(scrollView)
         
@@ -407,8 +456,28 @@ final class ShotPlayerViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             
+            // MARK: - Custom Nav Bar
+            customNavBar.topAnchor.constraint(equalTo: g.topAnchor),
+            customNavBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            customNavBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            customNavBar.heightAnchor.constraint(equalToConstant: 44),
+
+            navBackBtn.leadingAnchor.constraint(equalTo: customNavBar.leadingAnchor, constant: 16),
+            navBackBtn.centerYAnchor.constraint(equalTo: customNavBar.centerYAnchor),
+            navBackBtn.widthAnchor.constraint(equalToConstant: 40),
+            navBackBtn.heightAnchor.constraint(equalToConstant: 40),
+
+            navTitleLabel.centerXAnchor.constraint(equalTo: customNavBar.centerXAnchor),
+            navTitleLabel.centerYAnchor.constraint(equalTo: customNavBar.centerYAnchor),
+            navTitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: navBackBtn.trailingAnchor, constant: 8),
+
+            navExportBtn.trailingAnchor.constraint(equalTo: customNavBar.trailingAnchor, constant: -16),
+            navExportBtn.centerYAnchor.constraint(equalTo: customNavBar.centerYAnchor),
+            navExportBtn.heightAnchor.constraint(equalToConstant: 28),
+            navExportBtn.leadingAnchor.constraint(greaterThanOrEqualTo: navTitleLabel.trailingAnchor, constant: 8),
+
             // MARK: - ScrollView Setup
-            scrollView.topAnchor.constraint(equalTo: g.topAnchor),
+            scrollView.topAnchor.constraint(equalTo: customNavBar.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -616,6 +685,7 @@ final class ShotPlayerViewController: UIViewController {
         let accent = stripColors[currentIndex % stripColors.count]
 
          title = "\(sceneName)  ·  \(shot.displayName)"
+         navTitleLabel.text = "\(sceneName)  ·  \(shot.displayName)"
 
          scrubber.setAccent(accent)
 

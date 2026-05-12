@@ -1,0 +1,272 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "Reality Composer Pro Version 2.0 (494.60.2)"
+    }
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    def "saxam" (
+        active = true
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        customData = {
+            float3 rotationEulerHint = (4.7123885, 0, 0)
+        }
+        references = @saxam.usdz@
+    )
+    {
+        rel material:binding = </Root/saxam/_materials/Ch22_body> (
+            bindMaterialAs = "strongerThanDescendants"
+        )
+        quatf xformOp:orient = (0.70710677, -0.70710677, 0, 0)
+        float3 xformOp:scale = (0.5, 0.5, 0.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "Armature"
+        {
+            over "Ch22_Body" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "strongerThanDescendants"
+                )
+            }
+
+            over "Ch22_Sneakers" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "strongerThanDescendants"
+                )
+            }
+
+            over "Ch22_Shirt" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "strongerThanDescendants"
+                )
+            }
+
+            over "Ch22_Pants" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "strongerThanDescendants"
+                )
+            }
+
+            over "Armature" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+            }
+
+            over "Ch22_Eyelashes" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/saxam/_materials/Ch22_body> (
+                    bindMaterialAs = "strongerThanDescendants"
+                )
+            }
+        }
+
+        over "_materials"
+        {
+            over "Ch22_body"
+            {
+                token outputs:mtlx:surface.connect = </Root/saxam/_materials/Ch22_body/PreviewSurface.outputs:out>
+                token outputs:realitykit:vertex
+                token outputs:surface.connect = </Root/saxam/_materials/Ch22_body/Principled_BSDF.outputs:surface>
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (-162.92844, 7.3647857)
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 32
+
+                over "Principled_BSDF" (
+                    active = false
+                )
+                {
+                }
+
+                def Shader "PreviewSurface"
+                {
+                    uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                    float inputs:clearcoat
+                    float inputs:clearcoatRoughness
+                    color3f inputs:diffuseColor.connect = </Root/saxam/_materials/Ch22_body/Image.outputs:out>
+                    color3f inputs:emissiveColor
+                    float inputs:ior
+                    float inputs:metallic
+                    float3 inputs:normal.connect = </Root/saxam/_materials/Ch22_body/Image_1.outputs:out>
+                    float inputs:occlusion
+                    float inputs:opacity
+                    float inputs:opacityThreshold
+                    float inputs:roughness.connect = </Root/saxam/_materials/Ch22_body/Image_2.outputs:out>
+                    token outputs:out
+                    float2 ui:nodegraph:node:pos = (-435.28125, 57.820312)
+                    int ui:nodegraph:node:stackingOrder = 18
+                    string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:normal", "Advanced"]
+                }
+
+                def Shader "Image"
+                {
+                    uniform token info:id = "ND_image_color3"
+                    color3f inputs:default
+                    asset inputs:file = @textures/Ch22_1001_Diffuse.png@
+                    string inputs:filtertype
+                    float2 inputs:texcoord
+                    string inputs:uaddressmode
+                    string inputs:vaddressmode
+                    color3f outputs:out
+                    float2 ui:nodegraph:node:pos = (-685.7617, 66.58984)
+                    int ui:nodegraph:node:stackingOrder = 12
+                }
+
+                def Shader "Image_1"
+                {
+                    uniform token info:id = "ND_image_vector3"
+                    float3 inputs:default
+                    asset inputs:file = @textures/Ch22_1001_Normal.png@
+                    string inputs:filtertype
+                    float2 inputs:texcoord
+                    string inputs:uaddressmode
+                    string inputs:vaddressmode
+                    float3 outputs:out
+                    float2 ui:nodegraph:node:pos = (-975.0112, 37.817142)
+                    int ui:nodegraph:node:stackingOrder = 22
+                }
+
+                def Shader "Image_2"
+                {
+                    uniform token info:id = "ND_image_float"
+                    asset inputs:file = @textures/Ch22_1001_Glossiness.png@
+                    string inputs:filtertype
+                    string inputs:vaddressmode
+                    float outputs:out
+                    float2 ui:nodegraph:node:pos = (-1244.1411, 37.850937)
+                    int ui:nodegraph:node:stackingOrder = 30
+                }
+            }
+
+            over "Ch22_hair"
+            {
+                token outputs:mtlx:surface.connect = </Root/saxam/_materials/Ch22_hair/PreviewSurface.outputs:out>
+                token outputs:realitykit:vertex
+                token outputs:surface.connect = </Root/saxam/_materials/Ch22_hair/Principled_BSDF.outputs:surface>
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (0, 110.5)
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 7
+
+                over "Principled_BSDF" (
+                    active = false
+                )
+                {
+                }
+
+                def Shader "PreviewSurface"
+                {
+                    uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                    token outputs:out
+                    float2 ui:nodegraph:node:pos = (-255, 105)
+                    int ui:nodegraph:node:stackingOrder = 6
+                }
+            }
+        }
+    }
+
+    def Material "Material"
+    {
+        reorder nameChildren = ["PreviewSurface", "Image", "Material_2"]
+        token outputs:mtlx:surface.connect = </Root/Material/PreviewSurface.outputs:out>
+        token outputs:realitykit:vertex
+        float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (517.40234, 18.203125)
+        int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 2
+
+        def Shader "PreviewSurface"
+        {
+            uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+            color3f inputs:diffuseColor.connect = </Root/Material/Image.outputs:out>
+            float inputs:metallic
+            float3 inputs:normal
+            float inputs:opacity
+            float inputs:roughness
+            token outputs:out
+            float2 ui:nodegraph:node:pos = (121.390625, 66.0625)
+            int ui:nodegraph:node:stackingOrder = 4
+        }
+
+        def Shader "Image"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/Ch22_1002_Diffuse.png@
+            string inputs:filtertype
+            float2 inputs:texcoord
+            string inputs:uaddressmode
+            string inputs:vaddressmode
+            color3f outputs:out
+            float2 ui:nodegraph:node:pos = (-121.32031, 132.42578)
+            int ui:nodegraph:node:stackingOrder = 8
+        }
+
+        def Material "Material_2"
+        {
+            token cullMode = "back" (
+                allowedTokens = ["unspecified", "none", "front", "back"]
+            )
+            token outputs:mtlx:surface.connect = </Root/Material/Material_2/PreviewSurface.outputs:out>
+            token outputs:realitykit:vertex
+            token outputs:surface.connect = </Root/Material/Material_2/UsdPreviewSurface.outputs:surface>
+            string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["outputs:mtlx:surface"]
+            float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (469.80325, 67.7081)
+            int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 24
+
+            def Shader "PreviewSurface" (
+                active = true
+            )
+            {
+                uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                color3f inputs:diffuseColor.connect = </Root/Material/Material_2/Image.outputs:out>
+                float inputs:metallic
+                float3 inputs:normal
+                float inputs:opacity
+                float inputs:roughness.connect = None
+                token outputs:out
+                float2 ui:nodegraph:node:pos = (93.5, 100.5)
+                int ui:nodegraph:node:stackingOrder = 13
+            }
+
+            def Shader "Image"
+            {
+                uniform token info:id = "ND_image_color3"
+                color3f inputs:default
+                asset inputs:file = @textures/Ch22_1001_Diffuse.png@
+                string inputs:filtertype
+                float2 inputs:texcoord
+                string inputs:uaddressmode
+                string inputs:vaddressmode
+                color3f outputs:out
+                float2 ui:nodegraph:node:pos = (-186.21542, 161.8448)
+                int ui:nodegraph:node:stackingOrder = 20
+            }
+
+            def Shader "UsdPreviewSurface" (
+                active = false
+            )
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                token outputs:surface
+            }
+        }
+    }
+}
+
