@@ -604,62 +604,82 @@ extension CanvasViewController {
     }
 
     // ── 3-ring rotation gizmo pan (.rotate mode only) ─────────────────────────
+    //
+    // Uses CameraRelativeRotationSolver for camera-independent rotation.
+    // The rotation axis is FROZEN at drag start and rotation amount is computed
+    // from ray-plane intersection — same gesture always produces the same
+    // rotation regardless of camera orbit angle.
 
     @objc func handleRotationPan(_ gesture: UIPanGestureRecognizer) {
         guard interactionMode == .rotate else { return }
         let location = gesture.location(in: arView)
         switch gesture.state {
         case .began:
-            // FIX 5: Do NOT call saveCurrentStateToUndo() unconditionally.
-            // Camera-orbit / deselect pans mustn't create empty undo entries.
             let hits = arView.hitTest(location)
             activeRotationAxis = nil
             activeGizmoPart    = .none
+
             if let hit = hits.first(where: { ["xRing","yRing","zRing"].contains($0.entity.name) }) {
-                // The RotationRingGizmo is parented directly to the entity, so its
-                // world-space matrix columns ARE the entity's current local axes in
-                // world space. Read those columns from the gizmo itself (not from
-                // the individual ring entities, which carry extra per-ring orientations
-                // that don't correspond to the rotation axes).
-                //   column 0 = entity's world +X  (red ring rotates around this)
-                //   column 1 = entity's world +Y  (green ring rotates around this)
-                //   column 2 = entity's world +Z  (blue ring rotates around this)
-                // The torus mesh is built in the XY plane (face normal = [0,0,1]).
-                // Each ring then gets an orientation baked in RotationRingGizmo:
-                //   xRing: pi/2 around Y  → face normal becomes [1,0,0]  → col 0
-                //   yRing: pi/2 around X  → face normal becomes [0,-1,0] → -col 1
-                //   zRing: identity       → face normal stays  [0,0,1]   → col 2
-                // We read these from the RotationRingGizmo's world matrix so the
-                // axes follow the entity's current orientation correctly.
-                let gizmoMatrix = (rotationGizmo ?? hit.entity).transformMatrix(relativeTo: nil)
+                guard let selected = selectedEntity,
+                      let gizmo = rotationGizmo else { return }
+
+                // ── Compute frozen world-space axis from the gizmo's matrix ──
+                // The RotationRingGizmo is entity-parented, so its world matrix
+                // columns are the entity's current local axes in world space.
+                let gizmoMatrix = gizmo.transformMatrix(relativeTo: nil)
+                let worldAxis: SIMD3<Float>
+                let part: GizmoPart
+
                 switch hit.entity.name {
                 case "xRing":
-                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.0.x,
-                                                                       gizmoMatrix.columns.0.y,
-                                                                       gizmoMatrix.columns.0.z))
-                    activeGizmoPart    = .rotateX
+                    worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.0.x,
+                                                             gizmoMatrix.columns.0.y,
+                                                             gizmoMatrix.columns.0.z))
+                    part = .rotateX
                 case "yRing":
                     // yRing face normal is [0,-1,0] in local gizmo space → negate col 1
-                    activeRotationAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
-                                                                     -gizmoMatrix.columns.1.y,
-                                                                     -gizmoMatrix.columns.1.z))
-                    activeGizmoPart    = .rotateY
+                    worldAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
+                                                             -gizmoMatrix.columns.1.y,
+                                                             -gizmoMatrix.columns.1.z))
+                    part = .rotateY
                 default:
-                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.2.x,
-                                                                       gizmoMatrix.columns.2.y,
-                                                                       gizmoMatrix.columns.2.z))
-                    activeGizmoPart    = .rotateZ
+                    worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.2.x,
+                                                             gizmoMatrix.columns.2.y,
+                                                             gizmoMatrix.columns.2.z))
+                    part = .rotateZ
                 }
-                saveCurrentStateToUndo()
-                highlightGizmoPart(activeGizmoPart)
-                lastPanLocation = location
+
+                activeRotationAxis = worldAxis
+                activeGizmoPart    = part
+
+                // ── Freeze axis in the solver and create interaction plane ──
+                let pivot = selected.position(relativeTo: nil)
+                let ok = rotationSolver.beginRotation(
+                    axis: worldAxis,
+                    pivot: pivot,
+                    touchPoint: location,
+                    arView: arView
+                )
+
+                if ok {
+                    saveCurrentStateToUndo()
+                    highlightGizmoPart(part)
+                    lastPanLocation = location
+                } else {
+                    // Grazing angle fallback — store lastPanLocation for screen-space fallback
+                    saveCurrentStateToUndo()
+                    highlightGizmoPart(part)
+                    lastPanLocation = location
+                }
                 return
             }
+
+            // ── Non-ring hit: select/deselect entity ──
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
                 if root?.name.contains("Gizmo") == false {
-                    saveCurrentStateToUndo()   // FIX 5: only when an entity is selected
+                    saveCurrentStateToUndo()
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
                     setEntityTransparency(root, alpha: 0.9)
@@ -670,53 +690,54 @@ extension CanvasViewController {
                 selectedEntity = nil
                 hideGizmo(); hideRotationGizmo()
             }
+
         case .changed:
-            guard let sel = selectedEntity else { return }
-            let dx = Float(location.x - lastPanLocation.x)
-            let dy = Float(location.y - lastPanLocation.y)
+            guard let sel = selectedEntity,
+                  activeGizmoPart == .rotateX || activeGizmoPart == .rotateY || activeGizmoPart == .rotateZ
+            else { return }
 
-            // Get the ring entity directly from the gizmo so we can read its
-            // true world-space normal — the axis the ring is physically lying on
-            // right now, after all prior rotations.
-            guard let gizmo = rotationGizmo else { lastPanLocation = location; return }
+            if rotationSolver.tracking {
+                // ── Primary path: camera-relative ray-plane intersection ──
+                if let deltaQuat = rotationSolver.updateRotation(touchPoint: location, arView: arView) {
+                    let currentWorld = sel.orientation(relativeTo: nil)
+                    sel.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
+                }
+            } else {
+                // ── Fallback: screen-space angular tracking ──
+                // Used when the initial projection failed (camera nearly parallel
+                // to the rotation plane). This uses the projected entity centre
+                // to compute screen-space angles, similar to handleRingPan.
+                guard let axis = activeRotationAxis else { return }
+                let entityCentre = sel.position(relativeTo: nil)
+                guard let centre2D = arView.project(entityCentre) else {
+                    lastPanLocation = location; return
+                }
 
-            let ringName: String
-            switch activeGizmoPart {
-            case .rotateX: ringName = "xRing"
-            case .rotateY: ringName = "yRing"
-            case .rotateZ: ringName = "zRing"
-            default: lastPanLocation = location; return
+                let prev = CGPoint(x: lastPanLocation.x - centre2D.x,
+                                   y: lastPanLocation.y - centre2D.y)
+                let curr = CGPoint(x: location.x - centre2D.x,
+                                   y: location.y - centre2D.y)
+                let prevLen = sqrt(prev.x*prev.x + prev.y*prev.y)
+                let currLen = sqrt(curr.x*curr.x + curr.y*curr.y)
+                guard prevLen > 8, currLen > 8 else {
+                    lastPanLocation = location; return
+                }
+                let prevAngle = Float(atan2(prev.y, prev.x))
+                let currAngle = Float(atan2(curr.y, curr.x))
+                var delta = currAngle - prevAngle
+                if delta >  Float.pi { delta -= 2 * Float.pi }
+                if delta < -Float.pi { delta += 2 * Float.pi }
+                guard delta.isFinite, abs(delta) > 0.001 else {
+                    lastPanLocation = location; return
+                }
+                let deltaQuat = simd_quatf(angle: -delta, axis: axis)
+                let currentWorld = sel.orientation(relativeTo: nil)
+                sel.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
             }
-
-            guard let ring = gizmo.findEntity(named: ringName) else {
-                lastPanLocation = location; return
-            }
-
-            // The ring's world orientation quaternion directly gives us its
-            // local axes. The torus mesh is built in the XY plane so its face
-            // normal is local +Z. After the ring's own baked orientation:
-            //   xRing (pi/2 around Y): local Z rotates to world X  → use act([0,0,1])
-            //   yRing (pi/2 around X): local Z rotates to world -Y → use act([0,0,1])
-            //   zRing (identity):      local Z stays world Z        → use act([0,0,1])
-            // In all cases we just rotate [0,0,1] by the ring's world quaternion.
-            let ringWorldQuat = ring.orientation(relativeTo: nil)
-            let liveAxis = simd_normalize(ringWorldQuat.act([0, 0, 1]))
-
-            let angle: Float
-            switch activeGizmoPart {
-            case .rotateX: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
-            case .rotateZ: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
-            default:       angle = (abs(dx) > abs(dy) ?  dx : -dy) * 0.006
-            }
-            guard angle.isFinite else { return }
-
-            // Apply rotation in world space using setOrientation so we don't
-            // have to manually convert between local and world quaternion spaces.
-            let deltaQuat    = simd_quatf(angle: angle, axis: liveAxis)
-            let currentWorld = sel.orientation(relativeTo: nil)
-            sel.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
             lastPanLocation = location
+
         case .ended, .cancelled:
+            rotationSolver.endRotation()
             activeRotationAxis = nil
             resetGizmoColors()
         default: break
