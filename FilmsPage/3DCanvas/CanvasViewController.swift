@@ -255,6 +255,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var activeRotationAxis: SIMD3<Float>?
     var lastPanLocation: CGPoint = .zero
     var lastDragPoint: SIMD3<Float>?
+
+    /// Camera-relative rotation solver — used by both handleRotationPan and
+    /// handlePan's rotation branch for consistent, camera-independent rotation.
+    let rotationSolver = CameraRelativeRotationSolver()
     /// Non-nil when the gizmo is sitting on a path handle instead of a scene entity
     var activeHandleEntity: Entity?
     
