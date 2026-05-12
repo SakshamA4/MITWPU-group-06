@@ -171,9 +171,7 @@
                             <constraint firstItem="Gtc-NX-FN5" firstAttribute="trailing" secondItem="JHl-AU-Otb" secondAttribute="trailing" id="l4C-vJ-syO"/>
                         </constraints>
                     </view>
-                    <navigationItem key="navigationItem" largeTitleDisplayMode="always" id="E1i-M0-rUh">
-                        <barButtonItem key="rightBarButtonItem" systemItem="search" id="Tic-G7-E9X"/>
-                    </navigationItem>
+                    <navigationItem key="navigationItem" largeTitleDisplayMode="always" id="E1i-M0-rUh"/>
                     <connections>
                         <outlet property="libraryCollectionView" destination="Gtc-NX-FN5" id="ZfG-v8-mmQ"/>
                         <segue destination="Rbs-cT-bva" kind="show" identifier="BackgroundViewController" id="tPM-fk-MAX"/>
@@ -432,7 +430,7 @@
                                 <nil key="highlightedColor"/>
                             </label>
                             <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="JPT-dJ-tyF">
-                                <rect key="frame" x="0.0" y="240" width="1210" height="594"/>
+                                <rect key="frame" x="0.0" y="248" width="1210" height="586"/>
                                 <color key="backgroundColor" red="0.043137259779999999" green="0.043137259779999999" blue="0.082352943720000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                 <collectionViewFlowLayout key="collectionViewLayout" automaticEstimatedItemSize="YES" minimumLineSpacing="10" minimumInteritemSpacing="10" id="L5e-AN-Yym">
                                     <size key="itemSize" width="268" height="325"/>
@@ -460,7 +458,7 @@
                             <constraint firstItem="JPT-dJ-tyF" firstAttribute="leading" secondItem="2el-Xh-1VL" secondAttribute="leading" id="5Hu-GY-jHh"/>
                             <constraint firstItem="2el-Xh-1VL" firstAttribute="trailing" secondItem="JPT-dJ-tyF" secondAttribute="trailing" id="Ddm-VM-WYm"/>
                             <constraint firstItem="IZQ-Me-bwe" firstAttribute="leading" secondItem="2el-Xh-1VL" secondAttribute="leading" constant="80" id="hUd-N9-MBa"/>
-                            <constraint firstItem="JPT-dJ-tyF" firstAttribute="top" secondItem="IZQ-Me-bwe" secondAttribute="bottom" constant="36" id="nsL-Xe-Xjd"/>
+                            <constraint firstItem="JPT-dJ-tyF" firstAttribute="top" secondItem="IZQ-Me-bwe" secondAttribute="bottom" constant="44" id="nsL-Xe-Xjd"/>
                             <constraint firstAttribute="bottom" secondItem="JPT-dJ-tyF" secondAttribute="bottom" id="zjH-jf-2jb"/>
                         </constraints>
                     </view>

@@ -32,18 +32,23 @@ extension CanvasViewController {
             arView.debugOptions = []
             arView.environment.sceneUnderstanding.options = []
 
+            // FIX B: Switch to AR camera mode BEFORE starting the session.
+            // Running arView.session.run() while cameraMode == .nonAR produces
+            // undefined behaviour and can permanently corrupt the ARView render state.
+            arView.cameraMode = .ar
+
             // 6. Start AR world-tracking (no .removeExistingAnchors — that wipes scene entities)
             let config = ARWorldTrackingConfiguration()
             config.planeDetection = [.horizontal]
             arView.session.run(config, options: [.resetTracking])
 
-            // 7. Update button appearance to "active"
-            arModeButton?.tintColor = .white
-            arModeButton?.backgroundColor = UIColor(red: 0/255, green: 100/255, blue: 220/255, alpha: 1)
-
         } else {
             // Return to editor mode
             arView.session.pause()
+
+            // FIX B: Restore non-AR camera mode so the PerspectiveCamera nodes
+            // (editorCamera / sceneCameras) drive rendering again.
+            arView.cameraMode = .nonAR
 
             // Restore editor grid
             arView.scene.findEntity(named: "Grid")?.isEnabled = true
@@ -55,9 +60,6 @@ extension CanvasViewController {
             // Keep blur/HDR off — editor looks better without them too
             arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableHDR]
 
-            // Update button back to inactive appearance
-            arModeButton?.tintColor = .systemGreen
-            arModeButton?.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         }
     }
 

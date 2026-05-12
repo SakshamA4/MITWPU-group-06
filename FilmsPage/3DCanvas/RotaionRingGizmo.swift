@@ -45,7 +45,7 @@ final class RotationRingGizmo: Entity {
 
 
     required init() {
-        fatalError()
+//        fatalError()
     }
 
     private func setupRings(radius: Float) {

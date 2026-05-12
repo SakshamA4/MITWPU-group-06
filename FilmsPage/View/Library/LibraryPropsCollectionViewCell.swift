@@ -20,7 +20,14 @@ class LibraryPropsCollectionViewCell: UICollectionViewCell {
     }
     func configure(with item: PropItem) {
         libraryPropLabel.text = item.name
-        libraryPropImage.image = UIImage(named: item.imageName)
+        if item.isCustom {
+            libraryPropImage.image = UIImage(systemName: "cube.box")
+            libraryPropImage.tintColor = UIColor(named: "AccentColor") ?? .systemBlue
+            libraryPropImage.contentMode = .scaleAspectFit
+        } else {
+            libraryPropImage.image = UIImage(named: item.imageName)
+            libraryPropImage.contentMode = .scaleToFill // Reset to default or standard used
+        }
 //        featuredImageView.layer.cornerRadius = 12.0
 //        featuredImageView.clipsToBounds = true
 // DispatchQueue.main.async { [weak self] in

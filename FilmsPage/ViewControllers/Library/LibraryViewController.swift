@@ -23,6 +23,14 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
                 libraryCollectionView.setCollectionViewLayout(generateLayout(), animated: false)
             }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.libraryCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+
         // Do any additional setup after loading the view.
     
     func collectionView(_ collectionView: UICollectionView,
@@ -183,15 +191,19 @@ extension LibraryViewController: UICollectionViewDataSource {
 
            switch sectionType {
            case . featured:
-               let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as! ScenesAndCameraCollectionViewCell
+               guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as? ScenesAndCameraCollectionViewCell else {
+                   return UICollectionViewCell()
+               }
                cell.configure(with: item)
                return cell
 
            case .assets:
-                   let cell = collectionView.dequeueReusableCell(
+                   guard let cell = collectionView.dequeueReusableCell(
                        withReuseIdentifier: "assets_cell",
                        for: indexPath
-                   ) as! CharactersPropsLightsBackgroundCollectionViewCell
+                   ) as? CharactersPropsLightsBackgroundCollectionViewCell else {
+                       return UICollectionViewCell()
+                   }
                    cell.configure(with: item)
                    return cell
                }

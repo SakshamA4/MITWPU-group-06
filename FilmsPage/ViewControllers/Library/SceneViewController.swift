@@ -57,6 +57,18 @@ class SceneViewController: UIViewController {
         super.viewDidLayoutSubviews()
         configureFlowLayout()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.SceneCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
+}
+
+private func deleteScene(_ model: ScenesModel) {
+    ScenesDataStore.shared.deleteScene(by: model.id)
 }
 
 // MARK: - Setup
@@ -74,6 +86,11 @@ private extension SceneViewController {
         SceneCollectionView.backgroundColor = .clear
         SceneCollectionView.showsVerticalScrollIndicator = false
     }
+    private func deleteScene(_ model: ScenesModel) {
+        ScenesDataStore.shared.deleteScene(by: model.id)
+        // loadData() is called automatically via NotificationCenter observer
+    }
+    
     
     func configureFlowLayout() {
             // Make sure we are working with a flow layout
@@ -144,42 +161,66 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
         //let selectedSceneModel = allScenes[indexPath.item]
         let selectedModel = allScenes[indexPath.item]
         let vc = CanvasViewController()
+        vc.currentSceneID = selectedModel.id   // FIX: was missing — caused saves to never load from Library
         vc.sceneName = selectedModel.name
         vc.sceneNotes = selectedModel.notes ?? ""
+        vc.sceneImageName = selectedModel.image  
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
     }
 }
 
-// MARK: - Add Background
+extension SceneViewController {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        contextMenuConfigurationForItemAt indexPath: IndexPath,
+        point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+            let model = self.allScenes[indexPath.item]
+
+            let renameAction = UIAction(
+                title: "Edit Name",
+                image: UIImage(systemName: "pencil")
+            ) { [weak self] _ in
+                self?.presentRenameAlert(for: model, at: indexPath)
+            }
+
+            let deleteAction = UIAction(
+                title: "Delete",
+                image: UIImage(systemName: "trash"),
+                attributes: .destructive
+            ) { [weak self] _ in
+                self?.deleteScene(model)
+            }
+
+            return UIMenu(title: model.name, children: [renameAction, deleteAction])
+        }
+    }
 
 
-private extension SceneViewController {
-    
-//    @objc func addSceneTapped() {
-//        let alert = UIAlertController(title: "New Scene",
-//                                      message: "Enter a name for the new Scene",
-//                                      preferredStyle: .alert)
-//        alert.addTextField { $0.placeholder = "Scene name" }
-//        
-//        let addAction = UIAlertAction(title: "Add", style: .default) { [weak self] _ in
-//            guard let self = self else { return }
-//            _ = alert.textFields?.first?.text?.isEmpty == false
-//                ? alert.textFields?.first?.text!
-//                : "New Scene"
-//            
-//            let newItem = SceneItem(title: "name", imageName: "Scene_placeholder")
-//            SceneData.addScene(newItem)
-//            self.items = SceneData.allScenes
-//            
-//            let newIndexPath = IndexPath(item: self.items.count - 1, section: 0)
-//            self.SceneCollectionView.insertItems(at: [newIndexPath])
-//        }
-//        
-//        alert.addAction(addAction)
-//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-//        present(alert, animated: true)
-//    }
+
+    private func presentRenameAlert(for model: ScenesModel, at indexPath: IndexPath) {
+        let alert = UIAlertController(title: "Edit Name", message: nil, preferredStyle: .alert)
+
+        alert.addTextField { tf in
+            tf.text = model.name
+            tf.placeholder = "Scene Name"
+            tf.autocapitalizationType = .words
+        }
+
+        let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
+            guard let newName = alert.textFields?.first?.text, !newName.isEmpty else { return }
+            var updated = model
+            updated.name = newName
+            ScenesDataStore.shared.updateScene(updated)
+        }
+
+        alert.addAction(saveAction)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
 }
 

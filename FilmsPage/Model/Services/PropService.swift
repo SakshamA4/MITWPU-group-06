@@ -11,6 +11,15 @@ class PropService {
     static let shared = PropService()
     private let storageKey = StorageKeys.props
     private var isInitialized = false
+    
+    private let customPropsDirectory: URL = {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        let customDir = paths[0].appendingPathComponent("CustomProps")
+        if !FileManager.default.fileExists(atPath: customDir.path) {
+            try? FileManager.default.createDirectory(at: customDir, withIntermediateDirectories: true)
+        }
+        return customDir
+    }()
 
     private var props: [PropItem] = [] {
         didSet {
@@ -29,6 +38,26 @@ class PropService {
     
     func getProps() -> [PropItem] {
         return props
+    }
+    
+    func copyToCustomProps(sourceURL: URL) throws -> URL {
+        // Start accessing the security scoped resource since the URL comes from UIDocumentPickerViewController
+        let isSecured = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if isSecured {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+        
+        let fileName = sourceURL.lastPathComponent
+        let destinationURL = customPropsDirectory.appendingPathComponent(fileName)
+        
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        return destinationURL
     }
     
     func getProps(forFilmId filmId: UUID) -> [PropItem] {
@@ -101,27 +130,44 @@ class PropService {
     }
 
     private func load() {
+        
+        let defaultProps: [PropItem] = [
+            PropItem(id: UUID(), name: "Chair",        imageName: "chair_img",      filmId: nil, description: "Standard chair",  modelFileName: "chair"),
+            PropItem(id: UUID(), name: "Table",        imageName: "Table_img",      filmId: nil, description: "Standard table",  modelFileName: "Table"),
+            PropItem(id: UUID(), name: "Lamp",         imageName: "lamp_img",       filmId: nil, description: "Desk lamp",       modelFileName: "lamp"),
+            PropItem(id: UUID(), name: "Robot",        imageName: "robot_img",      filmId: nil, description: "Toy robot",       modelFileName: "Robot"),
+            PropItem(id: UUID(), name: "Flower Vase",  imageName: "flowerVase_img", filmId: nil, description: "Flower vase",     modelFileName: "flowerVase"),
+            PropItem(id: UUID(), name: "Plant",        imageName: "Plant_img",      filmId: nil, description: "House Plant",     modelFileName: "Plant"),
+            PropItem(id: UUID(), name: "Wardrobe",     imageName: "wardrobe_img",   filmId: nil, description: "Wardrobe",        modelFileName: "wardrobe"),
+            PropItem(id: UUID(), name: "Sofa",         imageName: "sofa",   filmId: nil, description: "Sofa",            modelFileName: "Sofa"),
+            PropItem(id: UUID(), name: "Ball",         imageName: "ball_img",       filmId: nil, description: "Sports ball",     modelFileName: "ball"),
+            PropItem(id: UUID(), name: "Sofa Chair",   imageName: "sofaChair",     filmId: nil, description: "Chair",           modelFileName: "Chair 2"),
+            PropItem(id: UUID(), name: "Dining Table", imageName: "diningTable",filmId: nil, description: "Dining table",    modelFileName: "DiningTable3"),
+            PropItem(id: UUID(), name: "House",        imageName: "house",     filmId: nil, description: "House",           modelFileName: "House2"),
+            PropItem(id: UUID(), name: "Trees",        imageName: "Trees",      filmId: nil, description: "Trees",           modelFileName: "Trees"),
+            PropItem(id: UUID(), name: "Vine Tree",    imageName: "vine",   filmId: nil, description: "Vine tree",       modelFileName: "VineTree"),
+        ]
+
         if let data = UserDefaults.standard.data(forKey: storageKey) {
             do {
                 let decoder = JSONDecoder()
-                props = try decoder.decode([PropItem].self, from: data)
+                var saved = try decoder.decode([PropItem].self, from: data)
+
+                let savedFileNames = Set(saved.compactMap { $0.modelFileName })
+                let missing = defaultProps.filter {
+                    guard let fn = $0.modelFileName else { return false }
+                    return !savedFileNames.contains(fn)
+                }
+                if !missing.isEmpty {
+                    saved.append(contentsOf: missing)
+                }
+                props = saved
             } catch {
                 print("Failed to load props: \(error)")
+                props = defaultProps
             }
-        }
-        
-        // Initialize with default template props (no filmId - templates)
-        if props.isEmpty {
-            props = [
-                PropItem(id: UUID(), name: "Chair", imageName: "chair_img", filmId: nil, description: "Standard chair", modelFileName: "chair"),
-                PropItem(id: UUID(), name: "Table", imageName: "Table_img", filmId: nil, description: "Standard table", modelFileName: "Table"),
-                PropItem(id: UUID(), name: "Lamp", imageName: "lamp_img", filmId: nil, description: "Desk lamp", modelFileName: "lamp"),
-                PropItem(id: UUID(), name: "Robot", imageName: "robot_img", filmId: nil, description: "Toy robot", modelFileName: "Robot"),
-                PropItem(name: "Flower Vase", imageName: "flowerVase_img", filmId: nil, description: "Flower vase", modelFileName: "flowerVase"),
-                PropItem(name: "Plant", imageName: "Plant_img", filmId: nil, description: "House Plant", modelFileName: "Plant"),
-                PropItem(name: "Wardrobe", imageName: "wardrobe_img", filmId: nil, description: "Wardrobe", modelFileName: "wardrobe"),
-                PropItem(id: UUID(), name: "Ball", imageName: "ball_img", filmId: nil, description: "Sports ball", modelFileName: "ball")
-            ]
+        } else {
+            props = defaultProps
         }
     }
 }

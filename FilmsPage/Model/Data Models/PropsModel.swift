@@ -15,4 +15,6 @@ struct PropItem: Codable {
     var surfaceTexture: String?
     var colour: String?
     var modelFileName: String?
+    var localModelURL: URL?
+    var isCustom: Bool = false
 }

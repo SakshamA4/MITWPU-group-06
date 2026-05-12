@@ -232,6 +232,7 @@ extension CanvasViewController {
         
         stopPlayback()
         playbackState = .paused
+        stopAllWalkCycles()
         
         pauseButton.isHidden = true
         playButton.isHidden = false
@@ -241,11 +242,12 @@ extension CanvasViewController {
     
     func startPlayback() {
         stopPlayback()  // safety
-        
-        displayLink = CADisplayLink(
-            target: self,
-            selector: #selector(updatePlayback)
-        )
+
+        // FIX 1: Use a proxy object so CADisplayLink doesn't retain self strongly.
+        // Without this, a dismissed modal VC is kept alive indefinitely.
+        let proxy = DisplayLinkProxy()
+        proxy.target = self
+        displayLink = CADisplayLink(target: proxy, selector: #selector(DisplayLinkProxy.tick(_:)))
         displayLink?.add(to: .main, forMode: .common)
     }
 
@@ -280,6 +282,7 @@ extension CanvasViewController {
         currentTimelineTime = 0
         playbackStartTime = 0
         
+        stopAllWalkCycles()
         exitTimelineMode()
         
         timelineContainer.isHidden = true
@@ -303,13 +306,26 @@ extension CanvasViewController {
         for (entityName, clips) in clipsByEntity {
             
             guard
-                let entity = arView.scene.findEntity(named: entityName),
+                let entity = timelineEntityCache[entityName] ?? mainAnchor?.findEntity(named: entityName),
                 let baseTransform = baseTransforms[entityName]
             else { continue }
             
             var translation = baseTransform.translation
             var rotation = baseTransform.rotation
             var scale = baseTransform.scale
+            var fov: Float? = nil
+
+            // A zoom clip targets the cameraRoot (a plain Entity whose name starts with
+            // "SceneCameraRoot_").  The actual PerspectiveCamera is a child of that root.
+            // Look for the camera either directly (if this entity IS a PerspectiveCamera)
+            // or inside its children (the normal camera-root case).
+            let perspectiveCamera: PerspectiveCamera? = {
+                if let pc = entity as? PerspectiveCamera { return pc }
+                return entity.children.compactMap { $0 as? PerspectiveCamera }.first
+            }()
+            if let pc = perspectiveCamera {
+                fov = baseFOVs[entityName] ?? pc.camera.fieldOfViewInDegrees
+            }
             
             // Sort clips by start time (important!)
             let sortedClips = clips.sorted { $0.startTime < $1.startTime }
@@ -338,30 +354,35 @@ extension CanvasViewController {
                 switch clip.track {
                     
                 case .position:
-                    
                     if let path = clip.motionPath {
-                        
-                        let t = max(
-                            0,
-                            min(
-                                1,
-                                (time - clip.startTime) / clip.duration
-                            )
-                        )
-                        
-                        translation = path.evaluateConstantSpeed(t)
-                        
+                        let t = max(0, min(1, (time - clip.startTime) / clip.duration))
+                        if clip.type == .walk {
+                            // Walk: position + facing + skeleton set directly on entity
+                            applyWalkToEntity(entity, path: path, progress: t)
+                            // Sync back so the final Transform(...) at the bottom of the
+                            // loop doesn't overwrite what applyWalkToEntity just set
+                            translation = entity.position
+                            rotation    = entity.transform.rotation
+                        } else {
+                            translation = path.evaluateConstantSpeed(t)
+                        }
                     }
                     
                 case .rotation:
-                    let delta = simd_quatf(
-                        angle: value.y,
-                        axis: [0, 1, 0]
-                    )
-                    rotation = delta * rotation
+                    // New model: fromValue = axis, toValue.x = totalRadians (unbounded)
+                    // evaluateTimeline interpolates from 0 to totalRadians * eased
+                    let axis         = RotationPathRenderer.axisOf(clip)
+                    let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
+                    let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
+                    rotation         = delta * rotation
                     
                 case .scale:
                     scale *= value
+                    
+                case .fov:
+                    // Interpolate FOV between fromValue.x and toValue.x
+                    let scalarVal = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
+                    fov = scalarVal
                 }
             }
             
@@ -370,6 +391,12 @@ extension CanvasViewController {
                 rotation: rotation,
                 translation: translation
             )
+
+            // Apply the interpolated FOV to the PerspectiveCamera (may be the entity
+            // itself or a child of a SceneCameraRoot_ entity).
+            if let pc = perspectiveCamera, let f = fov {
+                pc.camera.fieldOfViewInDegrees = f
+            }
         }
     }
 
@@ -424,11 +451,10 @@ extension CanvasViewController {
                 }
                 
             case .rotation:
-                let delta = simd_quatf(
-                    angle: clip.toValue.y * eased,
-                    axis: [0, 1, 0]
-                )
-                rotation = delta * rotation
+                let axis         = RotationPathRenderer.axisOf(clip)
+                let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
+                let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
+                rotation         = delta * rotation
                 
             case .scale:
                 scale *= simd_mix(
@@ -436,6 +462,9 @@ extension CanvasViewController {
                     clip.toValue,
                     SIMD3<Float>(repeating: eased)
                 )
+                
+            case .fov:
+                break
             }
         }
         
@@ -504,6 +533,7 @@ extension CanvasViewController {
     func hideAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = false
+            visual.startHandle?.isEnabled = false
         }
     }
 
@@ -511,6 +541,7 @@ extension CanvasViewController {
     func showAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = true
+            visual.startHandle?.isEnabled = true    // start handle is on entity, show separately
         }
     }
 
@@ -518,27 +549,105 @@ extension CanvasViewController {
     func enterTimelineMode() {
         editorMode = .timeline
         hideAllMotionPaths()
+        hideAllRotationArcs()   // hide arcs during playback; restored in exitTimelineMode
         hideAnimationPanel()
         selectedEntity = nil
         
         baseTransforms.removeAll()
-        
-        for anchor in arView.scene.anchors {
-            for entity in anchor.children {
+        baseFOVs.removeAll()
+        timelineEntityCache.removeAll()
+
+        // Snapshot only the user scene entities under MainAnchor.
+        // Iterating arView.scene.anchors would include the Grid anchor (40,000+ line entities),
+        // causing massive memory allocation and frame drops.
+        // FIX 6: Also skip "PathContainer" — its children (PathRoot_ entities) hold
+        // motion path geometry that must not be snapshotted as user-scene entities.
+        let skipNames: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        mainAnchor?.children
+            .filter { !skipNames.contains($0.name) && !$0.name.isEmpty }
+            .forEach { entity in
                 baseTransforms[entity.name] = entity.transform
+                timelineEntityCache[entity.name] = entity
+                // If this entity is a camera-root (SceneCameraRoot_), snapshot the FOV
+                // from its PerspectiveCamera child, keyed under the root's name — because
+                // zoom AnimationClips target the root name, not the camera child name.
+                if let pc = entity as? PerspectiveCamera {
+                    baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                } else if let pc = entity.children.compactMap({ $0 as? PerspectiveCamera }).first {
+                    baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                }
             }
-        }
     }
 
     
+    // MARK: - Shot Player Playback Context
+    //
+    // Called by ShotPlayerViewController (via closure) so that evaluateTimeline
+    // has valid baseTransforms / baseFOVs / timelineEntityCache without changing
+    // the editor's UI state (editorMode, motion path visibility, etc.).
+
+    func enterShotPlaybackMode() {
+        baseTransforms.removeAll()
+        baseFOVs.removeAll()
+        timelineEntityCache.removeAll()
+
+        let skipNames: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
+        mainAnchor?.children
+            .filter { !skipNames.contains($0.name) && !$0.name.isEmpty }
+            .forEach { entity in
+                baseTransforms[entity.name]     = entity.transform
+                timelineEntityCache[entity.name] = entity
+                // Zoom clips target the cameraRoot name; snapshot its child camera's FOV
+                // under the same key so evaluateTimeline can restore it correctly.
+                if let pc = entity as? PerspectiveCamera {
+                    baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                } else if let pc = entity.children.compactMap({ $0 as? PerspectiveCamera }).first {
+                    baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                }
+            }
+    }
+
+    func exitShotPlaybackMode() {
+        // Restore every entity to its pre-playback state so the editor scene is clean.
+        for (name, transform) in baseTransforms {
+            mainAnchor?.findEntity(named: name)?.transform = transform
+        }
+        // baseFOVs is keyed by the cameraRoot name; the PerspectiveCamera is a child.
+        for (name, fov) in baseFOVs {
+            guard let entity = mainAnchor?.findEntity(named: name) else { continue }
+            let camera: PerspectiveCamera? =
+                (entity as? PerspectiveCamera) ??
+                entity.children.compactMap { $0 as? PerspectiveCamera }.first
+            camera?.camera.fieldOfViewInDegrees = fov
+        }
+        baseTransforms.removeAll()
+        baseFOVs.removeAll()
+        timelineEntityCache.removeAll()
+    }
+
     func exitTimelineMode() {
         editorMode = .edit
-        showAllMotionPaths()
-        for (name, transform) in baseTransforms {
-            arView.scene.findEntity(named: name)?.transform = transform
+        // Only restore paths and arcs if we are in the editor view.
+        // If a scene camera is still active, setActiveCamera already hid them
+        // and activateEditorCamera will restore them when the user exits the camera.
+        if activeCamera === editorCamera {
+            showAllMotionPaths()
+            showAllRotationArcs()
         }
-        
+        for (name, transform) in baseTransforms {
+            mainAnchor?.findEntity(named: name)?.transform = transform
+        }
+        // baseFOVs is keyed by the cameraRoot name; the PerspectiveCamera is a child.
+        for (name, fov) in baseFOVs {
+            guard let entity = mainAnchor?.findEntity(named: name) else { continue }
+            let camera: PerspectiveCamera? =
+                (entity as? PerspectiveCamera) ??
+                entity.children.compactMap { $0 as? PerspectiveCamera }.first
+            camera?.camera.fieldOfViewInDegrees = fov
+        }
         baseTransforms.removeAll()
+        baseFOVs.removeAll()
+        timelineEntityCache.removeAll()
     }
 
 

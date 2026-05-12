@@ -3,97 +3,110 @@ import PhotosUI
 import RealityKit
 import UIKit
 import ARKit
+import ObjectiveC.runtime
+
+// MARK: - Stored properties for ring gesture (via ObjC associated objects)
+private var _ringPanGRKey:      UInt8 = 0
+private var _ringDragActiveKey: UInt8 = 0
+
+extension CanvasViewController {
+
+    var ringPanGestureRecognizer: UIPanGestureRecognizer? {
+        get { objc_getAssociatedObject(self, &_ringPanGRKey) as? UIPanGestureRecognizer }
+        set { objc_setAssociatedObject(self, &_ringPanGRKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+
+    var ringDragActive: Bool {
+        get { (objc_getAssociatedObject(self, &_ringDragActiveKey) as? Bool) ?? false }
+        set { objc_setAssociatedObject(self, &_ringDragActiveKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+}
 
 extension CanvasViewController {
 
     func setupGestures() {
-        // 1. Tap to select (Existing)
+        // ── 1. Single tap ─────────────────────────────────────────────────────
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+        tap.numberOfTapsRequired = 1
         arView.addGestureRecognizer(tap)
 
-        // 2. Camera Rotation (2-Finger Pan)
-        let cameraPan = UIPanGestureRecognizer(target: self, action: #selector(handleCameraPan(_:)))
-        cameraPan.minimumNumberOfTouches = 2
-        arView.addGestureRecognizer(cameraPan)
+        // ── 2. Double tap — focus/frame entity ────────────────────────────────
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        tap.require(toFail: doubleTap)
+        arView.addGestureRecognizer(doubleTap)
 
-        // 3. Object/Gizmo Interaction (1-Finger Pan) — handles move gizmo AND rotation rings
+        // ── 3a. Ring drag — registered first to capture ring touches ──────────
+        let ringPan = UIPanGestureRecognizer(target: self, action: #selector(handleRingPan(_:)))
+        ringPan.maximumNumberOfTouches = 1
+        arView.addGestureRecognizer(ringPan)
+        ringPanGestureRecognizer = ringPan
+
+        // ── 3b. 1-finger pan — gizmo drag OR camera pan on empty space ────────
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.delegate = self
         arView.addGestureRecognizer(pan)
 
-        // 4. Long Press (Existing)
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handlePathLongPress(_:)))
+        // ── 4. 2-finger pan — camera pitch ────────────────────────────────────
+        let twoPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+        twoPan.minimumNumberOfTouches = 2
+        twoPan.maximumNumberOfTouches = 2
+        arView.addGestureRecognizer(twoPan)
+
+        // ── 5. Pinch — zoom / scale ───────────────────────────────────────────
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        arView.addGestureRecognizer(pinch)
+
+        // ── 6. Twist — camera yaw or entity Y-rotation ────────────────────────
+        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        arView.addGestureRecognizer(rotation)
+
+        // ── 7. Long press — entity action menu OR path/arc context menu ──────
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         longPress.minimumPressDuration = 0.45
         longPress.cancelsTouchesInView = false
         arView.addGestureRecognizer(longPress)
 
-        // 5. Camera Zoom (Pinch)
-        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
-        arView.addGestureRecognizer(pinch)
-
-        // 6. Rotation (Existing)
-        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
-        arView.addGestureRecognizer(rotation)
+        pinch.delegate    = self
+        rotation.delegate = self
+        twoPan.delegate   = self
     }
 
+    // ── 2-finger pitch ────────────────────────────────────────────────────────
 
-    
-    @objc func handleCameraPan(_ gesture: UIPanGestureRecognizer) {
-        // In AR mode the physical device IS the camera — editor orbit does nothing useful
-        guard !isARModeActive else { return }
-
+    @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+        guard !isARModeActive, editorMode == .edit else { return }
         let translation = gesture.translation(in: arView)
-
-        // Sensitivity: how fast the camera turns
-        let sensitivity: Float = 0.005
-
-        // Update yaw (horizontal) and pitch (vertical)
-        yaw -= Float(translation.x) * sensitivity
-        pitch += Float(translation.y) * sensitivity
-
-        // Constraint: Prevent the camera from flipping upside down
-        pitch = max(min(pitch, 1.5), -1.5)
-
+        pitch += Float(translation.y) * 0.005
+        pitch  = max(0.05, min(1.4, pitch))
         gesture.setTranslation(.zero, in: arView)
         updateEditorCamera()
     }
 
-    
+    // ── Twist — yaw (empty) or entity Y-rotation (selected) ──────────────────
+
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
-        guard let entity = selectedEntity else { return }
-        guard editorMode == .edit else { return }
+        guard !isARModeActive, editorMode == .edit else { return }
 
-        // LOCK CHECK
-        let isLocked = entity.components[LockComponent.self]?.isLocked ?? false
-        if isLocked { return }
-
+        // Two-finger twist always rotates the camera (yaw), never the entity.
+        // Entity rotation is only via the rotation rings or the outer ring gizmo.
         switch gesture.state {
-        case .began:
-            saveCurrentStateToUndo()
-            initialRotation = entity.orientation
-
+        case .began:    initialCameraYaw = yaw
         case .changed:
-            // Direct 1:1 mapping — gesture.rotation is accumulated radians since .began
-            let totalGestureRotation = Float(gesture.rotation)
-            if let startRotation = initialRotation {
-                let rotationQuaternion = simd_quatf(angle: -totalGestureRotation, axis: [0, 1, 0])
-                entity.orientation = rotationQuaternion * startRotation
-                cameraCollectionView?.reloadData()
-            }
-
-        case .ended, .cancelled:
-            initialRotation = nil
-
-        default:
-            break
+            guard let startYaw = initialCameraYaw else { return }
+            yaw = startYaw + Float(gesture.rotation)
+            updateEditorCamera()
+        case .ended, .cancelled: initialCameraYaw = nil
+        default: break
         }
     }
+
+    // ── Single tap ────────────────────────────────────────────────────────────
 
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: arView)
 
-        // In AR mode: tap to place / reposition the entire scene on the real floor
         if isARModeActive {
             placeSceneOnRealSurface(at: location)
             return
@@ -102,167 +115,242 @@ extension CanvasViewController {
         pathEditToolbar?.removeFromSuperview()
         pathEditToolbar = nil
 
-        // ─────────────────────────────
-        // 1️⃣ MOTION PATH HANDLE SELECTION
-        // ─────────────────────────────
-        if let hit = arView.entity(at: location),
-            let handle = hit.components[MotionPathHandleComponent.self]
-        {
-            selectedPathClipID = handle.clipID
-            updatePathSelection()
-
+        // 0️⃣ Rotation arc handle
+        let arcHitResults = arView.hitTest(location)
+        if let arcHit = arcHitResults.first(where: {
+            $0.entity.components[RotationArcComponent.self] != nil
+        }), let arcComp = arcHit.entity.components[RotationArcComponent.self] {
+            selectedArcClipID  = arcComp.clipID
             setEntityTransparency(selectedEntity, alpha: 1.0)
-            selectedEntity = nil
+            selectedEntity     = nil
+            activeHandleEntity = nil
             hideRotationGizmo()
-
-            // Show gizmo on tapped handle so user can drag via gizmo arrows/plane
-            activeHandleEntity = hit
             hideGizmo()
-            showGizmo(at: hit)
-
             return
         }
 
-        
+        // 1️⃣ Motion path handle
+        if let hit = arView.entity(at: location),
+           let handle = hit.components[MotionPathHandleComponent.self] {
+            selectedPathClipID = handle.clipID
+            updatePathSelection()
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity     = nil
+            hideRotationGizmo()
+            activeHandleEntity = hit
+            hideGizmo()
+            showGizmo(at: hit)
+            return
+        }
+
         currentActionMenu?.removeFromSuperview()
         currentActionMenu = nil
-        
-        // 1. Perform Hit Test
+
         let hits = arView.hitTest(location)
-        
-        // 2. Filter hits: Find object root, ignoring Gizmo
         let objectHit = hits.first { hit in
             var current: Entity? = hit.entity
-            while let checkEntity = current {
-                if checkEntity.name == "GizmoRoot" || checkEntity.name.contains("Gizmo") {
-                    return false
-                }
-                if checkEntity.name == "MainAnchor" { break }
-                current = checkEntity.parent
+            while let e = current {
+                if e.name == "GizmoRoot" || e.name.contains("Gizmo")       { return false }
+                if e.name == "MotionPath" || e.name.hasPrefix("PathRoot_")
+                    || e.name.hasPrefix("path.")                            { return false }
+                if e.name.hasPrefix("RotationArc_") || e.name == "startLine"
+                    || e.name == "endLine" || e.name == "arcCurve"
+                    || e.name.hasPrefix("arcHandle.")                       { return false }
+                if e.components[MotionPathHandleComponent.self] != nil
+                    || e.components[RotationArcComponent.self]  != nil      { return false }
+                if e.name == "MainAnchor" { break }
+                current = e.parent
             }
             return true
         }
-        
+
         if let hitResult = objectHit {
-            // 3. Find the valid scene object's root
             var root: Entity = hitResult.entity
-            while let parent = root.parent, parent.name != "MainAnchor" {
-                root = parent
-            }
-            
-            // 4. Handle Selection Transitions
+            while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
             if let previous = selectedEntity, previous != root {
                 setEntityTransparency(previous, alpha: 1.0)
             }
-            
-            selectedEntity = root
-
-            activeHandleEntity = nil          // no longer editing a path handle
-            // Apply transparency so gizmo/rings are visible
-            setEntityTransparency(root, alpha: 0.7)
-            
-            // 🔥 This decides whether we show move gizmo OR rotation rings
-            updateGizmoMode()
-            
-            showActionMenu(at: location)
-            
-            if let animation = root.availableAnimations.first {
-                root.playAnimation(animation.repeat(count: 1))
-            }
-            
-        } else {
-            // 5. Tapped empty space -> Clean up everything
-            setEntityTransparency(selectedEntity, alpha: 1.0)
-            selectedEntity = nil
+            selectedEntity     = root
             activeHandleEntity = nil
-            
+            setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
-            
+            // Menu is now triggered by long press, not tap
+
+            // commented this to stop auto animation playing
+//            if let anim = root.availableAnimations.first {
+//                root.playAnimation(anim.repeat(count: 1))
+//            }
+        } else {
+            setEntityTransparency(selectedEntity, alpha: 1.0)
+            selectedEntity     = nil
+            activeHandleEntity = nil
+            updateGizmoMode()
             hideGizmo()
             hideRotationGizmo()
             hideAnimationPanel()
+            refreshSidebarContent()
         }
-        
-        
     }
 
+    // ── Double tap — focus/frame entity ──────────────────────────────────────
+
+    @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard !isARModeActive, editorMode == .edit else { return }
+        let location = gesture.location(in: arView)
+        let hits     = arView.hitTest(location)
+        let objectHit = hits.first { hit in
+            var current: Entity? = hit.entity
+            while let e = current {
+                if e.name.contains("Gizmo") || e.name == "MotionPath"
+                    || e.name.hasPrefix("PathRoot_") || e.name.hasPrefix("path.")
+                    || e.name.hasPrefix("RotationArc_") || e.name.hasPrefix("arcHandle.")
+                    || e.components[MotionPathHandleComponent.self] != nil
+                    || e.components[RotationArcComponent.self] != nil { return false }
+                if e.name == "MainAnchor" { break }
+                current = e.parent
+            }
+            return true
+        }
+        guard let hit = objectHit else { return }
+        var root: Entity = hit.entity
+        while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+        frameEntityAnimated(root)
+    }
+
+    func frameEntityAnimated(_ entity: Entity) {
+        guard !isARModeActive else { return }
+        let bounds     = modelOnlyBounds(for: entity, relativeTo: nil)
+        let targetPos  = (bounds.min + bounds.max) * 0.5
+        let maxDim     = max(bounds.extents.x, max(bounds.extents.y, bounds.extents.z))
+        let targetDist = max(1.5, min(15.0, maxDim * 3.0))
+        framingStartTarget = cameraTarget
+        framingEndTarget   = targetPos
+        framingStartDist   = distance
+        framingEndDist     = targetDist
+        framingStartTime   = CACurrentMediaTime()
+        framingDuration    = 0.35
+        framingDisplayLink?.invalidate()
+        let link = CADisplayLink(target: self, selector: #selector(framingTick(_:)))
+        link.add(to: .main, forMode: .common)
+        framingDisplayLink = link
+    }
+
+    @objc func framingTick(_ link: CADisplayLink) {
+        let elapsed = CACurrentMediaTime() - framingStartTime
+        let raw     = Float(min(elapsed / framingDuration, 1.0))
+        let t       = 1 - pow(1 - raw, 3)
+        cameraTarget = simd_mix(framingStartTarget, framingEndTarget, SIMD3<Float>(repeating: t))
+        distance     = framingStartDist + (framingEndDist - framingStartDist) * t
+        updateEditorCamera()
+        if raw >= 1.0 { link.invalidate(); framingDisplayLink = nil }
+    }
+
+    // ── Action menu ───────────────────────────────────────────────────────────
 
     func showActionMenu(at point: CGPoint) {
-        
         guard let entity = selectedEntity else { return }
-        
-        let menu = EntityActionMenu()
-        
         let isCurrentlyLocked = entity.components[LockComponent.self]?.isLocked ?? false
-        menu.setLockTitle(isLocked: isCurrentlyLocked)
-        
+        let isCamera = entity.name.lowercased().contains("scenecamera")
+            || entity.components[CategoryComponent.self]?.toolType == .camera
+
+        // ── Check if entity is a wall or ground (colorable) ──────────────────
+        let isWall = entity.components[CanvasViewController.WallComponent.self] != nil
+        let isGround = entity.components[CanvasViewController.GroundComponent.self] != nil
+        let showColorOption = isWall || isGround
+
+        // ── Check if entity is a light (has LightConfigComponent) ────────────
+        let isLight = entity.components[LightConfigComponent.self] != nil
+
+        let menu = EntityActionMenu()
+        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
-        
         NSLayoutConstraint.activate([
             menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
-            menu.bottomAnchor.constraint(equalTo: view.topAnchor, constant: point.y - 40)
+            menu.bottomAnchor.constraint(equalTo: view.topAnchor,      constant: point.y - 40),
         ])
-        
-        menu.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(menu)
-        
-        NSLayoutConstraint.activate([
-            menu.centerXAnchor.constraint(
-                equalTo: view.leadingAnchor,
-                constant: point.x
-            ),
-            menu.bottomAnchor.constraint(
-                equalTo: view.topAnchor,
-                constant: point.y - 40
-            ),
-        ])
-        
         menu.onAction = { [weak self] action in
-            guard let self = self else { return }
-            
+            guard let self else { return }
             switch action {
             case .move:
-                if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                    self.interactionMode = .move
-                    self.presentAnimationPrompt(type: .move)
-                }
+                guard !(entity.components[LockComponent.self]?.isLocked ?? false) else { return }
                 menu.removeFromSuperview()
-                
+                self.interactionMode = .move
+                self.presentAnimationPrompt(type: .move)
             case .rotate:
-                if !(entity.components[LockComponent.self]?.isLocked ?? false) {
-                    self.interactionMode = .rotate
-                    self.presentAnimationPrompt(type: .rotate)
-                }
+                guard !(entity.components[LockComponent.self]?.isLocked ?? false) else { return }
                 menu.removeFromSuperview()
-                
+                self.interactionMode = .rotate
+                self.presentAnimationPrompt(type: .rotate)
+            case .addMovement:
+                menu.removeFromSuperview()
+                self.presentAddMovementPicker(for: entity)
+
+            case .changeColour:
+                // Open color picker for wall/ground entities
+                menu.removeFromSuperview()
+                if let modelEntity = entity as? ModelEntity {
+                    self.showColorPicker(for: modelEntity)
+                }
+
+            case .editMaterial:
+                // Open full material editor for wall/ground entities
+                menu.removeFromSuperview()
+                if let modelEntity = entity as? ModelEntity {
+                    self.presentMaterialEditor(for: modelEntity)
+                }
+
+            case .lightSettings:
+                // Open light control panel for light entities
+                menu.removeFromSuperview()
+                if var config = entity.components[LightConfigComponent.self] {
+                    let panelVC = LightControlPanelViewController(
+                        entity: entity,
+                        config: config
+                    ) { [weak self] updatedConfig in
+                        guard let self else { return }
+                        // This fires on every slider drag — updates the live 3D scene in real time
+                        self.updateLightProperties(for: entity, config: updatedConfig)
+                    }
+                    
+                    if self.view.bounds.width >= 375 {
+                        panelVC.modalPresentationStyle = .custom
+                        panelVC.transitioningDelegate = self.rightPanelTransitioningDelegate
+                    } else {
+                        panelVC.modalPresentationStyle = .pageSheet
+                        if let sheet = panelVC.sheetPresentationController {
+                            sheet.detents = [.medium()]
+                            sheet.prefersGrabberVisible = true
+                        }
+                    }
+                    self.present(panelVC, animated: true)
+                }
+
+            // ── Camera entity actions ───────────────────────────────────────
+            case .addShot:
+                menu.removeFromSuperview()
+                self.presentShotPicker(for: entity)
+            case .aspectRatio:
+                menu.removeFromSuperview()
+                self.presentAspectRatioPicker(for: entity)
             case .lock:
                 let newState = !isCurrentlyLocked
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
                 lockComp.isLocked = newState
                 entity.components.set(lockComp)
-
                 if newState {
-                    // Locking: hide everything, reset transparency
                     self.interactionMode = .move
                     self.setEntityTransparency(entity, alpha: 1.0)
                     self.hideGizmo()
                     self.hideRotationGizmo()
                 } else {
-                    // Unlocking: restore transparency, show correct gizmo for current mode
-                    self.setEntityTransparency(entity, alpha: 0.7)
+                    self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
                 menu.removeFromSuperview()
-                
             case .delete:
-                // 1. Reset transparency so the "ghost" version isn't saved in Undo/Redo
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
-                
-                // 2. Perform deletion
                 self.deleteSelected()
-                
-                // 3. Cleanup UI
                 self.hideGizmo()
                 menu.removeFromSuperview()
             }
@@ -270,265 +358,368 @@ extension CanvasViewController {
         self.currentActionMenu = menu
     }
 
-    
-    
-    // @objc func handlePan(_ gesture: UIPanGestureRecognizer) { (SAKSHAM GITHUB 3D canvas file)
+    // ── Add Movement picker ───────────────────────────────────────────────────
 
-    
+    func presentAddMovementPicker(for entity: Entity) {
+        let alert = UIAlertController(title: "Add Movement",
+                                      message: "Choose the type of animation to add",
+                                      preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Move (Position Path)", style: .default) { [weak self] _ in
+            self?.interactionMode = .move
+            self?.presentAnimationPrompt(type: .move)
+        })
+        alert.addAction(UIAlertAction(title: "Rotate", style: .default) { [weak self] _ in
+            self?.interactionMode = .rotate
+            self?.presentAnimationPrompt(type: .rotate)
+        })
+        if entity.components[CategoryComponent.self]?.toolType == .character,
+           entity.components[CharacterPoseComponent.self]?.isStandingPose == true {
+            alert.addAction(UIAlertAction(title: "Walk (Path + Animation)", style: .default) { [weak self] _ in
+                self?.interactionMode = .move
+                self?.animateWalk()
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    // ── Aspect Ratio picker ──────────────────────────────────────────────────
+
+    func presentAspectRatioPicker(for entity: Entity) {
+        // Walk up to the camera root if needed
+        var cameraRoot: Entity = entity
+        while let parent = cameraRoot.parent, parent.name != "MainAnchor" { cameraRoot = parent }
+
+        // Find the camera and current ratio
+        let currentRatio = cameraRoot.components[CameraAspectComponent.self]?.aspectRatio ?? .default
+        guard let cameraItem = sceneCameraItems.first(where: { $0.cameraRoot === cameraRoot }) else { return }
+
+        let alert = UIAlertController(
+            title: "Aspect Ratio",
+            message: "Choose the framing ratio for this camera",
+            preferredStyle: .actionSheet
+        )
+
+        for ratio in CameraAspectRatio.allCases {
+            let prefix = ratio == currentRatio ? "✓ " : ""
+            alert.addAction(UIAlertAction(title: "\(prefix)\(ratio.displayName)", style: .default) { [weak self] _ in
+                guard let self = self else { return }
+                self.applyAspectRatio(ratio, to: cameraItem.camera, cameraRoot: cameraRoot)
+            })
+        }
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    // ── Body drag (called from handlePan when no gizmo part is hit) ───────────
+    // Uses the virtual editor camera for direction, not arView.cameraTransform
+
     func handleBodyDrag(_ gesture: UIPanGestureRecognizer, entity: Entity) {
+        if dragStartPosition == nil {
+            dragStartPosition = entity.position
+            gesture.setTranslation(.zero, in: arView)
+            return
+        }
         guard let startPos = dragStartPosition else { return }
         let translation = gesture.translation(in: arView)
-        let mouseDelta = SIMD2<Float>(Float(translation.x), Float(translation.y))
-        
         var newPosition = startPos
-        let sensitivity: Float = 0.005
-        let dx = mouseDelta.x * sensitivity
-        let dy = -mouseDelta.y * sensitivity
+        // FIX: sensitivity now scales with camera distance, matching panCameraTarget()
+        // which uses distance * 0.0015. At distance=5 this gives 0.0015; at distance=15
+        // it gives 0.0045 — so dragging feels consistent regardless of zoom level.
+        // The old fixed 0.005 was too fast when zoomed in and too slow when zoomed out.
+        let sensitivity: Float = max(0.001, distance * 0.0003)
+        let dx =  Float(translation.x) * sensitivity
+        let dy = -Float(translation.y) * sensitivity
         
         if currentDragMode == .ground {
-            let camOri = arView.cameraTransform.rotation
-            let right = camOri.act([1, 0, 0])
-            let forward = camOri.act([0, 0, -1])
-            
-            let flatForward = simd_normalize(SIMD3<Float>(forward.x, 0, forward.z))
-            let flatRight = simd_normalize(SIMD3<Float>(right.x, 0, right.z))
-            
-            newPosition += (flatRight * dx) + (flatForward * dy)
-            newPosition.y = startPos.y
+            let camPos      = activeCamera.position(relativeTo: nil)
+            let scenePos    = entity.position(relativeTo: nil)
+            let forward3D   = simd_normalize(scenePos - camPos)
+            let flatForward = simd_normalize(SIMD3<Float>(forward3D.x, 0, forward3D.z))
+            let flatRight   = simd_normalize(simd_cross(flatForward, SIMD3<Float>(0, 1, 0)))
+            newPosition    += (flatRight * dx) + (flatForward * dy)
+            newPosition.y   = startPos.y
         } else {
             newPosition.y = startPos.y + (dy * 2.0)
+            let skipYClamp: Bool = {
+                if let cat = entity.components[CategoryComponent.self] {
+                    return cat.toolType == .light || cat.toolType == .camera
+                }
+                return entity.name.hasPrefix("SceneCamera") || entity.name.contains("Light")
+            }()
+            if !skipYClamp {
+                let bounds = modelOnlyBounds(for: entity, relativeTo: entity)
+                newPosition.y = max(-bounds.min.y, newPosition.y)
+            }
         }
-        
-        entity.position = newPosition
+        let clampedPosition = clampPositionAvoidingOverlap(entity: entity, proposedPosition: newPosition)
+        entity.position = clampedPosition
         updateGizmoPosition()
     }
 
-
-
-
-    func calculateWorldDragDelta(_ gesture: UIPanGestureRecognizer) -> SIMD3<
-        Float
-    > {
-        
+    func calculateWorldDragDelta(_ gesture: UIPanGestureRecognizer) -> SIMD3<Float> {
         let translation = gesture.translation(in: arView)
         gesture.setTranslation(.zero, in: arView)
-        
-        let sensitivity: Float = 0.005
-        
-        let dx = Float(translation.x) * sensitivity
-        let dz = Float(translation.y) * sensitivity
-        
-        let cam = arView.cameraTransform.rotation
-        
-        let right = cam.act([1, 0, 0])
-        let forward = cam.act([0, 0, 1])
-        
-        return (right * dx) + (forward * dz)
+        let dx = Float(translation.x) * 0.005
+        let dz = Float(translation.y) * 0.005
+        let camOri = activeCamera.orientation(relativeTo: nil)
+        return (camOri.act([1,0,0]) * dx) + (camOri.act([0,0,1]) * dz)
     }
 
-    
     @objc func toggleMovementTapped(_ sender: UIButton) {
         if currentDragMode == .ground {
             currentDragMode = .vertical
-            print("Switched to Vertical (Y) Movement")
-            // Update button icon here if needed
-            sender.setImage(
-                UIImage(systemName: "arrow.up.and.down"),
-                for: .normal
-            )
-            sender.tintColor = .yellow  // Visual feedback
+            sender.setImage(UIImage(systemName: "arrow.up.and.down"), for: .normal)
+            sender.tintColor = .yellow
         } else {
             currentDragMode = .ground
-            print("Switched to Ground (XZ) Movement")
-            // Update button icon here if needed
-            sender.setImage(
-                UIImage(systemName: "arrow.left.and.right"),
-                for: .normal
-            )
+            sender.setImage(UIImage(systemName: "arrow.left.and.right"), for: .normal)
             sender.tintColor = .white
         }
     }
 
-    
-    func calculateAxisMovement(
-        entity: Entity,
-        axis: GizmoAxis,
-        mouseDelta: SIMD2<Float>,
-        view: ARView
-    ) -> SIMD3<Float> {
-        
-        var axisVector: SIMD3<Float> = [0, 0, 0]
-        
+    func calculateAxisMovement(entity: Entity, axis: GizmoAxis,
+                                mouseDelta: SIMD2<Float>, view: ARView) -> SIMD3<Float> {
+        var axisVector: SIMD3<Float> = [0,0,0]
         switch axis {
-        case .x: axisVector = [1, 0, 0]
-        case .y: axisVector = [0, 1, 0]
-        case .z: axisVector = [0, 0, 1]
-        case .none: return [0, 0, 0]
+        case .x:    axisVector = [1,0,0]
+        case .y:    axisVector = [0,1,0]
+        case .z:    axisVector = [0,0,1]
+        case .none: return [0,0,0]
         }
-        
-        // 2. Project 3D points to 2D Screen Space to find the "Visual Line"
-        let objectWorldPos = entity.position
-        // A point slightly further along the axis
-        let axisEndWorldPos = objectWorldPos + axisVector
-        
-        // Project both to screen coordinates
-        guard let screenPosCenter = view.project(objectWorldPos),
-              let screenPosAxisEnd = view.project(axisEndWorldPos)
-        else {
-            return [0, 0, 0]
-        }
-        
-        // 3. Calculate the Screen Vector (The direction of the arrow on screen)
-        let screenVector = SIMD2<Float>(
-            Float(screenPosAxisEnd.x - screenPosCenter.x),
-            Float(screenPosAxisEnd.y - screenPosCenter.y)
-        )
-        
-        // Normalize to get direction only
-        let screenDir = simd_normalize(screenVector)
-        
-        // 4. Dot Product
-        // This tells us how much we moved the mouse *along* that line
+        let op = entity.position
+        guard let sp = view.project(op), let se = view.project(op + axisVector) else { return [0,0,0] }
+        let screenDir  = simd_normalize(SIMD2<Float>(Float(se.x-sp.x), Float(se.y-sp.y)))
         let projection = simd_dot(mouseDelta, screenDir)
-        
-        // 5. Sensitivity Factor
-        // Adjust this to make the movement feel 1:1 or slower
-        let sensitivity: Float = 0.002
-        
-        // 6. Return the 3D delta
-        // We multiply the World Axis Vector by the projected amount
-        return axisVector * (projection * sensitivity)
+        return axisVector * (projection * 0.002)
     }
 
-    
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+    // ── Gesture recogniser delegate ───────────────────────────────────────────
+    // Only blocks handlePan when the ring is touched (ringPan owns those touches).
+    // All other touches — gizmo arrows, entity body, empty space — always allowed.
 
-    
-    guard gestureRecognizer is UIPanGestureRecognizer,
-          interactionMode == .rotate else {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer is UIPanGestureRecognizer else { return true }
+        if gestureRecognizer.numberOfTouches >= 2 { return true }
+        let location = gestureRecognizer.location(in: arView)
+        let hits     = arView.hitTest(location)
+        // Block handlePan when ring is touched — ringPan handles it.
+        // Walk up parents since ring collider segments are children of Gizmo_Ring_XZ.
+        for hit in hits {
+            var e: Entity? = hit.entity
+            while let entity = e {
+                if entity.name == "Gizmo_Ring_XZ" { return false }
+                e = entity.parent
+            }
+        }
         return true
     }
 
-    let location = gestureRecognizer.location(in: arView)
-    let hits = arView.hitTest(location)
+    // ── Ring pan — Y-axis rotation via outer ring ─────────────────────────────
 
-    // Only allow rotation pan if touching a ring
-    for hit in hits {
-        let name = hit.entity.name
-        if name == "xRing" || name == "yRing" || name == "zRing" {
-            return true
+    func ringPanShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+        let location = gesture.location(in: arView)
+        return arView.hitTest(location).contains { hit in
+            var e: Entity? = hit.entity
+            while let entity = e {
+                if entity.name == "Gizmo_Ring_XZ" { return true }
+                e = entity.parent
+            }
+            return false
         }
     }
 
-    // Otherwise block this pan so old gizmo works
-    return false
+    @objc func handleRingPan(_ gesture: UIPanGestureRecognizer) {
+        guard let selected = selectedEntity else { return }
+        let isLocked = selected.components[LockComponent.self]?.isLocked ?? false
+        guard !isLocked else { return }
+        let location = gesture.location(in: arView)
 
+        switch gesture.state {
+        case .began:
+            let hits = arView.hitTest(location)
+            let ringHit = hits.contains { hit in
+                var e: Entity? = hit.entity
+                while let entity = e {
+                    if entity.name == "Gizmo_Ring_XZ" { return true }
+                    e = entity.parent
+                }
+                return false
+            }
+            guard ringHit else { return }
+            saveCurrentStateToUndo()
+            ringDragActive  = true
+            lastPanLocation = location
+            highlightGizmoPart(.rotateY)
+
+        case .changed:
+            guard ringDragActive else { return }
+
+            // Circular motion: project the gizmo centre to screen space,
+            // then measure the angle of the touch around that centre.
+            // The delta angle between frames is the rotation amount.
+            if let gizmo = gizmoRoot,
+               let centre2D = arView.project(gizmo.position(relativeTo: nil)) {
+
+                let prev = CGPoint(x: lastPanLocation.x  - centre2D.x,
+                                   y: lastPanLocation.y  - centre2D.y)
+                let curr = CGPoint(x: location.x         - centre2D.x,
+                                   y: location.y         - centre2D.y)
+
+                // Only act when fingers are far enough from centre to give a stable angle
+                let prevLen = sqrt(prev.x*prev.x + prev.y*prev.y)
+                let currLen = sqrt(curr.x*curr.x + curr.y*curr.y)
+                guard prevLen > 8, currLen > 8 else {
+                    lastPanLocation = location
+                    return
+                }
+
+                let prevAngle = Float(atan2(prev.y, prev.x))
+                let currAngle = Float(atan2(curr.y, curr.x))
+
+                // Wrap delta to (-π, π]
+                var delta = currAngle - prevAngle
+                if delta >  Float.pi { delta -= 2 * Float.pi }
+                if delta < -Float.pi { delta += 2 * Float.pi }
+
+                guard delta.isFinite, abs(delta) > 0.0001 else {
+                    lastPanLocation = location
+                    return
+                }
+
+                // Clockwise screen drag → clockwise Y rotation (negate UIKit angle convention)
+                var t = selected.transform
+                t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0,1,0]) * t.rotation)
+                selected.transform = t
+                updateGizmoPosition()
+            }
+            lastPanLocation = location
+
+        case .ended, .cancelled:
+            ringDragActive = false
+            resetGizmoColors()
+        default: break
+        }
     }
 
+    // ── 3-ring rotation gizmo pan (.rotate mode only) ─────────────────────────
 
-    
     @objc func handleRotationPan(_ gesture: UIPanGestureRecognizer) {
-        
-        
-        // Only run in rotation mode
         guard interactionMode == .rotate else { return }
-        
         let location = gesture.location(in: arView)
-        
         switch gesture.state {
-            
         case .began:
-            saveCurrentStateToUndo()
+            // FIX 5: Do NOT call saveCurrentStateToUndo() unconditionally.
+            // Camera-orbit / deselect pans mustn't create empty undo entries.
             let hits = arView.hitTest(location)
-            
-            // 1. Reset selection state for this touch
             activeRotationAxis = nil
-            activeGizmoPart = .none
-            
-            // 2. Priority: Check if we hit a GIZMO part
-            if let gizmoHit = hits.first(where: { $0.entity.name.contains("Ring") || $0.entity.name.contains("Arrow") || $0.entity.name.contains("Plane") }) {
-                let name = gizmoHit.entity.name
-                
-                // Handle Movement Parts
-                if name.contains("Arrow_Y") {
-                    activeGizmoPart = .arrowY
-                } else if name.contains("Plane_XZ") {
-                    activeGizmoPart = .planeXZ
+            activeGizmoPart    = .none
+            if let hit = hits.first(where: { ["xRing","yRing","zRing"].contains($0.entity.name) }) {
+                // The RotationRingGizmo is parented directly to the entity, so its
+                // world-space matrix columns ARE the entity's current local axes in
+                // world space. Read those columns from the gizmo itself (not from
+                // the individual ring entities, which carry extra per-ring orientations
+                // that don't correspond to the rotation axes).
+                //   column 0 = entity's world +X  (red ring rotates around this)
+                //   column 1 = entity's world +Y  (green ring rotates around this)
+                //   column 2 = entity's world +Z  (blue ring rotates around this)
+                // The torus mesh is built in the XY plane (face normal = [0,0,1]).
+                // Each ring then gets an orientation baked in RotationRingGizmo:
+                //   xRing: pi/2 around Y  → face normal becomes [1,0,0]  → col 0
+                //   yRing: pi/2 around X  → face normal becomes [0,-1,0] → -col 1
+                //   zRing: identity       → face normal stays  [0,0,1]   → col 2
+                // We read these from the RotationRingGizmo's world matrix so the
+                // axes follow the entity's current orientation correctly.
+                let gizmoMatrix = (rotationGizmo ?? hit.entity).transformMatrix(relativeTo: nil)
+                switch hit.entity.name {
+                case "xRing":
+                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.0.x,
+                                                                       gizmoMatrix.columns.0.y,
+                                                                       gizmoMatrix.columns.0.z))
+                    activeGizmoPart    = .rotateX
+                case "yRing":
+                    // yRing face normal is [0,-1,0] in local gizmo space → negate col 1
+                    activeRotationAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
+                                                                     -gizmoMatrix.columns.1.y,
+                                                                     -gizmoMatrix.columns.1.z))
+                    activeGizmoPart    = .rotateY
+                default:
+                    activeRotationAxis = simd_normalize(SIMD3<Float>( gizmoMatrix.columns.2.x,
+                                                                       gizmoMatrix.columns.2.y,
+                                                                       gizmoMatrix.columns.2.z))
+                    activeGizmoPart    = .rotateZ
                 }
-                // Handle Rotation Rings
-                else if name == "xRing" {
-                    activeRotationAxis = [1, 0, 0]
-                    activeGizmoPart = .rotateX
-                } else if name == "yRing" {
-                    activeRotationAxis = [0, 1, 0]
-                    activeGizmoPart = .rotateY
-                } else if name == "zRing" {
-                    activeRotationAxis = [0, 0, 1]
-                    activeGizmoPart = .rotateZ
-                }
-                
+                saveCurrentStateToUndo()
                 highlightGizmoPart(activeGizmoPart)
                 lastPanLocation = location
-                return // Stop here if we touched the gizmo
+                return
             }
-
-            // 3. Secondary: Check if we hit an OBJECT
             if let hit = arView.entity(at: location) {
                 var root: Entity? = hit
                 while let parent = root?.parent, parent.name != "MainAnchor" { root = parent }
-
                 if root?.name.contains("Gizmo") == false {
+                    saveCurrentStateToUndo()   // FIX 5: only when an entity is selected
                     setEntityTransparency(selectedEntity, alpha: 1.0)
                     selectedEntity = root
-                    setEntityTransparency(root, alpha: 0.7)
-                    updateGizmoMode()   // spawns rings immediately on the new entity
+                    setEntityTransparency(root, alpha: 0.9)
+                    updateGizmoMode()
                 }
             } else {
-                // 4. Final: Hit BLANK SPACE -> Deselect and Hide
                 setEntityTransparency(selectedEntity, alpha: 1.0)
                 selectedEntity = nil
-                hideGizmo()
-                hideRotationGizmo()
+                hideGizmo(); hideRotationGizmo()
             }
         case .changed:
-            
-            
-            guard let axis = activeRotationAxis,
-                  let selected = selectedEntity else { return }
-            
+            guard let sel = selectedEntity else { return }
             let dx = Float(location.x - lastPanLocation.x)
             let dy = Float(location.y - lastPanLocation.y)
-            
-            let drag = abs(dx) > abs(dy) ? dx : -dy
-            let angle = drag * 0.005
-            
-            // Safety check — prevent NaN rotations
+
+            // Get the ring entity directly from the gizmo so we can read its
+            // true world-space normal — the axis the ring is physically lying on
+            // right now, after all prior rotations.
+            guard let gizmo = rotationGizmo else { lastPanLocation = location; return }
+
+            let ringName: String
+            switch activeGizmoPart {
+            case .rotateX: ringName = "xRing"
+            case .rotateY: ringName = "yRing"
+            case .rotateZ: ringName = "zRing"
+            default: lastPanLocation = location; return
+            }
+
+            guard let ring = gizmo.findEntity(named: ringName) else {
+                lastPanLocation = location; return
+            }
+
+            // The ring's world orientation quaternion directly gives us its
+            // local axes. The torus mesh is built in the XY plane so its face
+            // normal is local +Z. After the ring's own baked orientation:
+            //   xRing (pi/2 around Y): local Z rotates to world X  → use act([0,0,1])
+            //   yRing (pi/2 around X): local Z rotates to world -Y → use act([0,0,1])
+            //   zRing (identity):      local Z stays world Z        → use act([0,0,1])
+            // In all cases we just rotate [0,0,1] by the ring's world quaternion.
+            let ringWorldQuat = ring.orientation(relativeTo: nil)
+            let liveAxis = simd_normalize(ringWorldQuat.act([0, 0, 1]))
+
+            let angle: Float
+            switch activeGizmoPart {
+            case .rotateX: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
+            case .rotateZ: angle = (abs(dy) > abs(dx) ?  dy : -dx) * 0.006
+            default:       angle = (abs(dx) > abs(dy) ?  dx : -dy) * 0.006
+            }
             guard angle.isFinite else { return }
-            
-            let rotation = simd_quatf(angle: angle, axis: axis)
-            
-            var transform = selected.transform
-            
-            // Stable incremental rotation
-            transform.rotation = rotation * transform.rotation
-            
-            // Safety normalize quaternion
-            transform.rotation = simd_normalize(transform.rotation)
-            
-            selected.transform = transform
-            
+
+            // Apply rotation in world space using setOrientation so we don't
+            // have to manually convert between local and world quaternion spaces.
+            let deltaQuat    = simd_quatf(angle: angle, axis: liveAxis)
+            let currentWorld = sel.orientation(relativeTo: nil)
+            sel.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
             lastPanLocation = location
-            
-            
         case .ended, .cancelled:
-            
             activeRotationAxis = nil
-            
-        default:
-            break
+            resetGizmoColors()
+        default: break
         }
-        
     }
-
 }
-

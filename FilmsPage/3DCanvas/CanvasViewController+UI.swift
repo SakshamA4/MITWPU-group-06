@@ -5,6 +5,15 @@ import UIKit
 import ARKit
 
 extension CanvasViewController {
+    
+    // ISSUE 5: Adaptive layout properties
+    var isLargeIPad: Bool {
+        max(UIScreen.main.bounds.width, UIScreen.main.bounds.height) >= 1024
+    }
+    
+    var layoutScale: CGFloat {
+        isLargeIPad ? 1.0 : 0.88
+    }
 
     func setupTopControlsUI() {
         // 1. Add Breakdown button
@@ -203,8 +212,13 @@ extension CanvasViewController {
     @objc func toggleRotationMode(_ button: UIButton) {
         interactionMode = (interactionMode == .move) ? .rotate : .move
 
-        button.backgroundColor =
-            interactionMode == .rotate ? .systemOrange : .systemBlue
+        if interactionMode == .rotate {
+            button.setImage(UIImage(systemName: "rotate.3d"), for: .normal)
+            button.backgroundColor = .systemOrange
+        } else {
+            button.setImage(UIImage(systemName: "move.3d"), for: .normal)
+            button.backgroundColor = .systemBlue
+        }
 
         // Immediately swap gizmo ↔ rings on the currently selected entity
         updateGizmoMode()
@@ -246,30 +260,31 @@ extension CanvasViewController {
         return button
     }
 
-    func makeGrid(size: Int, spacing: Float) -> Entity {
+    // Grid: size:100 produces 402 line entities (±20 m span at 0.2 m spacing).
+    func makeGrid(size: Int = 100, spacing: Float) -> Entity {
         let container = Entity()
         let length = Float(size) * spacing * 2
-        
+
         for i in -size...size {
             let isMajor = i % 5 == 0
-            
+
             var xColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
             var zColor: UIColor =
-            isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
-            
+                isMajor ? .gray : .lightGray.withAlphaComponent(0.8)
+
             if i == 0 {
                 xColor = .red
                 zColor = .blue
             }
-            
+
             let xLine = ModelEntity(
                 mesh: .generateBox(size: [length, 0.002, 0.002]),
                 materials: [SimpleMaterial(color: xColor, isMetallic: false)]
             )
             xLine.position = [0, 0, Float(i) * spacing]
             container.addChild(xLine)
-            
+
             let zLine = ModelEntity(
                 mesh: .generateBox(size: [0.002, 0.002, length]),
                 materials: [SimpleMaterial(color: zColor, isMetallic: false)]
@@ -277,7 +292,7 @@ extension CanvasViewController {
             zLine.position = [Float(i) * spacing, 0, 0]
             container.addChild(zLine)
         }
-        
+
         return container
     }
 
@@ -321,9 +336,14 @@ extension CanvasViewController {
 
     
     func refreshSidebarContent() {
+        // FIX 8: Skip redundant rebuilds during batch load — the persistence service
+        // resets isBatchLoading and calls us exactly once at Phase 9.
+        guard !isBatchLoading else { return }
         hierarchyStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        let allEntities = arView.scene.anchors.flatMap { $0.children }
+
+        // Use mainAnchor directly — never arView.scene.anchors.flatMap, which would
+        // include the Grid anchor (40,000+ line entities) and cause severe slowdowns.
+        let allEntities: [Entity] = mainAnchor.map { Array($0.children) } ?? []
         
         var itemsByCategory: [ToolType: [Entity]] = [:]
         ToolType.allCases.forEach { itemsByCategory[$0] = [] }
@@ -346,7 +366,16 @@ extension CanvasViewController {
             hierarchyStackView.addArrangedSubview(header)
             
             for entity in entities {
-                let row = createHierarchyItemRow(title: entity.name)
+                // For camera entities, show the human-readable "Camera N" name
+                // instead of the raw internal name (e.g. "SceneCamera_1_<UUID>").
+                let displayTitle: String
+                if tool == .camera,
+                   let cameraItem = sceneCameraItems.first(where: { $0.cameraRoot === entity }) {
+                    displayTitle = cameraItem.displayName
+                } else {
+                    displayTitle = entity.name
+                }
+                let row = createHierarchyItemRow(title: displayTitle, entityName: entity.name)
                 hierarchyStackView.addArrangedSubview(row)
             }
         }
@@ -381,13 +410,15 @@ extension CanvasViewController {
 
 
     
-    private func createHierarchyItemRow(title: String) -> UIView {
+    private func createHierarchyItemRow(title: String, entityName: String? = nil) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
         
         // 2. Set the title and color
         config.title = title
-        let isSelected = selectedEntity?.name == title
+        // Selection highlight uses the actual entity name for the match
+        let nameForSelection = entityName ?? title
+        let isSelected = selectedEntity?.name == nameForSelection
         config.baseForegroundColor = isSelected ? .systemRed : .label
         
         config.contentInsets = NSDirectionalEdgeInsets(
@@ -409,10 +440,10 @@ extension CanvasViewController {
         // Alignment still works on the button property
         button.contentHorizontalAlignment = .leading
         
-        // 6. Add the action
+        // 6. Add the action — select by the real entity name, not the display label
         button.addAction(
             UIAction { [weak self] _ in
-                self?.selectEntityFromSidebar(named: title)
+                self?.selectEntityFromSidebar(named: nameForSelection)
             },
             for: .touchUpInside
         )
@@ -427,6 +458,7 @@ extension CanvasViewController {
         
         // 1. TOP TOOLBAR (Floating)
         let toolbar = UIStackView()
+        toolbar.tag = 8804
         toolbar.axis = .horizontal
         toolbar.spacing = 6
         toolbar.alignment = .center
@@ -462,6 +494,7 @@ extension CanvasViewController {
         
         // 3. 2D / 3D BUTTONS (Bottom-Right)
         let viewModeControl = UISegmentedControl(items: ["2D", "3D"])
+        viewModeControl.tag = 8805
         viewModeControl.selectedSegmentIndex = 1
         viewModeControl.translatesAutoresizingMaskIntoConstraints = false
         viewModeControl.backgroundColor = UIColor.systemBackground
@@ -496,7 +529,8 @@ extension CanvasViewController {
         
         //         4. ROTATE BUTTON (Bottom-Left - Blue Button)
         let rotateBtn = UIButton(type: .system)
-        rotateBtn.setImage(UIImage(systemName: "rotate.right"), for: .normal)
+        rotateBtn.tag = 8806
+        rotateBtn.setImage(UIImage(systemName: "move.3d"), for: .normal)
         rotateBtn.tintColor = .white
         rotateBtn.backgroundColor = .systemBlue
         rotateBtn.layer.cornerRadius = 22
@@ -547,27 +581,12 @@ extension CanvasViewController {
         //                view.addSubview(redoBtn)
       
         
-        // AR MODE BUTTON
-        let arButton = UIButton(type: .system)
-        let arIconCfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
-        arButton.setImage(UIImage(systemName: "arkit", withConfiguration: arIconCfg), for: .normal)
-        arButton.tintColor = .systemGreen
-        arButton.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
-        arButton.layer.cornerRadius = 16
-        arButton.clipsToBounds = true
-        arButton.translatesAutoresizingMaskIntoConstraints = false
-        self.arModeButton = arButton
-        arButton.addAction(UIAction { [weak self] _ in
-            guard let self = self else { return }
-            self.isARModeActive.toggle()
-            self.toggleARMode(isOn: self.isARModeActive)
-        }, for: .touchUpInside)
+
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
-        view.addSubview(arButton)
 
         
         //undo redo
@@ -612,17 +631,11 @@ extension CanvasViewController {
                 constant: -16
             ),
             viewModeControl.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -20
+                equalTo: view.bottomAnchor,
+                constant: -16
             ),
             viewModeControl.heightAnchor.constraint(equalToConstant: 32),
             viewModeControl.widthAnchor.constraint(equalToConstant: 120),
-
-            // AR Button (bottom-right, left of 2D/3D control)
-            arButton.trailingAnchor.constraint(equalTo: viewModeControl.leadingAnchor, constant: -12),
-            arButton.centerYAnchor.constraint(equalTo: viewModeControl.centerYAnchor),
-            arButton.widthAnchor.constraint(equalToConstant: 44),
-            arButton.heightAnchor.constraint(equalToConstant: 44),
 
             // Rotate Button (Bottom Left)
             rotateBtn.leadingAnchor.constraint(
@@ -630,51 +643,99 @@ extension CanvasViewController {
                 constant: 16
             ),
             rotateBtn.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -20
+                equalTo: view.bottomAnchor,
+                constant: -16
             ),
             rotateBtn.widthAnchor.constraint(equalToConstant: 40),
             rotateBtn.heightAnchor.constraint(equalToConstant: 40),
             
         ])
         
-        // 8. CAMERA COLLECTION VIEW (Right Side)
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .vertical
-        layout.itemSize = CGSize(width: 120, height: 120)
-        layout.minimumLineSpacing = 10
-        
-        cameraCollectionView = UICollectionView(
-            frame: .zero,
-            collectionViewLayout: layout
-        )
-        
-        cameraCollectionView.register(
-            CameraPreviewCell.self,
-            forCellWithReuseIdentifier: CameraPreviewCell.reuseID
-        )
-        
-        cameraCollectionView.backgroundColor = UIColor.black.withAlphaComponent(
-            0.85
-        )
-        cameraCollectionView.layer.cornerRadius = 14
+        // REPLACE WITH THIS:
+        // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
+        let cameraPanel = UIView()
+        cameraPanel.tag = 8800
+        cameraPanel.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        cameraPanel.layer.cornerRadius = 16
+        cameraPanel.clipsToBounds = true
+        cameraPanel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cameraPanel)
+
+        // Collection view with top spacing via sectionInset
+        let camLayout = UICollectionViewFlowLayout()
+        camLayout.scrollDirection = .vertical
+        camLayout.minimumLineSpacing = 12
+        camLayout.sectionInset = UIEdgeInsets(top: 16, left: 8, bottom: 12, right: 8)
+
+        cameraCollectionView = UICollectionView(frame: .zero, collectionViewLayout: camLayout)
+        cameraCollectionView.tag = 8802
+        cameraCollectionView.register(CameraPreviewCell.self, forCellWithReuseIdentifier: CameraPreviewCell.reuseID)
+        cameraCollectionView.backgroundColor = .clear
+        cameraCollectionView.showsVerticalScrollIndicator = false
         cameraCollectionView.translatesAutoresizingMaskIntoConstraints = false
-        
         cameraCollectionView.dataSource = self
         cameraCollectionView.delegate = self
+        cameraPanel.addSubview(cameraCollectionView)
+
+        // Panel constraints — slides in/out from the right edge.
+        // ISSUE 4 & 5: Adaptive sizing based on device
+        // On 13-inch iPad: panel width = 200pt, cell height = panelWidth * 0.75, max panel height = min(availableHeight * 0.55, 420)
+        // On 11-inch iPad: panel width = 176pt, cell height = panelWidth * 0.75, max panel height = min(availableHeight * 0.55, 340)
+        let isLarge = isLargeIPad
+        let panelWidth: CGFloat = isLarge ? 200 : 176
+        let availableHeight = view.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom - topControlsHeight
+        let maxPanelHeight = min(availableHeight * 0.55, isLarge ? 420 : 340)
+        let cellHeight = panelWidth * 0.75
         
-        view.addSubview(cameraCollectionView)
+        // Update column width in collection view layout
+        if let layout = cameraCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.itemSize = CGSize(width: panelWidth - 16, height: cellHeight)
+        }
         
+        panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+            constant: panelWidth  // start fully off-screen (collapsed)
+        )
+        panelTrailingConstraint?.identifier = "panelTrailing"
+        
+        panelWidthConstraint = cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth)
+        panelHeightConstraint = cameraPanel.heightAnchor.constraint(equalToConstant: maxPanelHeight)
+
         NSLayoutConstraint.activate([
-            cameraCollectionView.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor,
-                constant: -16
-            ),
-            cameraCollectionView.centerYAnchor.constraint(
-                equalTo: view.centerYAnchor
-            ),
-            cameraCollectionView.widthAnchor.constraint(equalToConstant: 140),
-            cameraCollectionView.heightAnchor.constraint(equalToConstant: 320),
+            panelTrailingConstraint!,
+            cameraPanel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            panelWidthConstraint!,
+            panelHeightConstraint!,
+
+            cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
+            cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            cameraCollectionView.trailingAnchor.constraint(equalTo: cameraPanel.trailingAnchor),
+            cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
+        ])
+
+        cameraPanel.alpha = 1.0  // always opaque; visibility controlled by slide position
+
+        // Pull-tab button — lives on the main view so it is never clipped by the panel.
+        // It sticks out from the panel's left edge and is always reachable.
+        let pullTab = UIButton(type: .system)
+        pullTab.tag = 8803
+        let tabCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        pullTab.setImage(UIImage(systemName: "chevron.right", withConfiguration: tabCfg), for: .normal)
+        pullTab.tintColor = .white
+        pullTab.backgroundColor = UIColor(white: 0.13, alpha: 0.95)
+        pullTab.layer.cornerRadius = 10
+        pullTab.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        pullTab.translatesAutoresizingMaskIntoConstraints = false
+        pullTab.addTarget(self, action: #selector(toggleCameraPanelTapped), for: .touchUpInside)
+        pullTab.alpha = 0.0  // hidden until first camera is added
+        view.addSubview(pullTab)
+
+
+        NSLayoutConstraint.activate([
+            pullTab.trailingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
+            pullTab.centerYAnchor.constraint(equalTo: cameraPanel.centerYAnchor),
+            pullTab.widthAnchor.constraint(equalToConstant: 20),
+            pullTab.heightAnchor.constraint(equalToConstant: 44),
         ])
         
         // 9. SIDEBAR & HIERARCHY
@@ -690,7 +751,7 @@ extension CanvasViewController {
         )
         
         NSLayoutConstraint.activate([
-            sidebarView.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            sidebarView.topAnchor.constraint(equalTo: view.topAnchor),
             sidebarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             sidebarView.widthAnchor.constraint(equalToConstant: sidebarWidth),
             sidebarLeadingConstraint,
@@ -786,16 +847,83 @@ extension CanvasViewController {
     }
 
 
-    @objc func shotBreakdownTapped() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        print("🎬 Shot Breakdown Tapped")
+//    @objc func shotBreakdownTapped() {
+//        let generator = UIImpactFeedbackGenerator(style: .medium)
+//        generator.impactOccurred()
+//        print("🎬 Shot Breakdown Tapped")
+//    }
+    
+    @objc func shotBreakdownTapped_DISABLED() {
+        let vc = ShotBreakdownViewController()
+        vc.sceneName        = self.sceneName
+        vc.timeline         = self.timeline
+        vc.arView           = self.arView                    // ← new
+         vc.evaluateTimeline = { [weak self] t in             // ← new
+            self?.evaluateTimeline(at: t)
+        }
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    // MARK: - Color Picker
+    func showColorPicker(for entity: ModelEntity) {
+        self.colorPickerTargetEntity = entity
+        let picker = UIColorPickerViewController()
+        picker.delegate = self
+        picker.supportsAlpha = false
+        
+        // Set initial color from the entity
+        if let wallComp = entity.components[CanvasViewController.WallComponent.self] {
+            picker.selectedColor = wallComp.uiColor
+        } else if let groundComp = entity.components[CanvasViewController.GroundComponent.self] {
+            picker.selectedColor = groundComp.uiColor
+        }
+        
+        // Add a custom done button with checkmark
+        let doneButton = UIBarButtonItem(
+            image: UIImage(systemName: "checkmark"),
+            style: .done,
+            target: self,
+            action: #selector(colorPickerDoneTapped)
+        )
+        picker.navigationItem.rightBarButtonItem = doneButton
+        
+        // Present in a navigation controller to show the custom bar button
+        let navController = UINavigationController(rootViewController: picker)
+        self.present(navController, animated: true)
+    }
+
+    // Helper function for showing color picker immediately after spawning
+    func showColorPickerForNewSpawn(_ entity: ModelEntity) {
+        // Select the entity first
+        self.selectedEntity = entity
+        // Show the color picker
+        self.showColorPicker(for: entity)
+    }
+
+    @objc func colorPickerDoneTapped() {
+        self.dismiss(animated: true)
     }
 
 
 }
 
+// MARK: - UIColorPickerViewController Delegate
+extension CanvasViewController: UIColorPickerViewControllerDelegate {
+    func colorPickerViewController(
+        _ viewController: UIColorPickerViewController,
+        didSelect color: UIColor,
+        continuously: Bool
+    ) {
+        guard let entity = colorPickerTargetEntity as? ModelEntity else { return }
+        self.applyColor(color, to: entity)
+    }
+
+    func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+        colorPickerTargetEntity = nil
+    }
+}
+
 // MARK: - UICollectionView DataSource + Delegate
-extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+extension CanvasViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     // Implementations are in CanvasViewController+Camera.swift
 }

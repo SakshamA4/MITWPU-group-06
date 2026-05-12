@@ -14,17 +14,29 @@
 		19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"3DCanvas/Canvasviewcontroller+archandledrag.swift",
 				Info.plist,
 			);
 			target = 19075A4A2ED4646D00B3A488 /* FilmsPage */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 19075A492ED4646D00B3A488 /* Resources */;
+			membershipExceptions = (
+				"3DCanvas/Canvasviewcontroller+archandledrag.swift",
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		19075A4D2ED4646D00B3A488 /* FilmsPage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */,
+				197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */,
 			);
 			path = FilmsPage;
 			sourceTree = "<group>";
@@ -137,7 +149,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 2Z3FULAVPS;
+				DEVELOPMENT_TEAM = 9J8ANKA3XC;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FilmsPage/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -150,7 +162,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = shravanids.FilmsPage;
+				PRODUCT_BUNDLE_IDENTIFIER = sshravani.FilmsPagess;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -173,7 +185,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 2Z3FULAVPS;
+				DEVELOPMENT_TEAM = 9J8ANKA3XC;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FilmsPage/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -186,7 +198,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = shravanids.FilmsPage;
+				PRODUCT_BUNDLE_IDENTIFIER = sshravani.FilmsPagess;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

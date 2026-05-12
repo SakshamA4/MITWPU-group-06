@@ -15,6 +15,22 @@ struct OriginalColorComponent: Component {
     let color: UIColor
 }
 
+struct CustomPropComponent: Component {
+    let customModelURL: URL
+}
+
+struct CharacterPoseComponent: Component {
+    let modelFileName: String
+
+    // Only these exact model names are standing poses that support Walk.
+    // Add new standing model names here as your cast grows.
+    private static let standingModelNames: Set<String> = ["man1", "woman1"]
+
+    var isStandingPose: Bool {
+        Self.standingModelNames.contains(modelFileName.lowercased())
+    }
+}
+
 struct CategoryComponent: Component {
     let toolType: ToolType
 }
@@ -73,7 +89,7 @@ enum ToolType: CaseIterable {
                         
                         // 2. Filter for items that actually have a 3D model
                         // This ensures only "Spotlight" shows up, and the text-only ones are hidden
-                        let playableLights = allLights.filter { $0.modelFileName != nil }
+                        let playableLights = allLights.filter { $0.modelFileName != nil || $0.isProcedural }
 
                         // 3. Convert them to SpawnItems
                         return playableLights.map { SpawnItem(light: $0) }
@@ -100,25 +116,35 @@ enum ToolType: CaseIterable {
             
         case .sky:
             return [
+//                SpawnItem(
+//                    title: "Daylight Sky",
+//                    imageName: "cloud.sun",
+//                    modelFileName: "sky_day"
+//                ),
+//                SpawnItem(
+//                    title: "Sunset Sky",
+//                    imageName: "sunset",
+//                    modelFileName: "sky_sunset"
+//                ),
+//                SpawnItem(
+//                    title: "Midnight Sky",
+//                    imageName: "moon.stars",
+//                    modelFileName: "sky_night"
+//                ),
                 SpawnItem(
-                    title: "Daylight Sky",
-                    imageName: "cloud.sun",
-                    modelFileName: "sky_day"
+                    title: "Blue Sky",
+                    imageName: "Blue_sky",
+                    modelFileName: "Blue_sky"
                 ),
                 SpawnItem(
-                    title: "Sunset Sky",
-                    imageName: "sunset",
-                    modelFileName: "sky_sunset"
+                    title: "Starry Night",
+                    imageName: "Nighty_night",
+                    modelFileName: "Nighty_night"
                 ),
                 SpawnItem(
-                    title: "Midnight Sky",
-                    imageName: "moon.stars",
-                    modelFileName: "sky_night"
-                ),
-                SpawnItem(
-                    title: "Real Clouds",
-                    imageName: "sky_image_1",
-                    modelFileName: "sky_image_1"
+                    title: "Evening Hue",
+                    imageName: "Evening_sky",
+                    modelFileName: "Evening_sky"
                 )
 
             ]

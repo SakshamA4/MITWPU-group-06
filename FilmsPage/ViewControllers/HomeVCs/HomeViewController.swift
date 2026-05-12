@@ -10,9 +10,25 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
 
     @IBOutlet weak var collectionView: UICollectionView!
     
+    @IBOutlet weak var searchButton: UIBarButtonItem!
+    
     // Local Data Source (Mirrors the Store)
     private var templates: [ScenesModel] = []
     private var recentScenes: [ScenesModel] = []
+    
+    // MARK: - Search State
+    private var filteredTemplates: [ScenesModel] = []
+    private var filteredRecentScenes: [ScenesModel] = []
+    private var currentSearchText: String = ""
+    private var savedRightBarButtonItems: [UIBarButtonItem]?
+    
+    // Computed properties for search
+    private var isSearching: Bool { !currentSearchText.isEmpty }
+    private var currentTemplates: [ScenesModel] { isSearching ? filteredTemplates : templates }
+    private var currentRecentScenes: [ScenesModel] { isSearching ? filteredRecentScenes : recentScenes }
+    
+    // Search controller
+    private let searchController = UISearchController(searchResultsController: nil)
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -22,6 +38,11 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         super.viewDidLoad()
         setupCollectionView()
         setupObservers()
+        setupSearchController()
+        
+        // Save the right bar button items and ensure they are visible initially
+        savedRightBarButtonItems = navigationItem.rightBarButtonItems
+        
         refreshData() // Initial load
     }
     
@@ -30,6 +51,37 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         
         // 📍 THE FIX: Refresh data from the store to show updated notes/scenes
         refreshData()
+        
+        // Always hide search bar and show search button when view appears
+        navigationItem.searchController = nil
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
+    }
+
+    @IBAction func searchAction(_ sender: Any) {
+        // Show search controller in navigation bar
+        navigationItem.searchController = searchController
+        
+        // Hide the search button by removing it from nav bar
+        navigationItem.rightBarButtonItems = nil
+        
+        // Animate the search bar appearance
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
+        
+        // Activate and focus the search bar
+        searchController.isActive = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.searchController.searchBar.becomeFirstResponder()
+        }
+    }
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView?.collectionViewLayout.invalidateLayout()
+        })
     }
     // MARK: - Setup
     private func setupCollectionView() {
@@ -52,6 +104,16 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         )
     }
     
+    private func setupSearchController() {
+        searchController.searchResultsUpdater = self
+        searchController.searchBar.delegate = self
+        searchController.delegate = self
+        searchController.obscuresBackgroundDuringPresentation = false
+        searchController.searchBar.placeholder = "Search Scenes"
+        // Don't set navigationItem.searchController initially (search bar hidden)
+        definesPresentationContext = true
+    }
+    
     @objc private func handleScenesUpdated() {
         refreshData()
     }
@@ -61,12 +123,36 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         templates = ScenesDataStore.shared.currentTemplates
         recentScenes = ScenesDataStore.shared.currentRecentScenes
         
+        // Clear search state when data refreshes
+        currentSearchText = ""
+        filteredTemplates = []
+        filteredRecentScenes = []
+        searchController.isActive = false
+        
         // 2. Reload UI
         collectionView.reloadData()
     }
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         // No delegate setup needed - using NotificationCenter
+    }
+    
+    // MARK: - Filter Logic
+    
+    private func filterScenes(for query: String) {
+        currentSearchText = query.trimmingCharacters(in: .whitespaces)
+        if currentSearchText.isEmpty {
+            filteredTemplates = []
+            filteredRecentScenes = []
+        } else {
+            filteredTemplates = templates.filter {
+                $0.name.localizedCaseInsensitiveContains(currentSearchText)
+            }
+            filteredRecentScenes = recentScenes.filter {
+                $0.name.localizedCaseInsensitiveContains(currentSearchText)
+            }
+        }
+        collectionView.reloadData()
     }
 }
 
@@ -78,23 +164,27 @@ extension HomeViewController: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return section == 0 ? templates.count : recentScenes.count
+        return section == 0 ? currentTemplates.count : currentRecentScenes.count
     }
     
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if indexPath.section == 0 {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as! TemplatesCollectionViewCell
-            let item = templates[indexPath.row]
-            cell.templateLabel.text = item.name
-            cell.templatesImageView.setFilmImage(named: item.image ?? "Image")
-            return cell
-        } else {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as! RecentScenesCollectionViewCell
-            let item = recentScenes[indexPath.row]
-            cell.configure(with: item)
-            return cell
-        }
-    }
+      func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+          if indexPath.section == 0 {
+              guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "templates_cell", for: indexPath) as? TemplatesCollectionViewCell else {
+                  return UICollectionViewCell()
+              }
+              let item = currentTemplates[indexPath.row]
+              cell.templateLabel.text = item.name
+              cell.templatesImageView.setFilmImage(named: item.image ?? "Image")
+              return cell
+          } else {
+              guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "recentscenes_cell", for: indexPath) as? RecentScenesCollectionViewCell else {
+                  return UICollectionViewCell()
+              }
+              let item = currentRecentScenes[indexPath.row]
+              cell.configure(with: item)
+              return cell
+          }
+      }
     
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         guard kind == UICollectionView.elementKindSectionHeader else { return UICollectionReusableView() }
@@ -105,7 +195,7 @@ extension HomeViewController: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let selectedModel = (indexPath.section == 0) ? templates[indexPath.row] : recentScenes[indexPath.row]
+        let selectedModel = (indexPath.section == 0) ? currentTemplates[indexPath.row] : currentRecentScenes[indexPath.row]
         let vc = CanvasViewController()
         
         // Ensure the Canvas tracks the ID from the Home page
@@ -190,7 +280,7 @@ extension HomeViewController {
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
             
             // Get the model used in the view
-            let sceneModel = self.recentScenes[indexPath.item]
+            let sceneModel = self.currentRecentScenes[indexPath.item]
             
             // ACTION 1: Rename
             let renameAction = UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { [weak self] _ in
@@ -210,8 +300,7 @@ extension HomeViewController {
     // MARK: - Helper Functions
     
     private func deleteRecentScene(_ sceneModel: ScenesModel) {
-        SceneService.shared.deleteScene(by: sceneModel.id)
-        // No need to reload manually; the NotificationCenter observer in viewDidLoad handles it.
+        ScenesDataStore.shared.deleteScene(by: sceneModel.id)
     }
     
     private func presentRenameAlert(for sceneModel: ScenesModel) {
@@ -222,25 +311,67 @@ extension HomeViewController {
             tf.placeholder = "Scene Name"
             tf.autocapitalizationType = .words
         }
-        
-        // FIX 2: Removed [weak self]
-        // You are using SceneService.shared (Singleton), so you don't need 'self' here.
-        // This fixes the "Variable 'self' was written to, but never read" error.
+    
         let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
             guard let newName = alert.textFields?.first?.text, !newName.isEmpty else { return }
+            var updatedScene = sceneModel
+            updatedScene.name = newName
+            ScenesDataStore.shared.updateScene(updatedScene)
             
-            // Fetch and Update using the Service directly
-            if let originalScene = SceneService.shared.getScene(by: sceneModel.id) {
-                var updatedScene = sceneModel
-                updatedScene.name = newName
-                
-                ScenesDataStore.shared.updateScene(updatedScene)
-            }
         }
         
         alert.addAction(saveAction)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         
-        present(alert, animated: true)
+         present(alert, animated: true)
+     }
+}
+
+// MARK: - UISearchResultsUpdating
+
+extension HomeViewController: UISearchResultsUpdating {
+    func updateSearchResults(for searchController: UISearchController) {
+        let searchText = searchController.searchBar.text ?? ""
+        filterScenes(for: searchText)
+    }
+}
+
+// MARK: - UISearchBarDelegate
+
+extension HomeViewController: UISearchBarDelegate {
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        currentSearchText = ""
+        filteredTemplates = []
+        filteredRecentScenes = []
+        collectionView.reloadData()
+        
+        // Hide the search controller and remove from nav bar
+        searchController.isActive = false
+        navigationItem.searchController = nil
+        
+        // Restore the search button to nav bar
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
+    }
+}
+
+// MARK: - UISearchControllerDelegate
+
+extension HomeViewController: UISearchControllerDelegate {
+    func willDismissSearchController(_ searchController: UISearchController) {
+        // Clear search state before dismissing
+        currentSearchText = ""
+        filteredTemplates = []
+        filteredRecentScenes = []
+        collectionView.reloadData()
+    }
+    
+    func didDismissSearchController(_ searchController: UISearchController) {
+        // Restore the search button when search controller is dismissed
+        navigationItem.searchController = nil
+        if let savedItems = savedRightBarButtonItems {
+            navigationItem.rightBarButtonItems = savedItems
+        }
     }
 }

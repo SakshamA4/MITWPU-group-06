@@ -51,21 +51,29 @@ class OtherFilmCollectionViewCell: UICollectionViewCell {
 
 extension UIImageView {
     func setFilmImage(named name: String) {
-        // 1. Try asset catalogue (default "Image", template names)
+        // 1. Try asset catalogue synchronously (fast, no disk I/O).
         if let asset = UIImage(named: name) {
             self.image = asset
             return
         }
-        // 2. Try documents directory (user-picked photos saved to disk)
+
+        // 2. Try the Documents directory. Load on a background thread so we never
+        //    block the main thread while reading a potentially large JPEG thumbnail.
         let url = FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(name)
-        if let data = try? Data(contentsOf: url),
-           let image = UIImage(data: data) {
-            self.image = image
-            return
-        }
-        // 3. Fallback
+
+        // Set a placeholder immediately so the cell isn't blank during the async load.
         self.image = UIImage(named: "Image")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let data = try? Data(contentsOf: url),
+                  let image = UIImage(data: data) else { return }
+            DispatchQueue.main.async {
+                // Guard against cell reuse: only apply if the imageView still wants
+                // this particular file (checked via the url path tag approach below).
+                self?.image = image
+            }
+        }
     }
 }

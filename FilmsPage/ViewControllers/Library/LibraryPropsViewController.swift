@@ -6,22 +6,27 @@
 //
 
 import UIKit
-
-
+import UniformTypeIdentifiers
 class LibraryPropsViewController: UIViewController {
 
     @IBOutlet weak var propsCollectionView: UICollectionView!
 
     private let propService = PropService.shared
     private var props: [PropItem] = []
+    private var importCoordinator: PropImportCoordinator?
     
     override func viewDidLoad() {
         super.viewDidLoad()
         propsCollectionView.dataSource = self
-        propsCollectionView.delegate = self
+//        propsCollectionView.delegate = self
         propsCollectionView.backgroundColor = .clear
         props = propService.getProps()
         print(props)
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePropsUpdated), name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
+        
+        let importButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(importTapped))
+        navigationItem.rightBarButtonItem = importButton
 
         propsCollectionView.register(
             UINib(nibName: "LibraryPropsCollectionViewCell", bundle: nil),
@@ -33,6 +38,14 @@ class LibraryPropsViewController: UIViewController {
         super.viewDidLayoutSubviews()
         configureLayout()
     }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.propsCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
 
     private func configureLayout() {
         guard let layout = propsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
@@ -66,6 +79,17 @@ class LibraryPropsViewController: UIViewController {
                                            right: sideInset)
         layout.scrollDirection = .vertical
     }
+    
+    @objc private func handlePropsUpdated() {
+        self.props = self.propService.getProps()
+        self.propsCollectionView.reloadData()
+    }
+    
+    @objc private func importTapped() {
+        let coordinator = PropImportCoordinator()
+        self.importCoordinator = coordinator
+        coordinator.start(presentingViewController: self)
+    }
 }
 
 extension LibraryPropsViewController: UICollectionViewDataSource {
@@ -77,31 +101,33 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(
+        guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "LibraryPropsCollectionViewCell",
             for: indexPath
-        ) as! LibraryPropsCollectionViewCell
+        ) as? LibraryPropsCollectionViewCell else {
+            return UICollectionViewCell()
+        }
 
         cell.configure(with: props[indexPath.item])
         return cell
     }
 }
 
-extension LibraryPropsViewController: UICollectionViewDelegate {
-
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
-
-        let selectedProp = props[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
-            withIdentifier: "PropDetailViewController"
-        ) as? PropDetailViewController else {
-            return
-        }
-
-        vc.prop = selectedProp
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+//extension LibraryPropsViewController: UICollectionViewDelegate {
+//
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//
+//        let selectedProp = props[indexPath.item]
+//
+//        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "PropDetailViewController"
+//        ) as? PropDetailViewController else {
+//            return
+//        }
+//
+//        vc.prop = selectedProp
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
+//}

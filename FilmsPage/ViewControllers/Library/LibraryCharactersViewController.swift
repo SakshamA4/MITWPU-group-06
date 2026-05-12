@@ -17,7 +17,7 @@ class LibraryCharactersViewController: UIViewController {
         override func viewDidLoad() {
             super.viewDidLoad()
             charactersCollectionView.dataSource = self
-            charactersCollectionView.delegate = self
+//            charactersCollectionView.delegate = self
             charactersCollectionView.backgroundColor = .clear
 
             charactersCollectionView.register(
@@ -33,6 +33,14 @@ class LibraryCharactersViewController: UIViewController {
             super.viewDidLayoutSubviews()
             configureLayout()
         }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            self.charactersCollectionView?.collectionViewLayout.invalidateLayout()
+        })
+    }
+
     private func configureLayout() {
         guard let layout = charactersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
             let newLayout = UICollectionViewFlowLayout()
@@ -44,17 +52,37 @@ class LibraryCharactersViewController: UIViewController {
         // IMPORTANT: disable self-sizing
         layout.estimatedItemSize = .zero
 
-        let columns: CGFloat = 3
+//        let columns: CGFloat = 3
+//        let spacing: CGFloat = 35
+//        let sideInset: CGFloat = 46
+////        let verticalInset: CGFloat = 40
+//
+//        let width = charactersCollectionView.bounds.width
+//        guard width > 0 else { return }
+//
+//        let totalSpacing = spacing * (columns - 1) + sideInset * 2
+//        let itemWidth = floor((width - totalSpacing) / columns)
+//        let itemHeight = itemWidth * 0.67
+//
+//        layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
+//        layout.minimumInteritemSpacing = spacing
+//        layout.minimumLineSpacing = spacing
+//        layout.sectionInset = UIEdgeInsets(top: 0,
+//                                           left: sideInset,
+//                                           bottom: 0,
+//                                           right: sideInset)
+        let columns: CGFloat = 4
         let spacing: CGFloat = 35
-        let sideInset: CGFloat = 46
-//        let verticalInset: CGFloat = 40
+        let sideInset: CGFloat = 75
 
         let width = charactersCollectionView.bounds.width
         guard width > 0 else { return }
 
         let totalSpacing = spacing * (columns - 1) + sideInset * 2
         let itemWidth = floor((width - totalSpacing) / columns)
-        let itemHeight = itemWidth * 0.67
+
+        // ✅ Make it square like lights
+        let itemHeight = itemWidth
 
         layout.itemSize = CGSize(width: itemWidth, height: itemHeight)
         layout.minimumInteritemSpacing = spacing
@@ -76,37 +104,39 @@ class LibraryCharactersViewController: UIViewController {
             characters.count
         }
 
-        func collectionView(_ collectionView: UICollectionView,
-                            cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "LibraryCharactersCollectionViewCell",
-                for: indexPath
-            ) as! LibraryCharactersCollectionViewCell
+         func collectionView(_ collectionView: UICollectionView,
+                             cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+             guard let cell = collectionView.dequeueReusableCell(
+                 withReuseIdentifier: "LibraryCharactersCollectionViewCell",
+                 for: indexPath
+             ) as? LibraryCharactersCollectionViewCell else {
+                 return UICollectionViewCell()
+             }
 
-            cell.configure(with: characters[indexPath.item])
-            return cell
-        }
+             cell.configure(with: characters[indexPath.item])
+             return cell
+         }
     }
 
 
-
-extension LibraryCharactersViewController: UICollectionViewDelegate {
-
-    func collectionView(_ collectionView: UICollectionView,
-                        didSelectItemAt indexPath: IndexPath) {
-
-        let selectedCharacter = characters[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        guard let vc = storyboard.instantiateViewController(
-            withIdentifier: "CharacterDetailsViewController"
-        ) as? CharacterDetailsViewController else {
-            return
-        }
-        
-        vc.characterTemplate = selectedCharacter
-
-
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
+//
+//extension LibraryCharactersViewController: UICollectionViewDelegate {
+//
+//    func collectionView(_ collectionView: UICollectionView,
+//                        didSelectItemAt indexPath: IndexPath) {
+//
+//        let selectedCharacter = characters[indexPath.item]
+//
+//        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+//        guard let vc = storyboard.instantiateViewController(
+//            withIdentifier: "CharacterDetailsViewController"
+//        ) as? CharacterDetailsViewController else {
+//            return
+//        }
+//        
+//        vc.characterTemplate = selectedCharacter
+//
+//
+//        navigationController?.pushViewController(vc, animated: true)
+//    }
+//}
