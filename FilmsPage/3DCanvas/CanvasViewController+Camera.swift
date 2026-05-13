@@ -434,6 +434,9 @@ extension CanvasViewController {
         // Hide gizmos and all editor overlays — they obstruct the camera preview
         gizmoRoot?.isEnabled = false
         rotationGizmo?.isEnabled = false
+        // Hide yellow drop-shadow projection lines
+        hideDropShadow()
+        selectedEntity = nil
         hideAllMotionPaths()
         hideAllRotationArcs()
         showExitCameraButton()

@@ -48,7 +48,6 @@ extension CanvasViewController {
         pointPan.minimumNumberOfTouches = 1
         pointPan.maximumNumberOfTouches = 1
         pointPan.accessibilityHint = "CamViewPoint"
-        tagGesture(pointPan, tag: CamGestureTag.point)
         arView.addGestureRecognizer(pointPan)
 
         // 2-finger: Move X-Y (dolly)
@@ -56,25 +55,21 @@ extension CanvasViewController {
         movePan.minimumNumberOfTouches = 2
         movePan.maximumNumberOfTouches = 2
         movePan.accessibilityHint = "CamViewMoveXY"
-        tagGesture(movePan, tag: CamGestureTag.moveXY)
         arView.addGestureRecognizer(movePan)
 
         // Pinch: Truck Z (forward/back)
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handleCameraViewTruck(_:)))
         pinch.accessibilityHint = "CamViewTruck"
-        tagGesture(pinch, tag: CamGestureTag.truck)
         arView.addGestureRecognizer(pinch)
 
         // 2-finger twist: Roll
         let twist = UIRotationGestureRecognizer(target: self, action: #selector(handleCameraViewRoll(_:)))
         twist.accessibilityHint = "CamViewRoll"
-        tagGesture(twist, tag: CamGestureTag.roll)
         arView.addGestureRecognizer(twist)
     }
 
     private func removeCameraViewGestures() {
         guard let gestures = arView?.gestureRecognizers else { return }
-        let tags = Set([CamGestureTag.point, CamGestureTag.moveXY, CamGestureTag.truck, CamGestureTag.roll])
         for g in gestures {
             if let hint = g.accessibilityHint, hint.hasPrefix("CamView") {
                 arView.removeGestureRecognizer(g)
@@ -82,16 +77,46 @@ extension CanvasViewController {
         }
     }
 
-    private func tagGesture(_ gesture: UIGestureRecognizer, tag: Int) {
-        // We use accessibilityHint as a lightweight tag since UIGestureRecognizer has no .tag
-        // The hint is already set above; tag value is unused but kept for documentation
-    }
-
     // MARK: - Active Camera Root Helper
 
     private var activeCameraRoot: Entity? {
         guard activeCamera !== editorCamera else { return nil }
         return cameraToVisualMap[activeCamera]
+    }
+
+    // MARK: - Motion Path Sync
+    //
+    // After moving the camera through gestures, update any animation clips
+    // whose fromValue is the old camera position. This keeps the motion path
+    // starting point in sync with where the user placed the camera.
+
+    private func syncMotionPathsAfterCameraMove() {
+        guard let cameraRoot = activeCameraRoot else { return }
+        let cameraName = cameraRoot.name
+        let newPos = cameraRoot.position(relativeTo: nil)
+
+        // Update clip fromValue for any movement clips belonging to this camera
+        for i in 0..<timeline.clips.count {
+            let clip = timeline.clips[i]
+            guard clip.entityName == cameraName,
+                  clip.track == .position,
+                  clip.motionPath != nil else { continue }
+
+            // Update the clip's fromValue and motion path start to new camera position
+            var updatedPath = clip.motionPath
+            updatedPath?.start = newPos
+            timeline.clips[i] = AnimationClip(
+                preservingID: clip,
+                fromValue: newPos,
+                motionPath: updatedPath
+            )
+
+            // Refresh the visual path
+            showMotionPath(for: timeline.clips[i])
+        }
+
+        // Also update the baseTransform for this entity
+        baseTransforms[cameraName] = cameraRoot.transform
     }
 
     // MARK: - 1-Finger: Point Camera (Rotate Yaw / Pitch)
@@ -123,6 +148,10 @@ extension CanvasViewController {
 
             gesture.setTranslation(.zero, in: arView)
         }
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            syncMotionPathsAfterCameraMove()
+        }
     }
 
     // MARK: - 2-Finger: Move X-Y (Dolly)
@@ -146,6 +175,10 @@ extension CanvasViewController {
 
             gesture.setTranslation(.zero, in: arView)
         }
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            syncMotionPathsAfterCameraMove()
+        }
     }
 
     // MARK: - Pinch: Truck Z (Forward / Back)
@@ -161,13 +194,18 @@ extension CanvasViewController {
             let ori = cameraRoot.orientation(relativeTo: nil)
             let forward = ori.act(SIMD3<Float>(0, 0, -1))
 
-            // Pinch out (scale > 1) = move forward; pinch in (scale < 1) = move back
+            // FIX: Pinch IN (scale < 1) = move forward; pinch OUT (scale > 1) = move back
+            // This feels natural: pinching in = pushing into the scene
             let speed: Float = 0.5
-            let delta = forward * (scaleFactor - 1.0) * speed
+            let delta = forward * (1.0 - scaleFactor) * speed
 
             cameraRoot.setPosition(cameraRoot.position(relativeTo: nil) + delta, relativeTo: nil)
 
             gesture.scale = 1.0
+        }
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            syncMotionPathsAfterCameraMove()
         }
     }
 
@@ -189,6 +227,10 @@ extension CanvasViewController {
             cameraRoot.setOrientation(newOri, relativeTo: nil)
 
             gesture.rotation = 0
+        }
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            syncMotionPathsAfterCameraMove()
         }
     }
 }

@@ -59,6 +59,12 @@ final class CameraViewOverlay: UIView {
     private let rightTrack     = UIView()     // vertical slider container
     private let focusBracket   = UIView()     // AF tap indicator
 
+    // ── DoF Blur ──
+    private var blurView: UIVisualEffectView?
+    private let blurMaskLayer  = CAGradientLayer()
+    /// Normalized focus point for AF mode (0…1, 0…1).
+    private var afFocusPoint: CGPoint = CGPoint(x: 0.5, y: 0.5)
+
     /// All interactive subviews — used by hitTest to decide pass-through.
     private var interactiveControls: [UIView] {
         [focalSlider, focalLabel, gridButton, gridPicker,
@@ -80,6 +86,7 @@ final class CameraViewOverlay: UIView {
         super.layoutSubviews()
         updateGridOverlay()
         layoutVerticalSliders()
+        updateBlurEffect()
     }
 
     // MARK: - Touch Pass-Through
@@ -543,17 +550,20 @@ final class CameraViewOverlay: UIView {
         }
         updateComponent { $0.mode = mode }
         updateFocusMode()
+        updateBlurEffect()
         onSettingsChanged?()
     }
 
     @objc private func apertureChanged() {
         updateComponent { $0.aperture = self.leftSlider.value }
         updateFocusLabels()
+        updateBlurEffect()
     }
 
     @objc private func focusDistanceChanged() {
         updateComponent { $0.focusDistance = self.rightSlider.value }
         updateFocusLabels()
+        updateBlurEffect()
     }
 
     @objc private func focusSliderEnded() {
@@ -583,10 +593,12 @@ final class CameraViewOverlay: UIView {
         // Store normalized focus point
         let nx = Float(point.x / bounds.width)
         let ny = Float(point.y / bounds.height)
+        afFocusPoint = CGPoint(x: CGFloat(nx), y: CGFloat(ny))
         updateComponent {
             $0.focusPointX = nx
             $0.focusPointY = ny
         }
+        updateBlurEffect()
         onSettingsChanged?()
     }
 
@@ -611,5 +623,93 @@ final class CameraViewOverlay: UIView {
         var comp = root.components[CameraFocusComponent.self] ?? CameraFocusComponent()
         mutate(&comp)
         root.components.set(comp)
+    }
+
+    // MARK: - DoF Blur Effect
+    //
+    // Simulates depth-of-field using UIVisualEffectView with a radial gradient mask.
+    // - OFF: no blur
+    // - AF: light vignette blur centred on the tapped focus point
+    // - MF: configurable blur — aperture controls intensity, focus distance controls
+    //       the clear-area radius (closer distance = smaller clear area = more blur)
+
+    private func updateBlurEffect() {
+        let modeIndex = focusSegment.selectedSegmentIndex
+
+        // OFF mode — remove blur entirely
+        if modeIndex == 0 {
+            blurView?.removeFromSuperview()
+            blurView = nil
+            return
+        }
+
+        // Create blur view if needed
+        if blurView == nil {
+            let effect = UIBlurEffect(style: .dark)
+            let bv = UIVisualEffectView(effect: effect)
+            bv.frame = bounds
+            bv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            bv.isUserInteractionEnabled = false
+            // Insert behind all HUD controls but above the base overlay
+            insertSubview(bv, at: 0)
+            blurView = bv
+        }
+
+        guard let bv = blurView else { return }
+        bv.frame = bounds
+
+        // Compute blur opacity and clear-area from mode
+        let aperture: Float
+        let clearRadius: CGFloat
+        let focusCenter: CGPoint
+
+        if modeIndex == 1 {
+            // AF mode — light blur, focused on tapped point
+            aperture = 4.0
+            clearRadius = 0.35
+            focusCenter = CGPoint(x: afFocusPoint.x * bounds.width,
+                                  y: afFocusPoint.y * bounds.height)
+        } else {
+            // MF mode — configurable
+            aperture = leftSlider.value    // f/1.4 (heavy blur) → f/22 (light blur)
+            let dist = rightSlider.value   // 0.5m (tiny clear) → 20m (large clear)
+            // Map focus distance to clear radius: close = small clear, far = large clear
+            clearRadius = CGFloat(0.1 + (dist / 20.0) * 0.5)
+            focusCenter = CGPoint(x: bounds.midX, y: bounds.midY)
+        }
+
+        // Map aperture to alpha: f/1.4 → 0.6 (heavy), f/22 → 0.05 (barely visible)
+        let maxAperture: Float = 22.0
+        let minAperture: Float = 1.4
+        let normalised = (aperture - minAperture) / (maxAperture - minAperture)
+        let blurAlpha = CGFloat(0.6 - normalised * 0.55)
+        bv.alpha = max(0.05, blurAlpha)
+
+        // Apply radial gradient mask — clear in the focus area, opaque at edges
+        let maskLayer = CAGradientLayer()
+        maskLayer.type = .radial
+        maskLayer.frame = bv.bounds
+
+        // Focus center as start point (normalized)
+        let startX = focusCenter.x / max(1, bounds.width)
+        let startY = focusCenter.y / max(1, bounds.height)
+        maskLayer.startPoint = CGPoint(x: startX, y: startY)
+        maskLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+
+        // Clear center → opaque edges
+        maskLayer.colors = [
+            UIColor.clear.cgColor,
+            UIColor.clear.cgColor,
+            UIColor.black.withAlphaComponent(0.4).cgColor,
+            UIColor.black.cgColor
+        ]
+        maskLayer.locations = [
+            0.0,
+            NSNumber(value: Float(clearRadius)),
+            NSNumber(value: Float(clearRadius + 0.15)),
+            1.0
+        ]
+
+        bv.layer.mask = maskLayer
     }
 }
