@@ -384,6 +384,10 @@ extension CanvasViewController {
         hideExitCameraButton()
         // Remove aspect ratio overlay — no scene camera is active in editor mode
         removeLetterboxOverlay()
+        // Remove camera view HUD overlay and gestures
+        cameraViewOverlay?.removeFromSuperview()
+        cameraViewOverlay = nil
+        enableCameraViewGestures(false)
         // Restore gizmos in editor view
         gizmoRoot?.isEnabled = true
         rotationGizmo?.isEnabled = true
@@ -438,6 +442,36 @@ extension CanvasViewController {
         sidebarView.isHidden = true
         layersButton.isHidden = true
         movementToggleButton.isHidden = true
+
+        // ── Show camera view HUD overlay ──
+        showCameraViewOverlay(camera: camera)
+        enableCameraViewGestures(true)
+    }
+
+    /// Creates (or reuses) the camera-through HUD and configures it for the given camera.
+    private func showCameraViewOverlay(camera: PerspectiveCamera) {
+        // Ensure focus component exists on the camera root
+        guard let camRoot = cameraToVisualMap[camera] else { return }
+        if camRoot.components[CameraFocusComponent.self] == nil {
+            // Initialize with default values; set focal length from current FOV
+            var comp = CameraFocusComponent()
+            comp.focalLengthMM = fovToFocalLength(camera.camera.fieldOfViewInDegrees)
+            camRoot.components.set(comp)
+        }
+
+        let overlay = CameraViewOverlay(frame: view.bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.configure(cameraRoot: camRoot, camera: camera)
+        overlay.onSettingsChanged = { [weak self] in
+            self?.startCameraPreviewUpdates()
+        }
+        // Insert above letterbox but below exit button
+        if let exitBtn = view.viewWithTag(9001) {
+            view.insertSubview(overlay, belowSubview: exitBtn)
+        } else {
+            view.addSubview(overlay)
+        }
+        cameraViewOverlay = overlay
     }
 
     // MARK: - Aspect Ratio Application

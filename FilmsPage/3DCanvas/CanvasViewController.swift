@@ -403,6 +403,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var cameraCounter: Int = 0
     var cameraCollectionView: UICollectionView!
 
+    /// HUD overlay shown when looking through a scene camera.
+    /// Contains focal length slider, composition grid, and focus controls.
+    var cameraViewOverlay: CameraViewOverlay?
+
     // MARK: - Top Right UI
     let shotBreakdownBtn: UIButton = {
         let btn = UIButton(type: .system)

@@ -92,6 +92,12 @@ struct EntityRecord: Codable {
     var customModelPath: String?
     /// Per-camera aspect ratio (e.g. "16:9"). nil for non-camera entities or legacy saves.
     var cameraAspectRatio: String?
+    /// Per-camera focus/lens settings. nil for non-camera entities or legacy saves.
+    var cameraFocalLengthMM: Float?
+    var cameraGridType: String?
+    var cameraFocusMode: String?
+    var cameraAperture: Float?
+    var cameraFocusDistance: Float?
 }
 
 // MARK: - AnimationClipRecord
@@ -297,6 +303,20 @@ final class ScenePersistenceService {
                  cameraAspectRatio = camAspect.aspectRatio.rawValue
              }
 
+             // Extract camera focus/lens settings from CameraFocusComponent
+             var cameraFocalLengthMM: Float?
+             var cameraGridType: String?
+             var cameraFocusMode: String?
+             var cameraAperture: Float?
+             var cameraFocusDistance: Float?
+             if let focus = entity.components[CameraFocusComponent.self] {
+                 cameraFocalLengthMM = focus.focalLengthMM
+                 cameraGridType = focus.gridType.rawValue
+                 cameraFocusMode = focus.mode.rawValue
+                 cameraAperture = focus.aperture
+                 cameraFocusDistance = focus.focusDistance
+             }
+
              if let model = entity as? ModelEntity {
 
                  if let w = model.components[CanvasViewController.WallComponent.self] {
@@ -386,7 +406,12 @@ final class ScenePersistenceService {
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
                  proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
                  customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
-                 cameraAspectRatio:   cameraAspectRatio
+                 cameraAspectRatio:   cameraAspectRatio,
+                 cameraFocalLengthMM: cameraFocalLengthMM,
+                 cameraGridType:      cameraGridType,
+                 cameraFocusMode:     cameraFocusMode,
+                 cameraAperture:      cameraAperture,
+                 cameraFocusDistance: cameraFocusDistance
              ))
         }
 
@@ -958,12 +983,24 @@ final class ScenePersistenceService {
                   return .default
               }()
               root.components.set(CameraAspectComponent(aspectRatio: aspectRatio))
+
+              // Restore per-camera focus/lens settings from CameraFocusComponent
+              var focusComp = CameraFocusComponent()
+              if let mm = record.cameraFocalLengthMM { focusComp.focalLengthMM = mm }
+              if let raw = record.cameraGridType, let grid = GridType(rawValue: raw) { focusComp.gridType = grid }
+              if let raw = record.cameraFocusMode, let mode = CameraFocusComponent.FocusMode(rawValue: raw) { focusComp.mode = mode }
+              if let ap = record.cameraAperture { focusComp.aperture = ap }
+              if let fd = record.cameraFocusDistance { focusComp.focusDistance = fd }
+              root.components.set(focusComp)
+
               print("📷 Restoring camera '\(displayName)' with model: \(cameraModelName), aspect: \(aspectRatio.displayName)")
 
               let cam = PerspectiveCamera()
               cam.name = "PerspCam_\(cameraID.uuidString)"
               cam.isEnabled = false
               cam.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+              // Apply restored focal length to camera FOV
+              cam.camera.fieldOfViewInDegrees = focalLengthToFOV(focusComp.focalLengthMM)
               root.addChild(cam)
               root.transform = t
               anchor.addChild(root)
