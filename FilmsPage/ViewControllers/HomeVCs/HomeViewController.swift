@@ -293,36 +293,8 @@ extension HomeViewController {
                 self?.deleteRecentScene(sceneModel)
             }
 
-            // ACTION 3: Add to / Remove from Sequence
-            var sequenceActions: [UIAction] = []
-
-            if sceneModel.sequenceID != nil {
-                // Already in a sequence — offer removal
-                let removeAction = UIAction(title: "Remove from Sequence", image: UIImage(systemName: "rectangle.stack.badge.minus")) { [weak self] _ in
-                    ScenesDataStore.shared.removeFromSequence(sceneID: sceneModel.id)
-                }
-                sequenceActions.append(removeAction)
-            }
-
-            let addAction = UIAction(title: "Add to Sequence", image: UIImage(systemName: "rectangle.stack.badge.plus")) { [weak self] _ in
-                self?.presentAddToSequenceAlert(for: sceneModel)
-            }
-            sequenceActions.append(addAction)
-
-            // ACTION 4: Export Sequence (only if scene is in a sequence)
-            if let seqID = sceneModel.sequenceID, let seqName = sceneModel.sequenceName {
-                let groups = ScenesDataStore.shared.scenesGroupedBySequence()
-                if let group = groups.first(where: { $0.sequenceID == seqID }), group.scenes.count >= 1 {
-                    let exportAction = UIAction(title: "Export Sequence \"\(seqName)\"", image: UIImage(systemName: "film.stack")) { [weak self] _ in
-                        self?.presentSequenceExportSheet(sequenceID: seqID, sequenceName: seqName, scenes: group.scenes)
-                    }
-                    sequenceActions.append(exportAction)
-                }
-            }
-
-            let sequenceMenu = UIMenu(title: "Sequence", image: UIImage(systemName: "rectangle.stack"), children: sequenceActions)
             
-            return UIMenu(title: sceneModel.name, children: [renameAction, sequenceMenu, deleteAction])
+            return UIMenu(title: sceneModel.name, children: [renameAction, deleteAction])
         }
     }
     
@@ -354,86 +326,6 @@ extension HomeViewController {
         
          present(alert, animated: true)
      }
-
-    // MARK: - Sequence Assignment
-
-    private func presentAddToSequenceAlert(for sceneModel: ScenesModel) {
-        let alert = UIAlertController(
-            title: "Add to Sequence",
-            message: "Enter a sequence name. Scenes with the same name are grouped together.",
-            preferredStyle: .alert
-        )
-
-        alert.addTextField { tf in
-            tf.placeholder = "Sequence Name"
-            tf.text = sceneModel.sequenceName ?? ""
-            tf.autocapitalizationType = .words
-        }
-
-        // Show existing sequence names as suggestions
-        let groups = ScenesDataStore.shared.scenesGroupedBySequence()
-
-        let addAction = UIAlertAction(title: "Add", style: .default) { _ in
-            guard let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespaces),
-                  !name.isEmpty else { return }
-
-            // Check if a sequence with this name already exists
-            let existingGroup = groups.first { $0.sequenceName.lowercased() == name.lowercased() }
-            let seqID = existingGroup?.sequenceID ?? UUID()
-
-            ScenesDataStore.shared.assignToSequence(sceneID: sceneModel.id, sequenceID: seqID, sequenceName: name)
-        }
-
-        alert.addAction(addAction)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        present(alert, animated: true)
-    }
-
-    // MARK: - Sequence Export
-
-    private func presentSequenceExportSheet(sequenceID: UUID, sequenceName: String, scenes: [ScenesModel]) {
-        let sheet = SequenceExportSheet(sequenceName: sequenceName, scenes: scenes)
-        sheet.onExport = { [weak self] settings in
-            self?.startSequenceExport(scenes: scenes, sequenceName: sequenceName, settings: settings)
-        }
-        present(sheet, animated: true)
-    }
-
-    private func startSequenceExport(scenes: [ScenesModel], sequenceName: String, settings: ExportSettings) {
-        let exportService = SequenceExportService()
-        exportService.scenes = scenes.map {
-            SequenceExportService.SceneEntry(sceneID: $0.id, sceneName: $0.name)
-        }
-        exportService.settings = settings
-        exportService.presentingVC = self
-
-        // Progress overlay
-        let overlay = ExportProgressOverlay()
-        overlay.show(in: view)
-        overlay.onCancel = { [weak exportService] in
-            exportService?.cancel()
-        }
-
-        exportService.onProgress = { [weak overlay] progress in
-            overlay?.update(with: progress)
-        }
-
-        exportService.onComplete = { [weak self, weak overlay] url, error in
-            overlay?.dismiss {
-                if let url = url {
-                    let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-                    share.popoverPresentationController?.sourceView = self?.view
-                    self?.present(share, animated: true)
-                } else if let error = error {
-                    let alert = UIAlertController(title: "Export Failed", message: error.localizedDescription, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self?.present(alert, animated: true)
-                }
-            }
-        }
-
-        exportService.startExport()
-    }
 }
 
 // MARK: - UISearchResultsUpdating

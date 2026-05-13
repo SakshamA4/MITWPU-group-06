@@ -272,6 +272,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var sceneImageName: String?
     var currentSceneID: UUID?
     
+    /// When true, viewDidLoad skips all UI setup (toolbars, gestures, nav bar,
+    /// gizmo, animation panel) and viewDidAppear skips loadSceneIfSaved().
+    /// The coordinator loads scenes explicitly via ScenePersistenceService.
+    /// Set this BEFORE the view loads (i.e. before accessing .view).
+    var isExportMode: Bool = false
+
     // FIX: Track whether the scene has been loaded to prevent reloading it
     // multiple times when returning from navigation (e.g., shot breakdown).
     // Reset to false when exiting the scene.
@@ -633,6 +639,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
         setupARView()
         setupInitialScene()
+
+        // In export mode, skip all interactive UI — only the ARView and
+        // scene graph are needed for rendering frames.
+        guard !isExportMode else { return }
+
         setupUI()
         setupGestures()
         setupTimelineControls()
@@ -653,6 +664,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // In export mode, the coordinator loads scenes explicitly.
+        guard !isExportMode else { return }
         // Defer scene load until the view is fully on screen.
         // This lets RealityKit finish its initial render pass before we
         // start deserialising entities, preventing the black-screen stall
