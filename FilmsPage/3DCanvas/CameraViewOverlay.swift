@@ -5,6 +5,10 @@
 //  Full-screen HUD overlay shown when looking through a scene camera.
 //  Contains: focal length slider, composition grid, focus controls.
 //
+//  Touch routing: hitTest returns nil for touches that don't land on
+//  any HUD control, letting them pass through to arView underneath
+//  so the camera-view gestures (point, dolly, truck, roll) work.
+//
 
 import UIKit
 import RealityKit
@@ -21,6 +25,10 @@ final class CameraViewOverlay: UIView {
 
     /// Called when the focal length slider or focus controls change a persisted value.
     var onSettingsChanged: (() -> Void)?
+
+    /// Aspect ratio of the active camera — used to compute the letterbox-safe rect
+    /// so grid lines are clipped to the visible camera frame.
+    var cameraAspectRatio: Float = 16.0 / 9.0
 
     // MARK: - Style Constants
 
@@ -51,6 +59,12 @@ final class CameraViewOverlay: UIView {
     private let rightTrack     = UIView()     // vertical slider container
     private let focusBracket   = UIView()     // AF tap indicator
 
+    /// All interactive subviews — used by hitTest to decide pass-through.
+    private var interactiveControls: [UIView] {
+        [focalSlider, focalLabel, gridButton, gridPicker,
+         focusSegment, leftTrack, rightTrack]
+    }
+
     // MARK: - Init
 
     override init(frame: CGRect) {
@@ -68,12 +82,50 @@ final class CameraViewOverlay: UIView {
         layoutVerticalSliders()
     }
 
+    // MARK: - Touch Pass-Through
+    //
+    // Only intercept touches that land on HUD controls (slider, segment, grid button).
+    // Everything else passes through to arView so camera gestures work.
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // If the grid picker is visible, let it handle touches
+        if !gridPicker.isHidden {
+            let pickerPoint = gridPicker.convert(point, from: self)
+            if let hit = gridPicker.hitTest(pickerPoint, with: event) {
+                return hit
+            }
+        }
+
+        // Check each interactive control
+        for control in interactiveControls {
+            guard !control.isHidden, control.alpha > 0.01 else { continue }
+            let controlPoint = control.convert(point, from: self)
+            if let hit = control.hitTest(controlPoint, with: event) {
+                return hit
+            }
+        }
+
+        // AF mode: let taps through to this view for focus bracket
+        if focusSegment.selectedSegmentIndex == 1 {
+            // Check if it's a tap (not a drag) — we return self for the tap gesture
+            return self
+        }
+
+        // Otherwise, pass through to arView below
+        return nil
+    }
+
     // MARK: - Configuration
 
     /// Call after setting cameraRoot / perspectiveCamera to sync UI with stored values.
     func configure(cameraRoot: Entity, camera: PerspectiveCamera) {
         self.cameraRoot = cameraRoot
         self.perspectiveCamera = camera
+
+        // Read aspect ratio from camera root
+        if let aspectComp = cameraRoot.components[CameraAspectComponent.self] {
+            cameraAspectRatio = aspectComp.aspectRatio.ratio
+        }
 
         let comp = cameraRoot.components[CameraFocusComponent.self] ?? CameraFocusComponent()
 
@@ -96,6 +148,35 @@ final class CameraViewOverlay: UIView {
         rightSlider.value = comp.focusDistance
         updateFocusMode()
         updateFocusLabels()
+    }
+
+    // MARK: - Letterbox-Safe Rect
+    //
+    // Computes the visible camera frame inside the letterbox bars.
+    // Grid lines are drawn only within this rect.
+
+    private var letterboxSafeRect: CGRect {
+        let viewSize = bounds.size
+        guard viewSize.width > 0, viewSize.height > 0 else { return bounds }
+
+        let viewRatio = Float(viewSize.width / viewSize.height)
+        let targetRatio = cameraAspectRatio
+
+        if abs(viewRatio - targetRatio) < 0.01 {
+            return bounds // No letterbox needed
+        }
+
+        if targetRatio < viewRatio {
+            // Pillarbox: narrower — bars on left/right
+            let targetWidth = viewSize.height * CGFloat(targetRatio)
+            let barWidth = (viewSize.width - targetWidth) / 2.0
+            return CGRect(x: barWidth, y: 0, width: targetWidth, height: viewSize.height)
+        } else {
+            // Letterbox: wider — bars on top/bottom
+            let targetHeight = viewSize.width / CGFloat(targetRatio)
+            let barHeight = (viewSize.height - targetHeight) / 2.0
+            return CGRect(x: 0, y: barHeight, width: viewSize.width, height: targetHeight)
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -282,16 +363,17 @@ final class CameraViewOverlay: UIView {
         gridPicker.isHidden = true
     }
 
+    /// Draws grid lines ONLY within the letterbox-safe rect (the visible camera frame).
     private func updateGridOverlay() {
         let path = UIBezierPath()
-        // Use the full overlay bounds as the drawable area
-        let rect = bounds
+        // Use the letterbox-safe rect, not full overlay bounds
+        let rect = letterboxSafeRect
         guard rect.width > 0, rect.height > 0 else {
             gridOverlay.path = nil
             return
         }
 
-        gridOverlay.frame = rect
+        gridOverlay.frame = bounds
 
         switch selectedGrid {
         case .none:
@@ -322,7 +404,6 @@ final class CameraViewOverlay: UIView {
             path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
             path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         case .diagonalThirds:
-            // Thirds
             let w = rect.width, h = rect.height
             for i in 1...2 {
                 let x = rect.minX + w * CGFloat(i) / 3.0
@@ -332,7 +413,6 @@ final class CameraViewOverlay: UIView {
                 path.move(to: CGPoint(x: rect.minX, y: y))
                 path.addLine(to: CGPoint(x: rect.maxX, y: y))
             }
-            // Diagonals
             path.move(to: CGPoint(x: rect.minX, y: rect.minY))
             path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
             path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
@@ -388,6 +468,7 @@ final class CameraViewOverlay: UIView {
         focusBracket.layer.borderWidth = 1.5
         focusBracket.layer.cornerRadius = 4
         focusBracket.isHidden = true
+        focusBracket.isUserInteractionEnabled = false
         addSubview(focusBracket)
 
         // AF tap gesture
@@ -449,7 +530,6 @@ final class CameraViewOverlay: UIView {
     }
 
     private func layoutVerticalSliders() {
-        // Force layout update for rotated sliders
         leftSlider.layoutIfNeeded()
         rightSlider.layoutIfNeeded()
     }

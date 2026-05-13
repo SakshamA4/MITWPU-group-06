@@ -9,6 +9,8 @@ extension CanvasViewController {
     func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
         // In AR mode the real device camera moves — no editor orbit needed
         if isARModeActive { return }
+        // When looking through a scene camera, camera-view gestures handle movement
+        if activeCamera !== editorCamera { return }
         let translation = gesture.translation(in: arView)
         
         yaw -= Float(translation.x) * 0.005
@@ -21,6 +23,11 @@ extension CanvasViewController {
 
     
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        // When looking through a scene camera, pinch = truck Z (handled by camera-view gestures)
+        if activeCamera !== editorCamera {
+            gesture.scale = 1.0
+            return
+        }
         if gesture.state == .began {
             saveCurrentStateToUndo()
         }

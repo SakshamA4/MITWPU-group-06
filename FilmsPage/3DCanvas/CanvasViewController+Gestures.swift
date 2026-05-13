@@ -77,6 +77,8 @@ extension CanvasViewController {
 
     @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
+        // When looking through a scene camera, 2-finger pan = dolly XY
+        guard activeCamera === editorCamera else { return }
         let translation = gesture.translation(in: arView)
         pitch += Float(translation.y) * 0.005
         pitch  = max(0.05, min(1.4, pitch))
@@ -88,6 +90,8 @@ extension CanvasViewController {
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
+        // When looking through a scene camera, twist = roll (handled by camera-view gestures)
+        guard activeCamera === editorCamera else { return }
 
         // Two-finger twist always rotates the camera (yaw), never the entity.
         // Entity rotation is only via the rotation rings or the outer ring gizmo.

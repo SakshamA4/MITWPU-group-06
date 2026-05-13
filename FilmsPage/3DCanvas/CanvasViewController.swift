@@ -1109,6 +1109,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Pan gesture
 
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+        // When looking through a scene camera, 1-finger pan = point camera
+        guard activeCamera === editorCamera else { return }
         let location = gesture.location(in: arView)
 
 
