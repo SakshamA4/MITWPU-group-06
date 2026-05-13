@@ -1277,6 +1277,13 @@ final class ScenePersistenceService {
      func evictScene(_ sceneID: UUID) {
          modelCacheManager.evictScene(sceneID)
      }
+
+     /// Marks a scene as exited without immediately evicting its cache.
+     /// The last N scenes are retained for fast reopening. Oldest are evicted
+     /// when the retention limit is exceeded or memory pressure occurs.
+     func markSceneExited(_ sceneID: UUID) {
+         modelCacheManager.markExited(sceneID: sceneID)
+     }
      
      /// Logs current cache statistics to console.
      func logCacheStats() {

@@ -38,12 +38,15 @@ final class ModelCacheManager {
     static let maxScenesInCache = 10                    // Keep up to 10 scenes
     static let evictionThreshold: Float = 0.7          // Evict at 70% full (560 MB)
     static let defaultModelEstimateSize = 8 * 1024 * 1024  // 8 MB per model (conservative)
+    static let maxRetainedExitedScenes = 2             // Keep last N exited scenes in cache
     
     // MARK: - Private Properties
     
     private var sceneCache: [UUID: [String: CachedModel]] = [:]  // [sceneID: [fileName: CachedModel]]
     private var cacheStats: [UUID: CacheStats] = [:]
     private var currentMemoryUsage: Int = 0
+    /// Tracks scene IDs in exit order (FIFO) for durable cache retention.
+    private var exitedSceneOrder: [UUID] = []
     
     private let queue = DispatchQueue(label: "com.filmpage.modelcache", attributes: .concurrent)
     
@@ -171,7 +174,40 @@ final class ModelCacheManager {
             self.sceneCache.removeAll()
             self.cacheStats.removeAll()
             self.currentMemoryUsage = 0
+            self.exitedSceneOrder.removeAll()
             print("🗑️ Cache CLEAR ALL (freed \(freed / 1024 / 1024)MB)")
+        }
+    }
+    
+    /// Marks a scene as exited. Retains the last `maxRetainedExitedScenes` in cache;
+    /// evicts the oldest when the limit is exceeded. This allows reopening a recently
+    /// visited scene without reloading USDZ models from disk.
+    func markExited(sceneID: UUID) {
+        queue.async(flags: .barrier) { [weak self] in
+            guard let self = self else { return }
+            
+            // Remove if already tracked (re-exit of same scene)
+            self.exitedSceneOrder.removeAll { $0 == sceneID }
+            self.exitedSceneOrder.append(sceneID)
+            
+            // Evict oldest exited scenes beyond the retention limit
+            while self.exitedSceneOrder.count > Self.maxRetainedExitedScenes {
+                let evictID = self.exitedSceneOrder.removeFirst()
+                if let scene = self.sceneCache[evictID] {
+                    let freed = scene.values.reduce(0) { $0 + $1.estimatedSize }
+                    self.sceneCache.removeValue(forKey: evictID)
+                    self.cacheStats.removeValue(forKey: evictID)
+                    self.currentMemoryUsage -= freed
+                    print("🗑️ Cache EVICT oldest exited scene: \(evictID.uuidString.prefix(8))... (freed \(freed / 1024)KB)")
+                }
+            }
+            
+            // Safety: if we're still over the memory threshold, evict LRU
+            if Float(self.currentMemoryUsage) > Float(Self.maxCacheSize) * Self.evictionThreshold {
+                self.evictLRUScene_internal()
+            }
+            
+            print("📦 Cache retained \(self.exitedSceneOrder.count)/\(Self.maxRetainedExitedScenes) exited scene(s), memory: \(self.currentMemoryUsage / 1024 / 1024)MB")
         }
     }
     

@@ -117,4 +117,46 @@ class ScenesDataStore {
             UserDefaults.standard.set(encoded, forKey: kRecentScenesKey)
         }
     }
+
+    // MARK: - Sequence Management
+
+    /// Returns all recent scenes grouped by sequenceID (non-nil only),
+    /// preserving the list order within each group.
+    func scenesGroupedBySequence() -> [(sequenceID: UUID, sequenceName: String, scenes: [ScenesModel])] {
+        var groups: [UUID: (name: String, scenes: [ScenesModel])] = [:]
+        var order: [UUID] = []
+
+        for scene in recentScenes {
+            guard let seqID = scene.sequenceID,
+                  let seqName = scene.sequenceName else { continue }
+            if groups[seqID] == nil {
+                groups[seqID] = (name: seqName, scenes: [])
+                order.append(seqID)
+            }
+            groups[seqID]?.scenes.append(scene)
+        }
+
+        return order.compactMap { id in
+            guard let group = groups[id] else { return nil }
+            return (sequenceID: id, sequenceName: group.name, scenes: group.scenes)
+        }
+    }
+
+    /// Assigns a scene to a sequence. Creates a new sequenceID if needed.
+    func assignToSequence(sceneID: UUID, sequenceID: UUID, sequenceName: String) {
+        guard let index = recentScenes.firstIndex(where: { $0.id == sceneID }) else { return }
+        recentScenes[index].sequenceID = sequenceID
+        recentScenes[index].sequenceName = sequenceName
+        saveData()
+        NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
+    }
+
+    /// Removes a scene from its sequence.
+    func removeFromSequence(sceneID: UUID) {
+        guard let index = recentScenes.firstIndex(where: { $0.id == sceneID }) else { return }
+        recentScenes[index].sequenceID = nil
+        recentScenes[index].sequenceName = nil
+        saveData()
+        NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
+    }
 }

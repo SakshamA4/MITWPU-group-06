@@ -67,6 +67,10 @@ extension CanvasViewController {
     /// Silently saves the scene when the app moves to the background.
     /// Runs the full save pipeline so nothing is lost if iOS kills the process.
     /// No UI overlay is shown — the save runs invisibly in the background.
+    ///
+    /// FIX: Now waits for pendingBackgroundTasks == 0 before writing JSON,
+    /// using the same polling approach as the user-initiated saveAndExit() path.
+    /// This prevents in-flight TextureResource uploads from being missed.
     @objc private func autoSaveOnBackground() {
         guard let id = currentSceneID else { return }
         // Capture thumbnail only if the view is still on screen.
@@ -75,15 +79,26 @@ extension CanvasViewController {
                 guard let self = self else { return }
                 let filename = ScenePersistenceService.shared.saveThumbnail(thumbnailImage, sceneID: id)
                 if let filename = filename { self.sceneImageName = filename }
-                ScenePersistenceService.shared.save(canvas: self, sceneID: id) { success in
-                    print(success ? "✅ Auto-saved on background" : "❌ Auto-save failed")
-                }
+                self.waitForBackgroundsAndAutoSave(sceneID: id)
             }
         } else {
             // View not visible (e.g. shot breakdown is on top) — save without thumbnail.
-            ScenePersistenceService.shared.save(canvas: self, sceneID: id) { success in
-                print(success ? "✅ Auto-saved on background (no thumbnail)" : "❌ Auto-save failed")
+            waitForBackgroundsAndAutoSave(sceneID: id)
+        }
+    }
+
+    /// Polls every 50ms until all background texture uploads complete,
+    /// then writes the scene JSON. Identical to the user-initiated
+    /// waitForBackgroundsAndSave() but without spinner or commitExit().
+    private func waitForBackgroundsAndAutoSave(sceneID: UUID) {
+        guard pendingBackgroundTasks == 0 else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                self?.waitForBackgroundsAndAutoSave(sceneID: sceneID)
             }
+            return
+        }
+        ScenePersistenceService.shared.save(canvas: self, sceneID: sceneID) { success in
+            print(success ? "✅ Auto-saved on background" : "❌ Auto-save failed")
         }
     }
 
@@ -195,12 +210,13 @@ extension CanvasViewController {
              object: nil
          )
          
-         // FIX: Explicitly evict the scene from cache on exit to prevent memory accumulation.
-         // This ensures that when the user exits a scene, all its models are immediately
-         // removed from the cache, allowing the app to support 7-8+ scenes without memory bloat.
+         // FIX: Mark the scene as exited instead of immediately evicting.
+         // The cache retains the last N scenes so reopening is instant.
+         // Eviction happens automatically when the retained count exceeds
+         // maxRetainedExitedScenes or on memory warning.
          if let sceneID = currentSceneID {
-             ScenePersistenceService.shared.evictScene(sceneID)
-             print("🗑️ Scene \(sceneID.uuidString.prefix(8))... evicted from cache on exit")
+             ScenePersistenceService.shared.markSceneExited(sceneID)
+             print("📦 Scene \(sceneID.uuidString.prefix(8))... marked exited (cache retained)")
          }
 
          dismiss(animated: true)
