@@ -556,11 +556,11 @@ extension CanvasViewController {
         case .changed:
             guard ringDragActive else { return }
 
-            // Circular motion: project the gizmo centre to screen space,
+            // Circular motion: project the ENTITY centre to screen space,
             // then measure the angle of the touch around that centre.
-            // The delta angle between frames is the rotation amount.
-            if let gizmo = gizmoRoot,
-               let centre2D = arView.project(gizmo.position(relativeTo: nil)) {
+            // (Using entity centre, not gizmo base, so rotation feels centred.)
+            let entityCentre = selected.position(relativeTo: nil)
+            if let centre2D = arView.project(entityCentre) {
 
                 let prev = CGPoint(x: lastPanLocation.x  - centre2D.x,
                                    y: lastPanLocation.y  - centre2D.y)

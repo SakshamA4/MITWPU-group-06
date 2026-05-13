@@ -1245,15 +1245,42 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     activeGizmoPart = .arrowY;  highlightGizmoPart(.arrowY)
                 } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
                     activeGizmoPart = .planeXZ; highlightGizmoPart(.planeXZ)
-                } else if name == "xRing" {
-                    activeGizmoPart = .rotateX
-                    highlightGizmoPart(.rotateX)
-                } else if name == "yRing" {
-                    activeGizmoPart = .rotateY
-                    highlightGizmoPart(.rotateY)
-                } else if name == "zRing" {
-                    activeGizmoPart = .rotateZ
-                    highlightGizmoPart(.rotateZ)
+                } else if name == "xRing" || name == "yRing" || name == "zRing" {
+                    // ── Initialize rotation solver for ring drags ──
+                    let part: GizmoPart
+                    switch name {
+                    case "xRing": part = .rotateX
+                    case "yRing": part = .rotateY
+                    default:      part = .rotateZ
+                    }
+                    activeGizmoPart = part
+                    highlightGizmoPart(part)
+
+                    // Compute frozen world-space axis from the gizmo
+                    if let selected = selectedEntity, let gizmo = rotationGizmo {
+                        let gizmoMatrix = gizmo.transformMatrix(relativeTo: nil)
+                        let worldAxis: SIMD3<Float>
+                        switch name {
+                        case "xRing":
+                            worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.0.x,
+                                                                     gizmoMatrix.columns.0.y,
+                                                                     gizmoMatrix.columns.0.z))
+                        case "yRing":
+                            worldAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
+                                                                     -gizmoMatrix.columns.1.y,
+                                                                     -gizmoMatrix.columns.1.z))
+                        default:
+                            worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.2.x,
+                                                                     gizmoMatrix.columns.2.y,
+                                                                     gizmoMatrix.columns.2.z))
+                        }
+                        activeRotationAxis = worldAxis
+                        let pivot = selected.position(relativeTo: nil)
+                        rotationSolver.beginRotation(
+                            axis: worldAxis, pivot: pivot,
+                            touchPoint: location, arView: arView
+                        )
+                    }
                 }
 
                 if let handle = activeHandleEntity {
@@ -1318,43 +1345,41 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
             // Rotation rings
             if activeGizmoPart == .rotateX || activeGizmoPart == .rotateY || activeGizmoPart == .rotateZ {
-                guard let selected = selectedEntity,
-                      let gizmo   = rotationGizmo else {
+                guard let selected = selectedEntity else {
                     let t = gesture.translation(in: arView)
                     panCameraTarget(translation: t)
                     gesture.setTranslation(.zero, in: arView)
                     return
                 }
 
-                // Look up the ring entity directly and read its current
-                // world-space orientation quaternion. The torus mesh is built
-                // in the XY plane so its face normal is local [0,0,1].
-                // Rotating that by the ring's world quat gives the exact axis
-                // the ring is physically lying on right now — even after the
-                // entity has been rotated by previous drags.
-                let ringName: String
-                switch activeGizmoPart {
-                case .rotateX: ringName = "xRing"
-                case .rotateY: ringName = "yRing"
-                default:       ringName = "zRing"
+                // ── Camera-relative rotation via solver ──
+                if rotationSolver.tracking {
+                    if let deltaQuat = rotationSolver.updateRotation(touchPoint: location, arView: arView) {
+                        let currentWorld = selected.orientation(relativeTo: nil)
+                        selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
+                    }
+                } else {
+                    // Fallback: screen-space angular tracking around projected entity centre
+                    guard let axis = activeRotationAxis else { lastPanLocation = location; return }
+                    let entityCentre = selected.position(relativeTo: nil)
+                    guard let centre2D = arView.project(entityCentre) else {
+                        lastPanLocation = location; return
+                    }
+                    let prev = CGPoint(x: lastPanLocation.x - centre2D.x, y: lastPanLocation.y - centre2D.y)
+                    let curr = CGPoint(x: location.x - centre2D.x, y: location.y - centre2D.y)
+                    let prevLen = sqrt(prev.x*prev.x + prev.y*prev.y)
+                    let currLen = sqrt(curr.x*curr.x + curr.y*curr.y)
+                    guard prevLen > 8, currLen > 8 else { lastPanLocation = location; return }
+                    let prevAngle = Float(atan2(prev.y, prev.x))
+                    let currAngle = Float(atan2(curr.y, curr.x))
+                    var delta = currAngle - prevAngle
+                    if delta >  Float.pi { delta -= 2 * Float.pi }
+                    if delta < -Float.pi { delta += 2 * Float.pi }
+                    guard delta.isFinite, abs(delta) > 0.001 else { lastPanLocation = location; return }
+                    let deltaQuat = simd_quatf(angle: -delta, axis: axis)
+                    let currentWorld = selected.orientation(relativeTo: nil)
+                    selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
                 }
-
-                guard let ring = gizmo.findEntity(named: ringName) else {
-                    lastPanLocation = location; return
-                }
-
-                let liveAxis = simd_normalize(ring.orientation(relativeTo: nil).act([0, 0, 1]))
-
-                let dx = Float(location.x - lastPanLocation.x)
-                let dy = Float(location.y - lastPanLocation.y)
-                let drag = abs(dx) > abs(dy) ? dx : -dy
-                let angle = -(drag * 0.01)
-                guard angle.isFinite else { return }
-
-                // Apply in world space so we never mix coordinate frames.
-                let deltaQuat    = simd_quatf(angle: angle, axis: liveAxis)
-                let currentWorld = selected.orientation(relativeTo: nil)
-                selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
                 lastPanLocation = location
                 return
             }
@@ -1520,6 +1545,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             activeGizmoPart      = .none
             activeRotationAxis   = nil
             isDraggingObject     = false
+            rotationSolver.endRotation()
             // activeHandleEntity intentionally NOT cleared here — clearing it causes
             // the next gizmo-part drag to find targetEntity == nil and silently
             // camera-pan instead of moving the handle. Cleared only in handleTap.
