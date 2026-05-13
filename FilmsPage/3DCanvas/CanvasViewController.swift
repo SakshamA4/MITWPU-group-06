@@ -587,6 +587,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
 
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 16:9).
+        var aspectRatio: CGSize?
+
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
             set {
@@ -607,6 +611,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
+
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 4:3 for width:depth).
+        var aspectRatio: CGSize?
 
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }

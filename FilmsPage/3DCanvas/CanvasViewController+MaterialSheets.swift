@@ -17,7 +17,7 @@ extension CanvasViewController {
     func presentWallCreationSheet() {
         let viewModel = WallCreationViewModel()
 
-        viewModel.onConfirm = { [weak self] width, height, thickness, config in
+        viewModel.onConfirm = { [weak self] width, height, thickness, config, aspectRatio in
             guard let self = self else { return }
             self.dismiss(animated: true) {
                 if let entity = self.spawnCinematicWall(
@@ -26,6 +26,12 @@ extension CanvasViewController {
                     thickness: thickness,
                     materialConfig: config
                 ) {
+                    // Apply aspect ratio lock if set
+                    if let ratio = aspectRatio {
+                        var wallComp = entity.components[WallComponent.self] ?? WallComponent()
+                        wallComp.aspectRatio = ratio
+                        entity.components.set(wallComp)
+                    }
                     self.selectedEntity = entity
                     self.refreshSidebarContent()
                 }
@@ -56,13 +62,19 @@ extension CanvasViewController {
     func presentGroundCreationSheet() {
         let viewModel = GroundCreationViewModel()
 
-        viewModel.onConfirm = { [weak self] size, config in
+        viewModel.onConfirm = { [weak self] size, config, aspectRatio in
             guard let self = self else { return }
             self.dismiss(animated: true) {
                 if let entity = self.spawnCinematicGround(
                     size: size,
                     materialConfig: config
                 ) {
+                    // Apply aspect ratio lock if set
+                    if let ratio = aspectRatio {
+                        var groundComp = entity.components[GroundComponent.self] ?? GroundComponent(width: size, depth: size)
+                        groundComp.aspectRatio = ratio
+                        entity.components.set(groundComp)
+                    }
                     self.selectedEntity = entity
                     self.refreshSidebarContent()
                 }
