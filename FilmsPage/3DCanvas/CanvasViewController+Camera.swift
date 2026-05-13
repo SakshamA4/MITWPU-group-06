@@ -801,23 +801,49 @@ extension CanvasViewController {
     func showExitCameraButton() {
         if view.viewWithTag(9001) != nil { return }
 
+        // Container — 44×44 to match the play button size
+        let container = UIView()
+        container.tag = 9001
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.clipsToBounds = true
+        container.layer.cornerRadius = 22
+
+        // Frosted glass background
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        blur.isUserInteractionEnabled = false
+        container.addSubview(blur)
+
+        // Subtle border
+        container.layer.borderWidth = 0.5
+        container.layer.borderColor = UIColor(white: 1, alpha: 0.15).cgColor
+
+        // Chevron-left icon — native iOS back button style
         let btn = UIButton(type: .system)
-        btn.tag = 9001
-        btn.setTitle("Exit Camera", for: .normal)
-        btn.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        btn.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
         btn.tintColor = .white
-        btn.backgroundColor = UIColor(red: 0.9, green: 0.3, blue: 0.3, alpha: 0.92)
-        btn.layer.cornerRadius = 18
-        btn.clipsToBounds = true
-        btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.addTarget(self, action: #selector(exitCameraViewTapped), for: .touchUpInside)
+        container.addSubview(btn)
 
-        view.addSubview(btn)
+        view.addSubview(container)
         NSLayoutConstraint.activate([
-            btn.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            btn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-            btn.heightAnchor.constraint(equalToConstant: 36)
+            // Top-left, aligned with the layers button row
+            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            container.widthAnchor.constraint(equalToConstant: 44),
+            container.heightAnchor.constraint(equalToConstant: 44),
+
+            blur.topAnchor.constraint(equalTo: container.topAnchor),
+            blur.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            btn.topAnchor.constraint(equalTo: container.topAnchor),
+            btn.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            btn.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            btn.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
     }
 
