@@ -146,6 +146,7 @@ class PropService {
             PropItem(id: UUID(), name: "House",        imageName: "house",     filmId: nil, description: "House",           modelFileName: "House2"),
             PropItem(id: UUID(), name: "Trees",        imageName: "Trees",      filmId: nil, description: "Trees",           modelFileName: "Trees"),
             PropItem(id: UUID(), name: "Vine Tree",    imageName: "vine",   filmId: nil, description: "Vine tree",       modelFileName: "VineTree"),
+            PropItem(id: UUID(), name: "Ford Car",    imageName: "ford Car",   filmId: nil, description: "ford car",       modelFileName: "FordCar"),
         ]
 
         if let data = UserDefaults.standard.data(forKey: storageKey) {
