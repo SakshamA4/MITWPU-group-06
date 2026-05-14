@@ -171,6 +171,21 @@ extension CanvasViewController {
         if let hitResult = objectHit {
             var root: Entity = hitResult.entity
             while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+
+            // Locked entities are not selectable by tap — treat as empty space.
+            let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+            if isLocked {
+                setEntityTransparency(selectedEntity, alpha: 1.0)
+                selectedEntity     = nil
+                activeHandleEntity = nil
+                updateGizmoMode()
+                hideGizmo()
+                hideRotationGizmo()
+                hideAnimationPanel()
+                refreshSidebarContent()
+                return
+            }
+
             if let previous = selectedEntity, previous != root {
                 setEntityTransparency(previous, alpha: 1.0)
             }
@@ -399,16 +414,22 @@ extension CanvasViewController {
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
                 lockComp.isLocked = newState
                 entity.components.set(lockComp)
+                menu.removeFromSuperview()
                 if newState {
-                    self.interactionMode = .move
+                    // Locked — deselect entirely so entity becomes non-interactive
                     self.setEntityTransparency(entity, alpha: 1.0)
+                    self.selectedEntity = nil
+                    self.activeHandleEntity = nil
+                    self.interactionMode = .move
                     self.hideGizmo()
                     self.hideRotationGizmo()
+                    self.hideAnimationPanel()
+                    self.updateGizmoMode()
                 } else {
+                    // Unlocked — keep selected so user can interact immediately
                     self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
-                menu.removeFromSuperview()
             case .delete:
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
                 self.deleteSelected()

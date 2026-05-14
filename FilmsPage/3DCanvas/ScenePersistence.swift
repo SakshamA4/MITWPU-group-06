@@ -98,6 +98,12 @@ struct EntityRecord: Codable {
     var cameraFocusMode: String?
     var cameraAperture: Float?
     var cameraFocusDistance: Float?
+    /// Aspect ratio lock width for wall/ground pinch resize. nil = free resize.
+    var aspectRatioWidth: Float?
+    /// Aspect ratio lock height for wall/ground pinch resize. nil = free resize.
+    var aspectRatioHeight: Float?
+    /// Entity lock state. nil or false = unlocked.
+    var isLocked: Bool?
 }
 
 // MARK: - AnimationClipRecord
@@ -421,7 +427,10 @@ final class ScenePersistenceService {
                  cameraGridType:      cameraGridType,
                  cameraFocusMode:     cameraFocusMode,
                  cameraAperture:      cameraAperture,
-                 cameraFocusDistance: cameraFocusDistance
+                 cameraFocusDistance: cameraFocusDistance,
+                 aspectRatioWidth:    aspectRatioWidth,
+                 aspectRatioHeight:   aspectRatioHeight,
+                 isLocked:            entity.components[LockComponent.self]?.isLocked == true ? true : nil
              ))
         }
 
@@ -630,6 +639,17 @@ final class ScenePersistenceService {
         // restoreEntity. Phase 5 calls reloadData() once after all entities are restored.
         for record in doc.entities {
             await restoreEntity(record: record, vc: vc, sceneID: sceneID)
+
+            // Restore lock state (must run after restoreEntity since the entity
+            // is created inside that method). Look up by stable UUID.
+            if record.isLocked == true,
+               let savedID = record.id,
+               let uuid = UUID(uuidString: savedID) {
+                let entity = vc.mainAnchor?.children.first {
+                    $0.components[CanvasViewController.EntityIDComponent.self]?.id == uuid
+                }
+                entity?.components.set(LockComponent(isLocked: true))
+            }
         }
 
         // Phase 5 – reload camera collection view once, now that all cameras are appended.

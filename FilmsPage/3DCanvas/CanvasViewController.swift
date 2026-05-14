@@ -1330,20 +1330,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 while let parent = root?.parent, parent.name != "MainAnchor" {
                     root = parent
                 }
-                if root?.name != "GizmoRoot" {
-                    selectedEntity = root
-                }
-                // If entity is selected (or just became selected) and gizmo is visible,
-                // treat body drag as planeXZ so the entity moves with the finger
-                if let sel = selectedEntity,
-                   gizmoRoot?.isEnabled == true,
-                   !(sel.components[LockComponent.self]?.isLocked ?? false) {
-                    activeGizmoPart   = .planeXZ
-                    dragStartPosition = sel.position
-                    isDraggingObject  = true
-                    lastPanLocation   = location
-                } else {
+
+                // Locked entities: skip selection entirely — 1-finger drag pans camera
+                let isLocked = root?.components[LockComponent.self]?.isLocked ?? false
+                if isLocked {
                     activeGizmoPart = .none
+                } else if root?.name != "GizmoRoot" {
+                    selectedEntity = root
+                    // If entity is selected and gizmo is visible,
+                    // treat body drag as planeXZ so the entity moves with the finger
+                    if let sel = selectedEntity,
+                       gizmoRoot?.isEnabled == true {
+                        activeGizmoPart   = .planeXZ
+                        dragStartPosition = sel.position
+                        isDraggingObject  = true
+                        lastPanLocation   = location
+                    } else {
+                        activeGizmoPart = .none
+                    }
                 }
             }
 
@@ -1802,6 +1806,15 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
         }
+
+        // For locked entities, hide the gizmo — only the unlock option should
+        // be available via the context menu, not the transform handles.
+        let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+        if isLocked {
+            hideGizmo()
+            hideRotationGizmo()
+        }
+
         showActionMenu(at: location)
     }
 }

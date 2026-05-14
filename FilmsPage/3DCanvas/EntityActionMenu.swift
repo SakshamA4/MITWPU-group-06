@@ -102,6 +102,12 @@ class EntityActionMenu: UIView {
     private func buildButtons() {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
+        // When locked, only show the Unlock button — no other interaction allowed
+        if isCurrentlyLocked {
+            addMenuButton(title: "Unlock", action: .lock)
+            return
+        }
+
         switch mode {
 
         case .standard:
@@ -120,7 +126,7 @@ class EntityActionMenu: UIView {
                 addMenuButton(title: "Set Ratio", action: .setRatio)
                 addSeparator()
             }
-            addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
+            addMenuButton(title: "Lock", action: .lock)
             addSeparator()
             addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
 
@@ -130,7 +136,7 @@ class EntityActionMenu: UIView {
             addSeparator()
             addMenuButton(title: "Aspect Ratio",   action: .aspectRatio)
             addSeparator()
-            addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
+            addMenuButton(title: "Lock", action: .lock)
             addSeparator()
             addMenuButton(title: "Delete",         action: .delete, isDestructive: true)
         }

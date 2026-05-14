@@ -195,18 +195,147 @@ extension HomeViewController: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let selectedModel = (indexPath.section == 0) ? currentTemplates[indexPath.row] : currentRecentScenes[indexPath.row]
+        // --- Recent Scenes (section 1) — open directly, unchanged ---
+        if indexPath.section == 1 {
+            let selectedModel = currentRecentScenes[indexPath.row]
+            let vc = CanvasViewController()
+            vc.currentSceneID = selectedModel.id
+            vc.sceneName = selectedModel.name
+            vc.sceneNotes = selectedModel.notes ?? ""
+            vc.sceneImageName = selectedModel.image
+            let navController = UINavigationController(rootViewController: vc)
+            navController.modalPresentationStyle = .fullScreen
+            self.present(navController, animated: true)
+            return
+        }
+
+        // --- Templates (section 0) ---
+        let selectedModel = currentTemplates[indexPath.row]
+        let templateDef = ScenesDataStore.shared.bundledTemplate(for: selectedModel.id)
+
+        // If the template has no bundled scene, open exactly as today.
+        guard let jsonName = templateDef?.bundledJSONName,
+              let thumbName = templateDef?.bundledThumbName else {
+            let vc = CanvasViewController()
+            vc.currentSceneID = selectedModel.id
+            vc.sceneName = selectedModel.name
+            vc.sceneNotes = selectedModel.notes ?? ""
+            vc.sceneImageName = selectedModel.image
+            let navController = UINavigationController(rootViewController: vc)
+            navController.modalPresentationStyle = .fullScreen
+            self.present(navController, animated: true)
+            return
+        }
+
+        // IMPORTANT: Never write to, modify, or delete bundle template files.
+        // indoor_scene.json and indoor_scene.jpg in BundledTemplates are read-only.
+        // Always copy to Documents with a new UUID before any modification.
+
+        let newSceneID = UUID()
+        let documentsDirectory = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        )[0]
+
+        // --- Copy bundled JSON to Documents ---
+        // Try subdirectory first (Xcode folder reference), fall back to flat bundle lookup.
+        let jsonURL = Bundle.main.url(
+            forResource: jsonName,
+            withExtension: "json",
+            subdirectory: "Templates"
+        ) ?? Bundle.main.url(
+            forResource: jsonName,
+            withExtension: "json"
+        )
+
+        guard let bundleURL = jsonURL else {
+            showTemplateErrorAlert()
+            return
+        }
+
+        let destURL = documentsDirectory
+            .appendingPathComponent("scene_\(newSceneID.uuidString).json")
+
+        // Remove stale file if it exists from a previous failed attempt
+        if FileManager.default.fileExists(atPath: destURL.path) {
+            try? FileManager.default.removeItem(at: destURL)
+        }
+
+        do {
+            try FileManager.default.copyItem(at: bundleURL, to: destURL)
+        } catch {
+            showTemplateErrorAlert()
+            return
+        }
+
+        // Patch the sceneID inside the copied JSON so it matches the new UUID.
+        // Decode → mutate → re-encode to preserve the full CanvasSceneDocument structure.
+        do {
+            let rawData = try Data(contentsOf: destURL)
+            if var jsonObject = try JSONSerialization.jsonObject(with: rawData) as? [String: Any] {
+                jsonObject["sceneID"] = newSceneID.uuidString
+                let patchedData = try JSONSerialization.data(withJSONObject: jsonObject)
+                try patchedData.write(to: destURL, options: .atomic)
+            }
+        } catch {
+            // Non-fatal: the scene will still load from the filename-based lookup,
+            // and the next save will overwrite with the correct sceneID.
+        }
+
+        // --- Copy bundled thumbnail to Documents ---
+        let thumbFilename = "thumb_\(newSceneID.uuidString).jpg"
+
+        let thumbURL = Bundle.main.url(
+            forResource: thumbName,
+            withExtension: "jpg",
+            subdirectory: "Templates"
+        ) ?? Bundle.main.url(
+            forResource: thumbName,
+            withExtension: "jpg"
+        )
+
+        guard let thumbBundleURL = thumbURL else {
+            showTemplateErrorAlert()
+            return
+        }
+
+        let thumbDestURL = documentsDirectory
+            .appendingPathComponent(thumbFilename)
+
+        // Remove stale file if it exists from a previous failed attempt
+        if FileManager.default.fileExists(atPath: thumbDestURL.path) {
+            try? FileManager.default.removeItem(at: thumbDestURL)
+        }
+
+        do {
+            try FileManager.default.copyItem(at: thumbBundleURL, to: thumbDestURL)
+        } catch {
+            showTemplateErrorAlert()
+            return
+        }
+
+        // --- Open CanvasViewController with the new scene ---
+        // Do NOT add to recentScenes here — the entry is created in commitExit()
+        // only if the user saves. This avoids stale Recents entries when the user
+        // exits without saving.
         let vc = CanvasViewController()
-        
-        // Ensure the Canvas tracks the ID from the Home page
-        vc.currentSceneID = selectedModel.id
+        vc.currentSceneID = newSceneID
         vc.sceneName = selectedModel.name
-        vc.sceneNotes = selectedModel.notes ?? ""
-        vc.sceneImageName = selectedModel.image
-        
+        vc.sceneNotes = ""
+        vc.sceneImageName = thumbFilename
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
+    }
+
+    /// Presents a generic error alert when a bundled template cannot be opened.
+    private func showTemplateErrorAlert() {
+        let alert = UIAlertController(
+            title: "Error",
+            message: "Could not open template. Please try again.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
 
