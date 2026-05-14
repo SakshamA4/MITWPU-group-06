@@ -26,6 +26,9 @@ final class CameraViewOverlay: UIView {
     /// Called when the focal length slider or focus controls change a persisted value.
     var onSettingsChanged: (() -> Void)?
 
+    /// Called when the user taps the screen in AF mode to request a focus raycast.
+    var onAFTap: ((CGPoint) -> Void)?
+
     /// Aspect ratio of the active camera — used to compute the letterbox-safe rect
     /// so grid lines are clipped to the visible camera frame.
     var cameraAspectRatio: Float = 16.0 / 9.0
@@ -65,6 +68,11 @@ final class CameraViewOverlay: UIView {
     /// Normalized focus point for AF mode (0…1, 0…1).
     private var afFocusPoint: CGPoint = CGPoint(x: 0.5, y: 0.5)
 
+    // ── FOV Sync ──
+    private var displayLink: CADisplayLink?
+    /// Prevents the DisplayLink from fighting the user when they are actively dragging the slider.
+    private var isDraggingFocalSlider = false
+
     /// All interactive subviews — used by hitTest to decide pass-through.
     private var interactiveControls: [UIView] {
         [focalSlider, focalLabel, gridButton, gridPicker,
@@ -79,8 +87,13 @@ final class CameraViewOverlay: UIView {
         setupFocalLengthUI()
         setupGridUI()
         setupFocusUI()
+        setupDisplayLink()
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    deinit {
+        displayLink?.invalidate()
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -197,6 +210,7 @@ final class CameraViewOverlay: UIView {
         focalSlider.value = 35
         focalSlider.minimumTrackTintColor = accentColor
         focalSlider.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.15)
+        focalSlider.addTarget(self, action: #selector(focalSliderBegan), for: .touchDown)
         focalSlider.addTarget(self, action: #selector(focalSliderChanged), for: .valueChanged)
         focalSlider.addTarget(self, action: #selector(focalSliderEnded), for: [.touchUpInside, .touchUpOutside])
         focalSlider.translatesAutoresizingMaskIntoConstraints = false
@@ -236,6 +250,11 @@ final class CameraViewOverlay: UIView {
         updateFocalLabels(35)
     }
 
+    @objc private func focalSliderBegan() {
+        isDraggingFocalSlider = true
+        focalValueBadge.isHidden = false
+    }
+
     @objc private func focalSliderChanged() {
         let mm = focalSlider.value
         let snapped = snapToStandardFocalLength(mm)
@@ -252,6 +271,7 @@ final class CameraViewOverlay: UIView {
     }
 
     @objc private func focalSliderEnded() {
+        isDraggingFocalSlider = false
         focalValueBadge.isHidden = true
         onSettingsChanged?()
     }
@@ -601,6 +621,7 @@ final class CameraViewOverlay: UIView {
         }
         updateBlurEffect()
         onSettingsChanged?()
+        onAFTap?(point)
     }
 
     private func updateFocusMode() {
@@ -616,6 +637,13 @@ final class CameraViewOverlay: UIView {
         let dist = rightSlider.value
         rightLabel.text = String(format: " %.1fm ", dist)
     }
+    
+    /// Programmatically update focus distance (e.g. from AF raycast)
+    func setFocusDistance(_ distance: Float) {
+        rightSlider.value = max(rightSlider.minimumValue, min(rightSlider.maximumValue, distance))
+        updateFocusLabels()
+        updateBlurEffect()
+    }
 
     // MARK: - ECS Component Helper
 
@@ -624,6 +652,29 @@ final class CameraViewOverlay: UIView {
         var comp = root.components[CameraFocusComponent.self] ?? CameraFocusComponent()
         mutate(&comp)
         root.components.set(comp)
+    }
+
+    // MARK: - FOV Sync (Bi-Directional)
+
+    private func setupDisplayLink() {
+        displayLink = CADisplayLink(target: self, selector: #selector(updateFromCamera))
+        displayLink?.add(to: .main, forMode: .common)
+    }
+
+    @objc private func updateFromCamera() {
+        // Only update UI from camera if the user isn't actively dragging the slider
+        guard !isDraggingFocalSlider,
+              let cam = perspectiveCamera else { return }
+
+        // Get the actual FOV from the camera (could be animating via Timeline)
+        let currentFOV = cam.camera.fieldOfViewInDegrees
+        let currentMM = fovToFocalLength(currentFOV)
+
+        // Don't fight tiny floating point differences
+        if abs(focalSlider.value - currentMM) > 0.5 {
+            focalSlider.value = currentMM
+            updateFocalLabels(snapToStandardFocalLength(currentMM))
+        }
     }
 
     // MARK: - DoF Blur Effect

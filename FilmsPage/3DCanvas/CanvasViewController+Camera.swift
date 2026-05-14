@@ -482,6 +482,9 @@ extension CanvasViewController {
         overlay.onSettingsChanged = { [weak self] in
             self?.startCameraPreviewUpdates()
         }
+        overlay.onAFTap = { [weak self] point in
+            self?.handleCameraViewAFTap(at: point)
+        }
         // Insert above letterbox but below exit button
         if let exitBtn = view.viewWithTag(9001) {
             view.insertSubview(overlay, belowSubview: exitBtn)
@@ -489,6 +492,32 @@ extension CanvasViewController {
             view.addSubview(overlay)
         }
         cameraViewOverlay = overlay
+    }
+
+    // MARK: - Auto Focus Raycasting
+    
+    /// Called when the user taps the screen in AF mode while looking through a scene camera.
+    func handleCameraViewAFTap(at screenPoint: CGPoint) {
+        guard let arView = arView,
+              activeCamera !== editorCamera,
+              let camRoot = cameraToVisualMap[activeCamera] else { return }
+        
+        // Raycast from the tapped point
+        // Using .all so we can hit any model in the scene
+        let hits = arView.hitTest(screenPoint, query: .nearest, mask: .all)
+        if let firstHit = hits.first {
+            // Calculate distance from camera to hit point
+            let camPos = activeCamera.position(relativeTo: nil)
+            let distance = simd_distance(camPos, firstHit.position)
+            
+            // Update ECS Component
+            var comp = camRoot.components[CameraFocusComponent.self] ?? CameraFocusComponent()
+            comp.focusDistance = distance
+            camRoot.components.set(comp)
+            
+            // Update UI Slider and labels
+            cameraViewOverlay?.setFocusDistance(distance)
+        }
     }
 
     // MARK: - Aspect Ratio Application
@@ -960,6 +989,9 @@ extension CanvasViewController {
                 toValue: newTo,
                 motionPath: updatedPath
             )
+            
+            // Rebuild the visual path line so it shows up in the new position
+            showMotionPath(for: timeline.clips[i])
         }
         
         // Update baseTransform so playback starts from the new position
