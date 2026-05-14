@@ -39,7 +39,7 @@ extension CanvasViewController {
                 equalTo: layersButton.centerYAnchor
             ),
             shotBreakdownBtn.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor,
+                equalTo: compassView.leadingAnchor,
                 constant: -16
             ),
             shotBreakdownBtn.widthAnchor.constraint(equalToConstant: 44),
@@ -652,8 +652,25 @@ extension CanvasViewController {
             rotateBtn.heightAnchor.constraint(equalToConstant: 40),
             
         ])
+        // Navigation Compass (Top Right)
+        compassView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(compassView)
         
-        // REPLACE WITH THIS:
+        NSLayoutConstraint.activate([
+            compassView.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            compassView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            compassView.widthAnchor.constraint(equalToConstant: 70),
+            compassView.heightAnchor.constraint(equalToConstant: 70)
+        ])
+        
+        compassView.onNorthTap = { [weak self] in
+            guard let self = self else { return }
+            UIView.animate(withDuration: 0.4) {
+                self.yaw = 0
+                self.updateEditorCamera()
+            }
+        }
+
         // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
         let cameraPanel = UIView()
         cameraPanel.tag = 8800

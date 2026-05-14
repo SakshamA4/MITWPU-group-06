@@ -44,48 +44,75 @@ extension CanvasViewController {
             // Pinch does NOT zoom the camera in this case, giving the user full
             // control over the wall / background / ground size.
             if let entity = selectedEntity,
-               let modelEntity = entity as? ModelEntity,
                !(entity.components[LockComponent.self]?.isLocked ?? false) {
 
-                if var wall = modelEntity.components[WallComponent.self] {
-                    wall.width  *= capturedScale
-                    wall.height *= capturedScale
-                    wall.width  = max(0.3, min(wall.width,  10))
-                    wall.height = max(0.3, min(wall.height,  6))
-                    modelEntity.model?.mesh = MeshResource.generateBox(
-                        width: wall.width, height: wall.height, depth: 0.05)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(wall)
-                    return   // skip camera zoom
-                }
-
-                if var bg = modelEntity.components[BackgroundComponent.self] {
-                    bg.width  *= capturedScale
-                    bg.height *= capturedScale
-                    bg.width  = max(0.5, min(bg.width,  15))
-                    bg.height = max(0.5, min(bg.height, 10))
-                    modelEntity.model?.mesh = MeshResource.generateBox(
-                        width: bg.width, height: bg.height, depth: 0.05)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(bg)
-                    return   // skip camera zoom
-                }
-
-                if var ground = modelEntity.components[GroundComponent.self] {
-                    ground.width *= capturedScale
-                    ground.depth *= capturedScale
-                    ground.width = max(0.5, min(ground.width, 20))
-                    ground.depth = max(0.5, min(ground.depth, 20))
-                    modelEntity.model?.mesh = MeshResource.generatePlane(
-                        width: ground.width, depth: ground.depth)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(ground)
-                    return   // skip camera zoom
-                }
-                
-                if modelEntity.components[CategoryComponent.self]?.toolType == .prop {
-                    modelEntity.scale *= capturedScale
+                // ── Prop / Character entities — uniform scale ──────────────────
+                // Props and characters are loaded from USDZ as plain Entity roots,
+                // not ModelEntity, so this check must come before the ModelEntity cast.
+                if entity.components[CategoryComponent.self]?.toolType == .prop
+                    || entity.components[CategoryComponent.self]?.toolType == .character {
+                    var newScale = entity.scale * capturedScale
+                    newScale = simd_clamp(newScale, SIMD3(repeating: 0.05), SIMD3(repeating: 10.0))
+                    entity.scale = newScale
                     return
+                }
+
+                // ── Wall / Background / Ground — procedural mesh resize ───────
+                if let modelEntity = entity as? ModelEntity {
+
+                    if var wall = modelEntity.components[WallComponent.self] {
+                        if let ratio = wall.aspectRatio, ratio.width > 0 {
+                            // Ratio-locked: drive width, derive height
+                            wall.width *= capturedScale
+                            wall.width  = max(0.3, min(wall.width, 10))
+                            wall.height = wall.width / Float(ratio.width / ratio.height)
+                            wall.height = max(0.3, min(wall.height, 6))
+                        } else {
+                            // Free resize
+                            wall.width  *= capturedScale
+                            wall.height *= capturedScale
+                            wall.width  = max(0.3, min(wall.width,  10))
+                            wall.height = max(0.3, min(wall.height,  6))
+                        }
+                        modelEntity.model?.mesh = MeshResource.generateBox(
+                            width: wall.width, height: wall.height, depth: wall.thickness)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(wall)
+                        return   // skip camera zoom
+                    }
+
+                    if var bg = modelEntity.components[BackgroundComponent.self] {
+                        bg.width  *= capturedScale
+                        bg.height *= capturedScale
+                        bg.width  = max(0.5, min(bg.width,  15))
+                        bg.height = max(0.5, min(bg.height, 10))
+                        modelEntity.model?.mesh = MeshResource.generateBox(
+                            width: bg.width, height: bg.height, depth: 0.05)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(bg)
+                        return   // skip camera zoom
+                    }
+
+                    if var ground = modelEntity.components[GroundComponent.self] {
+                        if let ratio = ground.aspectRatio, ratio.width > 0 {
+                            // Ratio-locked: drive width, derive depth
+                            ground.width *= capturedScale
+                            ground.width = max(0.5, min(ground.width, 20))
+                            ground.depth = ground.width / Float(ratio.width / ratio.height)
+                            ground.depth = max(0.5, min(ground.depth, 20))
+                        } else {
+                            // Free resize
+                            ground.width *= capturedScale
+                            ground.depth *= capturedScale
+                            ground.width = max(0.5, min(ground.width, 20))
+                            ground.depth = max(0.5, min(ground.depth, 20))
+                        }
+                        modelEntity.model?.mesh = MeshResource.generatePlane(
+                            width: ground.width, depth: ground.depth)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(ground)
+                        return   // skip camera zoom
+                    }
                 }
             }
 
@@ -115,6 +142,9 @@ extension CanvasViewController {
 
         // Rescale gizmos so they stay a constant screen size as the camera moves
         updateGizmoScales()
+        
+        // Sync navigation compass
+        compassView.updateRotation(yaw: yaw)
     }
 
     // MARK: - Camera Pivot: Orbit Around Selected Entity

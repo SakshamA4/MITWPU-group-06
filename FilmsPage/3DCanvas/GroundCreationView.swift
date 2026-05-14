@@ -44,6 +44,9 @@ struct GroundCreationView: View {
                         // MARK: - Size
                         sizeSection
 
+                        // MARK: - Ratio Lock
+                        ratioSection
+
                         // MARK: - Texture Selection
                         textureSection
 
@@ -165,6 +168,50 @@ struct GroundCreationView: View {
 
             ColorPicker("Surface Tint", selection: $viewModel.tintColor, supportsOpacity: false)
                 .padding(.horizontal, 4)
+        }
+        .padding(.horizontal, Layout.horizontalInset)
+    }
+
+    // MARK: - Ratio Lock Section
+
+    private var ratioSection: some View {
+        VStack(alignment: .leading, spacing: Layout.separatorBottomSpacing) {
+            sectionHeader("Ratio Lock", showSeparator: true)
+
+            Toggle(isOn: $viewModel.ratioLocked) {
+                Text("Lock Aspect Ratio")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+            }
+            .tint(Color.blue)
+
+            if viewModel.ratioLocked {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Width")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(UIColor.secondaryLabel))
+                        TextField("4", text: $viewModel.ratioWidth)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                    }
+
+                    Text(":")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(UIColor.secondaryLabel))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Depth")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(UIColor.secondaryLabel))
+                        TextField("3", text: $viewModel.ratioDepth)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                    }
+                }
+            }
         }
         .padding(.horizontal, Layout.horizontalInset)
     }

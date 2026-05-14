@@ -399,11 +399,11 @@ final class VideoExportService {
                     autoreleasepool {
                         let pb: CVPixelBuffer?
                         if let img = image {
-                            pb = self.createPixelBuffer(from: img, size: size)
+                            pb = Self.createPixelBuffer(from: img, size: size)
                         } else {
                             // Frame capture failed — append a black frame to maintain timing
                             print("⚠️ [Export] Nil frame at globalIdx=\(currentGlobalIdx), using black fallback")
-                            pb = self.createBlackPixelBuffer(size: size)
+                            pb = Self.createBlackPixelBuffer(size: size)
                         }
 
                         if let pb = pb {
@@ -527,7 +527,9 @@ final class VideoExportService {
     // MARK: - Pixel Buffer Creation
 
     /// Optimized pixel buffer creation using BGRA (native Metal format).
-    private func createPixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
+    /// Exposed as `static` so SequenceExportCoordinator can reuse the same
+    /// conversion logic without duplicating code.
+    static func createPixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
         guard let cgImage = image.cgImage else { return nil }
 
         var pb: CVPixelBuffer?
@@ -564,7 +566,8 @@ final class VideoExportService {
     }
 
     /// Creates a black pixel buffer as fallback for failed captures.
-    private func createBlackPixelBuffer(size: CGSize) -> CVPixelBuffer? {
+    /// Exposed as `static` so SequenceExportCoordinator can reuse it.
+    static func createBlackPixelBuffer(size: CGSize) -> CVPixelBuffer? {
         var pb: CVPixelBuffer?
         let attrs: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,

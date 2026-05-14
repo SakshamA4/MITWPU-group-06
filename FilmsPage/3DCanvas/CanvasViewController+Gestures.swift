@@ -171,6 +171,21 @@ extension CanvasViewController {
         if let hitResult = objectHit {
             var root: Entity = hitResult.entity
             while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+
+            // Locked entities are not selectable by tap — treat as empty space.
+            let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+            if isLocked {
+                setEntityTransparency(selectedEntity, alpha: 1.0)
+                selectedEntity     = nil
+                activeHandleEntity = nil
+                updateGizmoMode()
+                hideGizmo()
+                hideRotationGizmo()
+                hideAnimationPanel()
+                refreshSidebarContent()
+                return
+            }
+
             if let previous = selectedEntity, previous != root {
                 setEntityTransparency(previous, alpha: 1.0)
             }
@@ -304,6 +319,63 @@ extension CanvasViewController {
                     self.presentMaterialEditor(for: modelEntity)
                 }
 
+            case .setRatio:
+                // Open ratio lock input for wall/ground entities
+                menu.removeFromSuperview()
+                guard let modelEntity = entity as? ModelEntity else { return }
+
+                let isWall = modelEntity.components[WallComponent.self] != nil
+                let secondLabel = isWall ? "Height" : "Depth"
+                let currentRatio: CGSize? = isWall
+                    ? modelEntity.components[WallComponent.self]?.aspectRatio
+                    : modelEntity.components[GroundComponent.self]?.aspectRatio
+
+                let alert = UIAlertController(
+                    title: "Set Ratio",
+                    message: "Enter Width : \(secondLabel) ratio for pinch resize.\nLeave empty or tap Clear for free resize.",
+                    preferredStyle: .alert
+                )
+                alert.addTextField { tf in
+                    tf.placeholder = "Width (e.g. 16)"
+                    tf.keyboardType = .decimalPad
+                    if let r = currentRatio { tf.text = "\(Int(r.width))" }
+                }
+                alert.addTextField { tf in
+                    tf.placeholder = "\(secondLabel) (e.g. 9)"
+                    tf.keyboardType = .decimalPad
+                    if let r = currentRatio { tf.text = "\(Int(r.height))" }
+                }
+
+                alert.addAction(UIAlertAction(title: "Confirm", style: .default) { _ in
+                    let wText = alert.textFields?[0].text ?? ""
+                    let hText = alert.textFields?[1].text ?? ""
+                    if let rw = Float(wText), let rh = Float(hText), rw > 0, rh > 0 {
+                        let ratio = CGSize(width: CGFloat(rw), height: CGFloat(rh))
+                        if isWall {
+                            var comp = modelEntity.components[WallComponent.self]!
+                            comp.aspectRatio = ratio
+                            modelEntity.components.set(comp)
+                        } else {
+                            var comp = modelEntity.components[GroundComponent.self]!
+                            comp.aspectRatio = ratio
+                            modelEntity.components.set(comp)
+                        }
+                    }
+                })
+                alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { _ in
+                    if isWall {
+                        var comp = modelEntity.components[WallComponent.self]!
+                        comp.aspectRatio = nil
+                        modelEntity.components.set(comp)
+                    } else {
+                        var comp = modelEntity.components[GroundComponent.self]!
+                        comp.aspectRatio = nil
+                        modelEntity.components.set(comp)
+                    }
+                })
+                alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+                self.present(alert, animated: true)
+
             case .lightSettings:
                 // Open light control panel for light entities
                 menu.removeFromSuperview()
@@ -342,16 +414,22 @@ extension CanvasViewController {
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
                 lockComp.isLocked = newState
                 entity.components.set(lockComp)
+                menu.removeFromSuperview()
                 if newState {
-                    self.interactionMode = .move
+                    // Locked — deselect entirely so entity becomes non-interactive
                     self.setEntityTransparency(entity, alpha: 1.0)
+                    self.selectedEntity = nil
+                    self.activeHandleEntity = nil
+                    self.interactionMode = .move
                     self.hideGizmo()
                     self.hideRotationGizmo()
+                    self.hideAnimationPanel()
+                    self.updateGizmoMode()
                 } else {
+                    // Unlocked — keep selected so user can interact immediately
                     self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
-                menu.removeFromSuperview()
             case .delete:
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
                 self.deleteSelected()

@@ -12,6 +12,20 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
 
     private let gradientLayer = CAGradientLayer()
 
+    /// Small pill badge showing the sequence name (top-left corner).
+    private let sequenceBadgeLabel: UILabel = {
+        let lbl = UILabel()
+        lbl.font = .systemFont(ofSize: 9, weight: .bold)
+        lbl.textColor = .white
+        lbl.textAlignment = .center
+        lbl.backgroundColor = UIColor(red: 0.694, green: 0.125, blue: 0.224, alpha: 0.90)
+        lbl.layer.cornerRadius = 8
+        lbl.clipsToBounds = true
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+        lbl.isHidden = true
+        return lbl
+    }()
+
     override func awakeFromNib() {
         super.awakeFromNib()
 
@@ -35,11 +49,29 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
 
         // Bring label above gradient
         contentView.bringSubviewToFront(recentLabel)
+
+        // Sequence badge
+        contentView.addSubview(sequenceBadgeLabel)
+        NSLayoutConstraint.activate([
+            sequenceBadgeLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            sequenceBadgeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            sequenceBadgeLabel.heightAnchor.constraint(equalToConstant: 16),
+        ])
+        // Padding via content insets is not available on UILabel, so we add width constraint
+        contentView.bringSubviewToFront(sequenceBadgeLabel)
     }
     
     func configure(with item: ScenesModel) {
         recentImageView.setFilmImage(named: item.image ?? "Image")
         recentLabel.text = item.name
+
+        // Sequence badge
+        if let seqName = item.sequenceName, !seqName.isEmpty {
+            sequenceBadgeLabel.text = "  \(seqName)  "
+            sequenceBadgeLabel.isHidden = false
+        } else {
+            sequenceBadgeLabel.isHidden = true
+        }
     }
 
     private func setupGradient() {

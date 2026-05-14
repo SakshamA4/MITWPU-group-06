@@ -30,6 +30,7 @@ class EntityActionMenu: UIView {
         case changeColour   // standard: open color picker (walls/ground only)
         case editMaterial   // standard: open material editor (walls/ground only)
         case lightSettings  // standard: open light control panel (lights only)
+        case setRatio       // standard: open ratio lock input (walls/ground only)
         case addShot        // camera:   open shot/movement picker
         case aspectRatio    // camera:   open aspect ratio picker
         case lock
@@ -101,6 +102,12 @@ class EntityActionMenu: UIView {
     private func buildButtons() {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
+        // When locked, only show the Unlock button — no other interaction allowed
+        if isCurrentlyLocked {
+            addMenuButton(title: "Unlock", action: .lock)
+            return
+        }
+
         switch mode {
 
         case .standard:
@@ -116,8 +123,10 @@ class EntityActionMenu: UIView {
                 addSeparator()
                 addMenuButton(title: "Change Colour", action: .changeColour)
                 addSeparator()
+                addMenuButton(title: "Set Ratio", action: .setRatio)
+                addSeparator()
             }
-            addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
+            addMenuButton(title: "Lock", action: .lock)
             addSeparator()
             addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
 
@@ -127,7 +136,7 @@ class EntityActionMenu: UIView {
             addSeparator()
             addMenuButton(title: "Aspect Ratio",   action: .aspectRatio)
             addSeparator()
-            addMenuButton(title: isCurrentlyLocked ? "Unlock" : "Lock", action: .lock)
+            addMenuButton(title: "Lock", action: .lock)
             addSeparator()
             addMenuButton(title: "Delete",         action: .delete, isDestructive: true)
         }

@@ -272,6 +272,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var sceneImageName: String?
     var currentSceneID: UUID?
     
+    /// When true, viewDidLoad skips all UI setup (toolbars, gestures, nav bar,
+    /// gizmo, animation panel) and viewDidAppear skips loadSceneIfSaved().
+    /// The coordinator loads scenes explicitly via ScenePersistenceService.
+    /// Set this BEFORE the view loads (i.e. before accessing .view).
+    var isExportMode: Bool = false
+
+    /// Set to true when this scene was created by copying a bundled template.
+    /// Used by commitExit() to clean up copied files if the user exits without saving.
+    var isTemplateCopy: Bool = false
+
+    /// Set to true by saveAndExit() after the user explicitly saves.
+    /// When false and isTemplateCopy is true, commitExit() removes the copied files
+    /// instead of adding the scene to recents.
+    var userDidSave: Bool = false
+
     // FIX: Track whether the scene has been loaded to prevent reloading it
     // multiple times when returning from navigation (e.g., shot breakdown).
     // Reset to false when exiting the scene.
@@ -597,6 +612,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
 
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 16:9).
+        var aspectRatio: CGSize?
+
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
             set {
@@ -618,6 +637,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
 
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 4:3 for width:depth).
+        var aspectRatio: CGSize?
+
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
             set {
@@ -628,6 +651,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
     }
 
+    // Navigation Compass
+    let compassView = CompassView()
+    
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -635,6 +661,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
         setupARView()
         setupInitialScene()
+
+        // In export mode, skip all interactive UI — only the ARView and
+        // scene graph are needed for rendering frames.
+        guard !isExportMode else { return }
+
         setupUI()
         setupGestures()
         setupTimelineControls()
@@ -655,6 +686,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // In export mode, the coordinator loads scenes explicitly.
+        guard !isExportMode else { return }
         // Defer scene load until the view is fully on screen.
         // This lets RealityKit finish its initial render pass before we
         // start deserialising entities, preventing the black-screen stall
@@ -1315,20 +1348,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 while let parent = root?.parent, parent.name != "MainAnchor" {
                     root = parent
                 }
-                if root?.name != "GizmoRoot" {
-                    selectedEntity = root
-                }
-                // If entity is selected (or just became selected) and gizmo is visible,
-                // treat body drag as planeXZ so the entity moves with the finger
-                if let sel = selectedEntity,
-                   gizmoRoot?.isEnabled == true,
-                   !(sel.components[LockComponent.self]?.isLocked ?? false) {
-                    activeGizmoPart   = .planeXZ
-                    dragStartPosition = sel.position
-                    isDraggingObject  = true
-                    lastPanLocation   = location
-                } else {
+
+                // Locked entities: skip selection entirely — 1-finger drag pans camera
+                let isLocked = root?.components[LockComponent.self]?.isLocked ?? false
+                if isLocked {
                     activeGizmoPart = .none
+                } else if root?.name != "GizmoRoot" {
+                    selectedEntity = root
+                    // If entity is selected and gizmo is visible,
+                    // treat body drag as planeXZ so the entity moves with the finger
+                    if let sel = selectedEntity,
+                       gizmoRoot?.isEnabled == true {
+                        activeGizmoPart   = .planeXZ
+                        dragStartPosition = sel.position
+                        isDraggingObject  = true
+                        lastPanLocation   = location
+                    } else {
+                        activeGizmoPart = .none
+                    }
                 }
             }
 
@@ -1787,6 +1824,15 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
         }
+
+        // For locked entities, hide the gizmo — only the unlock option should
+        // be available via the context menu, not the transform handles.
+        let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+        if isLocked {
+            hideGizmo()
+            hideRotationGizmo()
+        }
+
         showActionMenu(at: location)
     }
 }
