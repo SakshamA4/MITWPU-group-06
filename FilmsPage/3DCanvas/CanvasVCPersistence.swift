@@ -117,6 +117,7 @@ extension CanvasViewController {
     }
 
     private func saveAndExit() {
+        userDidSave = true
         guard let id = currentSceneID else {
             commitExit()
             return
@@ -181,6 +182,28 @@ extension CanvasViewController {
      /// Updates metadata and dismisses. No RealityKit access — safe to call any time.
      func commitExit() {
          let currentID = currentSceneID ?? currentSceneObject?.id ?? UUID()
+
+         // Template-copy cleanup: if the user exits without saving a scene that
+         // was created by copying a bundled template, remove the copied files
+         // from Documents and skip adding to recents entirely.
+         if isTemplateCopy && !userDidSave {
+             if let id = currentSceneID {
+                 ScenePersistenceService.shared.deleteSave(for: id)
+                 let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                 try? FileManager.default.removeItem(
+                     at: docs.appendingPathComponent("thumb_\(id.uuidString).jpg")
+                 )
+                 ScenePersistenceService.shared.evictScene(id)
+             }
+             hasSceneBeenLoaded = false
+             NotificationCenter.default.removeObserver(
+                 self,
+                 name: UIApplication.willResignActiveNotification,
+                 object: nil
+             )
+             dismiss(animated: true)
+             return
+         }
 
          let isTemplate = ScenesDataStore.shared.currentTemplates.contains { $0.id == currentID }
 

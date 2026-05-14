@@ -322,6 +322,7 @@ extension HomeViewController: UICollectionViewDataSource {
         vc.sceneName = selectedModel.name
         vc.sceneNotes = ""
         vc.sceneImageName = thumbFilename
+        vc.isTemplateCopy = true
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)

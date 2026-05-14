@@ -278,6 +278,15 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     /// Set this BEFORE the view loads (i.e. before accessing .view).
     var isExportMode: Bool = false
 
+    /// Set to true when this scene was created by copying a bundled template.
+    /// Used by commitExit() to clean up copied files if the user exits without saving.
+    var isTemplateCopy: Bool = false
+
+    /// Set to true by saveAndExit() after the user explicitly saves.
+    /// When false and isTemplateCopy is true, commitExit() removes the copied files
+    /// instead of adding the scene to recents.
+    var userDidSave: Bool = false
+
     // FIX: Track whether the scene has been loaded to prevent reloading it
     // multiple times when returning from navigation (e.g., shot breakdown).
     // Reset to false when exiting the scene.
