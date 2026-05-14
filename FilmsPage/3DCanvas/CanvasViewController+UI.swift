@@ -35,11 +35,14 @@ extension CanvasViewController {
         playButton.clipsToBounds = false
 
         NSLayoutConstraint.activate([
+            // 1. Compass View — Moved to Top Left under Layers Button
+            // (Constraints updated in setupCompass() instead for clarity)
+
             shotBreakdownBtn.centerYAnchor.constraint(
                 equalTo: layersButton.centerYAnchor
             ),
             shotBreakdownBtn.trailingAnchor.constraint(
-                equalTo: compassView.leadingAnchor,
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
                 constant: -16
             ),
             shotBreakdownBtn.widthAnchor.constraint(equalToConstant: 44),
@@ -113,7 +116,14 @@ extension CanvasViewController {
             action: #selector(moreTapped)
         )
         
-        navigationItem.rightBarButtonItems = [moreBtn, exportBtn]
+        let sceneSummaryBtn = UIBarButtonItem(
+            image: UIImage(systemName: "list.bullet.rectangle"),
+            style: .plain,
+            target: self,
+            action: #selector(sceneSummaryTapped)
+        )
+
+        navigationItem.rightBarButtonItems = [moreBtn, exportBtn, sceneSummaryBtn]
         
         // 4. Configure Appearance (Dark background like your image)
         let appearance = UINavigationBarAppearance()
@@ -198,6 +208,22 @@ extension CanvasViewController {
         infoVC.modalPresentationStyle = .overCurrentContext
         infoVC.modalTransitionStyle = .crossDissolve
         self.present(infoVC, animated: true)
+    }
+
+    @objc func sceneSummaryTapped() {
+        let summaryVC = SceneSummaryViewController()
+        summaryVC.sceneName = self.sceneName
+        summaryVC.sequenceName = self.sequenceName
+        summaryVC.filmName = self.filmName
+        summaryVC.rows = SceneSummaryViewController.makeRows(from: self)
+        
+        summaryVC.modalPresentationStyle = .pageSheet
+        if let sheet = summaryVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(summaryVC, animated: true)
     }
 
 
@@ -650,25 +676,6 @@ extension CanvasViewController {
             rotateBtn.heightAnchor.constraint(equalToConstant: 40),
             
         ])
-        // Navigation Compass (Top Right)
-        compassView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(compassView)
-        
-        NSLayoutConstraint.activate([
-            compassView.topAnchor.constraint(equalTo: toolbar.topAnchor),
-            compassView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-            compassView.widthAnchor.constraint(equalToConstant: 70),
-            compassView.heightAnchor.constraint(equalToConstant: 70)
-        ])
-        
-        compassView.onNorthTap = { [weak self] in
-            guard let self = self else { return }
-            UIView.animate(withDuration: 0.4) {
-                self.yaw = 0
-                self.updateEditorCamera()
-            }
-        }
-
         // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
         let cameraPanel = UIView()
         cameraPanel.tag = 8800
@@ -860,6 +867,29 @@ extension CanvasViewController {
         // Ensure the sidebar stays on top of the 3D scene
         view.bringSubviewToFront(sidebarView)
         view.bringSubviewToFront(layersButton)
+
+        // 10. COMPASS SETUP — Must be last so layersButton is in hierarchy
+        compassView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(compassView)
+        
+        NSLayoutConstraint.activate([
+            compassView.topAnchor.constraint(equalTo: layersButton.bottomAnchor, constant: 16),
+            compassView.centerXAnchor.constraint(equalTo: layersButton.centerXAnchor),
+            compassView.widthAnchor.constraint(equalToConstant: 70),
+            compassView.heightAnchor.constraint(equalToConstant: 70)
+        ])
+        
+        compassView.onNorthTap = { [weak self] in
+            guard let self = self else { return }
+            UIView.animate(withDuration: 0.4) {
+                self.yaw = 0
+                self.updateEditorCamera()
+            }
+        }
+        
+        compassView.onPan = { [weak self] translation in
+            self?.panCameraTarget(translation: translation)
+        }
         
     }
 

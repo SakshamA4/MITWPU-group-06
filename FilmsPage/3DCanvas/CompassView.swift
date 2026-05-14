@@ -15,6 +15,7 @@ class CompassView: UIView {
     private let centerDot = UIView()
     
     var onNorthTap: (() -> Void)?
+    var onPan: ((CGPoint) -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -88,6 +89,9 @@ class CompassView: UIView {
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
+        
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
+        addGestureRecognizer(pan)
         
         // Add a subtle inner shadow/glow
         let innerShadow = CALayer()
@@ -222,5 +226,13 @@ class CompassView: UIView {
     
     @objc private func handleTap() {
         onNorthTap?()
+    }
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        if gesture.state == .changed {
+            let translation = gesture.translation(in: self)
+            onPan?(translation)
+            gesture.setTranslation(.zero, in: self)
+        }
     }
 }
