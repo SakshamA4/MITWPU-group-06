@@ -42,19 +42,21 @@ class ScenesDataStore {
     
     private var templateDefinitions: [TemplateDefinition] = [
         TemplateDefinition(
-            scene: ScenesModel(id: outdoorID, name: "Outdoor Scene", image: "outdoor")
+            scene: ScenesModel(id: outdoorID, name: "Outdoor Scene", image: "outdoor"),
+            bundledJSONName: "outdoor_scene",
+            bundledThumbName: "outdoor_scene"
         ),
         TemplateDefinition(
             scene: ScenesModel(id: houseID, name: "House Scene", image: "scene1"),
             bundledJSONName: "indoor_scene",
             bundledThumbName: "indoor_scene"
         ),
-        TemplateDefinition(
-            scene: ScenesModel(id: scene3ID, name: "Diner Scene", image: "diner")
-        ),
-        TemplateDefinition(
-            scene: ScenesModel(id: scene4ID, name: "Park Scene", image: "park")
-        )
+//        TemplateDefinition(
+//            scene: ScenesModel(id: scene3ID, name: "Diner Scene", image: "diner")
+//        ),
+//        TemplateDefinition(
+//            scene: ScenesModel(id: scene4ID, name: "Park Scene", image: "park")
+//        )
     ]
     
     // MARK: - Getters
