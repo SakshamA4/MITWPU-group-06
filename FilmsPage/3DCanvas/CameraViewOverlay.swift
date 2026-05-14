@@ -237,7 +237,7 @@ final class CameraViewOverlay: UIView {
 
         NSLayoutConstraint.activate([
             focalLabel.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 16),
-            focalLabel.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -60),
+            focalLabel.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -115),
             focalLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 54),
             focalLabel.heightAnchor.constraint(equalToConstant: 26),
 
