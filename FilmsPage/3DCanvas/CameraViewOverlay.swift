@@ -287,8 +287,9 @@ final class CameraViewOverlay: UIView {
         addSubview(gridButton)
 
         NSLayoutConstraint.activate([
-            gridButton.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 16),
-            gridButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
+            // Offset 70pt from leading to clear the exit camera (back) button (44pt + 26pt gap)
+            gridButton.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 70),
+            gridButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
             gridButton.widthAnchor.constraint(equalToConstant: 36),
             gridButton.heightAnchor.constraint(equalToConstant: 36),
         ])

@@ -407,6 +407,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     /// Contains focal length slider, composition grid, and focus controls.
     var cameraViewOverlay: CameraViewOverlay?
 
+    /// Snapshot of the camera root's world position when entering camera-through view.
+    /// Used to compute the delta on exit and update animation clips.
+    var cameraViewEntryPos: SIMD3<Float>?
+    /// Name of the camera entity that was active when entering camera view.
+    var cameraViewEntryCameraName: String?
+
     // MARK: - Top Right UI
     let shotBreakdownBtn: UIButton = {
         let btn = UIButton(type: .system)

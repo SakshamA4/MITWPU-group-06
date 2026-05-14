@@ -1007,32 +1007,43 @@ extension CanvasViewController {
         playbackButtonStack.isHidden = true
 
         arView.snapshot(saveToHDR: false) { [weak self] image in
-            guard let self = self, let image = image else { return }
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard let image = image else {
+                    self.layersButton.isHidden        = false
+                    self.playbackButtonStack.isHidden = false
+                    return
+                }
 
-            let data: Data? = isPNG
-                ? image.pngData()
-                : image.jpegData(compressionQuality: 0.9)
+                let data: Data? = isPNG
+                    ? image.pngData()
+                    : image.jpegData(compressionQuality: 0.9)
 
-            guard let exportData  = data,
-                  let imageToShare = UIImage(data: exportData) else { return }
+                guard let exportData  = data,
+                      let imageToShare = UIImage(data: exportData) else {
+                    self.layersButton.isHidden        = false
+                    self.playbackButtonStack.isHidden = false
+                    return
+                }
 
-            let activityVC = UIActivityViewController(
-                activityItems: [imageToShare],
-                applicationActivities: nil
-            )
-
-            if let popover = activityVC.popoverPresentationController {
-                popover.sourceView = self.view
-                popover.sourceRect = CGRect(
-                    x: self.view.bounds.midX,
-                    y: self.view.bounds.midY,
-                    width: 0, height: 0
+                let activityVC = UIActivityViewController(
+                    activityItems: [imageToShare],
+                    applicationActivities: nil
                 )
-            }
 
-            self.present(activityVC, animated: true) {
-                self.layersButton.isHidden        = false
-                self.playbackButtonStack.isHidden = false
+                if let popover = activityVC.popoverPresentationController {
+                    popover.sourceView = self.view
+                    popover.sourceRect = CGRect(
+                        x: self.view.bounds.midX,
+                        y: self.view.bounds.midY,
+                        width: 0, height: 0
+                    )
+                }
+
+                self.present(activityVC, animated: true) {
+                    self.layersButton.isHidden        = false
+                    self.playbackButtonStack.isHidden = false
+                }
             }
         }
     }

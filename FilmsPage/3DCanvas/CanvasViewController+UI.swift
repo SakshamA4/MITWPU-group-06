@@ -192,7 +192,9 @@ extension CanvasViewController {
         
         // Snapshot logic
         arView.snapshot(saveToHDR: false) { image in
-            infoVC.sceneImage = image
+            DispatchQueue.main.async {
+                infoVC.sceneImage = image
+            }
         }
         
         infoVC.modalPresentationStyle = .overCurrentContext

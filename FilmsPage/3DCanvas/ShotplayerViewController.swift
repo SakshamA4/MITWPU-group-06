@@ -888,10 +888,13 @@ final class ShotPlayerViewController: UIViewController {
     private func exportFrame(png: Bool) {
         guard let arView = arView else { showAlert("No frame captured."); return }
         arView.snapshot(saveToHDR: false) { [weak self] img in
-            guard let img = img else { self?.showAlert("Failed to capture frame."); return }
-            let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
-            guard let d = data, let out = UIImage(data: d) else { return }
-            self?.presentShareSheet([out])
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard let img = img else { self.showAlert("Failed to capture frame."); return }
+                let data = png ? img.pngData() : img.jpegData(compressionQuality: 0.92)
+                guard let d = data, let out = UIImage(data: d) else { return }
+                self.presentShareSheet([out])
+            }
         }
     }
 

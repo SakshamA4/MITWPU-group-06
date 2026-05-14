@@ -469,8 +469,15 @@ extension CanvasViewController {
 
     func hideDropShadow() {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        // Search direct children by component
         for child in anchor.children where child.components[DropShadowComponent.self] != nil {
             child.removeFromParent()
+        }
+        // Also remove by name in case component was lost or entity is nested
+        for child in anchor.children {
+            if child.name == "ShadowLine" || child.name == "ShadowCircle" {
+                child.removeFromParent()
+            }
         }
     }
 

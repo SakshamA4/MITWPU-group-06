@@ -386,6 +386,8 @@ extension CanvasViewController {
                 if !(child is PerspectiveCamera) { child.isEnabled = true }
             }
         }
+        // Before showing paths, update all animation clips if the camera was moved
+        syncCameraClipsAfterCameraView()
         showAllMotionPaths()
         showAllRotationArcs()
         hideExitCameraButton()
@@ -437,6 +439,11 @@ extension CanvasViewController {
         // Hide yellow drop-shadow projection lines
         hideDropShadow()
         selectedEntity = nil
+        // Store camera position on entry so we can compute delta on exit
+        if let activeCameraRoot = cameraToVisualMap[camera] {
+            cameraViewEntryPos = activeCameraRoot.position(relativeTo: nil)
+            cameraViewEntryCameraName = activeCameraRoot.name
+        }
         hideAllMotionPaths()
         hideAllRotationArcs()
         showExitCameraButton()
@@ -911,6 +918,56 @@ extension CanvasViewController {
     ) {
         let item = sceneCameraItems[indexPath.item]
         setActiveCamera(item.camera)
+    }
+
+    // MARK: - Motion Path Sync (On Exit Camera View)
+    
+    /// Called when exiting camera view. Computes the total movement delta while in camera view
+    /// and applies it to all animation clips (start, c1, c2, end) belonging to this camera.
+    func syncCameraClipsAfterCameraView() {
+        guard let oldPos = cameraViewEntryPos,
+              let cameraName = cameraViewEntryCameraName,
+              let cameraEntity = mainAnchor?.findEntity(named: cameraName) else {
+            return
+        }
+        
+        let newPos = cameraEntity.position(relativeTo: nil)
+        let delta = newPos - oldPos
+        
+        guard simd_length(delta) > 0.0001 else { return }
+        
+        // Update ALL clip points by the same delta — whole path moves together
+        for i in 0..<timeline.clips.count {
+            let clip = timeline.clips[i]
+            guard clip.entityName == cameraName,
+                  clip.track == .position else { continue }
+            
+            let newFrom = clip.fromValue + delta
+            let newTo   = clip.toValue + delta
+            
+            var updatedPath: BezierMotionPath? = nil
+            if var path = clip.motionPath {
+                path.start    = path.start    + delta
+                path.control1 = path.control1 + delta
+                path.control2 = path.control2 + delta
+                path.end      = path.end      + delta
+                updatedPath = path
+            }
+            
+            timeline.clips[i] = AnimationClip(
+                preservingID: clip,
+                fromValue: newFrom,
+                toValue: newTo,
+                motionPath: updatedPath
+            )
+        }
+        
+        // Update baseTransform so playback starts from the new position
+        baseTransforms[cameraName] = cameraEntity.transform
+        
+        // Clear the stored entry state
+        cameraViewEntryPos = nil
+        cameraViewEntryCameraName = nil
     }
 
 }
