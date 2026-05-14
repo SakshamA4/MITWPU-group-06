@@ -622,6 +622,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
     }
 
+    // Navigation Compass
+    let compassView = CompassView()
+    
     // MARK: - Lifecycle
 
     override func viewDidLoad() {

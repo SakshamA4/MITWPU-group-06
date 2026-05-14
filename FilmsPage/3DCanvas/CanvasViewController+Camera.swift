@@ -115,6 +115,9 @@ extension CanvasViewController {
 
         // Rescale gizmos so they stay a constant screen size as the camera moves
         updateGizmoScales()
+        
+        // Sync navigation compass
+        compassView.updateRotation(yaw: yaw)
     }
 
     // MARK: - Camera Pivot: Orbit Around Selected Entity
