@@ -274,38 +274,37 @@ extension CanvasViewController {
         case .practicalLantern:
             let lanternColor = UIColor.fromKelvin(colorTemp)
 
-            // Main globe — emissive sphere
+            // Main globe — emissive sphere, OPAQUE so it doesn’t vanish under its own light
             var globeMat = PhysicallyBasedMaterial()
             globeMat.baseColor = .init(tint: lanternColor)
             globeMat.emissiveColor = .init(color: lanternColor)
-            globeMat.emissiveIntensity = 3.0
-            // Semi-translucent paper look
-            globeMat.blending = .transparent(opacity: .init(floatLiteral: 0.85))
+            globeMat.emissiveIntensity = 2.0
+            // No transparency — the model stays visible even when the point light is bright
 
             let globe = ModelEntity(
-                mesh: .generateSphere(radius: 0.15),
+                mesh: .generateSphere(radius: 0.30),
                 materials: [globeMat]
             )
             globe.name = "ProceduralGlobe"
             root.addChild(globe)
 
-            // Top cap — small dark fitting
+            // Top cap — small dark fitting (doubled proportionally)
             let capMat = SimpleMaterial(color: .darkGray, roughness: 0.8, isMetallic: true)
             let topCap = ModelEntity(
-                mesh: .generateCylinder(height: 0.025, radius: 0.04),
+                mesh: .generateCylinder(height: 0.05, radius: 0.08),
                 materials: [capMat]
             )
             topCap.name = "ProceduralTopCap"
-            topCap.position = [0, 0.14, 0]
+            topCap.position = [0, 0.28, 0]
             root.addChild(topCap)
 
-            // Bottom cap
+            // Bottom cap (doubled proportionally)
             let bottomCap = ModelEntity(
-                mesh: .generateCylinder(height: 0.015, radius: 0.03),
+                mesh: .generateCylinder(height: 0.03, radius: 0.06),
                 materials: [capMat]
             )
             bottomCap.name = "ProceduralBottomCap"
-            bottomCap.position = [0, -0.14, 0]
+            bottomCap.position = [0, -0.28, 0]
             root.addChild(bottomCap)
 
         // ════════════════════════════════════════════════════════════════════
@@ -570,40 +569,33 @@ extension CanvasViewController {
             spot.scale                     = SIMD3(repeating: cs)
 
             // Light originates from the front face of the LED panel
+            // The panel face is on the -Z side (min.z). We position the light
+            // at the panel head center and aim it straight forward along -Z.
             let lensPos = SIMD3<Float>(
                 b.center.x,
                 panelHeadY,
-                b.min.z - 2.0
+                b.min.z
             )
             spot.position = lensPos
 
             // Slight downward tilt
             let aimDownY = panelHeadY - (b.extents.y * 0.15)
 
-            // Move beam slightly to the LEFT from the panel's perspective
-            // Increase this value if you want more left shift
-            let leftCorrection: Float = 0.0
-            
+            // Aim straight forward (pure -Z, no X offset)
             let forwardDistance: Float = 500.0
             let target = SIMD3<Float>(
-                b.center.x,          // no left/right offset
+                b.center.x,
                 aimDownY,
                 b.min.z - forwardDistance
             )
-            
-            
-            
+
             spot.look(
                 at: target,
                 from: lensPos,
                 relativeTo: model
             )
-            // Debug
 
             print("LED PANEL: lens at \(lensPos)")
-
-            print("LED PANEL: leftCorrection = \(leftCorrection)")
-
             print("LED PANEL: aiming at \(target)")
 
             model.addChild(spot)
@@ -1076,6 +1068,43 @@ extension CanvasViewController {
         }
 
         present(exportVC, animated: true)
+    }
+
+    // MARK: - Shadow Casting Fix
+
+    /// Ensures all ModelEntity descendants use shadow-casting materials.
+    /// Some USDZ exports (notably the male character "LewScene") bake materials
+    /// as UnlitMaterial which opts the mesh out of shadow rendering entirely.
+    /// This traverses the hierarchy and promotes any UnlitMaterial to a
+    /// PhysicallyBasedMaterial with the same base colour, enabling shadow casting.
+    /// Only called on character entities — intentional UnlitMaterial usage on
+    /// lights, gizmos, and beam visuals is unaffected.
+    func ensureShadowCasting(on entity: Entity) {
+        func walk(_ e: Entity) {
+            if let model = e as? ModelEntity, var mc = model.model {
+                var newMats: [any RealityKit.Material] = []
+                var changed = false
+                for mat in mc.materials {
+                    if let unlit = mat as? UnlitMaterial {
+                        // Promote to PBR — preserves base colour, gains shadow casting
+                        var pbr = PhysicallyBasedMaterial()
+                        pbr.baseColor = unlit.color
+                        pbr.roughness = .init(floatLiteral: 0.6)
+                        newMats.append(pbr)
+                        changed = true
+                        print("SHADOW FIX: promoted UnlitMaterial → PBR on \(e.name)")
+                    } else {
+                        newMats.append(mat)
+                    }
+                }
+                if changed {
+                    mc.materials = newMats
+                    model.model = mc
+                }
+            }
+            for child in e.children { walk(child) }
+        }
+        walk(entity)
     }
 }
 

@@ -378,15 +378,9 @@ extension CanvasViewController {
         // Remove the entity from the scene
         cameraRoot.removeFromParent()
 
-        // Animate the cell out and reload
-        let indexPath = IndexPath(item: index, section: 0)
-        if cameraCollectionView?.numberOfItems(inSection: 0) ?? 0 > index {
-            cameraCollectionView?.performBatchUpdates({
-                cameraCollectionView?.deleteItems(at: [indexPath])
-            }, completion: nil)
-        } else {
-            cameraCollectionView?.reloadData()
-        }
+        // Reload the collection view — use reloadData for safety since
+        // the data source has already been modified above.
+        cameraCollectionView?.reloadData()
 
         if sceneCameraItems.isEmpty {
             stopCameraPreviewUpdates()
@@ -724,16 +718,25 @@ extension CanvasViewController {
          guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else { return }
 
          let item = sceneCameraItems[index]
-         let indexPath = IndexPath(item: index, section: 0)
+         // Capture the item ID so we can validate in the callback
+         let itemID = item.id
          // Resize the off-screen ARView to match this camera's aspect ratio
          resizePreviewARView(for: item.aspectRatio)
          captureCameraPreviewImage(for: item) { [weak self] image in
              guard let self = self, let image = image else { return }
-             self.sceneCameraItems[index].previewImage = image
-             if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
-                 cell.updatePreview(image: image, name: "Camera \(index + 1)")
+             // Guard: the camera might have been deleted while the capture was in-flight.
+             // Re-lookup by ID instead of using the captured index.
+             guard let currentIndex = self.sceneCameraItems.firstIndex(where: { $0.id == itemID }) else {
+                 // Camera was deleted mid-capture — skip and continue the chain
+                 self.snapshotPreviewCamera(at: index)
+                 return
              }
-             self.snapshotPreviewCamera(at: index + 1)
+             self.sceneCameraItems[currentIndex].previewImage = image
+             let indexPath = IndexPath(item: currentIndex, section: 0)
+             if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
+                 cell.updatePreview(image: image, name: self.sceneCameraItems[currentIndex].displayName)
+             }
+             self.snapshotPreviewCamera(at: currentIndex + 1)
          }
      }
 

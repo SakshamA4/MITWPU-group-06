@@ -172,13 +172,16 @@ extension CanvasViewController {
             var root: Entity = hitResult.entity
             while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
 
-            // Locked entities are not selectable by tap — treat as empty space.
+            // Locked entities: select them (so long-press → action menu works)
+            // but hide the gizmo — only the context menu should be reachable.
             let isLocked = root.components[LockComponent.self]?.isLocked ?? false
             if isLocked {
-                setEntityTransparency(selectedEntity, alpha: 1.0)
-                selectedEntity     = nil
+                if let previous = selectedEntity, previous != root {
+                    setEntityTransparency(previous, alpha: 1.0)
+                }
+                selectedEntity     = root
                 activeHandleEntity = nil
-                updateGizmoMode()
+                setEntityTransparency(root, alpha: 0.9)
                 hideGizmo()
                 hideRotationGizmo()
                 hideAnimationPanel()
@@ -280,8 +283,11 @@ extension CanvasViewController {
         // ── Check if entity is a light (has LightConfigComponent) ────────────
         let isLight = entity.components[LightConfigComponent.self] != nil
 
+        // ── Check if entity is a background (suppress Duplicate) ─────────────
+        let isBG = entity.components[CategoryComponent.self]?.toolType == .background
+
         let menu = EntityActionMenu()
-        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight)
+        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight, isBackground: isBG)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
         NSLayoutConstraint.activate([
@@ -430,6 +436,9 @@ extension CanvasViewController {
                     self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
+            case .duplicate:
+                menu.removeFromSuperview()
+                self.duplicateSelected()
             case .delete:
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
                 self.deleteSelected()

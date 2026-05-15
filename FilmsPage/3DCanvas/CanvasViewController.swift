@@ -1074,6 +1074,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // Stamp pose info so the action menu can gate Walk to standing poses only.
                 if toolType == .character {
                     entity.components.set(CharacterPoseComponent(modelFileName: item.modelFileName))
+                    // FIX: Some character USDZ exports (notably the male "LewScene") bake
+                    // materials as UnlitMaterial which opts meshes out of shadow rendering.
+                    // Promote any UnlitMaterial to PBR so all characters cast shadows.
+                    ensureShadowCasting(on: entity)
                 }
                 
                 if let customURL = item.customModelURL {
