@@ -35,6 +35,9 @@ final class GroundCreationViewModel: ObservableObject {
     @Published var tintColor: Color = .white
     @Published var reflectionIntensity: Float = 0.05
 
+    /// When true, the ground uses a flat tint color instead of a texture preset.
+    @Published var isPlainGround: Bool = false
+
     /// Confirmation callback. Passes (size, materialConfig, aspectRatio).
     var onConfirm: ((Float, CinematicMaterialConfig, CGSize?) -> Void)?
 
@@ -45,7 +48,7 @@ final class GroundCreationViewModel: ObservableObject {
 
     var materialConfig: CinematicMaterialConfig {
         var config = CinematicMaterialConfig()
-        config.presetID = selectedPresetID
+        config.presetID = isPlainGround ? "plain" : selectedPresetID
         config.roughness = roughness
         config.metallic = metallic
         config.opacity = opacity
