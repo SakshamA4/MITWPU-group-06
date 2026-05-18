@@ -77,6 +77,8 @@ extension CanvasViewController {
 
     @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
+        // When looking through a scene camera, 2-finger pan = dolly XY
+        guard activeCamera === editorCamera else { return }
         let translation = gesture.translation(in: arView)
         pitch += Float(translation.y) * 0.005
         pitch  = max(0.05, min(1.4, pitch))
@@ -88,6 +90,8 @@ extension CanvasViewController {
 
     @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
         guard !isARModeActive, editorMode == .edit else { return }
+        // When looking through a scene camera, twist = roll (handled by camera-view gestures)
+        guard activeCamera === editorCamera else { return }
 
         // Two-finger twist always rotates the camera (yaw), never the entity.
         // Entity rotation is only via the rotation rings or the outer ring gizmo.
@@ -167,6 +171,24 @@ extension CanvasViewController {
         if let hitResult = objectHit {
             var root: Entity = hitResult.entity
             while let parent = root.parent, parent.name != "MainAnchor" { root = parent }
+
+            // Locked entities: select them (so long-press → action menu works)
+            // but hide the gizmo — only the context menu should be reachable.
+            let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+            if isLocked {
+                if let previous = selectedEntity, previous != root {
+                    setEntityTransparency(previous, alpha: 1.0)
+                }
+                selectedEntity     = root
+                activeHandleEntity = nil
+                setEntityTransparency(root, alpha: 0.9)
+                hideGizmo()
+                hideRotationGizmo()
+                hideAnimationPanel()
+                refreshSidebarContent()
+                return
+            }
+
             if let previous = selectedEntity, previous != root {
                 setEntityTransparency(previous, alpha: 1.0)
             }
@@ -261,8 +283,11 @@ extension CanvasViewController {
         // ── Check if entity is a light (has LightConfigComponent) ────────────
         let isLight = entity.components[LightConfigComponent.self] != nil
 
+        // ── Check if entity is a background (suppress Duplicate) ─────────────
+        let isBG = entity.components[CategoryComponent.self]?.toolType == .background
+
         let menu = EntityActionMenu()
-        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight)
+        menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight, isBackground: isBG)
         menu.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(menu)
         NSLayoutConstraint.activate([
@@ -299,6 +324,63 @@ extension CanvasViewController {
                 if let modelEntity = entity as? ModelEntity {
                     self.presentMaterialEditor(for: modelEntity)
                 }
+
+            case .setRatio:
+                // Open ratio lock input for wall/ground entities
+                menu.removeFromSuperview()
+                guard let modelEntity = entity as? ModelEntity else { return }
+
+                let isWall = modelEntity.components[WallComponent.self] != nil
+                let secondLabel = isWall ? "Height" : "Depth"
+                let currentRatio: CGSize? = isWall
+                    ? modelEntity.components[WallComponent.self]?.aspectRatio
+                    : modelEntity.components[GroundComponent.self]?.aspectRatio
+
+                let alert = UIAlertController(
+                    title: "Set Ratio",
+                    message: "Enter Width : \(secondLabel) ratio for pinch resize.\nLeave empty or tap Clear for free resize.",
+                    preferredStyle: .alert
+                )
+                alert.addTextField { tf in
+                    tf.placeholder = "Width (e.g. 16)"
+                    tf.keyboardType = .decimalPad
+                    if let r = currentRatio { tf.text = "\(Int(r.width))" }
+                }
+                alert.addTextField { tf in
+                    tf.placeholder = "\(secondLabel) (e.g. 9)"
+                    tf.keyboardType = .decimalPad
+                    if let r = currentRatio { tf.text = "\(Int(r.height))" }
+                }
+
+                alert.addAction(UIAlertAction(title: "Confirm", style: .default) { _ in
+                    let wText = alert.textFields?[0].text ?? ""
+                    let hText = alert.textFields?[1].text ?? ""
+                    if let rw = Float(wText), let rh = Float(hText), rw > 0, rh > 0 {
+                        let ratio = CGSize(width: CGFloat(rw), height: CGFloat(rh))
+                        if isWall {
+                            var comp = modelEntity.components[WallComponent.self]!
+                            comp.aspectRatio = ratio
+                            modelEntity.components.set(comp)
+                        } else {
+                            var comp = modelEntity.components[GroundComponent.self]!
+                            comp.aspectRatio = ratio
+                            modelEntity.components.set(comp)
+                        }
+                    }
+                })
+                alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { _ in
+                    if isWall {
+                        var comp = modelEntity.components[WallComponent.self]!
+                        comp.aspectRatio = nil
+                        modelEntity.components.set(comp)
+                    } else {
+                        var comp = modelEntity.components[GroundComponent.self]!
+                        comp.aspectRatio = nil
+                        modelEntity.components.set(comp)
+                    }
+                })
+                alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+                self.present(alert, animated: true)
 
             case .lightSettings:
                 // Open light control panel for light entities
@@ -338,16 +420,25 @@ extension CanvasViewController {
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
                 lockComp.isLocked = newState
                 entity.components.set(lockComp)
+                menu.removeFromSuperview()
                 if newState {
-                    self.interactionMode = .move
+                    // Locked — deselect entirely so entity becomes non-interactive
                     self.setEntityTransparency(entity, alpha: 1.0)
+                    self.selectedEntity = nil
+                    self.activeHandleEntity = nil
+                    self.interactionMode = .move
                     self.hideGizmo()
                     self.hideRotationGizmo()
+                    self.hideAnimationPanel()
+                    self.updateGizmoMode()
                 } else {
+                    // Unlocked — keep selected so user can interact immediately
                     self.setEntityTransparency(entity, alpha: 0.9)
                     self.updateGizmoMode()
                 }
+            case .duplicate:
                 menu.removeFromSuperview()
+                self.duplicateSelected()
             case .delete:
                 self.setEntityTransparency(self.selectedEntity, alpha: 1.0)
                 self.deleteSelected()
@@ -556,11 +647,11 @@ extension CanvasViewController {
         case .changed:
             guard ringDragActive else { return }
 
-            // Circular motion: project the gizmo centre to screen space,
+            // Circular motion: project the ENTITY centre to screen space,
             // then measure the angle of the touch around that centre.
-            // The delta angle between frames is the rotation amount.
-            if let gizmo = gizmoRoot,
-               let centre2D = arView.project(gizmo.position(relativeTo: nil)) {
+            // (Using entity centre, not gizmo base, so rotation feels centred.)
+            let entityCentre = selected.position(relativeTo: nil)
+            if let centre2D = arView.project(entityCentre) {
 
                 let prev = CGPoint(x: lastPanLocation.x  - centre2D.x,
                                    y: lastPanLocation.y  - centre2D.y)

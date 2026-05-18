@@ -18,6 +18,12 @@ final class GroundCreationViewModel: ObservableObject {
 
     @Published var size: Float = 4.0
 
+    // MARK: - Ratio Lock
+
+    @Published var ratioLocked: Bool = false
+    @Published var ratioWidth: String = ""
+    @Published var ratioDepth: String = ""
+
     // MARK: - Material
 
     @Published var selectedPresetID: String = "concrete"
@@ -29,8 +35,11 @@ final class GroundCreationViewModel: ObservableObject {
     @Published var tintColor: Color = .white
     @Published var reflectionIntensity: Float = 0.05
 
-    /// Confirmation callback. Passes (size, materialConfig).
-    var onConfirm: ((Float, CinematicMaterialConfig) -> Void)?
+    /// When true, the ground uses a flat tint color instead of a texture preset.
+    @Published var isPlainGround: Bool = false
+
+    /// Confirmation callback. Passes (size, materialConfig, aspectRatio).
+    var onConfirm: ((Float, CinematicMaterialConfig, CGSize?) -> Void)?
 
     /// Cancellation callback.
     var onCancel: (() -> Void)?
@@ -39,7 +48,7 @@ final class GroundCreationViewModel: ObservableObject {
 
     var materialConfig: CinematicMaterialConfig {
         var config = CinematicMaterialConfig()
-        config.presetID = selectedPresetID
+        config.presetID = isPlainGround ? "plain" : selectedPresetID
         config.roughness = roughness
         config.metallic = metallic
         config.opacity = opacity
@@ -78,7 +87,15 @@ final class GroundCreationViewModel: ObservableObject {
     func confirm() {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        onConfirm?(size, materialConfig)
+
+        var aspectRatio: CGSize?
+        if ratioLocked,
+           let rw = Float(ratioWidth), let rd = Float(ratioDepth),
+           rw > 0, rd > 0 {
+            aspectRatio = CGSize(width: CGFloat(rw), height: CGFloat(rd))
+        }
+
+        onConfirm?(size, materialConfig, aspectRatio)
     }
 
     func cancel() {

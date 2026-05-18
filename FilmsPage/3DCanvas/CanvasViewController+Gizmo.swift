@@ -469,8 +469,15 @@ extension CanvasViewController {
 
     func hideDropShadow() {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
+        // Search direct children by component
         for child in anchor.children where child.components[DropShadowComponent.self] != nil {
             child.removeFromParent()
+        }
+        // Also remove by name in case component was lost or entity is nested
+        for child in anchor.children {
+            if child.name == "ShadowLine" || child.name == "ShadowCircle" {
+                child.removeFromParent()
+            }
         }
     }
 
@@ -679,6 +686,9 @@ extension CanvasViewController {
                 }
                 if let rotGizmo = rotationGizmo {
                     showDiscHighlight(named: "yDisc", color: .systemGreen, in: rotGizmo)
+                    // Dim non-active rings
+                    dimRing(named: "xRing", in: rotGizmo)
+                    dimRing(named: "zRing", in: rotGizmo)
                 }
             } else {
                 // Move mode: highlight the red OuterRing + its fill disc
@@ -694,6 +704,9 @@ extension CanvasViewController {
             }
             if let rotGizmo = rotationGizmo {
                 showDiscHighlight(named: "xDisc", color: .systemRed, in: rotGizmo)
+                // Dim non-active rings to focus attention on active axis
+                dimRing(named: "yRing", in: rotGizmo)
+                dimRing(named: "zRing", in: rotGizmo)
             }
         case .rotateZ:
             if let ring = gizmo.findEntity(named: "zRing") as? ModelEntity {
@@ -701,10 +714,27 @@ extension CanvasViewController {
             }
             if let rotGizmo = rotationGizmo {
                 showDiscHighlight(named: "zDisc", color: .systemBlue, in: rotGizmo)
+                // Dim non-active rings
+                dimRing(named: "xRing", in: rotGizmo)
+                dimRing(named: "yRing", in: rotGizmo)
             }
         case .none:
             break
         }
+    }
+
+    /// Dims a rotation ring to 30% opacity so the active axis stands out.
+    private func dimRing(named ringName: String, in root: Entity) {
+        guard let ring = root.findEntity(named: ringName) as? ModelEntity else { return }
+        // Preserve the ring's existing colour but at reduced opacity
+        let dimColor: UIColor
+        switch ringName {
+        case "xRing": dimColor = UIColor.systemRed.withAlphaComponent(0.3)
+        case "yRing": dimColor = UIColor.systemGreen.withAlphaComponent(0.3)
+        case "zRing": dimColor = UIColor.systemBlue.withAlphaComponent(0.3)
+        default: return
+        }
+        ring.model?.materials = [UnlitMaterial(color: dimColor)]
     }
 
     /// Shows a named disc fill entity with a semi-transparent version of `color`.
@@ -769,7 +799,7 @@ extension CanvasViewController {
             }
         }
 
-        // RotationRingGizmo rings (unchanged)
+        // RotationRingGizmo rings — restore full-opacity UnlitMaterial
         if let xRing = gizmo.findEntity(named: "xRing") as? ModelEntity {
             xRing.model?.materials = [UnlitMaterial(color: .systemRed)]
         }

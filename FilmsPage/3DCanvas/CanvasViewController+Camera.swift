@@ -9,6 +9,8 @@ extension CanvasViewController {
     func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
         // In AR mode the real device camera moves — no editor orbit needed
         if isARModeActive { return }
+        // When looking through a scene camera, camera-view gestures handle movement
+        if activeCamera !== editorCamera { return }
         let translation = gesture.translation(in: arView)
         
         yaw -= Float(translation.x) * 0.005
@@ -21,6 +23,11 @@ extension CanvasViewController {
 
     
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        // When looking through a scene camera, pinch = truck Z (handled by camera-view gestures)
+        if activeCamera !== editorCamera {
+            gesture.scale = 1.0
+            return
+        }
         if gesture.state == .began {
             saveCurrentStateToUndo()
         }
@@ -37,48 +44,75 @@ extension CanvasViewController {
             // Pinch does NOT zoom the camera in this case, giving the user full
             // control over the wall / background / ground size.
             if let entity = selectedEntity,
-               let modelEntity = entity as? ModelEntity,
                !(entity.components[LockComponent.self]?.isLocked ?? false) {
 
-                if var wall = modelEntity.components[WallComponent.self] {
-                    wall.width  *= capturedScale
-                    wall.height *= capturedScale
-                    wall.width  = max(0.3, min(wall.width,  10))
-                    wall.height = max(0.3, min(wall.height,  6))
-                    modelEntity.model?.mesh = MeshResource.generateBox(
-                        width: wall.width, height: wall.height, depth: 0.05)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(wall)
-                    return   // skip camera zoom
-                }
-
-                if var bg = modelEntity.components[BackgroundComponent.self] {
-                    bg.width  *= capturedScale
-                    bg.height *= capturedScale
-                    bg.width  = max(0.5, min(bg.width,  15))
-                    bg.height = max(0.5, min(bg.height, 10))
-                    modelEntity.model?.mesh = MeshResource.generateBox(
-                        width: bg.width, height: bg.height, depth: 0.05)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(bg)
-                    return   // skip camera zoom
-                }
-
-                if var ground = modelEntity.components[GroundComponent.self] {
-                    ground.width *= capturedScale
-                    ground.depth *= capturedScale
-                    ground.width = max(0.5, min(ground.width, 20))
-                    ground.depth = max(0.5, min(ground.depth, 20))
-                    modelEntity.model?.mesh = MeshResource.generatePlane(
-                        width: ground.width, depth: ground.depth)
-                    modelEntity.generateCollisionShapes(recursive: true)
-                    modelEntity.components.set(ground)
-                    return   // skip camera zoom
-                }
-                
-                if modelEntity.components[CategoryComponent.self]?.toolType == .prop {
-                    modelEntity.scale *= capturedScale
+                // ── Prop / Character entities — uniform scale ──────────────────
+                // Props and characters are loaded from USDZ as plain Entity roots,
+                // not ModelEntity, so this check must come before the ModelEntity cast.
+                if entity.components[CategoryComponent.self]?.toolType == .prop
+                    || entity.components[CategoryComponent.self]?.toolType == .character {
+                    var newScale = entity.scale * capturedScale
+                    newScale = simd_clamp(newScale, SIMD3(repeating: 0.05), SIMD3(repeating: 10.0))
+                    entity.scale = newScale
                     return
+                }
+
+                // ── Wall / Background / Ground — procedural mesh resize ───────
+                if let modelEntity = entity as? ModelEntity {
+
+                    if var wall = modelEntity.components[WallComponent.self] {
+                        if let ratio = wall.aspectRatio, ratio.width > 0 {
+                            // Ratio-locked: drive width, derive height
+                            wall.width *= capturedScale
+                            wall.width  = max(0.3, min(wall.width, 10))
+                            wall.height = wall.width / Float(ratio.width / ratio.height)
+                            wall.height = max(0.3, min(wall.height, 6))
+                        } else {
+                            // Free resize
+                            wall.width  *= capturedScale
+                            wall.height *= capturedScale
+                            wall.width  = max(0.3, min(wall.width,  10))
+                            wall.height = max(0.3, min(wall.height,  6))
+                        }
+                        modelEntity.model?.mesh = MeshResource.generateBox(
+                            width: wall.width, height: wall.height, depth: wall.thickness)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(wall)
+                        return   // skip camera zoom
+                    }
+
+                    if var bg = modelEntity.components[BackgroundComponent.self] {
+                        bg.width  *= capturedScale
+                        bg.height *= capturedScale
+                        bg.width  = max(0.5, min(bg.width,  15))
+                        bg.height = max(0.5, min(bg.height, 10))
+                        modelEntity.model?.mesh = MeshResource.generateBox(
+                            width: bg.width, height: bg.height, depth: 0.05)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(bg)
+                        return   // skip camera zoom
+                    }
+
+                    if var ground = modelEntity.components[GroundComponent.self] {
+                        if let ratio = ground.aspectRatio, ratio.width > 0 {
+                            // Ratio-locked: drive width, derive depth
+                            ground.width *= capturedScale
+                            ground.width = max(0.5, min(ground.width, 20))
+                            ground.depth = ground.width / Float(ratio.width / ratio.height)
+                            ground.depth = max(0.5, min(ground.depth, 20))
+                        } else {
+                            // Free resize
+                            ground.width *= capturedScale
+                            ground.depth *= capturedScale
+                            ground.width = max(0.5, min(ground.width, 20))
+                            ground.depth = max(0.5, min(ground.depth, 20))
+                        }
+                        modelEntity.model?.mesh = MeshResource.generatePlane(
+                            width: ground.width, depth: ground.depth)
+                        modelEntity.generateCollisionShapes(recursive: true)
+                        modelEntity.components.set(ground)
+                        return   // skip camera zoom
+                    }
                 }
             }
 
@@ -108,6 +142,9 @@ extension CanvasViewController {
 
         // Rescale gizmos so they stay a constant screen size as the camera moves
         updateGizmoScales()
+        
+        // Sync navigation compass
+        compassView.updateRotation(yaw: yaw)
     }
 
     // MARK: - Camera Pivot: Orbit Around Selected Entity
@@ -341,15 +378,9 @@ extension CanvasViewController {
         // Remove the entity from the scene
         cameraRoot.removeFromParent()
 
-        // Animate the cell out and reload
-        let indexPath = IndexPath(item: index, section: 0)
-        if cameraCollectionView?.numberOfItems(inSection: 0) ?? 0 > index {
-            cameraCollectionView?.performBatchUpdates({
-                cameraCollectionView?.deleteItems(at: [indexPath])
-            }, completion: nil)
-        } else {
-            cameraCollectionView?.reloadData()
-        }
+        // Reload the collection view — use reloadData for safety since
+        // the data source has already been modified above.
+        cameraCollectionView?.reloadData()
 
         if sceneCameraItems.isEmpty {
             stopCameraPreviewUpdates()
@@ -379,11 +410,17 @@ extension CanvasViewController {
                 if !(child is PerspectiveCamera) { child.isEnabled = true }
             }
         }
+        // Before showing paths, update all animation clips if the camera was moved
+        syncCameraClipsAfterCameraView()
         showAllMotionPaths()
         showAllRotationArcs()
         hideExitCameraButton()
         // Remove aspect ratio overlay — no scene camera is active in editor mode
         removeLetterboxOverlay()
+        // Remove camera view HUD overlay and gestures
+        cameraViewOverlay?.removeFromSuperview()
+        cameraViewOverlay = nil
+        enableCameraViewGestures(false)
         // Restore gizmos in editor view
         gizmoRoot?.isEnabled = true
         rotationGizmo?.isEnabled = true
@@ -423,6 +460,14 @@ extension CanvasViewController {
         // Hide gizmos and all editor overlays — they obstruct the camera preview
         gizmoRoot?.isEnabled = false
         rotationGizmo?.isEnabled = false
+        // Hide yellow drop-shadow projection lines
+        hideDropShadow()
+        selectedEntity = nil
+        // Store camera position on entry so we can compute delta on exit
+        if let activeCameraRoot = cameraToVisualMap[camera] {
+            cameraViewEntryPos = activeCameraRoot.position(relativeTo: nil)
+            cameraViewEntryCameraName = activeCameraRoot.name
+        }
         hideAllMotionPaths()
         hideAllRotationArcs()
         showExitCameraButton()
@@ -438,6 +483,65 @@ extension CanvasViewController {
         sidebarView.isHidden = true
         layersButton.isHidden = true
         movementToggleButton.isHidden = true
+
+        // ── Show camera view HUD overlay ──
+        showCameraViewOverlay(camera: camera)
+        enableCameraViewGestures(true)
+    }
+
+    /// Creates (or reuses) the camera-through HUD and configures it for the given camera.
+    private func showCameraViewOverlay(camera: PerspectiveCamera) {
+        // Ensure focus component exists on the camera root
+        guard let camRoot = cameraToVisualMap[camera] else { return }
+        if camRoot.components[CameraFocusComponent.self] == nil {
+            // Initialize with default values; set focal length from current FOV
+            var comp = CameraFocusComponent()
+            comp.focalLengthMM = fovToFocalLength(camera.camera.fieldOfViewInDegrees)
+            camRoot.components.set(comp)
+        }
+
+        let overlay = CameraViewOverlay(frame: view.bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.configure(cameraRoot: camRoot, camera: camera)
+        overlay.onSettingsChanged = { [weak self] in
+            self?.startCameraPreviewUpdates()
+        }
+        overlay.onAFTap = { [weak self] point in
+            self?.handleCameraViewAFTap(at: point)
+        }
+        // Insert above letterbox but below exit button
+        if let exitBtn = view.viewWithTag(9001) {
+            view.insertSubview(overlay, belowSubview: exitBtn)
+        } else {
+            view.addSubview(overlay)
+        }
+        cameraViewOverlay = overlay
+    }
+
+    // MARK: - Auto Focus Raycasting
+    
+    /// Called when the user taps the screen in AF mode while looking through a scene camera.
+    func handleCameraViewAFTap(at screenPoint: CGPoint) {
+        guard let arView = arView,
+              activeCamera !== editorCamera,
+              let camRoot = cameraToVisualMap[activeCamera] else { return }
+        
+        // Raycast from the tapped point
+        // Using .all so we can hit any model in the scene
+        let hits = arView.hitTest(screenPoint, query: .nearest, mask: .all)
+        if let firstHit = hits.first {
+            // Calculate distance from camera to hit point
+            let camPos = activeCamera.position(relativeTo: nil)
+            let distance = simd_distance(camPos, firstHit.position)
+            
+            // Update ECS Component
+            var comp = camRoot.components[CameraFocusComponent.self] ?? CameraFocusComponent()
+            comp.focusDistance = distance
+            camRoot.components.set(comp)
+            
+            // Update UI Slider and labels
+            cameraViewOverlay?.setFocusDistance(distance)
+        }
     }
 
     // MARK: - Aspect Ratio Application
@@ -491,7 +595,7 @@ extension CanvasViewController {
         overlay.tag = AspectRatioConstants.letterboxTag
         overlay.isUserInteractionEnabled = false
         overlay.frame = arView.bounds
-        view.addSubview(overlay)
+        view.insertSubview(overlay, aboveSubview: arView)
 
         if targetRatio < viewRatio {
             // Pillarbox: target is narrower — add dark bars on left and right
@@ -614,16 +718,25 @@ extension CanvasViewController {
          guard let mainAnchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity else { return }
 
          let item = sceneCameraItems[index]
-         let indexPath = IndexPath(item: index, section: 0)
+         // Capture the item ID so we can validate in the callback
+         let itemID = item.id
          // Resize the off-screen ARView to match this camera's aspect ratio
          resizePreviewARView(for: item.aspectRatio)
          captureCameraPreviewImage(for: item) { [weak self] image in
              guard let self = self, let image = image else { return }
-             self.sceneCameraItems[index].previewImage = image
-             if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
-                 cell.updatePreview(image: image, name: "Camera \(index + 1)")
+             // Guard: the camera might have been deleted while the capture was in-flight.
+             // Re-lookup by ID instead of using the captured index.
+             guard let currentIndex = self.sceneCameraItems.firstIndex(where: { $0.id == itemID }) else {
+                 // Camera was deleted mid-capture — skip and continue the chain
+                 self.snapshotPreviewCamera(at: index)
+                 return
              }
-             self.snapshotPreviewCamera(at: index + 1)
+             self.sceneCameraItems[currentIndex].previewImage = image
+             let indexPath = IndexPath(item: currentIndex, section: 0)
+             if let cell = self.cameraCollectionView?.cellForItem(at: indexPath) as? CameraPreviewCell {
+                 cell.updatePreview(image: image, name: self.sceneCameraItems[currentIndex].displayName)
+             }
+             self.snapshotPreviewCamera(at: currentIndex + 1)
          }
      }
 
@@ -760,23 +873,49 @@ extension CanvasViewController {
     func showExitCameraButton() {
         if view.viewWithTag(9001) != nil { return }
 
+        // Container — 44×44 to match the play button size
+        let container = UIView()
+        container.tag = 9001
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.clipsToBounds = true
+        container.layer.cornerRadius = 22
+
+        // Frosted glass background
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        blur.isUserInteractionEnabled = false
+        container.addSubview(blur)
+
+        // Subtle border
+        container.layer.borderWidth = 0.5
+        container.layer.borderColor = UIColor(white: 1, alpha: 0.15).cgColor
+
+        // Chevron-left icon — native iOS back button style
         let btn = UIButton(type: .system)
-        btn.tag = 9001
-        btn.setTitle("Exit Camera", for: .normal)
-        btn.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        btn.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
         btn.tintColor = .white
-        btn.backgroundColor = UIColor(red: 0.9, green: 0.3, blue: 0.3, alpha: 0.92)
-        btn.layer.cornerRadius = 18
-        btn.clipsToBounds = true
-        btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.addTarget(self, action: #selector(exitCameraViewTapped), for: .touchUpInside)
+        container.addSubview(btn)
 
-        view.addSubview(btn)
+        view.addSubview(container)
         NSLayoutConstraint.activate([
-            btn.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            btn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-            btn.heightAnchor.constraint(equalToConstant: 36)
+            // Top-left, aligned with the layers button row
+            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            container.widthAnchor.constraint(equalToConstant: 44),
+            container.heightAnchor.constraint(equalToConstant: 44),
+
+            blur.topAnchor.constraint(equalTo: container.topAnchor),
+            blur.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            btn.topAnchor.constraint(equalTo: container.topAnchor),
+            btn.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            btn.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            btn.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
     }
 
@@ -841,6 +980,59 @@ extension CanvasViewController {
     ) {
         let item = sceneCameraItems[indexPath.item]
         setActiveCamera(item.camera)
+    }
+
+    // MARK: - Motion Path Sync (On Exit Camera View)
+    
+    /// Called when exiting camera view. Computes the total movement delta while in camera view
+    /// and applies it to all animation clips (start, c1, c2, end) belonging to this camera.
+    func syncCameraClipsAfterCameraView() {
+        guard let oldPos = cameraViewEntryPos,
+              let cameraName = cameraViewEntryCameraName,
+              let cameraEntity = mainAnchor?.findEntity(named: cameraName) else {
+            return
+        }
+        
+        let newPos = cameraEntity.position(relativeTo: nil)
+        let delta = newPos - oldPos
+        
+        guard simd_length(delta) > 0.0001 else { return }
+        
+        // Update ALL clip points by the same delta — whole path moves together
+        for i in 0..<timeline.clips.count {
+            let clip = timeline.clips[i]
+            guard clip.entityName == cameraName,
+                  clip.track == .position else { continue }
+            
+            let newFrom = clip.fromValue + delta
+            let newTo   = clip.toValue + delta
+            
+            var updatedPath: BezierMotionPath? = nil
+            if var path = clip.motionPath {
+                path.start    = path.start    + delta
+                path.control1 = path.control1 + delta
+                path.control2 = path.control2 + delta
+                path.end      = path.end      + delta
+                updatedPath = path
+            }
+            
+            timeline.clips[i] = AnimationClip(
+                preservingID: clip,
+                fromValue: newFrom,
+                toValue: newTo,
+                motionPath: updatedPath
+            )
+            
+            // Rebuild the visual path line so it shows up in the new position
+            showMotionPath(for: timeline.clips[i])
+        }
+        
+        // Update baseTransform so playback starts from the new position
+        baseTransforms[cameraName] = cameraEntity.transform
+        
+        // Clear the stored entry state
+        cameraViewEntryPos = nil
+        cameraViewEntryCameraName = nil
     }
 
 }

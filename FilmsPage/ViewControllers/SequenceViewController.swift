@@ -19,11 +19,15 @@ class SequenceViewController: UIViewController {
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
     var filmName: String?
+    private var activeCoordinator: SequenceExportCoordinator?
+    private var exportCanvas: CanvasViewController?
+    private var progressOverlay: ExportProgressOverlay?
     
     // MARK: - Search State
     private var filteredScenes: [Scene] = []
     private var currentSearchText: String = ""
     private var savedSearchButton: UIBarButtonItem?
+    private var savedExportButton: UIBarButtonItem?
     
     // Computed properties for search
     private var isSearching: Bool { !currentSearchText.isEmpty }
@@ -55,7 +59,136 @@ class SequenceViewController: UIViewController {
         
         // Save the search button and ensure it's visible initially
         savedSearchButton = serachButton
-        navigationItem.rightBarButtonItem = serachButton
+
+        // Add export button to the left of the search button
+        let exportButton = UIBarButtonItem(
+            image: UIImage(systemName: "film.stack"),
+            style: .plain,
+            target: self,
+            action: #selector(exportSequenceTapped)
+        )
+        exportButton.tintColor = .systemRed
+        savedExportButton = exportButton
+        navigationItem.rightBarButtonItems = [serachButton, exportButton]
+    }
+
+    // MARK: - Sequence Export
+
+    @objc private func exportSequenceTapped() {
+        guard let sequence = sequence else { return }
+        guard !scene.isEmpty else {
+            let alert = UIAlertController(
+                title: "No Scenes",
+                message: "Add scenes to this sequence before exporting.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+
+        // Convert Film Scene models to ScenesModel for the export sheet
+        // SequenceExportSheet expects [ScenesModel], but we have [Scene].
+        // Build lightweight ScenesModel wrappers.
+        let scenesForExport: [ScenesModel] = scene.map {
+            ScenesModel(id: $0.id, name: $0.name, image: $0.image ?? "Image")
+        }
+
+        let sheet = SequenceExportSheet(
+            sequenceName: sequence.name,
+            scenes: scenesForExport
+        )
+        sheet.onExport = { [weak self] settings in
+            self?.startSequenceExport(settings: settings)
+        }
+        present(sheet, animated: true)
+    }
+
+    private func startSequenceExport(settings: ExportSettings) {
+        guard let sequence = sequence else { return }
+
+        // Create a dedicated CanvasViewController for export rendering.
+        // isExportMode MUST be set before .view is accessed (which triggers viewDidLoad).
+        // This skips all interactive UI setup — only the ARView and scene graph are created.
+        let exportCanvas = CanvasViewController()
+        exportCanvas.isExportMode = true
+        addChild(exportCanvas)
+        exportCanvas.view.frame = view.bounds
+        exportCanvas.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.insertSubview(exportCanvas.view, at: 0) // Behind everything
+        exportCanvas.didMove(toParent: self)
+        self.exportCanvas = exportCanvas
+
+        // Wait for the ARView + RealityKit to fully initialise before starting.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            self.launchCoordinator(canvas: exportCanvas, settings: settings, sequence: sequence)
+        }
+    }
+
+    private func launchCoordinator(canvas: CanvasViewController, settings: ExportSettings, sequence: Sequence) {
+        let entries = scene.map {
+            SequenceExportCoordinator.SequenceSceneEntry(sceneID: $0.id, sceneName: $0.name)
+        }
+
+        // Progress overlay
+        let overlay = ExportProgressOverlay()
+        overlay.show(in: view)
+        self.progressOverlay = overlay
+
+        let coordinator = SequenceExportCoordinator(
+            scenes: entries,
+            settings: settings,
+            canvas: canvas,
+            onProgress: { [weak overlay] progress in
+                overlay?.update(with: progress)
+            },
+            onCompletion: { [weak self] result in
+                guard let self = self else { return }
+                self.activeCoordinator = nil
+                self.progressOverlay?.dismiss {
+                    self.teardownExportCanvas()
+
+                    switch result {
+                    case .success(let url):
+                        self.previewAndShare(videoURL: url, sequenceName: sequence.name)
+                    case .failure(let error):
+                        // Cancelled exports don't show an alert
+                        guard (error as NSError).code != -3 else { return }
+                        let alert = UIAlertController(
+                            title: "Export Failed",
+                            message: error.localizedDescription,
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(alert, animated: true)
+                    }
+                }
+            }
+        )
+        self.activeCoordinator = coordinator
+
+        overlay.onCancel = { [weak coordinator] in
+            coordinator?.cancel()
+        }
+
+        coordinator.start()
+    }
+
+    private func teardownExportCanvas() {
+        exportCanvas?.willMove(toParent: nil)
+        exportCanvas?.view.removeFromSuperview()
+        exportCanvas?.removeFromParent()
+        exportCanvas = nil
+    }
+
+    private func previewAndShare(videoURL: URL, sequenceName: String) {
+        let previewVC = SequencePreviewViewController(
+            videoURL: videoURL,
+            sequenceName: sequenceName
+        )
+        previewVC.modalPresentationStyle = .fullScreen
+        present(previewVC, animated: true)
     }
 
     @IBAction func searchAction(_ sender: Any) {
@@ -113,7 +246,7 @@ class SequenceViewController: UIViewController {
         updateTitle()
         // Always hide search bar and show search button when view appears
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? serachButton
+        restoreBarButtons()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -151,6 +284,14 @@ class SequenceViewController: UIViewController {
             }
         }
         collectionView.reloadData()
+    }
+
+    private func restoreBarButtons() {
+        var items: [UIBarButtonItem] = []
+        if let search = savedSearchButton { items.append(search) }
+        else { items.append(serachButton) }
+        if let export = savedExportButton { items.append(export) }
+        navigationItem.rightBarButtonItems = items
     }
 
 }
@@ -343,8 +484,8 @@ extension SequenceViewController: UISearchBarDelegate {
         searchController.isActive = false
         navigationItem.searchController = nil
         
-        // Restore the search button to nav bar
-        navigationItem.rightBarButtonItem = savedSearchButton ?? serachButton
+        // Restore the buttons to nav bar
+        restoreBarButtons()
     }
 }
 
@@ -361,6 +502,6 @@ extension SequenceViewController: UISearchControllerDelegate {
     func didDismissSearchController(_ searchController: UISearchController) {
         // Restore the search button when search controller is dismissed
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? serachButton
+        restoreBarButtons()
     }
 }

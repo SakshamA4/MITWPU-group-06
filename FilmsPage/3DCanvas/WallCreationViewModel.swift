@@ -20,6 +20,12 @@ final class WallCreationViewModel: ObservableObject {
     @Published var height: Float = 1.2
     @Published var thickness: Float = 0.05
 
+    // MARK: - Ratio Lock
+
+    @Published var ratioLocked: Bool = false
+    @Published var ratioWidth: String = ""
+    @Published var ratioHeight: String = ""
+
     // MARK: - Material
 
     @Published var selectedPresetID: String = "concrete"
@@ -31,8 +37,8 @@ final class WallCreationViewModel: ObservableObject {
     @Published var tintColor: Color = .white
     @Published var reflectionIntensity: Float = 0.05
 
-    /// Confirmation callback. Passes (width, height, thickness, materialConfig).
-    var onConfirm: ((Float, Float, Float, CinematicMaterialConfig) -> Void)?
+    /// Confirmation callback. Passes (width, height, thickness, materialConfig, aspectRatio).
+    var onConfirm: ((Float, Float, Float, CinematicMaterialConfig, CGSize?) -> Void)?
 
     /// Cancellation callback.
     var onCancel: (() -> Void)?
@@ -80,7 +86,15 @@ final class WallCreationViewModel: ObservableObject {
     func confirm() {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        onConfirm?(width, height, thickness, materialConfig)
+
+        var aspectRatio: CGSize?
+        if ratioLocked,
+           let rw = Float(ratioWidth), let rh = Float(ratioHeight),
+           rw > 0, rh > 0 {
+            aspectRatio = CGSize(width: CGFloat(rw), height: CGFloat(rh))
+        }
+
+        onConfirm?(width, height, thickness, materialConfig, aspectRatio)
     }
 
     func cancel() {

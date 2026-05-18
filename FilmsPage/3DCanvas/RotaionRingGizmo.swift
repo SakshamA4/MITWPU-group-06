@@ -51,9 +51,9 @@ final class RotationRingGizmo: Entity {
     private func setupRings(radius: Float) {
 
    
-    xRing = makeRing(color: .red, axis: .x, radius: radius)
-    yRing = makeRing(color: .green, axis: .y, radius: radius)
-    zRing = makeRing(color: .blue, axis: .z, radius: radius)
+    xRing = makeRing(color: .systemRed, axis: .x, radius: radius)
+    yRing = makeRing(color: .systemGreen, axis: .y, radius: radius)
+    zRing = makeRing(color: .systemBlue, axis: .z, radius: radius)
 
     addChild(xRing)
     addChild(yRing)
@@ -70,16 +70,13 @@ final class RotationRingGizmo: Entity {
     ) -> ModelEntity {
         let torus = generateTorusMesh(
             ringRadius: radius,
-            pipeRadius: radius * 0.03,
-            segments: 48,
+            pipeRadius: radius * 0.025,   // Thinner for a cleaner DCC look
+            segments: 64,                  // Higher for smoother curves
             sides: 16
         )
 
-        let material = SimpleMaterial(
-            color: color,
-            roughness: 0.1,
-            isMetallic: true
-        )
+        // UnlitMaterial ensures consistent visibility regardless of scene lighting
+        let material = UnlitMaterial(color: color)
 
         let ring = ModelEntity(mesh: torus, materials: [material])
 

@@ -92,6 +92,18 @@ struct EntityRecord: Codable {
     var customModelPath: String?
     /// Per-camera aspect ratio (e.g. "16:9"). nil for non-camera entities or legacy saves.
     var cameraAspectRatio: String?
+    /// Per-camera focus/lens settings. nil for non-camera entities or legacy saves.
+    var cameraFocalLengthMM: Float?
+    var cameraGridType: String?
+    var cameraFocusMode: String?
+    var cameraAperture: Float?
+    var cameraFocusDistance: Float?
+    /// Aspect ratio lock width for wall/ground pinch resize. nil = free resize.
+    var aspectRatioWidth: Float?
+    /// Aspect ratio lock height for wall/ground pinch resize. nil = free resize.
+    var aspectRatioHeight: Float?
+    /// Entity lock state. nil or false = unlocked.
+    var isLocked: Bool?
 }
 
 // MARK: - AnimationClipRecord
@@ -285,6 +297,8 @@ final class ScenePersistenceService {
              var backgroundImagePath: String?
              var materialConfig: CinematicMaterialConfig?
              var cameraModelName: String?
+             var aspectRatioWidth: Float?
+             var aspectRatioHeight: Float?
 
              // Extract camera visual model name from CameraVisualComponent
              if let camVisual = entity.components[CanvasViewController.CameraVisualComponent.self] {
@@ -297,6 +311,20 @@ final class ScenePersistenceService {
                  cameraAspectRatio = camAspect.aspectRatio.rawValue
              }
 
+             // Extract camera focus/lens settings from CameraFocusComponent
+             var cameraFocalLengthMM: Float?
+             var cameraGridType: String?
+             var cameraFocusMode: String?
+             var cameraAperture: Float?
+             var cameraFocusDistance: Float?
+             if let focus = entity.components[CameraFocusComponent.self] {
+                 cameraFocalLengthMM = focus.focalLengthMM
+                 cameraGridType = focus.gridType.rawValue
+                 cameraFocusMode = focus.mode.rawValue
+                 cameraAperture = focus.aperture
+                 cameraFocusDistance = focus.focusDistance
+             }
+
              if let model = entity as? ModelEntity {
 
                  if let w = model.components[CanvasViewController.WallComponent.self] {
@@ -304,6 +332,10 @@ final class ScenePersistenceService {
                      wallColorR = w.colorR; wallColorG = w.colorG
                      wallColorB = w.colorB; wallColorA = w.colorA
                      materialConfig = w.materialConfig
+                     if let ratio = w.aspectRatio {
+                         aspectRatioWidth = Float(ratio.width)
+                         aspectRatioHeight = Float(ratio.height)
+                     }
                  }
 
                  if let g = model.components[CanvasViewController.GroundComponent.self] {
@@ -311,6 +343,10 @@ final class ScenePersistenceService {
                      groundColorR = g.colorR; groundColorG = g.colorG
                      groundColorB = g.colorB; groundColorA = g.colorA
                      materialConfig = g.materialConfig
+                     if let ratio = g.aspectRatio {
+                         aspectRatioWidth = Float(ratio.width)
+                         aspectRatioHeight = Float(ratio.height)
+                     }
                  }
 
                 // Background image extraction.
@@ -386,7 +422,15 @@ final class ScenePersistenceService {
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
                  proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
                  customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
-                 cameraAspectRatio:   cameraAspectRatio
+                 cameraAspectRatio:   cameraAspectRatio,
+                 cameraFocalLengthMM: cameraFocalLengthMM,
+                 cameraGridType:      cameraGridType,
+                 cameraFocusMode:     cameraFocusMode,
+                 cameraAperture:      cameraAperture,
+                 cameraFocusDistance: cameraFocusDistance,
+                 aspectRatioWidth:    aspectRatioWidth,
+                 aspectRatioHeight:   aspectRatioHeight,
+                 isLocked:            entity.components[LockComponent.self]?.isLocked == true ? true : nil
              ))
         }
 
@@ -595,6 +639,17 @@ final class ScenePersistenceService {
         // restoreEntity. Phase 5 calls reloadData() once after all entities are restored.
         for record in doc.entities {
             await restoreEntity(record: record, vc: vc, sceneID: sceneID)
+
+            // Restore lock state (must run after restoreEntity since the entity
+            // is created inside that method). Look up by stable UUID.
+            if record.isLocked == true,
+               let savedID = record.id,
+               let uuid = UUID(uuidString: savedID) {
+                let entity = vc.mainAnchor?.children.first {
+                    $0.components[CanvasViewController.EntityIDComponent.self]?.id == uuid
+                }
+                entity?.components.set(LockComponent(isLocked: true))
+            }
         }
 
         // Phase 5 – reload camera collection view once, now that all cameras are appended.
@@ -831,6 +886,10 @@ final class ScenePersistenceService {
                  wallComp.colorB = b; wallComp.colorA = a
              }
              wallComp.materialConfig = record.materialConfig
+             // Restore aspect ratio lock if saved
+             if let arW = record.aspectRatioWidth, let arH = record.aspectRatioHeight {
+                 wallComp.aspectRatio = CGSize(width: CGFloat(arW), height: CGFloat(arH))
+             }
 
              // Use cinematic material if available, else legacy SimpleMaterial
              if let config = record.materialConfig {
@@ -875,6 +934,10 @@ final class ScenePersistenceService {
                  groundComp.colorB = b; groundComp.colorA = a
              }
              groundComp.materialConfig = record.materialConfig
+             // Restore aspect ratio lock if saved
+             if let arW = record.aspectRatioWidth, let arH = record.aspectRatioHeight {
+                 groundComp.aspectRatio = CGSize(width: CGFloat(arW), height: CGFloat(arH))
+             }
 
              // Use cinematic material if available, else legacy SimpleMaterial
              if let config = record.materialConfig {
@@ -958,12 +1021,24 @@ final class ScenePersistenceService {
                   return .default
               }()
               root.components.set(CameraAspectComponent(aspectRatio: aspectRatio))
+
+              // Restore per-camera focus/lens settings from CameraFocusComponent
+              var focusComp = CameraFocusComponent()
+              if let mm = record.cameraFocalLengthMM { focusComp.focalLengthMM = mm }
+              if let raw = record.cameraGridType, let grid = GridType(rawValue: raw) { focusComp.gridType = grid }
+              if let raw = record.cameraFocusMode, let mode = CameraFocusComponent.FocusMode(rawValue: raw) { focusComp.mode = mode }
+              if let ap = record.cameraAperture { focusComp.aperture = ap }
+              if let fd = record.cameraFocusDistance { focusComp.focusDistance = fd }
+              root.components.set(focusComp)
+
               print("📷 Restoring camera '\(displayName)' with model: \(cameraModelName), aspect: \(aspectRatio.displayName)")
 
               let cam = PerspectiveCamera()
               cam.name = "PerspCam_\(cameraID.uuidString)"
               cam.isEnabled = false
               cam.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+              // Apply restored focal length to camera FOV
+              cam.camera.fieldOfViewInDegrees = focalLengthToFOV(focusComp.focalLengthMM)
               root.addChild(cam)
               root.transform = t
               anchor.addChild(root)
@@ -1276,6 +1351,13 @@ final class ScenePersistenceService {
      /// Evicts a specific scene from the model cache to free memory.
      func evictScene(_ sceneID: UUID) {
          modelCacheManager.evictScene(sceneID)
+     }
+
+     /// Marks a scene as exited without immediately evicting its cache.
+     /// The last N scenes are retained for fast reopening. Oldest are evicted
+     /// when the retention limit is exceeded or memory pressure occurs.
+     func markSceneExited(_ sceneID: UUID) {
+         modelCacheManager.markExited(sceneID: sceneID)
      }
      
      /// Logs current cache statistics to console.

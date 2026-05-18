@@ -62,15 +62,16 @@ class MyFilmViewController: UIViewController {
         navigationItem.rightBarButtonItem = searchButton
 
         filmName.text = film?.name ?? "My Film"
+        setupReportButton()
     }
 
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
-        // Always hide search bar and show search button when view appears
+        // Always hide search bar and restore both nav buttons when view appears
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        setupReportButton()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -128,6 +129,33 @@ class MyFilmViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.searchController.searchBar.becomeFirstResponder()
         }
+    }
+
+    // MARK: - Report
+
+    private func setupReportButton() {
+        let cfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        let reportBtn = UIBarButtonItem(
+            image: UIImage(systemName: "doc.text.magnifyingglass", withConfiguration: cfg),
+            style: .plain,
+            target: self,
+            action: #selector(showFilmReport)
+        )
+        // Keep the existing search button alongside the new report button
+        navigationItem.rightBarButtonItems = [searchButton, reportBtn]
+        savedSearchButton = navigationItem.rightBarButtonItem
+    }
+
+    @objc private func showFilmReport() {
+        let reportVC = FilmReportViewController()
+        reportVC.film = film
+        reportVC.modalPresentationStyle = .pageSheet
+        if let sheet = reportVC.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(reportVC, animated: true)
     }
 
     func registerCells() {
@@ -331,8 +359,8 @@ extension MyFilmViewController: UISearchBarDelegate {
         searchController.isActive = false
         navigationItem.searchController = nil
         
-        // Restore the search button to nav bar
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        // Restore both search + report buttons
+        setupReportButton()
     }
 }
 
@@ -347,8 +375,8 @@ extension MyFilmViewController: UISearchControllerDelegate {
     }
     
     func didDismissSearchController(_ searchController: UISearchController) {
-        // Restore the search button when search controller is dismissed
+        // Restore both search + report buttons when search is dismissed
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        setupReportButton()
     }
 }

@@ -272,6 +272,21 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var sceneImageName: String?
     var currentSceneID: UUID?
     
+    /// When true, viewDidLoad skips all UI setup (toolbars, gestures, nav bar,
+    /// gizmo, animation panel) and viewDidAppear skips loadSceneIfSaved().
+    /// The coordinator loads scenes explicitly via ScenePersistenceService.
+    /// Set this BEFORE the view loads (i.e. before accessing .view).
+    var isExportMode: Bool = false
+
+    /// Set to true when this scene was created by copying a bundled template.
+    /// Used by commitExit() to clean up copied files if the user exits without saving.
+    var isTemplateCopy: Bool = false
+
+    /// Set to true by saveAndExit() after the user explicitly saves.
+    /// When false and isTemplateCopy is true, commitExit() removes the copied files
+    /// instead of adding the scene to recents.
+    var userDidSave: Bool = false
+
     // FIX: Track whether the scene has been loaded to prevent reloading it
     // multiple times when returning from navigation (e.g., shot breakdown).
     // Reset to false when exiting the scene.
@@ -402,6 +417,16 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     /// is never reused for a newly spawned camera even if Camera 2 was deleted.
     var cameraCounter: Int = 0
     var cameraCollectionView: UICollectionView!
+
+    /// HUD overlay shown when looking through a scene camera.
+    /// Contains focal length slider, composition grid, and focus controls.
+    var cameraViewOverlay: CameraViewOverlay?
+
+    /// Snapshot of the camera root's world position when entering camera-through view.
+    /// Used to compute the delta on exit and update animation clips.
+    var cameraViewEntryPos: SIMD3<Float>?
+    /// Name of the camera entity that was active when entering camera view.
+    var cameraViewEntryCameraName: String?
 
     // MARK: - Top Right UI
     let shotBreakdownBtn: UIButton = {
@@ -587,6 +612,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
 
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 16:9).
+        var aspectRatio: CGSize?
+
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
             set {
@@ -608,6 +637,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         /// Cinematic material configuration. nil = legacy color-only mode.
         var materialConfig: CinematicMaterialConfig?
 
+        /// Aspect ratio lock for pinch resize. nil = free resize.
+        /// Width and height of the CGSize represent the ratio (e.g. 4:3 for width:depth).
+        var aspectRatio: CGSize?
+
         var uiColor: UIColor {
             get { UIColor(red: CGFloat(colorR), green: CGFloat(colorG), blue: CGFloat(colorB), alpha: CGFloat(colorA)) }
             set {
@@ -618,6 +651,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         }
     }
 
+    // Navigation Compass
+    let compassView = CompassView()
+    
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -625,6 +661,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
         setupARView()
         setupInitialScene()
+
+        // In export mode, skip all interactive UI — only the ARView and
+        // scene graph are needed for rendering frames.
+        guard !isExportMode else { return }
+
         setupUI()
         setupGestures()
         setupTimelineControls()
@@ -645,6 +686,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // In export mode, the coordinator loads scenes explicitly.
+        guard !isExportMode else { return }
         // Defer scene load until the view is fully on screen.
         // This lets RealityKit finish its initial render pass before we
         // start deserialising entities, preventing the black-screen stall
@@ -1031,6 +1074,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // Stamp pose info so the action menu can gate Walk to standing poses only.
                 if toolType == .character {
                     entity.components.set(CharacterPoseComponent(modelFileName: item.modelFileName))
+                    // FIX: Some character USDZ exports (notably the male "LewScene") bake
+                    // materials as UnlitMaterial which opts meshes out of shadow rendering.
+                    // Promote any UnlitMaterial to PBR so all characters cast shadows.
+                    ensureShadowCasting(on: entity)
                 }
                 
                 if let customURL = item.customModelURL {
@@ -1105,6 +1152,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     // MARK: - Pan gesture
 
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+        // When looking through a scene camera, 1-finger pan = point camera
+        guard activeCamera === editorCamera else { return }
         let location = gesture.location(in: arView)
 
 
@@ -1245,15 +1294,42 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     activeGizmoPart = .arrowY;  highlightGizmoPart(.arrowY)
                 } else if name == "Gizmo_Plane_XZ" || parentName == "PlaneHandle" {
                     activeGizmoPart = .planeXZ; highlightGizmoPart(.planeXZ)
-                } else if name == "xRing" {
-                    activeGizmoPart = .rotateX
-                    highlightGizmoPart(.rotateX)
-                } else if name == "yRing" {
-                    activeGizmoPart = .rotateY
-                    highlightGizmoPart(.rotateY)
-                } else if name == "zRing" {
-                    activeGizmoPart = .rotateZ
-                    highlightGizmoPart(.rotateZ)
+                } else if name == "xRing" || name == "yRing" || name == "zRing" {
+                    // ── Initialize rotation solver for ring drags ──
+                    let part: GizmoPart
+                    switch name {
+                    case "xRing": part = .rotateX
+                    case "yRing": part = .rotateY
+                    default:      part = .rotateZ
+                    }
+                    activeGizmoPart = part
+                    highlightGizmoPart(part)
+
+                    // Compute frozen world-space axis from the gizmo
+                    if let selected = selectedEntity, let gizmo = rotationGizmo {
+                        let gizmoMatrix = gizmo.transformMatrix(relativeTo: nil)
+                        let worldAxis: SIMD3<Float>
+                        switch name {
+                        case "xRing":
+                            worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.0.x,
+                                                                     gizmoMatrix.columns.0.y,
+                                                                     gizmoMatrix.columns.0.z))
+                        case "yRing":
+                            worldAxis = simd_normalize(SIMD3<Float>(-gizmoMatrix.columns.1.x,
+                                                                     -gizmoMatrix.columns.1.y,
+                                                                     -gizmoMatrix.columns.1.z))
+                        default:
+                            worldAxis = simd_normalize(SIMD3<Float>(gizmoMatrix.columns.2.x,
+                                                                     gizmoMatrix.columns.2.y,
+                                                                     gizmoMatrix.columns.2.z))
+                        }
+                        activeRotationAxis = worldAxis
+                        let pivot = selected.position(relativeTo: nil)
+                        rotationSolver.beginRotation(
+                            axis: worldAxis, pivot: pivot,
+                            touchPoint: location, arView: arView
+                        )
+                    }
                 }
 
                 if let handle = activeHandleEntity {
@@ -1276,20 +1352,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 while let parent = root?.parent, parent.name != "MainAnchor" {
                     root = parent
                 }
-                if root?.name != "GizmoRoot" {
-                    selectedEntity = root
-                }
-                // If entity is selected (or just became selected) and gizmo is visible,
-                // treat body drag as planeXZ so the entity moves with the finger
-                if let sel = selectedEntity,
-                   gizmoRoot?.isEnabled == true,
-                   !(sel.components[LockComponent.self]?.isLocked ?? false) {
-                    activeGizmoPart   = .planeXZ
-                    dragStartPosition = sel.position
-                    isDraggingObject  = true
-                    lastPanLocation   = location
-                } else {
+
+                // Locked entities: skip selection entirely — 1-finger drag pans camera
+                let isLocked = root?.components[LockComponent.self]?.isLocked ?? false
+                if isLocked {
                     activeGizmoPart = .none
+                } else if root?.name != "GizmoRoot" {
+                    selectedEntity = root
+                    // If entity is selected and gizmo is visible,
+                    // treat body drag as planeXZ so the entity moves with the finger
+                    if let sel = selectedEntity,
+                       gizmoRoot?.isEnabled == true {
+                        activeGizmoPart   = .planeXZ
+                        dragStartPosition = sel.position
+                        isDraggingObject  = true
+                        lastPanLocation   = location
+                    } else {
+                        activeGizmoPart = .none
+                    }
                 }
             }
 
@@ -1318,43 +1398,41 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
             // Rotation rings
             if activeGizmoPart == .rotateX || activeGizmoPart == .rotateY || activeGizmoPart == .rotateZ {
-                guard let selected = selectedEntity,
-                      let gizmo   = rotationGizmo else {
+                guard let selected = selectedEntity else {
                     let t = gesture.translation(in: arView)
                     panCameraTarget(translation: t)
                     gesture.setTranslation(.zero, in: arView)
                     return
                 }
 
-                // Look up the ring entity directly and read its current
-                // world-space orientation quaternion. The torus mesh is built
-                // in the XY plane so its face normal is local [0,0,1].
-                // Rotating that by the ring's world quat gives the exact axis
-                // the ring is physically lying on right now — even after the
-                // entity has been rotated by previous drags.
-                let ringName: String
-                switch activeGizmoPart {
-                case .rotateX: ringName = "xRing"
-                case .rotateY: ringName = "yRing"
-                default:       ringName = "zRing"
+                // ── Camera-relative rotation via solver ──
+                if rotationSolver.tracking {
+                    if let deltaQuat = rotationSolver.updateRotation(touchPoint: location, arView: arView) {
+                        let currentWorld = selected.orientation(relativeTo: nil)
+                        selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
+                    }
+                } else {
+                    // Fallback: screen-space angular tracking around projected entity centre
+                    guard let axis = activeRotationAxis else { lastPanLocation = location; return }
+                    let entityCentre = selected.position(relativeTo: nil)
+                    guard let centre2D = arView.project(entityCentre) else {
+                        lastPanLocation = location; return
+                    }
+                    let prev = CGPoint(x: lastPanLocation.x - centre2D.x, y: lastPanLocation.y - centre2D.y)
+                    let curr = CGPoint(x: location.x - centre2D.x, y: location.y - centre2D.y)
+                    let prevLen = sqrt(prev.x*prev.x + prev.y*prev.y)
+                    let currLen = sqrt(curr.x*curr.x + curr.y*curr.y)
+                    guard prevLen > 8, currLen > 8 else { lastPanLocation = location; return }
+                    let prevAngle = Float(atan2(prev.y, prev.x))
+                    let currAngle = Float(atan2(curr.y, curr.x))
+                    var delta = currAngle - prevAngle
+                    if delta >  Float.pi { delta -= 2 * Float.pi }
+                    if delta < -Float.pi { delta += 2 * Float.pi }
+                    guard delta.isFinite, abs(delta) > 0.001 else { lastPanLocation = location; return }
+                    let deltaQuat = simd_quatf(angle: -delta, axis: axis)
+                    let currentWorld = selected.orientation(relativeTo: nil)
+                    selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
                 }
-
-                guard let ring = gizmo.findEntity(named: ringName) else {
-                    lastPanLocation = location; return
-                }
-
-                let liveAxis = simd_normalize(ring.orientation(relativeTo: nil).act([0, 0, 1]))
-
-                let dx = Float(location.x - lastPanLocation.x)
-                let dy = Float(location.y - lastPanLocation.y)
-                let drag = abs(dx) > abs(dy) ? dx : -dy
-                let angle = -(drag * 0.01)
-                guard angle.isFinite else { return }
-
-                // Apply in world space so we never mix coordinate frames.
-                let deltaQuat    = simd_quatf(angle: angle, axis: liveAxis)
-                let currentWorld = selected.orientation(relativeTo: nil)
-                selected.setOrientation(simd_normalize(deltaQuat * currentWorld), relativeTo: nil)
                 lastPanLocation = location
                 return
             }
@@ -1520,6 +1598,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             activeGizmoPart      = .none
             activeRotationAxis   = nil
             isDraggingObject     = false
+            rotationSolver.endRotation()
             // activeHandleEntity intentionally NOT cleared here — clearing it causes
             // the next gizmo-part drag to find targetEntity == nil and silently
             // camera-pan instead of moving the handle. Cleared only in handleTap.
@@ -1749,6 +1828,15 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
         }
+
+        // For locked entities, hide the gizmo — only the unlock option should
+        // be available via the context menu, not the transform handles.
+        let isLocked = root.components[LockComponent.self]?.isLocked ?? false
+        if isLocked {
+            hideGizmo()
+            hideRotationGizmo()
+        }
+
         showActionMenu(at: location)
     }
 }
