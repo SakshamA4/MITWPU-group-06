@@ -357,6 +357,8 @@ extension CanvasViewController {
             self.layersButton.alpha = self.isSidebarVisible ? 0 : 1
             self.playbackButtonStack.alpha = self.isSidebarVisible ? 0 : 1
             self.playbackButtonStack.isHidden = self.isSidebarVisible
+            // Hide compass while scene hierarchy is open
+            self.compassView.isHidden = self.isSidebarVisible
             self.view.layoutIfNeeded()
         }
     }

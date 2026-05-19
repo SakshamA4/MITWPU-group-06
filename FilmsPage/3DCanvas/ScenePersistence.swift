@@ -88,6 +88,11 @@ struct EntityRecord: Codable {
     var lightDiffuserAmount: Float?
     /// Procedural light kind (e.g. "practicalLantern"). nil for .usdz-based lights.
     var proceduralLightKind: String?
+    /// Custom light color RGBA — nil means use color temperature instead.
+    var lightCustomColorR: Float?
+    var lightCustomColorG: Float?
+    var lightCustomColorB: Float?
+    var lightCustomColorA: Float?
     /// Path to user-imported custom model in the Documents/CustomProps directory.
     var customModelPath: String?
     /// Per-camera aspect ratio (e.g. "16:9"). nil for non-camera entities or legacy saves.
@@ -421,6 +426,10 @@ final class ScenePersistenceService {
                  lightActiveGobo:     entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
                  proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
+                 lightCustomColorR:   entity.components[LightConfigComponent.self]?.customColorR,
+                 lightCustomColorG:   entity.components[LightConfigComponent.self]?.customColorG,
+                 lightCustomColorB:   entity.components[LightConfigComponent.self]?.customColorB,
+                 lightCustomColorA:   entity.components[LightConfigComponent.self]?.customColorA,
                  customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
                  cameraAspectRatio:   cameraAspectRatio,
                  cameraFocalLengthMM: cameraFocalLengthMM,
@@ -1196,7 +1205,11 @@ final class ScenePersistenceService {
                     reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
                     activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
                     diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
-                    proceduralKind:         procKind
+                    proceduralKind:         procKind,
+                    customColorR:           record.lightCustomColorR,
+                    customColorG:           record.lightCustomColorG,
+                    customColorB:           record.lightCustomColorB,
+                    customColorA:           record.lightCustomColorA
                 )
                 vc.attachLight(to: entity, config: config)
             }
@@ -1251,7 +1264,11 @@ final class ScenePersistenceService {
                     modelScale:             record.lightModelScale ?? 0.01,
                     reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
                     activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
-                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0
+                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
+                    customColorR:           record.lightCustomColorR,
+                    customColorG:           record.lightCustomColorG,
+                    customColorB:           record.lightCustomColorB,
+                    customColorA:           record.lightCustomColorA
                 )
                 vc.attachLight(to: entity, config: config)
             } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {

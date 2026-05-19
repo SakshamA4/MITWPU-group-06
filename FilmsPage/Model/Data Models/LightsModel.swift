@@ -28,6 +28,12 @@ enum GoboPattern: String, Codable, CaseIterable {
     case windowFrame
     case leaves
     case dots
+    case crosshatch
+    case starBurst
+    case circles
+    case diamondGrid
+    case barndoor
+    case branchShadow
 
     var textureName: String? {
         switch self {
@@ -36,6 +42,12 @@ enum GoboPattern: String, Codable, CaseIterable {
         case .windowFrame:     return "gobo_window"
         case .leaves:          return "gobo_leaves"
         case .dots:            return "gobo_dots"
+        case .crosshatch:      return "gobo_crosshatch"
+        case .starBurst:       return "gobo_starburst"
+        case .circles:         return "gobo_circles"
+        case .diamondGrid:     return "gobo_diamond"
+        case .barndoor:        return "gobo_barndoor"
+        case .branchShadow:    return "gobo_branch"
         }
     }
 
@@ -46,7 +58,258 @@ enum GoboPattern: String, Codable, CaseIterable {
         case .windowFrame:     return "Window"
         case .leaves:          return "Leaves"
         case .dots:            return "Dots"
+        case .crosshatch:      return "Cross"
+        case .starBurst:       return "Star"
+        case .circles:         return "Rings"
+        case .diamondGrid:     return "Diamond"
+        case .barndoor:        return "Barn"
+        case .branchShadow:    return "Branch"
         }
+    }
+
+    // MARK: - Procedural Gobo Texture Generation
+
+    /// Generates a gobo **shadow mask** texture as a CGImage.
+    ///
+    /// **Polarity for gate-mask approach:**
+    /// - **Opaque black** (alpha = 1.0) → blocks light, casts shadow on surfaces
+    /// - **Fully transparent** (alpha = 0.0) → light passes through
+    ///
+    /// Used with `PhysicallyBasedMaterial` + `opacityThreshold` so RealityKit's
+    /// shadow system casts the gobo pattern onto scene surfaces. The gate plane
+    /// is invisible from the side; you only see the shaped shadows/light on floors and walls.
+    ///
+    /// Returns nil for `.none`.
+    func generateTexture(lightColor: UIColor = .white, resolution: Int = 512) -> CGImage? {
+        guard self != .none else { return nil }
+        let size = CGSize(width: resolution, height: resolution)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let blocked = UIColor.black.withAlphaComponent(1.0)  // casts shadow
+        let image = renderer.image { ctx in
+            let cg = ctx.cgContext
+            let rect = CGRect(origin: .zero, size: size)
+
+            // Start fully transparent (= light passes through everywhere)
+            cg.clear(rect)
+
+            switch self {
+            case .none:
+                break
+
+            case .venetianBlinds:
+                // Horizontal slats BLOCK light (drawn as opaque black).
+                // Gaps between slats let light through (left transparent).
+                let slatCount = 8
+                let totalSlotH = rect.height / CGFloat(slatCount)
+                let slatFraction: CGFloat = 0.55  // 55% of each slot is solid slat
+                cg.setFillColor(blocked.cgColor)
+                for i in 0..<slatCount {
+                    let slotY = CGFloat(i) * totalSlotH
+                    let slatH = totalSlotH * slatFraction
+                    cg.fill(CGRect(x: 0, y: slotY, width: rect.width, height: slatH))
+                }
+
+            case .windowFrame:
+                // Window FRAME bars block light (opaque black).
+                // Glass panes let light through (transparent).
+                let barW: CGFloat = rect.width * 0.08
+                cg.setFillColor(blocked.cgColor)
+                // Outer frame
+                cg.fill(CGRect(x: 0, y: 0, width: rect.width, height: barW))
+                cg.fill(CGRect(x: 0, y: rect.height - barW, width: rect.width, height: barW))
+                cg.fill(CGRect(x: 0, y: 0, width: barW, height: rect.height))
+                cg.fill(CGRect(x: rect.width - barW, y: 0, width: barW, height: rect.height))
+                // Center vertical bar
+                cg.fill(CGRect(x: rect.width / 2 - barW / 2, y: 0,
+                               width: barW, height: rect.height))
+                // Horizontal bars (3 rows → 6 panes)
+                cg.fill(CGRect(x: 0, y: rect.height * 0.333 - barW / 2,
+                               width: rect.width, height: barW))
+                cg.fill(CGRect(x: 0, y: rect.height * 0.667 - barW / 2,
+                               width: rect.width, height: barW))
+
+            case .leaves:
+                // Leaf shapes BLOCK light (opaque). Gaps let light through.
+                srand48(42)  // deterministic
+                cg.setFillColor(blocked.cgColor)
+                for _ in 0..<55 {
+                    let x = CGFloat(drand48()) * rect.width
+                    let y = CGFloat(drand48()) * rect.height
+                    let w = CGFloat(25 + drand48() * 55)
+                    let h = CGFloat(12 + drand48() * 30)
+                    let angle = CGFloat(drand48() * .pi)
+                    cg.saveGState()
+                    cg.translateBy(x: x, y: y)
+                    cg.rotate(by: angle)
+                    // Leaf shape — pointed ellipse via Bézier curves
+                    let leafPath = UIBezierPath()
+                    leafPath.move(to: CGPoint(x: -w/2, y: 0))
+                    leafPath.addCurve(to: CGPoint(x: w/2, y: 0),
+                                      controlPoint1: CGPoint(x: -w/4, y: -h),
+                                      controlPoint2: CGPoint(x: w/4, y: -h))
+                    leafPath.addCurve(to: CGPoint(x: -w/2, y: 0),
+                                      controlPoint1: CGPoint(x: w/4, y: h),
+                                      controlPoint2: CGPoint(x: -w/4, y: h))
+                    cg.addPath(leafPath.cgPath)
+                    cg.fillPath()
+                    cg.restoreGState()
+                }
+
+            case .dots:
+                // Solid field blocks light; circular HOLES let light through.
+                // Fill everything opaque, then punch transparent holes.
+                cg.setFillColor(blocked.cgColor)
+                cg.fill(rect)
+                let cols = 6, rows = 6
+                let cellW = rect.width / CGFloat(cols)
+                let cellH = rect.height / CGFloat(rows)
+                let holeRadius = min(cellW, cellH) * 0.32
+                // Punch holes by clearing circles
+                cg.setBlendMode(.clear)
+                for row in 0..<rows {
+                    for col in 0..<cols {
+                        let cx = CGFloat(col) * cellW + cellW / 2
+                        let cy = CGFloat(row) * cellH + cellH / 2
+                        cg.fillEllipse(in: CGRect(
+                            x: cx - holeRadius, y: cy - holeRadius,
+                            width: holeRadius * 2, height: holeRadius * 2))
+                    }
+                }
+                cg.setBlendMode(.normal)
+
+            case .crosshatch:
+                // Diagonal grid — two sets of parallel lines at 45° block light.
+                let lineWidth: CGFloat = rect.width * 0.04
+                let spacing: CGFloat = rect.width / 8.0
+                cg.setStrokeColor(blocked.cgColor)
+                cg.setLineWidth(lineWidth)
+                // 45° lines (top-left to bottom-right)
+                for i in stride(from: -rect.width, through: rect.width * 2, by: spacing) {
+                    cg.move(to: CGPoint(x: i, y: 0))
+                    cg.addLine(to: CGPoint(x: i + rect.height, y: rect.height))
+                }
+                cg.strokePath()
+                // 135° lines (top-right to bottom-left)
+                for i in stride(from: -rect.width, through: rect.width * 2, by: spacing) {
+                    cg.move(to: CGPoint(x: i, y: 0))
+                    cg.addLine(to: CGPoint(x: i - rect.height, y: rect.height))
+                }
+                cg.strokePath()
+
+            case .starBurst:
+                // Radial spokes from center — alternating opaque/transparent wedges.
+                let spokeCount = 12
+                let cx = rect.width / 2, cy = rect.height / 2
+                let radius = sqrt(cx * cx + cy * cy)
+                cg.setFillColor(blocked.cgColor)
+                let wedgeAngle = (.pi * 2) / CGFloat(spokeCount)
+                for i in 0..<spokeCount where i % 2 == 0 {
+                    let startAngle = CGFloat(i) * wedgeAngle
+                    let endAngle = startAngle + wedgeAngle
+                    cg.move(to: CGPoint(x: cx, y: cy))
+                    cg.addArc(center: CGPoint(x: cx, y: cy), radius: radius,
+                              startAngle: startAngle, endAngle: endAngle, clockwise: false)
+                    cg.closePath()
+                    cg.fillPath()
+                }
+
+            case .circles:
+                // Concentric rings — alternating opaque rings and transparent gaps.
+                let cx = rect.width / 2, cy = rect.height / 2
+                let ringCount = 6
+                let maxRadius = sqrt(cx * cx + cy * cy)
+                let ringWidth = maxRadius / CGFloat(ringCount * 2)
+                cg.setFillColor(blocked.cgColor)
+                for i in 0..<ringCount {
+                    let outerR = maxRadius - CGFloat(i * 2) * ringWidth
+                    let innerR = outerR - ringWidth
+                    if outerR <= 0 { continue }
+                    let path = UIBezierPath(arcCenter: CGPoint(x: cx, y: cy),
+                                            radius: outerR, startAngle: 0,
+                                            endAngle: .pi * 2, clockwise: true)
+                    if innerR > 0 {
+                        path.addArc(withCenter: CGPoint(x: cx, y: cy),
+                                    radius: innerR, startAngle: 0,
+                                    endAngle: .pi * 2, clockwise: false)
+                    }
+                    cg.addPath(path.cgPath)
+                    cg.fillPath()
+                }
+
+            case .diamondGrid:
+                // Rotated square grid — creates diamond-shaped holes.
+                cg.setFillColor(blocked.cgColor)
+                cg.fill(rect)
+                let cols = 5, rows = 5
+                let cellW = rect.width / CGFloat(cols)
+                let cellH = rect.height / CGFloat(rows)
+                let diamondInset: CGFloat = 0.18
+                cg.setBlendMode(.clear)
+                for row in 0..<rows {
+                    for col in 0..<cols {
+                        let cx = CGFloat(col) * cellW + cellW / 2
+                        let cy = CGFloat(row) * cellH + cellH / 2
+                        let hw = cellW * (0.5 - diamondInset)
+                        let hh = cellH * (0.5 - diamondInset)
+                        let diamond = UIBezierPath()
+                        diamond.move(to: CGPoint(x: cx, y: cy - hh))
+                        diamond.addLine(to: CGPoint(x: cx + hw, y: cy))
+                        diamond.addLine(to: CGPoint(x: cx, y: cy + hh))
+                        diamond.addLine(to: CGPoint(x: cx - hw, y: cy))
+                        diamond.close()
+                        cg.addPath(diamond.cgPath)
+                        cg.fillPath()
+                    }
+                }
+                cg.setBlendMode(.normal)
+
+            case .barndoor:
+                // Barn doors — top and bottom flags partially close off the beam.
+                // Also adds thin vertical side flags.
+                let flagH = rect.height * 0.3   // 30% blocked from top and bottom
+                let sideW = rect.width * 0.12
+                cg.setFillColor(blocked.cgColor)
+                cg.fill(CGRect(x: 0, y: 0, width: rect.width, height: flagH))
+                cg.fill(CGRect(x: 0, y: rect.height - flagH, width: rect.width, height: flagH))
+                cg.fill(CGRect(x: 0, y: 0, width: sideW, height: rect.height))
+                cg.fill(CGRect(x: rect.width - sideW, y: 0, width: sideW, height: rect.height))
+
+            case .branchShadow:
+                // Organic tree branch silhouettes.
+                srand48(99)
+                cg.setStrokeColor(blocked.cgColor)
+                for _ in 0..<8 {
+                    let startX = CGFloat(drand48()) * rect.width
+                    let startY = CGFloat(drand48()) * rect.height * 0.3
+                    cg.setLineWidth(CGFloat(3 + drand48() * 6))
+                    cg.move(to: CGPoint(x: startX, y: startY))
+                    // Main branch
+                    var curX = startX, curY = startY
+                    let segments = 6 + Int(drand48() * 6)
+                    for _ in 0..<segments {
+                        curX += CGFloat(-20 + drand48() * 40)
+                        curY += CGFloat(15 + drand48() * 35)
+                        cg.addLine(to: CGPoint(x: curX, y: curY))
+                    }
+                    cg.strokePath()
+                    // Sub-branches
+                    curX = startX; curY = startY
+                    for j in 0..<segments {
+                        curX += CGFloat(-20 + drand48() * 40)
+                        curY += CGFloat(15 + drand48() * 35)
+                        if j % 2 == 0 {
+                            cg.setLineWidth(CGFloat(1.5 + drand48() * 3))
+                            cg.move(to: CGPoint(x: curX, y: curY))
+                            let bx = curX + CGFloat(-30 + drand48() * 60)
+                            let by = curY + CGFloat(10 + drand48() * 40)
+                            cg.addLine(to: CGPoint(x: bx, y: by))
+                            cg.strokePath()
+                        }
+                    }
+                }
+            }
+        }
+        return image.cgImage
     }
 }
 

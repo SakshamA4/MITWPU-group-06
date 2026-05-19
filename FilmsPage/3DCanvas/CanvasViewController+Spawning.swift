@@ -397,9 +397,9 @@ extension CanvasViewController {
 
         // ── 1. CLEAN UP ────────────────────────────────────────────────────
         for name in ["LightCore", "LensGlow", "BeamCone", "GlowAnchor",
-                     "DiffuseFill", "GoboCookie", "LED_Guts_Group",
-                     "Lantern_Guts_Group", "LanternInternalLight",
-                     "LanternGlowFallback"] {
+                     "DiffuseFill", "GoboCookie", "GoboBeam", "GoboGate",
+                     "LED_Guts_Group", "Lantern_Guts_Group",
+                     "LanternInternalLight", "LanternGlowFallback"] {
             model.findEntity(named: name)?.removeFromParent()
         }
 
@@ -420,7 +420,7 @@ extension CanvasViewController {
             let point = PointLight()
             point.name                    = "LightCore"
             point.light.intensity         = config.intensity
-            point.light.color             = config.uiColor
+            point.light.color             = config.effectiveColor
             point.light.attenuationRadius = config.attenuationRadius
             point.scale                   = SIMD3(repeating: cs)
             point.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
@@ -433,7 +433,7 @@ extension CanvasViewController {
 
             let bulb = ModelEntity(
                 mesh: .generateSphere(radius: bulbRadius),
-                materials: [UnlitMaterial(color: config.uiColor)]
+                materials: [UnlitMaterial(color: config.effectiveColor)]
             )
 
             bulb.name = "LanternBulb"
@@ -453,7 +453,7 @@ extension CanvasViewController {
                     for mat in mc.materials {
                         if var pbr = mat as? PhysicallyBasedMaterial {
                             if case .transparent = pbr.blending {
-                                pbr.emissiveColor     = .init(color: config.uiColor)
+                                pbr.emissiveColor     = .init(color: config.effectiveColor)
                                 pbr.emissiveIntensity = 3.0
                                 newMaterials.append(pbr)
                                 changed = true
@@ -491,7 +491,7 @@ extension CanvasViewController {
 
                 let glow = ModelEntity(
                     mesh: .generateSphere(radius: glowRadius),
-                    materials: [UnlitMaterial(color: config.uiColor)]
+                    materials: [UnlitMaterial(color: config.effectiveColor)]
                 )
 
                 glow.name = "LanternGlowFallback"
@@ -514,7 +514,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale    = SIMD3(repeating: cs)
@@ -545,6 +545,11 @@ extension CanvasViewController {
             print("SPOTLIGHT: lens at \(lensPos), aiming toward -X")
             model.addChild(spot)
 
+            // ── Gobo gate mask ───────────────────────────────────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
+
         // ════════════════════════════════════════════════════════════════════
         // LED PANEL — SpotLight at panel head (85% height), aimed forward-down
         // The panel head with 4×3 LED circles sits at the top of the tripod.
@@ -563,7 +568,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale                     = SIMD3(repeating: cs)
@@ -600,6 +605,11 @@ extension CanvasViewController {
 
             model.addChild(spot)
 
+            // ── Gobo gate mask (panels can also use gobos) ──────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
+
         } // end switch
 
         model.components.set(config)
@@ -615,7 +625,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
 
             if config.shadowEnabled {
@@ -635,13 +645,13 @@ extension CanvasViewController {
                 guard let point = lightCore as? PointLight else { return }
 
                 point.light.intensity         = config.intensity
-                point.light.color             = config.uiColor
+                point.light.color             = config.effectiveColor
                 point.light.attenuationRadius = config.attenuationRadius
 
                 // Update visible bulb color
                 if let bulb = entity.findEntity(named: "LanternBulb") as? ModelEntity {
                     bulb.model?.materials = [
-                        UnlitMaterial(color: config.uiColor)
+                        UnlitMaterial(color: config.effectiveColor)
                     ]
                 }
 
@@ -654,7 +664,7 @@ extension CanvasViewController {
                         for mat in mc.materials {
                             if var pbr = mat as? PhysicallyBasedMaterial {
                                 if case .transparent = pbr.blending {
-                                    pbr.emissiveColor     = .init(color: config.uiColor)
+                                    pbr.emissiveColor     = .init(color: config.effectiveColor)
                                     pbr.emissiveIntensity = 3.0
                                     newMaterials.append(pbr)
                                     changed = true
@@ -681,7 +691,7 @@ extension CanvasViewController {
 
             // Update fallback glow sphere color if present
             if let fb = entity.findEntity(named: "LanternGlowFallback") as? ModelEntity {
-                fb.model?.materials = [UnlitMaterial(color: config.uiColor)]
+                fb.model?.materials = [UnlitMaterial(color: config.effectiveColor)]
             }
         }
 
@@ -690,13 +700,16 @@ extension CanvasViewController {
             updateProceduralEmissiveMaterials(on: entity, config: config)
         }
 
+        // ── Update gobo gate mask ────────────────────────────────────────────
+        updateGoboGateMask(on: entity, config: config)
+
         entity.components.set(config)
     }
 
     /// Updates emissive PBR materials on procedural light child entities
     /// when the user changes color temperature or intensity via the slider.
     private func updateProceduralEmissiveMaterials(on entity: Entity, config: LightConfigComponent) {
-        let color = config.uiColor
+        let color = config.effectiveColor
 
         // Practical Lantern — globe sphere
         if let globe = entity.findEntity(named: "ProceduralGlobe") as? ModelEntity {
@@ -717,6 +730,73 @@ extension CanvasViewController {
             mat.emissiveIntensity = (config.proceduralKind == .skyPanel) ? 5.0 : 4.0
             face.model?.materials = [mat]
         }
+    }
+
+    // MARK: - Gobo Gate Mask (Shadow-Casting Alpha Plane)
+    //
+    // RealityKit SpotLightComponent has NO projected-texture property.
+    // Correct workaround: a thin alpha-tested plane at the spotlight gate.
+    // With shadows enabled, the opaque parts cast gobo-shaped shadows onto
+    // scene surfaces (floor, walls, actors). The gate plane is paper-thin
+    // and invisible from the side — you only see the shaped light/shadows.
+    //
+    // REQUIREMENT: Shadows are auto-enabled when a gobo is active.
+
+    /// Adds an alpha-tested gate-mask plane as a child of the SpotLight entity.
+    private func addGoboGateMask(to spotEntity: Entity, config: LightConfigComponent) {
+        guard config.activeGobo != .none else { return }
+        guard let cgImage = config.activeGobo.generateTexture(
+            lightColor: config.effectiveColor, resolution: 512
+        ) else { return }
+
+        guard let texture = try? TextureResource.generate(
+            from: cgImage, options: .init(semantic: .color)
+        ) else {
+            print("GOBO: failed to create TextureResource")
+            return
+        }
+
+        // PBR material with opacityThreshold — shadow map respects alpha cutoff
+        var material = PhysicallyBasedMaterial()
+        material.baseColor = .init(tint: .black, texture: .init(texture))
+        material.opacityThreshold = 0.5
+        material.metallic = .init(floatLiteral: 0)
+        material.roughness = .init(floatLiteral: 1)
+
+        // Plane sized to cover beam cross-section at gate distance
+        let gateDistance: Float = 0.2
+        let outerRad = config.outerAngleDeg * (.pi / 180.0)
+        let planeHalf = gateDistance * tan(outerRad / 2.0) * 1.2
+        let gateSize = max(0.15, planeHalf * 2.0)
+
+        let gate = ModelEntity(
+            mesh: .generatePlane(width: gateSize, height: gateSize),
+            materials: [material]
+        )
+        gate.name = "GoboGate"
+        gate.position = SIMD3<Float>(0, 0, -gateDistance)
+
+        spotEntity.addChild(gate)
+
+        // Auto-enable shadows (required for gate mask to cast gobo pattern)
+        if let spot = spotEntity as? SpotLight, spot.shadow == nil {
+            var shadow = SpotLightComponent.Shadow()
+            shadow.depthBias = 0.01
+            spot.shadow = shadow
+        }
+
+        print("GOBO: gate mask '\(config.activeGobo.displayName)', size=\(gateSize)")
+    }
+
+    /// Updates or removes the gobo gate mask on a live entity.
+    private func updateGoboGateMask(on entity: Entity, config: LightConfigComponent) {
+        guard let lightCore = entity.findEntity(named: "LightCore") else { return }
+        lightCore.findEntity(named: "GoboGate")?.removeFromParent()
+
+        guard config.activeGobo != .none,
+              config.lightKind == .spot || config.lightKind == .panel else { return }
+
+        addGoboGateMask(to: lightCore, config: config)
     }
 
     // MARK: Point light
