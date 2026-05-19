@@ -233,24 +233,30 @@ struct GroundCreationView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button(action: { viewModel.cancel() }) {
-                Text("Cancel")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(Color(white: 0.50))
-            }
+            Button(
+                action: { viewModel.cancel() },
+                label: {
+                    Text("Cancel")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(Color(white: 0.50))
+                }
+            )
         }
         ToolbarItem(placement: .confirmationAction) {
-            Button(action: { viewModel.confirm() }) {
-                Text("Create")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color(red: 0.88, green: 0.28, blue: 0.28))
-                    )
-            }
+            Button(
+                action: { viewModel.confirm() },
+                label: {
+                    Text("Create")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(red: 0.88, green: 0.28, blue: 0.28))
+                        )
+                }
+            )
         }
     }
 

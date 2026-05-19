@@ -164,12 +164,12 @@ struct WallCreationView: View {
             sectionLabel("Dimensions")
 
             HStack(spacing: 8) {
-                sliderCard(label: "Width",     value: $viewModel.width,
-                           range: 0.5...6.0,  unit: "m",  compact: true)
-                sliderCard(label: "Height",    value: $viewModel.height,
-                           range: 0.3...4.0,  unit: "m",  compact: true)
+                sliderCard(label: "Width", value: $viewModel.width,
+                           range: 0.5...6.0, unit: "m", compact: true)
+                sliderCard(label: "Height", value: $viewModel.height,
+                           range: 0.3...4.0, unit: "m", compact: true)
                 sliderCard(label: "Thickness", value: $viewModel.thickness,
-                           range: 0.02...0.3, unit: "m",  compact: true)
+                           range: 0.02...0.3, unit: "m", compact: true)
             }
         }
     }
@@ -182,20 +182,20 @@ struct WallCreationView: View {
             // ── Left column: 3 sliders ────────────────────────────
             VStack(spacing: 8) {
                 sliderCard(label: "Roughness", value: $viewModel.roughness,
-                           range: 0...1,       unit: "")
-                sliderCard(label: "Metallic",  value: $viewModel.metallic,
-                           range: 0...1,       unit: "")
-                sliderCard(label: "Opacity",   value: $viewModel.opacity,
-                           range: 0.05...1,    unit: "")
+                           range: 0...1, unit: "")
+                sliderCard(label: "Metallic", value: $viewModel.metallic,
+                           range: 0...1, unit: "")
+                sliderCard(label: "Opacity", value: $viewModel.opacity,
+                           range: 0.05...1, unit: "")
             }
             .frame(maxWidth: .infinity)
 
             // ── Right column: 2 sliders + Ratio Lock card ─────────
             VStack(spacing: 8) {
-                sliderCard(label: "Tiling",     value: $viewModel.tilingScale,
-                           range: 0.25...4.0,  unit: "×")
+                sliderCard(label: "Tiling", value: $viewModel.tilingScale,
+                           range: 0.25...4.0, unit: "×")
                 sliderCard(label: "Reflection", value: $viewModel.reflectionIntensity,
-                           range: 0...1,        unit: "")
+                           range: 0...1, unit: "")
                 ratioLockCard
             }
             .frame(maxWidth: .infinity)
@@ -319,24 +319,30 @@ struct WallCreationView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button(action: { viewModel.cancel() }) {
-                Text("Cancel")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(Color(white: 0.50))
-            }
+            Button(
+                action: { viewModel.cancel() },
+                label: {
+                    Text("Cancel")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(Color(white: 0.50))
+                }
+            )
         }
         ToolbarItem(placement: .confirmationAction) {
-            Button(action: { viewModel.confirm() }) {
-                Text("Create")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color(red: 0.88, green: 0.28, blue: 0.28))
-                    )
-            }
+            Button(
+                action: { viewModel.confirm() },
+                label: {
+                    Text("Create")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(red: 0.88, green: 0.28, blue: 0.28))
+                        )
+                }
+            )
         }
     }
 
@@ -345,8 +351,8 @@ struct WallCreationView: View {
     private func formattedValue(_ v: Float, unit: String) -> String {
         switch unit {
         case "×": return String(format: "%.2f×", v)
-        case "m": return String(format: "%.2fm",  v)
-        default:  return String(format: "%.2f",   v)
+        case "m": return String(format: "%.2fm", v)
+        default:  return String(format: "%.2f", v)
         }
     }
 }

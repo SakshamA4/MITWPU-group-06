@@ -35,9 +35,8 @@ class LightsViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.lightsCollectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
-
 
     private func configureLayout() {
         guard let layout = lightsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
@@ -109,4 +108,3 @@ extension LightsViewController: UICollectionViewDelegate {
         performSegue(withIdentifier: "LightsInfoSegue", sender: self)
     }
 }
-

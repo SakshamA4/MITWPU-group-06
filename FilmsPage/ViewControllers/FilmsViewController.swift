@@ -25,31 +25,32 @@ class FilmsViewController: UIViewController {
     private var currentSearchText: String = ""
     private var savedSearchButton: UIBarButtonItem?
     private let filmService = FilmService.shared
-    
+
     // Computed properties for search
     private var isSearching: Bool { !currentSearchText.isEmpty }
     private var currentFilms: [Film] { isSearching ? filteredFilms : allFilms }
-    
+
     // Search controller
     private let searchController = UISearchController(searchResultsController: nil)
 
     // MARK: - Outlets
+    // swiftlint:disable:next identifier_name
     @IBOutlet weak var FilmsPageTitleLabel: UILabel!
     @IBOutlet weak var collectionView: UICollectionView!
     @IBOutlet weak var searchButton: UIBarButtonItem!
-    
+
     @IBAction func searchAction(_ sender: Any) {
         // Show search controller in navigation bar
         navigationItem.searchController = searchController
-        
+
         // Hide the search button by removing it from nav bar
         navigationItem.rightBarButtonItem = nil
-        
+
         // Animate the search bar appearance
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
-        
+
         // Activate and focus the search bar
         searchController.isActive = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -67,7 +68,7 @@ class FilmsViewController: UIViewController {
         registerCells()
         setupObservers()
         setupSearchController()
-        
+
         // Save the search button and ensure it's visible initially
         savedSearchButton = searchButton
         navigationItem.rightBarButtonItem = searchButton
@@ -83,7 +84,7 @@ class FilmsViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
-        
+
         // Always hide search bar and show search button when view appears
         navigationItem.searchController = nil
         navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
@@ -93,7 +94,7 @@ class FilmsViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
     // MARK: - Setup
@@ -117,7 +118,7 @@ class FilmsViewController: UIViewController {
             object: nil
         )
     }
-    
+
     private func setupSearchController() {
         searchController.searchResultsUpdater = self
         searchController.searchBar.delegate = self
@@ -136,9 +137,9 @@ class FilmsViewController: UIViewController {
         searchController.isActive = false
         collectionView.reloadData()
     }
-    
+
     // MARK: - Filter Logic
-    
+
     private func filterFilms(for query: String) {
         currentSearchText = query.trimmingCharacters(in: .whitespaces)
         if currentSearchText.isEmpty {
@@ -166,12 +167,12 @@ class FilmsViewController: UIViewController {
 
             // Outer side inset (matches your original 12pt leading/trailing section inset)
             // plus 10pt item content inset on each side = visually ~22pt from screen edge
-            
+
             let labelLeading: CGFloat = self.FilmsPageTitleLabel.convert(CGPoint.zero, to: self.view).x
             let sectionInset: CGFloat = max(labelLeading, 10)
-            //let sectionInset: CGFloat = 12
-            let itemInset:    CGFloat = 10        // applied per-item (left + right)
-            let interGroup:   CGFloat = 50        // vertical gap between rows (your original)
+            // let sectionInset: CGFloat = 12
+            let itemInset: CGFloat = 10        // applied per-item (left + right)
+            let interGroup: CGFloat = 50        // vertical gap between rows (your original)
 
             // Available width after section insets, then divide by columns
             let availableWidth = totalWidth - (sectionInset * 2)
@@ -313,7 +314,7 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
         // Adjust index based on whether search is active
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let film = currentFilms[itemIndex]
-        
+
         cell.configureCell(film: film)
         cell.onSeeNotesTapped = { [weak self] in
             self?.performSegue(withIdentifier: "displayNotesSegue", sender: film)
@@ -324,7 +325,7 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         // When not searching, index 0 is placeholder (ignore it)
         guard !(!isSearching && indexPath.item == 0) else { return }
-        
+
         // Adjust index based on whether search is active
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         performSegue(withIdentifier: "myFilmSegue", sender: currentFilms[itemIndex])
@@ -343,7 +344,7 @@ extension FilmsViewController {
 
         // When not searching, index 0 is placeholder (ignore it)
         guard !(!isSearching && indexPath.item == 0) else { return nil }
-        
+
         // Adjust index based on whether search is active
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let film = currentFilms[itemIndex]
@@ -379,11 +380,11 @@ extension FilmsViewController: UISearchBarDelegate {
         currentSearchText = ""
         filteredFilms = []
         collectionView.reloadData()
-        
+
         // Hide the search controller and remove from nav bar
         searchController.isActive = false
         navigationItem.searchController = nil
-        
+
         // Restore the search button to nav bar
         navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
     }
@@ -398,11 +399,10 @@ extension FilmsViewController: UISearchControllerDelegate {
         filteredFilms = []
         collectionView.reloadData()
     }
-    
+
     func didDismissSearchController(_ searchController: UISearchController) {
         // Restore the search button when search controller is dismissed
         navigationItem.searchController = nil
         navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
     }
 }
-

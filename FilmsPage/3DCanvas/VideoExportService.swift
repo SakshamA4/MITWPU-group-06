@@ -200,8 +200,8 @@ final class VideoExportService {
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: Int(bitrate),
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoMaxKeyFrameIntervalKey: fps * 2,
-            ] as [String: Any],
+                AVVideoMaxKeyFrameIntervalKey: fps * 2
+            ] as [String: Any]
         ]
 
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -212,7 +212,7 @@ final class VideoExportService {
             sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey  as String: Int(size.width),
-                kCVPixelBufferHeightKey as String: Int(size.height),
+                kCVPixelBufferHeightKey as String: Int(size.height)
             ]
         )
 
@@ -536,7 +536,7 @@ final class VideoExportService {
         let attrs: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any],
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any]
         ]
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,
@@ -571,7 +571,7 @@ final class VideoExportService {
         var pb: CVPixelBuffer?
         let attrs: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
         ]
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,

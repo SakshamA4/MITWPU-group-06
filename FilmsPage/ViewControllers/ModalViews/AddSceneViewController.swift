@@ -150,7 +150,7 @@ class AddSceneViewController: UIViewController {
             id: UUID(),
             name: name,
             image: imageNameToStore,
-            SequenceId: sequence.id
+            sequenceId: sequence.id
         )
 
         SceneService.shared.addScene(scene)

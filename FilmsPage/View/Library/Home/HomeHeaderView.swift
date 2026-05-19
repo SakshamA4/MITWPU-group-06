@@ -8,7 +8,7 @@
 import UIKit
 
 class HomeHeaderView: UICollectionReusableView {
-    
+
     @IBOutlet weak var titleLabel: UILabel!
 
     override func awakeFromNib() {
@@ -17,5 +17,5 @@ class HomeHeaderView: UICollectionReusableView {
         titleLabel.textColor = .white
                 titleLabel.font = UIFont.systemFont(ofSize: 44, weight: .bold)
     }
-    
+
 }

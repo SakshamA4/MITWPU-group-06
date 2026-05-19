@@ -113,7 +113,7 @@ final class SequencePreviewViewController: UIViewController {
 
             titleLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
             titleLabel.leadingAnchor.constraint(equalTo: closeButton.trailingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: shareButton.leadingAnchor, constant: -12),
+            titleLabel.trailingAnchor.constraint(equalTo: shareButton.leadingAnchor, constant: -12)
         ])
     }
 

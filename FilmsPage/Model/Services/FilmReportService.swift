@@ -185,44 +185,44 @@ final class FilmReportService {
 
         let lights: [LightReport] = lightEnts.map { e in
             LightReport(
-                kind:            e.lightKind ?? "unknown",
+                kind: e.lightKind ?? "unknown",
                 intensityLumens: e.lightIntensity,
                 colorTempKelvin: e.lightColorTempKelvin,
-                shadowEnabled:   e.lightShadowEnabled ?? false,
-                proceduralKind:  e.proceduralLightKind,
-                gobo:            e.lightActiveGobo
+                shadowEnabled: e.lightShadowEnabled ?? false,
+                proceduralKind: e.proceduralLightKind,
+                gobo: e.lightActiveGobo
             )
         }
         let cameras: [CameraReport] = cameraEnts.map { e in
             CameraReport(
-                aspectRatio:  e.cameraAspectRatio,
+                aspectRatio: e.cameraAspectRatio,
                 focalLengthMM: e.cameraFocalLengthMM,
-                focusMode:    e.cameraFocusMode
+                focusMode: e.cameraFocusMode
             )
         }
         let animations: [AnimationReport] = doc.animationClips.map { clip in
             AnimationReport(
-                entityName:      cleanName(clip.entityName),
-                animType:        clip.type,
-                track:           clip.track,
+                entityName: cleanName(clip.entityName),
+                animType: clip.type,
+                track: clip.track,
                 durationSeconds: clip.duration
             )
         }
 
         return SceneDetailReport(
-            sceneName:      scene.name,
-            sceneNotes:     scene.notes,
-            propCount:      props.count,
-            propNames:      props.map { cleanName($0.modelFileName) },
+            sceneName: scene.name,
+            sceneNotes: scene.notes,
+            propCount: props.count,
+            propNames: props.map { cleanName($0.modelFileName) },
             characterCount: chars.count,
             characterNames: chars.map { cleanName($0.modelFileName) },
-            lights:         lights,
-            cameras:        cameras,
-            animations:     animations,
+            lights: lights,
+            cameras: cameras,
+            animations: animations,
             backgroundCount: bgCount,
-            wallCount:      wallCount,
-            skySetting:     doc.skyType,
-            hasCanvasData:  true
+            wallCount: wallCount,
+            skySetting: doc.skyType,
+            hasCanvasData: true
         )
     }
 
@@ -247,14 +247,12 @@ final class FilmReportService {
         // Props
         let pc = d.propCount ?? 0
         out += "\n  PROPS (\(pc))\n"
-        if pc == 0 { out += "    — None\n" }
-        else { d.propNames.forEach { out += "    · \($0)\n" } }
+        if pc == 0 { out += "    — None\n" } else { d.propNames.forEach { out += "    · \($0)\n" } }
 
         // Characters
         let cc = d.characterCount ?? 0
         out += "\n  CHARACTERS (\(cc))\n"
-        if cc == 0 { out += "    — None\n" }
-        else { d.characterNames.forEach { out += "    · \($0)\n" } }
+        if cc == 0 { out += "    — None\n" } else { d.characterNames.forEach { out += "    · \($0)\n" } }
 
         // Animations
         out += "\n  ANIMATIONS (\(d.animations.count) clip(s))\n"
@@ -275,9 +273,9 @@ final class FilmReportService {
         } else {
             for (i, l) in d.lights.enumerated() {
                 var s = "    · Light \(i+1): \(formatLightKind(l))"
-                if let k  = l.colorTempKelvin  { s += "  [\(Int(k))K]" }
-                if let lm = l.intensityLumens  { s += "  [\(lm >= 1000 ? String(format:"%.0fK",lm/1000) : String(format:"%.0f",lm)) lm]" }
-                if l.shadowEnabled              { s += "  [Shadows ON]" }
+                if let k  = l.colorTempKelvin { s += "  [\(Int(k))K]" }
+                if let lm = l.intensityLumens { s += "  [\(lm >= 1000 ? String(format: "%.0fK", lm/1000) : String(format: "%.0f", lm)) lm]" }
+                if l.shadowEnabled { s += "  [Shadows ON]" }
                 if let g = l.gobo, g.lowercased() != "none", !g.isEmpty { s += "  [Gobo: \(g.capitalized)]" }
                 out += s + "\n"
             }
@@ -290,8 +288,8 @@ final class FilmReportService {
         } else {
             for (i, c) in d.cameras.enumerated() {
                 var s = "    · Camera \(i+1)"
-                if let r  = c.aspectRatio    { s += "  [\(r)]" }
-                if let fl = c.focalLengthMM  { s += "  [\(Int(fl))mm]" }
+                if let r  = c.aspectRatio { s += "  [\(r)]" }
+                if let fl = c.focalLengthMM { s += "  [\(Int(fl))mm]" }
                 if let fm = c.focusMode, !fm.isEmpty { s += "  [Focus: \(fm.capitalized)]" }
                 out += s + "\n"
             }

@@ -9,9 +9,8 @@ import UIKit
 class PlaceholderCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var bgView: UIView!
-    
-    @IBOutlet weak var addNew: UILabel!
 
+    @IBOutlet weak var addNew: UILabel!
 
     var onPlusButtonTapped: (() -> Void)?
 
@@ -19,7 +18,7 @@ class PlaceholderCollectionViewCell: UICollectionViewCell {
 
         override func awakeFromNib() {
             super.awakeFromNib()
-            
+
             bgView.clipsToBounds = false
             contentView.clipsToBounds = false
             layer.masksToBounds = false
@@ -31,8 +30,6 @@ class PlaceholderCollectionViewCell: UICollectionViewCell {
             bgView.layer.borderWidth = 1.0
         }
 
-
-    
     @IBAction func plusButtonTapped(_ sender: UIButton) {
         // 3. Trigger the closure when tapped.
         // The View Controller will decide WHICH segue to open.

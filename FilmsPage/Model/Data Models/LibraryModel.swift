@@ -6,7 +6,6 @@
 //
 import Foundation
 
-
 protocol LibraryDisplayItem: Identifiable, Hashable {
     var id: UUID { get }
     var title: String { get }
@@ -34,10 +33,7 @@ struct LibraryItem: LibraryDisplayItem {
     var destinationKey: String
 }
 
-
-
 enum LibraryModel {
-
 
     static let sections: [LibrarySection: [LibraryItem]] = [
         .featured: [
@@ -76,4 +72,3 @@ enum LibraryModel {
         ]
     ]
 }
-

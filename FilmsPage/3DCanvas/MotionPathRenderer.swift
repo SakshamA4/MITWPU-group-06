@@ -11,7 +11,6 @@ enum MotionPathRenderer {
         var material = UnlitMaterial()
         material.color = .init(tint: .systemBlue, texture: nil)
 
-
         entity.model = ModelComponent(
             mesh: buildTubeMesh(path: path),
             materials: [material]
@@ -108,7 +107,10 @@ enum MotionPathRenderer {
         desc.normals = MeshBuffers.Normals(normals)
         desc.primitives = .triangles(indices)
 
-        return try! MeshResource.generate(from: [desc])
+        guard let mesh = try? MeshResource.generate(from: [desc]) else {
+            return MeshResource.generateBox(size: 0.01) // fallback
+        }
+        return mesh
     }
     static func setPathColor(
         entity: ModelEntity,

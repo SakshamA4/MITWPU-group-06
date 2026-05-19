@@ -66,7 +66,7 @@ class EntityActionMenu: UIView {
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -133,7 +133,7 @@ class EntityActionMenu: UIView {
 
         case .camera:
             // Camera: Add Shot | Aspect Ratio | Lock | Duplicate | Delete
-            addMenuButton(title: "Add Shot",     action: .addShot)
+            addMenuButton(title: "Add Shot", action: .addShot)
             addSeparator()
             addMenuButton(title: "Aspect Ratio", action: .aspectRatio)
             addSeparator()
@@ -141,7 +141,7 @@ class EntityActionMenu: UIView {
             addSeparator()
             addMenuButton(title: "Duplicate", action: .duplicate)
             addSeparator()
-            addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
+            addMenuButton(title: "Delete", action: .delete, isDestructive: true)
         }
     }
 

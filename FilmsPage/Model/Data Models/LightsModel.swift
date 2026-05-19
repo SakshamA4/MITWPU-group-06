@@ -110,10 +110,10 @@ struct LightItem {
     let name: String
     let imageName: String
     let description: String
-    var modelFileName: String? = nil
+    var modelFileName: String?
     var lightKind: LightKind = .spot
     var isProcedural: Bool = false
-    var proceduralKind: ProceduralLightKind? = nil
+    var proceduralKind: ProceduralLightKind?
     var defaultConfig: LightConfig = LightConfig(
         intensity: 200_000,
         colorTemperatureKelvin: 5600,
@@ -301,9 +301,9 @@ extension UIColor {
         }
 
         return UIColor(
-            red:   CGFloat(r / 255),
+            red: CGFloat(r / 255),
             green: CGFloat(g / 255),
-            blue:  CGFloat(b / 255),
+            blue: CGFloat(b / 255),
             alpha: 1.0
         )
     }

@@ -26,8 +26,8 @@ final class SceneSummaryViewController: UIViewController {
     // MARK: - Input
     /// Populated by the presenter before showing.
     var sceneName: String     = "Scene"
-    var sequenceName: String? = nil
-    var filmName: String?     = nil
+    var sequenceName: String?
+    var filmName: String?
     var rows: [SummaryRow]    = []
 
     // MARK: - UI
@@ -55,7 +55,7 @@ final class SceneSummaryViewController: UIViewController {
         var cameraDetails = [String]()
         var bgCount       = 0
         var wallCount     = 0
-        var skyName: String? = nil
+        var skyName: String?
 
         // Clip stats
         let clips      = vc.timeline.clips
@@ -69,7 +69,7 @@ final class SceneSummaryViewController: UIViewController {
                   !name.hasPrefix("PathRoot_"),
                   !name.hasPrefix("RotationArc_"),
                   !name.hasPrefix("ProceduralSky"),
-                  !["Grid","EditorCamera","MainAnchor","GizmoRoot","MotionPath"].contains(name)
+                  !["Grid", "EditorCamera", "MainAnchor", "GizmoRoot", "MotionPath"].contains(name)
             else { continue }
 
             if let cat = child.components[CategoryComponent.self] {
@@ -190,7 +190,7 @@ final class SceneSummaryViewController: UIViewController {
             grabber.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 36),
-            grabber.heightAnchor.constraint(equalToConstant: 5),
+            grabber.heightAnchor.constraint(equalToConstant: 5)
         ])
     }
 
@@ -211,7 +211,7 @@ final class SceneSummaryViewController: UIViewController {
         // Subtitle: Sequence / Film
         var sub = "SCENE SUMMARY"
         if let seq = sequenceName { sub = seq.uppercased() + " › " + sub }
-        if let film = filmName    { sub = film.uppercased() + " › " + sub }
+        if let film = filmName { sub = film.uppercased() + " › " + sub }
         subtitleLabel.text = sub
         subtitleLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         subtitleLabel.textColor = accentColor
@@ -257,7 +257,7 @@ final class SceneSummaryViewController: UIViewController {
             sep.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
             sep.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             sep.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            sep.heightAnchor.constraint(equalToConstant: 1),
+            sep.heightAnchor.constraint(equalToConstant: 1)
         ])
 
         // Store ref to separator for table anchor
@@ -280,7 +280,7 @@ final class SceneSummaryViewController: UIViewController {
             tableView.topAnchor.constraint(equalTo: sep.bottomAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
     }
 
@@ -335,7 +335,9 @@ extension SceneSummaryViewController: UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: cellId, for: indexPath) as! SceneSummaryCell
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: cellId, for: indexPath) as? SceneSummaryCell else {
+            return UITableViewCell()
+        }
         cell.configure(with: rows[indexPath.row], accentColor: accentColor, bgColor: cellBg)
         return cell
     }
@@ -392,7 +394,7 @@ final class SceneSummaryCell: UITableViewCell {
             detailLbl.topAnchor.constraint(equalTo: titleLbl.bottomAnchor, constant: 3),
             detailLbl.leadingAnchor.constraint(equalTo: titleLbl.leadingAnchor),
             detailLbl.trailingAnchor.constraint(equalTo: titleLbl.trailingAnchor),
-            detailLbl.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            detailLbl.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
     }
 

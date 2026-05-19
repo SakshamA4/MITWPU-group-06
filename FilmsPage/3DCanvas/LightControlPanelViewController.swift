@@ -28,9 +28,9 @@ class LightControlPanelViewController: UIViewController {
     private let diffuserSlider   = UISlider()
     private let diffuserLabel    = UILabel()
     private let shadowToggle     = UISwitch()
-    private var kelvinButtons:    [UIButton] = []
+    private var kelvinButtons: [UIButton] = []
     private var reflectorButtons: [UIButton] = []
-    private var goboButtons:      [UIButton] = []
+    private var goboButtons: [UIButton] = []
 
     // Section containers (for conditional hiding)
     private let coneSection      = UIStackView()
@@ -43,9 +43,9 @@ class LightControlPanelViewController: UIViewController {
     private let accent = UIColor(red: 90/255, green: 130/255, blue: 255/255, alpha: 1)
 
     private let kelvinPresets: [(label: String, subtitle: String, kelvin: Float)] = [
-        ("2700K", "Tungsten",  2700),
-        ("5600K", "Daylight",  5600),
-        ("7000K", "Cool",      7000)
+        ("2700K", "Tungsten", 2700),
+        ("5600K", "Daylight", 5600),
+        ("7000K", "Cool", 7000)
     ]
 
     init(entity: Entity, config: LightConfigComponent, onUpdate: @escaping (LightConfigComponent) -> Void) {
@@ -63,7 +63,7 @@ class LightControlPanelViewController: UIViewController {
         view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         buildUI()
         populateFromConfig()
-        
+
         // Let the presentation controller know roughly how tall the content is.
         // It will be clamped by RightPanelPresentationController if it exceeds max bounds.
         preferredContentSize = CGSize(width: 300, height: 600)
@@ -100,16 +100,16 @@ class LightControlPanelViewController: UIViewController {
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             header.heightAnchor.constraint(equalToConstant: 44),
-            
+
             scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
+
             contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor),
             contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20)
         ])
 
         // ── Intensity ───────────────────────────────────────────────────
@@ -405,7 +405,7 @@ class LightControlPanelViewController: UIViewController {
         titleStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             titleStack.centerXAnchor.constraint(equalTo: btn.centerXAnchor),
-            titleStack.centerYAnchor.constraint(equalTo: btn.centerYAnchor),
+            titleStack.centerYAnchor.constraint(equalTo: btn.centerYAnchor)
         ])
 
         btn.layer.cornerRadius = 8

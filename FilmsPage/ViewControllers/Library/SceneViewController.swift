@@ -8,20 +8,18 @@
 import UIKit
 
 class SceneViewController: UIViewController {
-    
+
     // MARK: - Outlets
+    // swiftlint:disable:next identifier_name
     @IBOutlet weak var SceneCollectionView: UICollectionView!
-    
 
     private let sceneStore = ScenesDataStore.shared
     private var allScenes: [ScenesModel] = []
 
-
-    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         view.backgroundColor = UIColor(hex: "#060714")
         setupCollectionView()
         loadData()
@@ -33,7 +31,7 @@ class SceneViewController: UIViewController {
             object: nil
         )
     }
-    
+
     private func loadData() {
         let recent = sceneStore.currentRecentScenes
         let templates = sceneStore.currentTemplates
@@ -52,7 +50,6 @@ class SceneViewController: UIViewController {
         loadData()
     }
 
-    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         configureFlowLayout()
@@ -62,7 +59,7 @@ class SceneViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.SceneCollectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
 }
@@ -73,14 +70,13 @@ private func deleteScene(_ model: ScenesModel) {
 
 // MARK: - Setup
 private extension SceneViewController {
-    
-    
+
     func setupCollectionView() {
         //  Register the cell (required if using a XIB)
         let nib = UINib(nibName: "LibrarySceneCollectionViewCell", bundle: nil)
         SceneCollectionView.register(nib,
                                           forCellWithReuseIdentifier: LibrarySceneCollectionViewCell.reuseIdentifier)
-        
+
         SceneCollectionView.dataSource = self
         SceneCollectionView.delegate = self
         SceneCollectionView.backgroundColor = .clear
@@ -90,8 +86,7 @@ private extension SceneViewController {
         ScenesDataStore.shared.deleteScene(by: model.id)
         // loadData() is called automatically via NotificationCenter observer
     }
-    
-    
+
     func configureFlowLayout() {
             // Make sure we are working with a flow layout
             guard let layout = SceneCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
@@ -100,15 +95,15 @@ private extension SceneViewController {
                 configureFlowLayout()
                 return
             }
-            
+
             layout.scrollDirection = .vertical
             layout.estimatedItemSize = .zero    //  important: use our itemSize, not auto-layout sizing
-            
+
             let itemsPerRow: CGFloat = 4
             let sectionInset: CGFloat = 80
             let interItemSpacing: CGFloat = 35
             let lineSpacing: CGFloat = 35
-            
+
             layout.sectionInset = UIEdgeInsets(
                 top: 0,
                 left: sectionInset,
@@ -117,11 +112,11 @@ private extension SceneViewController {
             )
             layout.minimumInteritemSpacing = interItemSpacing
             layout.minimumLineSpacing = lineSpacing
-            
+
             let width = SceneCollectionView.bounds.width
             let totalSpacing = (2 * sectionInset) + ((itemsPerRow - 1) * interItemSpacing)
             let itemWidth = floor((width - totalSpacing) / itemsPerRow)
-            
+
             layout.itemSize = CGSize(width: itemWidth, height: itemWidth)
             layout.invalidateLayout()
         }
@@ -129,14 +124,14 @@ private extension SceneViewController {
 
 // MARK: - Data Source
 extension SceneViewController: UICollectionViewDataSource, UICollectionViewDelegate {
-    
+
     func numberOfSections(in collectionView: UICollectionView) -> Int { 1 }
-    
+
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
         allScenes.count
     }
-    
+
     func collectionView(_ collectionView: UICollectionView,
                         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(
@@ -148,7 +143,7 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
         cell.configure(with: allScenes[indexPath.item])
         return cell
     }
-    
+
 //    func collectionView(_ collectionView: UICollectionView,
 //                        didSelectItemAt indexPath: IndexPath) {
 //        let vc = CanvasViewController()
@@ -158,13 +153,13 @@ extension SceneViewController: UICollectionViewDataSource, UICollectionViewDeleg
 //        self.present(navController, animated: true)
 //    }
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        //let selectedSceneModel = allScenes[indexPath.item]
+        // let selectedSceneModel = allScenes[indexPath.item]
         let selectedModel = allScenes[indexPath.item]
         let vc = CanvasViewController()
         vc.currentSceneID = selectedModel.id   // FIX: was missing — caused saves to never load from Library
         vc.sceneName = selectedModel.name
         vc.sceneNotes = selectedModel.notes ?? ""
-        vc.sceneImageName = selectedModel.image  
+        vc.sceneImageName = selectedModel.image
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
@@ -200,8 +195,6 @@ extension SceneViewController {
         }
     }
 
-
-
     private func presentRenameAlert(for model: ScenesModel, at indexPath: IndexPath) {
         let alert = UIAlertController(title: "Edit Name", message: nil, preferredStyle: .alert)
 
@@ -223,4 +216,3 @@ extension SceneViewController {
         present(alert, animated: true)
     }
 }
-

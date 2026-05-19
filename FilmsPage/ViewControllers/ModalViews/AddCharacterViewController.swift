@@ -54,7 +54,7 @@ class AddCharacterViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
 }
@@ -96,7 +96,7 @@ extension AddCharacterViewController: UICollectionViewDelegate, UICollectionView
         guard segue.identifier == "characterDetailSegue",
               let vc = segue.destination as? CharacterDetailsViewController,
               let character = sender as? CharacterItem else { return }
-        
+
         // FIX: Assign to characterTemplate
         vc.characterTemplate = character
         vc.film = film

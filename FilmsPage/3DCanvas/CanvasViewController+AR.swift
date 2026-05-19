@@ -80,4 +80,3 @@ extension CanvasViewController {
         mainAnchor.transform = Transform(matrix: result.worldTransform)
     }
 }
-

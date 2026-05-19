@@ -11,7 +11,7 @@ class PropService {
     static let shared = PropService()
     private let storageKey = StorageKeys.props
     private var isInitialized = false
-    
+
     private let customPropsDirectory: URL = {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         let customDir = paths[0].appendingPathComponent("CustomProps")
@@ -35,11 +35,11 @@ class PropService {
     }
 
     // MARK: - CRUD Operations
-    
+
     func getProps() -> [PropItem] {
         return props
     }
-    
+
     func copyToCustomProps(sourceURL: URL) throws -> URL {
         // Start accessing the security scoped resource since the URL comes from UIDocumentPickerViewController
         let isSecured = sourceURL.startAccessingSecurityScopedResource()
@@ -48,40 +48,40 @@ class PropService {
                 sourceURL.stopAccessingSecurityScopedResource()
             }
         }
-        
+
         let fileName = sourceURL.lastPathComponent
         let destinationURL = customPropsDirectory.appendingPathComponent(fileName)
-        
+
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             try FileManager.default.removeItem(at: destinationURL)
         }
-        
+
         try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
         return destinationURL
     }
-    
+
     func getProps(forFilmId filmId: UUID) -> [PropItem] {
         return props.filter { prop in
             guard let filmIds = prop.filmId else { return false }
             return filmIds.compactMap { $0 }.contains(filmId)
         }
     }
-    
+
     func getProp(by id: UUID) -> PropItem? {
         return props.first { $0.id == id }
     }
-    
+
     func addProp(_ prop: PropItem) {
         props.append(prop)
     }
-    
+
     func updateProp(_ prop: PropItem) {
         if let propId = prop.id,
            let index = props.firstIndex(where: { $0.id == propId }) {
             props[index] = prop
         }
     }
-    
+
     func removeProp(_ propId: UUID, fromFilmId filmId: UUID) {
         guard let index = props.firstIndex(where: { $0.id == propId }) else { return }
 
@@ -90,14 +90,13 @@ class PropService {
             .filter { $0 != filmId }
     }
 
-    
     func deleteProp(by id: UUID) {
         props.removeAll { $0.id == id }
     }
-    
+
     func attachPropToFilm(propId: UUID, filmId: UUID) {
         guard let index = props.firstIndex(where: { $0.id == propId }) else { return }
-        
+
         if props[index].filmId == nil {
             props[index].filmId = [filmId]
         } else {
@@ -107,18 +106,18 @@ class PropService {
             }
         }
     }
-    
+
     func detachPropFromFilm(propId: UUID, filmId: UUID) {
         guard let index = props.firstIndex(where: { $0.id == propId }) else { return }
         props[index].filmId?.removeAll { $0 == filmId }
     }
-    
+
     func getPropCount(forFilmId filmId: UUID) -> Int {
         return getProps(forFilmId: filmId).count
     }
 
     // MARK: - Persistence
-    
+
     private func save() {
         do {
             let encoder = JSONEncoder()
@@ -130,23 +129,23 @@ class PropService {
     }
 
     private func load() {
-        
+
         let defaultProps: [PropItem] = [
-            PropItem(id: UUID(), name: "Chair",        imageName: "chair_img",      filmId: nil, description: "Standard chair",  modelFileName: "chair"),
-            PropItem(id: UUID(), name: "Table",        imageName: "Table_img",      filmId: nil, description: "Standard table",  modelFileName: "Table"),
-            PropItem(id: UUID(), name: "Lamp",         imageName: "lamp_img",       filmId: nil, description: "Desk lamp",       modelFileName: "lamp"),
-            PropItem(id: UUID(), name: "Robot",        imageName: "robot_img",      filmId: nil, description: "Toy robot",       modelFileName: "Robot"),
-            PropItem(id: UUID(), name: "Flower Vase",  imageName: "flowerVase_img", filmId: nil, description: "Flower vase",     modelFileName: "flowerVase"),
-            PropItem(id: UUID(), name: "Plant",        imageName: "Plant_img",      filmId: nil, description: "House Plant",     modelFileName: "Plant"),
-            PropItem(id: UUID(), name: "Wardrobe",     imageName: "wardrobe_img",   filmId: nil, description: "Wardrobe",        modelFileName: "wardrobe"),
-            PropItem(id: UUID(), name: "Sofa",         imageName: "sofa",   filmId: nil, description: "Sofa",            modelFileName: "Sofa"),
-            PropItem(id: UUID(), name: "Ball",         imageName: "ball_img",       filmId: nil, description: "Sports ball",     modelFileName: "ball"),
-            PropItem(id: UUID(), name: "Sofa Chair",   imageName: "sofaChair",     filmId: nil, description: "Chair",           modelFileName: "Chair 2"),
-            PropItem(id: UUID(), name: "Dining Table", imageName: "diningTable",filmId: nil, description: "Dining table",    modelFileName: "DiningTable3"),
-            PropItem(id: UUID(), name: "House",        imageName: "house",     filmId: nil, description: "House",           modelFileName: "House2"),
-            PropItem(id: UUID(), name: "Trees",        imageName: "Trees",      filmId: nil, description: "Trees",           modelFileName: "Trees"),
-            PropItem(id: UUID(), name: "Vine Tree",    imageName: "vine",   filmId: nil, description: "Vine tree",       modelFileName: "VineTree"),
-            PropItem(id: UUID(), name: "Ford Car",    imageName: "ford Car",   filmId: nil, description: "ford car",       modelFileName: "FordCar"),
+            PropItem(id: UUID(), name: "Chair", imageName: "chair_img", filmId: nil, description: "Standard chair", modelFileName: "chair"),
+            PropItem(id: UUID(), name: "Table", imageName: "Table_img", filmId: nil, description: "Standard table", modelFileName: "Table"),
+            PropItem(id: UUID(), name: "Lamp", imageName: "lamp_img", filmId: nil, description: "Desk lamp", modelFileName: "lamp"),
+            PropItem(id: UUID(), name: "Robot", imageName: "robot_img", filmId: nil, description: "Toy robot", modelFileName: "Robot"),
+            PropItem(id: UUID(), name: "Flower Vase", imageName: "flowerVase_img", filmId: nil, description: "Flower vase", modelFileName: "flowerVase"),
+            PropItem(id: UUID(), name: "Plant", imageName: "Plant_img", filmId: nil, description: "House Plant", modelFileName: "Plant"),
+            PropItem(id: UUID(), name: "Wardrobe", imageName: "wardrobe_img", filmId: nil, description: "Wardrobe", modelFileName: "wardrobe"),
+            PropItem(id: UUID(), name: "Sofa", imageName: "sofa", filmId: nil, description: "Sofa", modelFileName: "Sofa"),
+            PropItem(id: UUID(), name: "Ball", imageName: "ball_img", filmId: nil, description: "Sports ball", modelFileName: "ball"),
+            PropItem(id: UUID(), name: "Sofa Chair", imageName: "sofaChair", filmId: nil, description: "Chair", modelFileName: "Chair 2"),
+            PropItem(id: UUID(), name: "Dining Table", imageName: "diningTable", filmId: nil, description: "Dining table", modelFileName: "DiningTable3"),
+            PropItem(id: UUID(), name: "House", imageName: "house", filmId: nil, description: "House", modelFileName: "House2"),
+            PropItem(id: UUID(), name: "Trees", imageName: "Trees", filmId: nil, description: "Trees", modelFileName: "Trees"),
+            PropItem(id: UUID(), name: "Vine Tree", imageName: "vine", filmId: nil, description: "Vine tree", modelFileName: "VineTree"),
+            PropItem(id: UUID(), name: "Ford Car", imageName: "ford Car", filmId: nil, description: "ford car", modelFileName: "FordCar")
         ]
 
         if let data = UserDefaults.standard.data(forKey: storageKey) {

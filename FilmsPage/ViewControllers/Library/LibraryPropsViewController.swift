@@ -14,7 +14,7 @@ class LibraryPropsViewController: UIViewController {
     private let propService = PropService.shared
     private var props: [PropItem] = []
     private var importCoordinator: PropImportCoordinator?
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
         propsCollectionView.dataSource = self
@@ -22,9 +22,9 @@ class LibraryPropsViewController: UIViewController {
         propsCollectionView.backgroundColor = .clear
         props = propService.getProps()
         print(props)
-        
+
         NotificationCenter.default.addObserver(self, selector: #selector(handlePropsUpdated), name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
-        
+
         let importButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(importTapped))
         navigationItem.rightBarButtonItem = importButton
 
@@ -43,9 +43,8 @@ class LibraryPropsViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.propsCollectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
-
 
     private func configureLayout() {
         guard let layout = propsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
@@ -79,12 +78,12 @@ class LibraryPropsViewController: UIViewController {
                                            right: sideInset)
         layout.scrollDirection = .vertical
     }
-    
+
     @objc private func handlePropsUpdated() {
         self.props = self.propService.getProps()
         self.propsCollectionView.reloadData()
     }
-    
+
     @objc private func importTapped() {
         let coordinator = PropImportCoordinator()
         self.importCoordinator = coordinator
@@ -113,7 +112,7 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
     }
 }
 
-//extension LibraryPropsViewController: UICollectionViewDelegate {
+// extension LibraryPropsViewController: UICollectionViewDelegate {
 //
 //    func collectionView(_ collectionView: UICollectionView,
 //                        didSelectItemAt indexPath: IndexPath) {
@@ -130,4 +129,4 @@ extension LibraryPropsViewController: UICollectionViewDataSource {
 //        vc.prop = selectedProp
 //        navigationController?.pushViewController(vc, animated: true)
 //    }
-//}
+// }

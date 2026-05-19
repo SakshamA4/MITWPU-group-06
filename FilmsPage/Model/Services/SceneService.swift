@@ -26,50 +26,50 @@ class SceneService {
     }
 
     // MARK: - CRUD Operations
-    
+
     func getScenes() -> [Scene] {
         return scenes
     }
-    
+
     func getScenes(forSequenceId sequenceId: UUID) -> [Scene] {
-        return scenes.filter { $0.SequenceId == sequenceId }
+        return scenes.filter { $0.sequenceId == sequenceId }
     }
-    
+
     func getScene(by id: UUID) -> Scene? {
         return scenes.first { $0.id == id }
     }
-    
+
     func addScene(_ scene: Scene) {
         var sc = scene
         sc.image = "Image"
         scenes.append(scene)
     }
-    
+
     func updateScene(_ scene: Scene) {
         if let index = scenes.firstIndex(where: { $0.id == scene.id }) {
             scenes[index] = scene
         }
     }
-    
+
     func deleteScene(at index: Int) {
         guard index < scenes.count else { return }
         scenes.remove(at: index)
     }
-    
+
     func deleteScene(by id: UUID) {
         scenes.removeAll { $0.id == id }
     }
-    
+
     func deleteScenes(forSequenceId sequenceId: UUID) {
-        scenes.removeAll { $0.SequenceId == sequenceId }
+        scenes.removeAll { $0.sequenceId == sequenceId }
     }
-    
+
     func getSceneCount(forSequenceIds sequenceIds: [UUID]) -> Int {
-        return scenes.filter { sequenceIds.contains($0.SequenceId) }.count
+        return scenes.filter { sequenceIds.contains($0.sequenceId) }.count
     }
 
     // MARK: - Persistence
-    
+
     private func save() {
         do {
             let encoder = JSONEncoder()

@@ -50,13 +50,13 @@ struct CinematicMaterialConfig: Codable, Equatable, Hashable {
     /// Returns a config initialised from a `TexturePreset`'s defaults.
     static func from(preset: TexturePreset) -> CinematicMaterialConfig {
         CinematicMaterialConfig(
-            presetID:             preset.id,
-            roughness:            preset.defaultRoughness,
-            metallic:             preset.defaultMetallic,
-            opacity:              preset.defaultOpacity,
-            tilingScale:          1.0,
+            presetID: preset.id,
+            roughness: preset.defaultRoughness,
+            metallic: preset.defaultMetallic,
+            opacity: preset.defaultOpacity,
+            tilingScale: 1.0,
             tintR: 1, tintG: 1, tintB: 1, tintA: 1,
-            reflectionIntensity:  preset.defaultReflection
+            reflectionIntensity: preset.defaultReflection
         )
     }
 }

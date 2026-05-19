@@ -62,7 +62,7 @@ final class FilmReportViewController: UIViewController {
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
             backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
@@ -160,7 +160,7 @@ final class FilmReportViewController: UIViewController {
             divider.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             divider.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             divider.heightAnchor.constraint(equalToConstant: 1),
-            divider.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
+            divider.bottomAnchor.constraint(equalTo: headerView.bottomAnchor)
         ])
     }
 
@@ -190,7 +190,7 @@ final class FilmReportViewController: UIViewController {
             reportTextView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             reportTextView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             reportTextView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            reportTextView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            reportTextView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
         ])
     }
 
@@ -221,7 +221,7 @@ final class FilmReportViewController: UIViewController {
             spinner.centerYAnchor.constraint(equalTo: loadingContainer.centerYAnchor, constant: -20),
 
             loadingLabel.topAnchor.constraint(equalTo: spinner.bottomAnchor, constant: 14),
-            loadingLabel.centerXAnchor.constraint(equalTo: loadingContainer.centerXAnchor),
+            loadingLabel.centerXAnchor.constraint(equalTo: loadingContainer.centerXAnchor)
         ])
     }
 

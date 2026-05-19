@@ -27,8 +27,8 @@ struct CodableTransform: Codable {
 
     var transform: Transform {
         Transform(
-            scale:       SIMD3(sx, sy, sz),
-            rotation:    simd_quatf(ix: qx, iy: qy, iz: qz, r: qw),
+            scale: SIMD3(sx, sy, sz),
+            rotation: simd_quatf(ix: qx, iy: qy, iz: qz, r: qw),
             translation: SIMD3(tx, ty, tz)
         )
     }
@@ -268,7 +268,7 @@ final class ScenePersistenceService {
             "ProceduralSky"
         ]
 
-        var entityRecords:   [EntityRecord] = []
+        var entityRecords: [EntityRecord] = []
         var bgImagePayloads: [(filename: String, data: Data)] = []
 
         for entity in anchor.children {
@@ -386,57 +386,57 @@ final class ScenePersistenceService {
             }
 
              entityRecords.append(EntityRecord(
-                 id:                  {
+                 id: {
                      // Read existing stable UUID from component; assign one if missing.
                      if entity.components[CanvasViewController.EntityIDComponent.self] == nil {
                          entity.components.set(CanvasViewController.EntityIDComponent(id: UUID()))
                      }
                      return entity.components[CanvasViewController.EntityIDComponent.self]!.id.uuidString
                  }(),
-                 name:                entity.name,
-                 modelFileName:       modelFileName,
-                 toolType:            toolTypeTitle,
-                 isBackground:        isBackground,
-                 transform:           CodableTransform(entity.transform),
-                 wallWidth:           wallWidth,   wallHeight:   wallHeight,
-                 wallThickness:       wallThickness,
-                 wallColorR:          wallColorR,  wallColorG:   wallColorG,
-                 wallColorB:          wallColorB,  wallColorA:   wallColorA,
-                 groundWidth:         groundWidth, groundDepth:  groundDepth,
-                 groundColorR:        groundColorR, groundColorG: groundColorG,
-                 groundColorB:        groundColorB, groundColorA: groundColorA,
-                 bgWidth:             bgWidth,     bgHeight:     bgHeight,
+                 name: entity.name,
+                 modelFileName: modelFileName,
+                 toolType: toolTypeTitle,
+                 isBackground: isBackground,
+                 transform: CodableTransform(entity.transform),
+                 wallWidth: wallWidth, wallHeight: wallHeight,
+                 wallThickness: wallThickness,
+                 wallColorR: wallColorR, wallColorG: wallColorG,
+                 wallColorB: wallColorB, wallColorA: wallColorA,
+                 groundWidth: groundWidth, groundDepth: groundDepth,
+                 groundColorR: groundColorR, groundColorG: groundColorG,
+                 groundColorB: groundColorB, groundColorA: groundColorA,
+                 bgWidth: bgWidth, bgHeight: bgHeight,
                  backgroundImagePath: backgroundImagePath,
-                 materialConfig:      materialConfig,
-                 cameraModelName:     cameraModelName,
-                 lightKind:           entity.components[LightConfigComponent.self]?.lightKind.rawValue,
-                 lightIntensity:      entity.components[LightConfigComponent.self]?.intensity,
+                 materialConfig: materialConfig,
+                 cameraModelName: cameraModelName,
+                 lightKind: entity.components[LightConfigComponent.self]?.lightKind.rawValue,
+                 lightIntensity: entity.components[LightConfigComponent.self]?.intensity,
                  lightColorTempKelvin: entity.components[LightConfigComponent.self]?.colorTemperatureKelvin,
-                 lightInnerAngleDeg:  entity.components[LightConfigComponent.self]?.innerAngleDeg,
-                 lightOuterAngleDeg:  entity.components[LightConfigComponent.self]?.outerAngleDeg,
+                 lightInnerAngleDeg: entity.components[LightConfigComponent.self]?.innerAngleDeg,
+                 lightOuterAngleDeg: entity.components[LightConfigComponent.self]?.outerAngleDeg,
                  lightAttenuationRadius: entity.components[LightConfigComponent.self]?.attenuationRadius,
-                 lightShadowEnabled:  entity.components[LightConfigComponent.self]?.shadowEnabled,
-                 lightModelScale:     entity.components[LightConfigComponent.self]?.modelScale,
-                 lightReflectorType:  entity.components[LightConfigComponent.self]?.reflectorType.rawValue,
-                 lightActiveGobo:     entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
+                 lightShadowEnabled: entity.components[LightConfigComponent.self]?.shadowEnabled,
+                 lightModelScale: entity.components[LightConfigComponent.self]?.modelScale,
+                 lightReflectorType: entity.components[LightConfigComponent.self]?.reflectorType.rawValue,
+                 lightActiveGobo: entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
                  proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
-                 customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
-                 cameraAspectRatio:   cameraAspectRatio,
+                 customModelPath: entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
+                 cameraAspectRatio: cameraAspectRatio,
                  cameraFocalLengthMM: cameraFocalLengthMM,
-                 cameraGridType:      cameraGridType,
-                 cameraFocusMode:     cameraFocusMode,
-                 cameraAperture:      cameraAperture,
+                 cameraGridType: cameraGridType,
+                 cameraFocusMode: cameraFocusMode,
+                 cameraAperture: cameraAperture,
                  cameraFocusDistance: cameraFocusDistance,
-                 aspectRatioWidth:    aspectRatioWidth,
-                 aspectRatioHeight:   aspectRatioHeight,
-                 isLocked:            entity.components[LockComponent.self]?.isLocked == true ? true : nil
+                 aspectRatioWidth: aspectRatioWidth,
+                 aspectRatioHeight: aspectRatioHeight,
+                 isLocked: entity.components[LockComponent.self]?.isLocked == true ? true : nil
              ))
         }
 
         let clipRecords: [AnimationClipRecord] = vc.timeline.clips.map { clip in
-            var ps:  CodableSIMD3?; var pc1: CodableSIMD3?
-            var pc2: CodableSIMD3?; var pe:  CodableSIMD3?
+            var ps: CodableSIMD3?; var pc1: CodableSIMD3?
+            var pc2: CodableSIMD3?; var pe: CodableSIMD3?
             if let path = clip.motionPath {
                 ps  = CodableSIMD3(path.start)
                 pc1 = CodableSIMD3(path.control1)
@@ -444,9 +444,9 @@ final class ScenePersistenceService {
                 pe  = CodableSIMD3(path.end)
             }
             return AnimationClipRecord(
-                id:           clip.id.uuidString,
-                entityName:   clip.entityName,
-                entityID:     {
+                id: clip.id.uuidString,
+                entityName: clip.entityName,
+                entityID: {
                     if let id = clip.entityID { return id.uuidString }
                     // Persist the entity's stable UUID alongside the name for future use.
                     if let entity = vc.mainAnchor?.findEntity(named: clip.entityName) {
@@ -454,15 +454,15 @@ final class ScenePersistenceService {
                     }
                     return nil
                 }(),
-                type:         clip.type.rawValue,
-                track:        clip.track.rawValue,
-                easing:       clip.easing.rawValue,
-                startTime:    clip.startTime,
-                duration:     clip.duration,
-                fromValue:    CodableSIMD3(clip.fromValue),
-                toValue:      CodableSIMD3(clip.toValue),
-                pathStart:    ps,  pathControl1: pc1,
-                pathControl2: pc2, pathEnd:      pe
+                type: clip.type.rawValue,
+                track: clip.track.rawValue,
+                easing: clip.easing.rawValue,
+                startTime: clip.startTime,
+                duration: clip.duration,
+                fromValue: CodableSIMD3(clip.fromValue),
+                toValue: CodableSIMD3(clip.toValue),
+                pathStart: ps, pathControl1: pc1,
+                pathControl2: pc2, pathEnd: pe
             )
         }
 
@@ -472,12 +472,10 @@ final class ScenePersistenceService {
         // and the sky won't be re-applied on load (acceptable — user can re-select it).
         let savedSkyType: String? = {
             // Look for entity named "ProceduralSky_<type>"
-            for child in anchor.children {
-                if child.name.hasPrefix("ProceduralSky_") {
+            for child in anchor.children where child.name.hasPrefix("ProceduralSky_") {
                     let type = String(child.name.dropFirst("ProceduralSky_".count))
                     return type.isEmpty ? nil : type
                 }
-            }
             // Fallback: check CategoryComponent on any sky entity
             for child in anchor.children {
                 if child.components[CategoryComponent.self]?.toolType == .sky,
@@ -511,11 +509,11 @@ final class ScenePersistenceService {
         }()
 
         let doc = CanvasSceneDocument(
-            sceneID:           sceneID.uuidString,
-            entities:          entityRecords,
-            animationClips:    clipRecords,
+            sceneID: sceneID.uuidString,
+            entities: entityRecords,
+            animationClips: clipRecords,
             backgroundCounter: vc.backgroundCounter,
-            cameraCounter:     vc.cameraCounter,
+            cameraCounter: vc.cameraCounter,
             cameraYaw: vc.yaw, cameraPitch: vc.pitch, cameraDistance: vc.distance,
             cameraTargetX: vc.cameraTarget.x,
             cameraTargetY: vc.cameraTarget.y,
@@ -742,7 +740,7 @@ final class ScenePersistenceService {
 
         vc.refreshSidebarContent()
         print("✅ Loaded: \(doc.entities.count) entities, \(doc.animationClips.count) clips")
-        
+
         // FIX: Log memory diagnostics for debugging and tuning
         logCacheStats()
 
@@ -778,19 +776,19 @@ final class ScenePersistenceService {
 
     @MainActor
     private func clearSceneState(vc: CanvasViewController) {
-        vc.activeMotionPaths.values.forEach  { $0.root.removeFromParent() }
+        vc.activeMotionPaths.values.forEach { $0.root.removeFromParent() }
         vc.activeMotionPaths.removeAll()
 
         vc.activeRotationArcs.values.forEach { $0.root.removeFromParent() }
         vc.activeRotationArcs.removeAll()
-        
+
          // FIX: Clean up preview ARView clones to prevent memory accumulation
          // when switching between scenes (shot preview timer adds clones continuously).
          vc.cleanupPreviewARView()
-         
+
          // System entities to keep throughout the scene lifecycle
          let keep: Set<String> = ["Grid", "EditorCamera", "PathContainer"]
-         
+
          // FIX: Release GPU texture memory by clearing TextureResource references
          // in BackgroundComponents before removing entities from the scene graph.
          // TextureResource GPU memory is freed when the reference is deallocated.
@@ -860,8 +858,8 @@ final class ScenePersistenceService {
 
     @MainActor
     private func restoreEntity(
-        record:  EntityRecord,
-        vc:      CanvasViewController,
+        record: EntityRecord,
+        vc: CanvasViewController,
         sceneID: UUID
     ) async {
         guard let anchor = vc.mainAnchor else { return }
@@ -877,7 +875,7 @@ final class ScenePersistenceService {
              if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
                  e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
              }
-             
+
              // Create wall component with saved color, fallback to light gray defaults
              var wallComp = CanvasViewController.WallComponent(width: w, height: h, thickness: th)
              if let r = record.wallColorR, let g = record.wallColorG,
@@ -895,7 +893,7 @@ final class ScenePersistenceService {
              if let config = record.materialConfig {
                  let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: config)
                  e.model = ModelComponent(
-                     mesh:      MeshResource.generateBox(width: w, height: h, depth: th),
+                     mesh: MeshResource.generateBox(width: w, height: h, depth: th),
                      materials: [simpleMat]
                  )
                  // Apply full PBR material asynchronously
@@ -904,7 +902,7 @@ final class ScenePersistenceService {
                  }
              } else {
                  e.model = ModelComponent(
-                     mesh:      MeshResource.generateBox(width: w, height: h, depth: th),
+                     mesh: MeshResource.generateBox(width: w, height: h, depth: th),
                      materials: [SimpleMaterial(color: wallComp.uiColor, roughness: 0.6, isMetallic: false)]
                  )
              }
@@ -925,7 +923,7 @@ final class ScenePersistenceService {
              if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
                  e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
              }
-             
+
              // Create ground component with saved color, fallback to dark gray defaults
              var groundComp = CanvasViewController.GroundComponent(width: w, depth: d)
              if let r = record.groundColorR, let g = record.groundColorG,
@@ -943,7 +941,7 @@ final class ScenePersistenceService {
              if let config = record.materialConfig {
                  let simpleMat = CinematicMaterialManager.shared.buildSimpleMaterial(from: config)
                  e.model = ModelComponent(
-                     mesh:      MeshResource.generatePlane(width: w, depth: d),
+                     mesh: MeshResource.generatePlane(width: w, depth: d),
                      materials: [simpleMat]
                  )
                  Task { @MainActor in
@@ -951,7 +949,7 @@ final class ScenePersistenceService {
                  }
              } else {
                  e.model = ModelComponent(
-                     mesh:      MeshResource.generatePlane(width: w, depth: d),
+                     mesh: MeshResource.generatePlane(width: w, depth: d),
                      materials: [SimpleMaterial(color: groundComp.uiColor, roughness: 1.0, isMetallic: false)]
                  )
              }
@@ -975,7 +973,7 @@ final class ScenePersistenceService {
         // before sibling camera tasks finish, producing an incomplete camera sidebar.
         if record.name.lowercased().contains("scenecamera") {
             let root  = Entity()
-            
+
             // Extract or generate UUID for this camera
             let cameraID: UUID
             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
@@ -1050,9 +1048,9 @@ final class ScenePersistenceService {
               vc.cameraToVisualMap[cam] = root
              vc.sceneCameraItems.append(
                  CanvasViewController.SceneCameraItem(
-                     id:          cameraID,
-                     camera:      cam,
-                     cameraRoot:  root,
+                     id: cameraID,
+                     camera: cam,
+                     cameraRoot: root,
                      displayName: displayName,
                      aspectRatio: aspectRatio
                  )
@@ -1119,7 +1117,7 @@ final class ScenePersistenceService {
                      print("🔄 Converting image to sRGB and creating texture for '\(record.name)'...")
                      let safeCG = image.sRGBCGImage()
                      let texture = try await TextureResource(
-                         image:   safeCG,
+                         image: safeCG,
                          options: .init(semantic: .color)
                      )
                      material.color.texture = .init(texture)
@@ -1145,18 +1143,18 @@ final class ScenePersistenceService {
             }
 
             let e = ModelEntity(
-                mesh:      MeshResource.generateBox(width: w, height: h, depth: 0.05),
+                mesh: MeshResource.generateBox(width: w, height: h, depth: 0.05),
                 materials: [material]
             )
             e.name = record.name
             if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
                 e.components.set(CanvasViewController.EntityIDComponent(id: uuid))
             }
-            
+
             // FIX: Store textureResource reference for cleanup when scene is cleared
             e.components.set(CanvasViewController.BackgroundComponent(
-                width:       w,
-                height:      h,
+                width: w,
+                height: h,
                 cachedImage: restoredImage,      // retained so future save() calls can extract JPEG data
                 textureResource: textureResource  // FIX: Track for cleanup
             ))
@@ -1185,18 +1183,18 @@ final class ScenePersistenceService {
             if let kindRaw = record.lightKind,
                let kind = LightKind(rawValue: kindRaw) {
                 let config = LightConfigComponent(
-                    lightKind:              kind,
-                    intensity:              record.lightIntensity ?? 200_000,
+                    lightKind: kind,
+                    intensity: record.lightIntensity ?? 200_000,
                     colorTemperatureKelvin: colorTemp,
-                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
-                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
-                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
-                    shadowEnabled:          record.lightShadowEnabled ?? false,
-                    modelScale:             record.lightModelScale ?? 1.0,
-                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
-                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
-                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
-                    proceduralKind:         procKind
+                    innerAngleDeg: record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg: record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius: record.lightAttenuationRadius ?? 10,
+                    shadowEnabled: record.lightShadowEnabled ?? false,
+                    modelScale: record.lightModelScale ?? 1.0,
+                    reflectorType: ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo: GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount: record.lightDiffuserAmount ?? 0.0,
+                    proceduralKind: procKind
                 )
                 vc.attachLight(to: entity, config: config)
             }
@@ -1212,7 +1210,7 @@ final class ScenePersistenceService {
             // FIX: Use scene-scoped LRU cache manager instead of global cache.
             // This allows fast revisits to the same scene while evicting old scenes automatically.
             let entity: Entity
-            
+
             if let customPath = record.customModelPath {
                 let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let customDir = documentsDirectory.appendingPathComponent("CustomProps")
@@ -1241,17 +1239,17 @@ final class ScenePersistenceService {
                let kind = LightKind(rawValue: kindRaw) {
                 // Build config from persisted values — user's custom intensity/color/angles restored
                 let config = LightConfigComponent(
-                    lightKind:              kind,
-                    intensity:              record.lightIntensity ?? 200_000,
+                    lightKind: kind,
+                    intensity: record.lightIntensity ?? 200_000,
                     colorTemperatureKelvin: record.lightColorTempKelvin ?? 5600,
-                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
-                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
-                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
-                    shadowEnabled:          record.lightShadowEnabled ?? false,
-                    modelScale:             record.lightModelScale ?? 0.01,
-                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
-                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
-                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0
+                    innerAngleDeg: record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg: record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius: record.lightAttenuationRadius ?? 10,
+                    shadowEnabled: record.lightShadowEnabled ?? false,
+                    modelScale: record.lightModelScale ?? 0.01,
+                    reflectorType: ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo: GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount: record.lightDiffuserAmount ?? 0.0
                 )
                 vc.attachLight(to: entity, config: config)
             } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {
@@ -1293,24 +1291,24 @@ final class ScenePersistenceService {
                let pc2 = record.pathControl2,
                let pe  = record.pathEnd {
                 motionPath = BezierMotionPath(
-                    start:    ps.simd,
+                    start: ps.simd,
                     control1: pc1.simd,
                     control2: pc2.simd,
-                    end:      pe.simd
+                    end: pe.simd
                 )
             }
 
             let clip = AnimationClip(
-                id:         UUID(uuidString: record.id) ?? UUID(),
+                id: UUID(uuidString: record.id) ?? UUID(),
                 entityName: resolvedName,
-                entityID:   resolvedID,
-                type:       type,
-                track:      track,
-                easing:     easing,
-                startTime:  record.startTime,
-                duration:   record.duration,
-                fromValue:  record.fromValue.simd,
-                toValue:    record.toValue.simd,
+                entityID: resolvedID,
+                type: type,
+                track: track,
+                easing: easing,
+                startTime: record.startTime,
+                duration: record.duration,
+                fromValue: record.fromValue.simd,
+                toValue: record.toValue.simd,
                 motionPath: motionPath
             )
             vc.timeline.addClip(clip)
@@ -1334,20 +1332,20 @@ final class ScenePersistenceService {
         }
         return nil
     }
-     
+
      // MARK: - Cache Management & Diagnostics
-     
+
      /// Retrieves a cached model for the given scene (used by spawnEntity).
      func getCachedModel(_ fileName: String, for sceneID: UUID) -> Entity? {
          return modelCacheManager.getModel(fileName, for: sceneID)
      }
-     
+
      /// Caches a model for the given scene (used by spawnEntity).
      func cacheSpawnedModel(_ entity: Entity, _ fileName: String, for sceneID: UUID) {
          let estimatedSize = estimateEntitySize(entity)
          modelCacheManager.cacheModel(entity, fileName, for: sceneID, estimatedSize: estimatedSize)
      }
-     
+
      /// Evicts a specific scene from the model cache to free memory.
      func evictScene(_ sceneID: UUID) {
          modelCacheManager.evictScene(sceneID)
@@ -1359,7 +1357,7 @@ final class ScenePersistenceService {
      func markSceneExited(_ sceneID: UUID) {
          modelCacheManager.markExited(sceneID: sceneID)
      }
-     
+
      /// Logs current cache statistics to console.
      func logCacheStats() {
          let stats = modelCacheManager.getStats()
@@ -1368,13 +1366,13 @@ final class ScenePersistenceService {
          let percent = stats["percentUsed"] as? String ?? "0"
          let scenes = stats["scenesInCache"] as? Int ?? 0
          let models = stats["totalModels"] as? Int ?? 0
-         
+
          print("====== 📊 CACHE STATISTICS ======")
          print("Memory: \(current / 1024 / 1024)MB / \(max / 1024 / 1024)MB (\(percent)%)")
          print("Scenes: \(scenes), Models: \(models)")
          print("==================================")
      }
-    
+
     // MARK: - resolveModelFileName
 
     /// Strips the uniquifying suffix from an entity display name so we can

@@ -19,12 +19,12 @@ class CameraPreviewCell: UICollectionViewCell {
 
     // Image view receives live snapshots — replaces the static ARView clone
     let previewImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.backgroundColor = .black
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .black
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
     let label = UILabel()
@@ -45,7 +45,7 @@ class CameraPreviewCell: UICollectionViewCell {
             previewImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             previewImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             previewImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            previewImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            previewImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
 
         // Dark gradient at the bottom so the label is readable
@@ -63,7 +63,7 @@ class CameraPreviewCell: UICollectionViewCell {
             label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
-            label.heightAnchor.constraint(equalToConstant: 18),
+            label.heightAnchor.constraint(equalToConstant: 18)
         ])
     }
 

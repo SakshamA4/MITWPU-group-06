@@ -14,7 +14,7 @@ class SequenceViewController: UIViewController {
 
     @IBOutlet weak var sequenceTitle: UILabel!
     @IBOutlet weak var serachButton: UIBarButtonItem!
-    
+
     var scene: [Scene] = []
     var sceneCellId = "scene_cell"
     var sequence: Sequence?
@@ -22,20 +22,20 @@ class SequenceViewController: UIViewController {
     private var activeCoordinator: SequenceExportCoordinator?
     private var exportCanvas: CanvasViewController?
     private var progressOverlay: ExportProgressOverlay?
-    
+
     // MARK: - Search State
     private var filteredScenes: [Scene] = []
     private var currentSearchText: String = ""
     private var savedSearchButton: UIBarButtonItem?
     private var savedExportButton: UIBarButtonItem?
-    
+
     // Computed properties for search
     private var isSearching: Bool { !currentSearchText.isEmpty }
     private var currentScenes: [Scene] { isSearching ? filteredScenes : scene }
-    
+
     // Search controller
     private let searchController = UISearchController(searchResultsController: nil)
-    
+
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
@@ -56,7 +56,7 @@ class SequenceViewController: UIViewController {
         registerCells()
         setupObservers()
         setupSearchController()
-        
+
         // Save the search button and ensure it's visible initially
         savedSearchButton = serachButton
 
@@ -194,22 +194,22 @@ class SequenceViewController: UIViewController {
     @IBAction func searchAction(_ sender: Any) {
         // Show search controller in navigation bar
         navigationItem.searchController = searchController
-        
+
         // Hide the search button by removing it from nav bar
         navigationItem.rightBarButtonItem = nil
-        
+
         // Animate the search bar appearance
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
-        
+
         // Activate and focus the search bar
         searchController.isActive = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.searchController.searchBar.becomeFirstResponder()
         }
     }
-    
+
     private func setupSearchController() {
         searchController.searchResultsUpdater = self
         searchController.searchBar.delegate = self
@@ -219,7 +219,7 @@ class SequenceViewController: UIViewController {
         // Don't set navigationItem.searchController initially (search bar hidden)
         definesPresentationContext = true
     }
-    
+
     private func setupObservers() {
         NotificationCenter.default.addObserver(
             self,
@@ -228,7 +228,7 @@ class SequenceViewController: UIViewController {
             object: nil
         )
     }
-    
+
     @objc private func refreshData() {
         if let sequence = sequence {
             scene = sceneService.getScenes(forSequenceId: sequence.id)
@@ -253,9 +253,8 @@ class SequenceViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
-
 
     func registerCells() {
         collectionView.register(
@@ -271,9 +270,9 @@ class SequenceViewController: UIViewController {
     private func updateTitle() {
         sequenceTitle.text = sequence?.name ?? "Sequence"
     }
-    
+
     // MARK: - Filter Logic
-    
+
     private func filterScenes(for query: String) {
         currentSearchText = query.trimmingCharacters(in: .whitespaces)
         if currentSearchText.isEmpty {
@@ -288,8 +287,7 @@ class SequenceViewController: UIViewController {
 
     private func restoreBarButtons() {
         var items: [UIBarButtonItem] = []
-        if let search = savedSearchButton { items.append(search) }
-        else { items.append(serachButton) }
+        if let search = savedSearchButton { items.append(search) } else { items.append(serachButton) }
         if let export = savedExportButton { items.append(export) }
         navigationItem.rightBarButtonItems = items
     }
@@ -298,27 +296,27 @@ class SequenceViewController: UIViewController {
 
 extension SequenceViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        
+
         // Placeholder cell only shown when not searching
         if !isSearching && indexPath.item == 0 {
             guard let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: "placeholder_cell",
                 for: indexPath
             ) as? PlaceholderCollectionViewCell else { return UICollectionViewCell() }
-            
+
             cell.addNew.text = "New Scene"
             cell.onPlusButtonTapped = { [weak self] in
                 self?.performSegue(withIdentifier: "addSceneSegue", sender: nil)
             }
             return cell
         }
-        
+
         // Scene cells
         guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: sceneCellId,
             for: indexPath
         ) as? SceneCollectionViewCell else { return UICollectionViewCell() }
-        
+
         // Adjust index based on whether search is active
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let sceneToDisplay = currentScenes[itemIndex]
@@ -340,8 +338,7 @@ extension SequenceViewController: UICollectionViewDataSource {
 }
 
 extension SequenceViewController: UICollectionViewDelegate,
-    UICollectionViewDelegateFlowLayout
-{
+    UICollectionViewDelegateFlowLayout {
      override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
          if segue.identifier == "addSceneSegue" {
              if let vc = segue.destination as? AddSceneViewController {
@@ -367,22 +364,22 @@ extension SequenceViewController: UICollectionViewDelegate,
         // When not searching, index 0 is placeholder (ignore it)
         // When searching, no placeholder, so all indices are valid
         guard !(!isSearching && indexPath.item == 0) else { return }
-        
+
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let selectedScene = currentScenes[itemIndex]
-        
+
         let vc = CanvasViewController()
         vc.currentSceneObject = selectedScene
         vc.currentSceneID = selectedScene.id
         vc.sceneName = selectedScene.name
         vc.sequenceName = self.sequence?.name
         vc.filmName = self.filmName
-        
+
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)
     }
-    
+
     func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -392,73 +389,72 @@ extension SequenceViewController: UICollectionViewDelegate,
     }
 }
 
-
 extension SequenceViewController {
-    
+
     // MARK: - Context Menu (Long Press)
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         // When not searching, index 0 is placeholder (ignore it)
         guard !(!isSearching && indexPath.item == 0) else { return nil }
-        
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { suggestedActions in
-            
+
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+
             // 1. Define the "Edit" Action
             let editAction = UIAction(title: "Edit Name", image: UIImage(systemName: "pencil")) { [weak self] _ in
                 self?.presentEditAlert(at: indexPath)
             }
-            
+
             // 2. Define the "Delete" Action
             let deleteAction = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
                 self?.deleteScene(at: indexPath)
             }
-            
+
             // 3. Return the Menu
             return UIMenu(title: "", children: [editAction, deleteAction])
         }
     }
-    
+
     // MARK: - Helper Functions
-    
+
     private func deleteScene(at indexPath: IndexPath) {
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let sceneToDelete = currentScenes[itemIndex]
         sceneService.deleteScene(by: sceneToDelete.id)
     }
-    
+
     private func presentEditAlert(at indexPath: IndexPath) {
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let currentScene = currentScenes[itemIndex]
-        
+
         let alert = UIAlertController(title: "Edit Scene", message: "Enter a new name for this scene", preferredStyle: .alert)
-        
+
         alert.addTextField { textField in
             textField.text = currentScene.name
             textField.placeholder = "Scene Name"
         }
-        
+
         let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
             guard let self = self,
                   let newName = alert.textFields?.first?.text,
                   !newName.isEmpty else { return }
-            
+
             var updatedScene = currentScene
             updatedScene.name = newName
-            
+
             self.sceneService.updateScene(updatedScene)
-            
+
             // Update the scene in the full list
             if let originalIndex = self.scene.firstIndex(where: { $0.id == currentScene.id }) {
                 self.scene[originalIndex] = updatedScene
             }
-            
+
             self.collectionView.reloadItems(at: [indexPath])
         }
-        
+
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-        
+
         alert.addAction(saveAction)
         alert.addAction(cancelAction)
-        
+
          present(alert, animated: true)
      }
 }
@@ -479,11 +475,11 @@ extension SequenceViewController: UISearchBarDelegate {
         currentSearchText = ""
         filteredScenes = []
         collectionView.reloadData()
-        
+
         // Hide the search controller and remove from nav bar
         searchController.isActive = false
         navigationItem.searchController = nil
-        
+
         // Restore the buttons to nav bar
         restoreBarButtons()
     }
@@ -498,7 +494,7 @@ extension SequenceViewController: UISearchControllerDelegate {
         filteredScenes = []
         collectionView.reloadData()
     }
-    
+
     func didDismissSearchController(_ searchController: UISearchController) {
         // Restore the search button when search controller is dismissed
         navigationItem.searchController = nil
