@@ -88,6 +88,11 @@ struct EntityRecord: Codable {
     var lightDiffuserAmount: Float?
     /// Procedural light kind (e.g. "practicalLantern"). nil for .usdz-based lights.
     var proceduralLightKind: String?
+    /// Custom light color RGBA — nil means use color temperature instead.
+    var lightCustomColorR: Float?
+    var lightCustomColorG: Float?
+    var lightCustomColorB: Float?
+    var lightCustomColorA: Float?
     /// Path to user-imported custom model in the Documents/CustomProps directory.
     var customModelPath: String?
     /// Per-camera aspect ratio (e.g. "16:9"). nil for non-camera entities or legacy saves.
@@ -421,8 +426,12 @@ final class ScenePersistenceService {
                  lightActiveGobo: entity.components[LightConfigComponent.self]?.activeGobo.rawValue,
                  lightDiffuserAmount: entity.components[LightConfigComponent.self]?.diffuserAmount,
                  proceduralLightKind: entity.components[LightConfigComponent.self]?.proceduralKind?.rawValue,
-                 customModelPath: entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
-                 cameraAspectRatio: cameraAspectRatio,
+                 lightCustomColorR:   entity.components[LightConfigComponent.self]?.customColorR,
+                 lightCustomColorG:   entity.components[LightConfigComponent.self]?.customColorG,
+                 lightCustomColorB:   entity.components[LightConfigComponent.self]?.customColorB,
+                 lightCustomColorA:   entity.components[LightConfigComponent.self]?.customColorA,
+                 customModelPath:     entity.components[CustomPropComponent.self]?.customModelURL.lastPathComponent,
+                 cameraAspectRatio:   cameraAspectRatio,
                  cameraFocalLengthMM: cameraFocalLengthMM,
                  cameraGridType: cameraGridType,
                  cameraFocusMode: cameraFocusMode,
@@ -1186,15 +1195,19 @@ final class ScenePersistenceService {
                     lightKind: kind,
                     intensity: record.lightIntensity ?? 200_000,
                     colorTemperatureKelvin: colorTemp,
-                    innerAngleDeg: record.lightInnerAngleDeg ?? 0,
-                    outerAngleDeg: record.lightOuterAngleDeg ?? 30,
-                    attenuationRadius: record.lightAttenuationRadius ?? 10,
-                    shadowEnabled: record.lightShadowEnabled ?? false,
-                    modelScale: record.lightModelScale ?? 1.0,
-                    reflectorType: ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
-                    activeGobo: GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
-                    diffuserAmount: record.lightDiffuserAmount ?? 0.0,
-                    proceduralKind: procKind
+                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
+                    shadowEnabled:          record.lightShadowEnabled ?? false,
+                    modelScale:             record.lightModelScale ?? 1.0,
+                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
+                    proceduralKind:         procKind,
+                    customColorR:           record.lightCustomColorR,
+                    customColorG:           record.lightCustomColorG,
+                    customColorB:           record.lightCustomColorB,
+                    customColorA:           record.lightCustomColorA
                 )
                 vc.attachLight(to: entity, config: config)
             }
@@ -1242,14 +1255,18 @@ final class ScenePersistenceService {
                     lightKind: kind,
                     intensity: record.lightIntensity ?? 200_000,
                     colorTemperatureKelvin: record.lightColorTempKelvin ?? 5600,
-                    innerAngleDeg: record.lightInnerAngleDeg ?? 0,
-                    outerAngleDeg: record.lightOuterAngleDeg ?? 30,
-                    attenuationRadius: record.lightAttenuationRadius ?? 10,
-                    shadowEnabled: record.lightShadowEnabled ?? false,
-                    modelScale: record.lightModelScale ?? 0.01,
-                    reflectorType: ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
-                    activeGobo: GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
-                    diffuserAmount: record.lightDiffuserAmount ?? 0.0
+                    innerAngleDeg:          record.lightInnerAngleDeg ?? 0,
+                    outerAngleDeg:          record.lightOuterAngleDeg ?? 30,
+                    attenuationRadius:      record.lightAttenuationRadius ?? 10,
+                    shadowEnabled:          record.lightShadowEnabled ?? false,
+                    modelScale:             record.lightModelScale ?? 0.01,
+                    reflectorType:          ReflectorType(rawValue: record.lightReflectorType ?? "") ?? .standard,
+                    activeGobo:             GoboPattern(rawValue: record.lightActiveGobo ?? "") ?? .none,
+                    diffuserAmount:         record.lightDiffuserAmount ?? 0.0,
+                    customColorR:           record.lightCustomColorR,
+                    customColorG:           record.lightCustomColorG,
+                    customColorB:           record.lightCustomColorB,
+                    customColorA:           record.lightCustomColorA
                 )
                 vc.attachLight(to: entity, config: config)
             } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {

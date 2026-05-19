@@ -27,9 +27,46 @@ struct LightConfigComponent: Component, Codable {
     var diffuserAmount: Float = 0.0     // 0.0 = hard edge, 1.0 = full silk
     var proceduralKind: ProceduralLightKind?  // non-nil for procedural lights
 
+    // ── Custom color (optional — overrides Kelvin when set) ─────────────
+    var customColorR: Float? = nil
+    var customColorG: Float? = nil
+    var customColorB: Float? = nil
+    var customColorA: Float? = nil
+
+    /// True when a custom RGB color has been set (non-nil).
+    var hasCustomColor: Bool {
+        customColorR != nil
+    }
+
+    /// The custom UIColor if set, otherwise nil.
+    var customColor: UIColor? {
+        guard let r = customColorR, let g = customColorG,
+              let b = customColorB, let a = customColorA else { return nil }
+        return UIColor(red: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+    }
+
+    /// Sets the custom color from a UIColor. Pass nil to clear.
+    mutating func setCustomColor(_ color: UIColor?) {
+        guard let color = color else {
+            customColorR = nil; customColorG = nil
+            customColorB = nil; customColorA = nil
+            return
+        }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        customColorR = Float(r); customColorG = Float(g)
+        customColorB = Float(b); customColorA = Float(a)
+    }
+
     // Derived — not stored
     var uiColor: UIColor { .fromKelvin(colorTemperatureKelvin) }
     var counterScale: Float { 1.0 / modelScale }  // child entities must be scaled by this
+
+    /// Returns the custom color if set, otherwise the Kelvin-derived color.
+    /// Use this everywhere that applies color to lights, gobos, and emissive materials.
+    var effectiveColor: UIColor {
+        customColor ?? uiColor
+    }
 
     static func from(_ config: LightConfig, kind: LightKind, proceduralKind: ProceduralLightKind? = nil) -> LightConfigComponent {
         LightConfigComponent(
@@ -55,6 +92,7 @@ struct LightConfigComponent: Component, Codable {
         case shadowEnabled, modelScale
         case reflectorType, activeGobo, diffuserAmount
         case proceduralKind
+        case customColorR, customColorG, customColorB, customColorA
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +110,10 @@ struct LightConfigComponent: Component, Codable {
         activeGobo     = try c.decodeIfPresent(GoboPattern.self, forKey: .activeGobo) ?? .none
         diffuserAmount = try c.decodeIfPresent(Float.self, forKey: .diffuserAmount) ?? 0.0
         proceduralKind = try c.decodeIfPresent(ProceduralLightKind.self, forKey: .proceduralKind)
+        customColorR   = try c.decodeIfPresent(Float.self, forKey: .customColorR)
+        customColorG   = try c.decodeIfPresent(Float.self, forKey: .customColorG)
+        customColorB   = try c.decodeIfPresent(Float.self, forKey: .customColorB)
+        customColorA   = try c.decodeIfPresent(Float.self, forKey: .customColorA)
     }
 
     init(lightKind: LightKind, intensity: Float, colorTemperatureKelvin: Float,
@@ -80,7 +122,11 @@ struct LightConfigComponent: Component, Codable {
          reflectorType: ReflectorType = .standard,
          activeGobo: GoboPattern = .none,
          diffuserAmount: Float = 0.0,
-         proceduralKind: ProceduralLightKind? = nil) {
+         proceduralKind: ProceduralLightKind? = nil,
+         customColorR: Float? = nil,
+         customColorG: Float? = nil,
+         customColorB: Float? = nil,
+         customColorA: Float? = nil) {
         self.lightKind = lightKind
         self.intensity = intensity
         self.colorTemperatureKelvin = colorTemperatureKelvin
@@ -93,8 +139,13 @@ struct LightConfigComponent: Component, Codable {
         self.activeGobo = activeGobo
         self.diffuserAmount = diffuserAmount
         self.proceduralKind = proceduralKind
+        self.customColorR = customColorR
+        self.customColorG = customColorG
+        self.customColorB = customColorB
+        self.customColorA = customColorA
     }
 }
+
 
 struct SpawnPose {
     let title: String
