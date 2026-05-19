@@ -69,6 +69,15 @@ enum GoboPattern: String, Codable, CaseIterable {
 
     // MARK: - Procedural Gobo Texture Generation
 
+    private struct LCG: RandomNumberGenerator {
+        var state: UInt64
+        init(seed: UInt64) { self.state = seed }
+        mutating func next() -> UInt64 {
+            state = 2862933555777941757 &* state &+ 3037000493
+            return state
+        }
+    }
+
     /// Generates a gobo **shadow mask** texture as a CGImage.
     ///
     /// **Polarity for gate-mask approach:**
@@ -130,14 +139,14 @@ enum GoboPattern: String, Codable, CaseIterable {
 
             case .leaves:
                 // Leaf shapes BLOCK light (opaque). Gaps let light through.
-                srand48(42)  // deterministic
+                var rng = LCG(seed: 42)  // deterministic
                 cg.setFillColor(blocked.cgColor)
                 for _ in 0..<55 {
-                    let x = CGFloat(drand48()) * rect.width
-                    let y = CGFloat(drand48()) * rect.height
-                    let w = CGFloat(25 + drand48() * 55)
-                    let h = CGFloat(12 + drand48() * 30)
-                    let angle = CGFloat(drand48() * .pi)
+                    let x = CGFloat.random(in: 0...1, using: &rng) * rect.width
+                    let y = CGFloat.random(in: 0...1, using: &rng) * rect.height
+                    let w = CGFloat(25 + CGFloat.random(in: 0...1, using: &rng) * 55)
+                    let h = CGFloat(12 + CGFloat.random(in: 0...1, using: &rng) * 30)
+                    let angle = CGFloat.random(in: 0...1, using: &rng) * .pi
                     cg.saveGState()
                     cg.translateBy(x: x, y: y)
                     cg.rotate(by: angle)
@@ -276,32 +285,32 @@ enum GoboPattern: String, Codable, CaseIterable {
 
             case .branchShadow:
                 // Organic tree branch silhouettes.
-                srand48(99)
+                var rng = LCG(seed: 99)
                 cg.setStrokeColor(blocked.cgColor)
                 for _ in 0..<8 {
-                    let startX = CGFloat(drand48()) * rect.width
-                    let startY = CGFloat(drand48()) * rect.height * 0.3
-                    cg.setLineWidth(CGFloat(3 + drand48() * 6))
+                    let startX = CGFloat.random(in: 0...1, using: &rng) * rect.width
+                    let startY = CGFloat.random(in: 0...1, using: &rng) * rect.height * 0.3
+                    cg.setLineWidth(CGFloat(3 + CGFloat.random(in: 0...1, using: &rng) * 6))
                     cg.move(to: CGPoint(x: startX, y: startY))
                     // Main branch
                     var curX = startX, curY = startY
-                    let segments = 6 + Int(drand48() * 6)
+                    let segments = 6 + Int.random(in: 0...5, using: &rng)
                     for _ in 0..<segments {
-                        curX += CGFloat(-20 + drand48() * 40)
-                        curY += CGFloat(15 + drand48() * 35)
+                        curX += CGFloat(-20 + CGFloat.random(in: 0...1, using: &rng) * 40)
+                        curY += CGFloat(15 + CGFloat.random(in: 0...1, using: &rng) * 35)
                         cg.addLine(to: CGPoint(x: curX, y: curY))
                     }
                     cg.strokePath()
                     // Sub-branches
                     curX = startX; curY = startY
                     for j in 0..<segments {
-                        curX += CGFloat(-20 + drand48() * 40)
-                        curY += CGFloat(15 + drand48() * 35)
+                        curX += CGFloat(-20 + CGFloat.random(in: 0...1, using: &rng) * 40)
+                        curY += CGFloat(15 + CGFloat.random(in: 0...1, using: &rng) * 35)
                         if j % 2 == 0 {
-                            cg.setLineWidth(CGFloat(1.5 + drand48() * 3))
+                            cg.setLineWidth(CGFloat(1.5 + CGFloat.random(in: 0...1, using: &rng) * 3))
                             cg.move(to: CGPoint(x: curX, y: curY))
-                            let bx = curX + CGFloat(-30 + drand48() * 60)
-                            let by = curY + CGFloat(10 + drand48() * 40)
+                            let bx = curX + CGFloat(-30 + CGFloat.random(in: 0...1, using: &rng) * 60)
+                            let by = curY + CGFloat(10 + CGFloat.random(in: 0...1, using: &rng) * 40)
                             cg.addLine(to: CGPoint(x: bx, y: by))
                             cg.strokePath()
                         }

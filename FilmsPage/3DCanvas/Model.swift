@@ -28,10 +28,10 @@ struct LightConfigComponent: Component, Codable {
     var proceduralKind: ProceduralLightKind?  // non-nil for procedural lights
 
     // ── Custom color (optional — overrides Kelvin when set) ─────────────
-    var customColorR: Float? = nil
-    var customColorG: Float? = nil
-    var customColorB: Float? = nil
-    var customColorA: Float? = nil
+    var customColorR: Float?
+    var customColorG: Float?
+    var customColorB: Float?
+    var customColorA: Float?
 
     /// True when a custom RGB color has been set (non-nil).
     var hasCustomColor: Bool {
@@ -145,7 +145,6 @@ struct LightConfigComponent: Component, Codable {
         self.customColorA = customColorA
     }
 }
-
 
 struct SpawnPose {
     let title: String

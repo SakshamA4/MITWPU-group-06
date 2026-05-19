@@ -30,7 +30,7 @@ class LightControlPanelViewController: UIViewController {
     private let shadowToggle     = UISwitch()
     private var kelvinButtons: [UIButton] = []
     private var reflectorButtons: [UIButton] = []
-    private var goboButtons:      [UIButton] = []
+    private var goboButtons: [UIButton] = []
     private let colorWell         = UIColorWell()
     private let colorSection      = UIStackView()
 
