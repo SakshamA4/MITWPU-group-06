@@ -46,7 +46,7 @@ class AddSequenceViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(presentImageSourceOptions))
         sequenceImageView.addGestureRecognizer(tap)
-        
+
         notesTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
         notesTextField.layer.borderWidth = 1.0
         nameTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
@@ -131,7 +131,7 @@ class AddSequenceViewController: UIViewController {
 
     // MARK: - Save Sequence
 
-    @IBAction func AddNewSequence(_ sender: Any) {
+    @IBAction func addNewSequence(_ sender: Any) {
         guard let film = film else { return }
         guard let name = nameTextField.text, !name.isEmpty else {
             shakeField(nameTextField)

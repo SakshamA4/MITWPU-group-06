@@ -5,9 +5,9 @@
 ////  Created by SDC-USER on 08/12/25.
 ////
 //
-//import UIKit
+// import UIKit
 //
-//class AllPropsViewController: UIViewController, UICollectionViewDataSource {
+// class AllPropsViewController: UIViewController, UICollectionViewDataSource {
 //
 //    private var selectedProp: PropItem?
 //    var film: Film?
@@ -131,9 +131,9 @@
 //    }
 //    */
 //
-//}
+// }
 //
-//extension AllPropsViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+// extension AllPropsViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
 //    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
 //        let inset: CGFloat = 40
 //        let interItem: CGFloat = 40
@@ -146,10 +146,10 @@
 //    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
 //        return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
 //    }
-//}
+// }
 //
 //
-//extension AllPropsViewController {
+// extension AllPropsViewController {
 //    
 //    // MARK: - Context Menu
 //    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
@@ -189,4 +189,4 @@
 //        // BETTER: Add Observer in viewDidLoad like other screens:
 //        // NotificationCenter.default.post(name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
 //    }
-//}
+// }

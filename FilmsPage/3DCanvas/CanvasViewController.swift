@@ -209,8 +209,8 @@ extension Transform {
         let ct  = max(0, min(1, t))
         let rep = SIMD3<Float>(repeating: ct)
         return Transform(
-            scale:       simd_mix(from.scale, to.scale, rep),
-            rotation:    simd_slerp(from.rotation, to.rotation, ct),
+            scale: simd_mix(from.scale, to.scale, rep),
+            rotation: simd_slerp(from.rotation, to.rotation, ct),
             translation: simd_mix(from.translation, to.translation, rep)
         )
     }
@@ -251,7 +251,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - NEW Properties
 
-    //Ata
+    // Ata
     var activeRotationAxis: SIMD3<Float>?
     var lastPanLocation: CGPoint = .zero
     var lastDragPoint: SIMD3<Float>?
@@ -261,8 +261,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     let rotationSolver = CameraRelativeRotationSolver()
     /// Non-nil when the gizmo is sitting on a path handle instead of a scene entity
     var activeHandleEntity: Entity?
-    
-    
+
     var currentSceneObject: Scene?
     var sceneName: String = "Untitled Scene"
     var filmName: String?
@@ -271,7 +270,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var lastEditedDate: Date = Date()
     var sceneImageName: String?
     var currentSceneID: UUID?
-    
+
     /// When true, viewDidLoad skips all UI setup (toolbars, gestures, nav bar,
     /// gizmo, animation panel) and viewDidAppear skips loadSceneIfSaved().
     /// The coordinator loads scenes explicitly via ScenePersistenceService.
@@ -353,31 +352,30 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         btn.translatesAutoresizingMaskIntoConstraints = false
         return btn
     }()
-    
-    
+
     // Camera State
     var yaw: Float = 0.5
     var pitch: Float = 0.5
     var distance: Float = 5.0
     var cameraTarget = SIMD3<Float>(0, 0, 0)
     /// Snapshot of yaw at the start of a twist gesture — used for accumulated yaw rotation
-    var initialCameraYaw: Float? = nil
+    var initialCameraYaw: Float?
 
     // ── Camera framing animation state ────────────────────────────────────────
-    var framingDisplayLink: CADisplayLink? = nil
+    var framingDisplayLink: CADisplayLink?
     var framingStartTarget: SIMD3<Float>   = .zero
-    var framingEndTarget:   SIMD3<Float>   = .zero
-    var framingStartDist:   Float          = 5.0
-    var framingEndDist:     Float          = 5.0
-    var framingStartTime:   CFTimeInterval = 0
-    var framingDuration:    CFTimeInterval = 0.35
-    
-    //camera system
+    var framingEndTarget: SIMD3<Float>   = .zero
+    var framingStartDist: Float          = 5.0
+    var framingEndDist: Float          = 5.0
+    var framingStartTime: CFTimeInterval = 0
+    var framingDuration: CFTimeInterval = 0.35
+
+    // camera system
     var editorCamera: PerspectiveCamera!
     var activeCamera: PerspectiveCamera!
-    
+
     var isCameraPanelExpanded: Bool = false
-    
+
     var sceneCameras: [PerspectiveCamera] = []
     var cameraToVisualMap: [PerspectiveCamera: Entity] = [:]
 
@@ -396,7 +394,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var currentAxis: GizmoAxis = .none
     var currentActionMenu: EntityActionMenu?
     weak var colorPickerTargetEntity: ModelEntity?
-    
+
     var rightPanelTransitioningDelegate = RightPanelTransitioningDelegate()
 
      struct SceneCameraItem {
@@ -517,7 +515,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
      var playbackState: PlaybackState = .stopped
 
      var selectedPathClipID: UUID?
-     
+
      // ISSUE 4 & 5: Stored constraint references for camera panel layout
      var panelTrailingConstraint: NSLayoutConstraint?
      var panelHeightConstraint: NSLayoutConstraint?
@@ -554,11 +552,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var selectedArcClipID: UUID?
 
     // Arc handle drag state — self-contained, bypasses gizmo system.
-    var draggingArcHandle:  Entity?
-    var draggingArcClipID:  UUID?
-    var draggingArcRole:    RotationArcComponent.Role?
-    var arcDragLastAngle:   Float = 0
-    var arcDragCentre:      SIMD3<Float>?
+    var draggingArcHandle: Entity?
+    var draggingArcClipID: UUID?
+    var draggingArcRole: RotationArcComponent.Role?
+    var arcDragLastAngle: Float = 0
+    var arcDragCentre: SIMD3<Float>?
 
     // MARK: - Animation Fix helpers
     var lastUndoTime: TimeInterval = 0
@@ -653,7 +651,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // Navigation Compass
     let compassView = CompassView()
-    
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -703,7 +701,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
          displayLink?.invalidate()
          displayLink = nil
      }
-     
+
      override func viewDidLayoutSubviews() {
          super.viewDidLayoutSubviews()
          // ISSUE 4 & 5: Update camera panel size on layout changes
@@ -716,9 +714,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
              // ISSUE 4 & 5: Recompute panel layout on rotation
              self.updateCameraPanelLayout()
              self.cameraCollectionView?.collectionViewLayout.invalidateLayout()
-         })
+         }, completion: nil)
      }
-     
+
      private func updateCameraPanelLayout() {
          // ISSUE 4 & 5: Recompute sizes based on current device and orientation
          let isLarge = isLargeIPad
@@ -726,20 +724,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
          let availableHeight = view.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom - topControlsHeight
          let newMaxHeight = min(availableHeight * 0.55, isLarge ? 420 : 340)
          let cellHeight = newPanelWidth * 0.75
-         
+
          // Update stored constraints
          panelWidthConstraint?.constant = newPanelWidth
          panelHeightConstraint?.constant = newMaxHeight
-         
+
          // Update collection view layout item size
          if let layout = cameraCollectionView?.collectionViewLayout as? UICollectionViewFlowLayout {
              layout.itemSize = CGSize(width: newPanelWidth - 16, height: cellHeight)
          }
      }
 
-
     // MARK: - Preview ARView Cleanup
-    
+
     /// Cleans up all cloned entities in the offscreen preview ARView.
     /// Called when loading a new scene to prevent memory accumulation from
     /// orphaned preview clones.
@@ -748,7 +745,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         // Access the previewARView computed property from the Camera extension
         // to clean up any clones that accumulated during preview updates
         let previewView = self.previewARView
-        
+
         print("🧹 Cleaning up preview ARView...")
         previewView.scene.anchors.forEach { anchor in
             anchor.children.forEach { $0.removeFromParent() }
@@ -760,7 +757,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
          // Safety net: ensure the display link is gone even if viewWillDisappear was skipped.
          displayLink?.invalidate()
          displayLink = nil
-         
+
          // FIX: Safety cleanup - evict scene from cache if commitExit() wasn't called normally.
          // This catches edge cases where the VC is dismissed abnormally (e.g., navigation pop),
          // ensuring the scene is cleared from the cache to prevent memory bloat.
@@ -915,7 +912,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             guard activeLights < 8 else {
                 DispatchQueue.main.async {
                     let alert = UIAlertController(
-                        title:   "Light Limit Reached",
+                        title: "Light Limit Reached",
                         message: "RealityKit supports a maximum of 8 lights per scene.",
                         preferredStyle: .alert
                     )
@@ -958,7 +955,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     }
                     return
                 }
-                if checkName.contains("scenecamera") || item.modelFileName == "cam1" { spawnSceneCamera(modelName: item.modelFileName, displayName: item.title); return }
+                if checkName.contains("scenecamera") || item.modelFileName == "cam1" {
+                    spawnSceneCamera(modelName: item.modelFileName, displayName: item.title)
+                    return
+                }
                 if item.isBackground { spawnBackgroundPlane(item); return }
 
                 // ── Procedural light — no .usdz to load ──────────────────────
@@ -1008,7 +1008,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 // FIX: Use the model cache for spawned entities to track memory and enable eviction.
                 // This prevents memory accumulation when creating scenes with many of the same model.
                 let entity: Entity
-                
+
                 if let customURL = item.customModelURL {
                     // Load custom URL models synchronously or asynchronously? Entity(contentsOf:) doesn't have an async equivalent on older iOS versions, but `try await Entity(contentsOf:)` isn't a thing unless we use `Entity.loadAsync`.
                     // Actually RealityKit has `Entity.load(contentsOf:)` or `Entity.loadAsync`. Let's use `Entity.load(contentsOf:)`.
@@ -1079,11 +1079,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                     // Promote any UnlitMaterial to PBR so all characters cast shadows.
                     ensureShadowCasting(on: entity)
                 }
-                
+
                 if let customURL = item.customModelURL {
                     entity.components.set(CustomPropComponent(customModelURL: customURL))
                 }
-                
+
                 entity.generateCollisionShapes(recursive: true)
                 entity.components.set(InputTargetComponent())
 
@@ -1151,12 +1151,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - Pan gesture
 
+    // swiftlint:disable:next cyclomatic_complexity
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
         // When looking through a scene camera, 1-finger pan = point camera
         guard activeCamera === editorCamera else { return }
         let location = gesture.location(in: arView)
-
-
 
         // .began — detect arc tip using hitTest (collision-based, works in non-AR mode)
         if gesture.state == .began {
@@ -1165,8 +1164,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                let arcComp = hit.components[RotationArcComponent.self],
                let anchor  = arView.scene.findEntity(named: "MainAnchor"),
                let clipIdx = timeline.clips.firstIndex(where: { $0.id == arcComp.clipID }),
-               let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName)
-            {
+               let entity  = arView.scene.findEntity(named: timeline.clips[clipIdx].entityName) {
                 saveCurrentStateToUndo()
                 draggingArcHandle = hit
                 draggingArcClipID = arcComp.clipID
@@ -1198,8 +1196,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
            let visual  = activeRotationArcs[clipID],
            let anchor  = mainAnchor,
            let clipIdx = timeline.clips.firstIndex(where: { $0.id == clipID }),
-           let entity  = anchor.findEntity(named: timeline.clips[clipIdx].entityName)
-        {
+           let entity  = anchor.findEntity(named: timeline.clips[clipIdx].entityName) {
             let clip       = timeline.clips[clipIdx]
             let axis       = RotationPathRenderer.axisOf(clip)
             let arcCentreW = entity.position(relativeTo: nil)  // world-space arc centre
@@ -1234,7 +1231,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 timeline.clips[clipIdx] = AnimationClip(
                     preservingID: clip,
                     fromValue: axis.simdAxis,
-                    toValue:   SIMD3<Float>(newTotal, currentStart, 0)
+                    toValue: SIMD3<Float>(newTotal, currentStart, 0)
                 )
 
             case .start:
@@ -1247,7 +1244,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 timeline.clips[clipIdx] = AnimationClip(
                     preservingID: clip,
                     fromValue: axis.simdAxis,
-                    toValue:   SIMD3<Float>(currentTotal, newStart, 0)
+                    toValue: SIMD3<Float>(currentTotal, newStart, 0)
                 )
             }
 
@@ -1255,9 +1252,8 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             return
         }
 
-        if (gesture.state == .ended || gesture.state == .cancelled),
-           draggingArcHandle != nil
-        {
+        if gesture.state == .ended || gesture.state == .cancelled,
+           draggingArcHandle != nil {
             draggingArcHandle = nil
             draggingArcClipID = nil
             draggingArcRole   = nil
@@ -1528,11 +1524,11 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                    var path       = timeline.clips[clipIndex].motionPath,
                    let visual     = activeMotionPaths[handleComp.clipID] {
                     updateMotionPathHandle(
-                        target:    target,
-                        newPos:    newWorldPos,
+                        target: target,
+                        newPos: newWorldPos,
                         clipIndex: clipIndex,
-                        path:      &path,
-                        visual:    visual
+                        path: &path,
+                        visual: visual
                     )
                 }
                 // Motion path handle drag is handled above.
@@ -1636,7 +1632,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
                 let newLenP = simd_length(newVecP)
                 if oldLenP > 0.0001 && newLenP > 0.0001 {
                     let oPx = simd_normalize(oldVecP)
-                    let upP: SIMD3<Float> = abs(oPx.y) < 0.99 ? [0,1,0] : [1,0,0]
+                    let upP: SIMD3<Float> = abs(oPx.y) < 0.99 ? [0, 1, 0] : [1, 0, 0]
                     let oPz = simd_normalize(simd_cross(oPx, upP))
                     let oPy = simd_cross(oPz, oPx)
                     let nPx = simd_normalize(newVecP)
@@ -1710,7 +1706,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
             let newLen2 = simd_length(newVec2)
             if oldLen2 > 0.0001 && newLen2 > 0.0001 {
                 let oX  = simd_normalize(oldVec2)
-                let up2: SIMD3<Float> = abs(oX.y) < 0.99 ? [0,1,0] : [1,0,0]
+                let up2: SIMD3<Float> = abs(oX.y) < 0.99 ? [0, 1, 0] : [1, 0, 0]
                 let oZ  = simd_normalize(simd_cross(oX, up2))
                 let oY  = simd_cross(oZ, oX)
                 let nX  = simd_normalize(newVec2)
@@ -1844,19 +1840,19 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
 // MARK: - Collision Prevention Helper
 
 extension CanvasViewController {
-    
+
     /// Builds a snapshot of sibling bounds at drag start.
     /// Called once in handlePan(.began) so .changed never traverses the scene graph per frame.
     private func buildSiblingBoundsCache() {
         guard let anchor = mainAnchor else { cachedSiblingBounds = []; return }
-        
+
         // Characters are allowed to overlap everything — skip building the cache.
         if let draggedCategory = selectedEntity?.components[CategoryComponent.self],
            draggedCategory.toolType == .character {
             cachedSiblingBounds = []
             return
         }
-        
+
         cachedSiblingBounds = anchor.children.compactMap { sibling in
             guard sibling !== selectedEntity,
                   sibling.name != "GizmoRoot",
@@ -1865,18 +1861,18 @@ extension CanvasViewController {
                   sibling.name != "PathContainer",
                   !sibling.children.isEmpty || sibling is ModelEntity
             else { return nil }
-            
+
             // Also skip characters as collision targets —
             // non-character entities should not be blocked by characters either.
             if let cat = sibling.components[CategoryComponent.self],
                cat.toolType == .character {
                 return nil
             }
-            
+
             return (sibling, sibling.visualBounds(relativeTo: nil))
         }
     }
-    
+
     /// Clamps `proposedPosition` to smoothly avoid overlapping any sibling entity.
     /// Uses `cachedSiblingBounds` so this is O(n) with no extra scene-graph work.
     /// Instead of hard-blocking, applies gentle repulsion so colliding objects
@@ -1886,21 +1882,21 @@ extension CanvasViewController {
         proposedPosition: SIMD3<Float>
     ) -> SIMD3<Float> {
         guard !cachedSiblingBounds.isEmpty else { return proposedPosition }
-        
+
         // Temporarily move entity to proposed position to compute its bounds there
         let originalPosition = entity.position
         entity.position      = proposedPosition
         let selfBounds       = entity.visualBounds(relativeTo: nil)
         entity.position      = originalPosition
-        
+
         var resolved = proposedPosition
-        
+
         for (_, otherBounds) in cachedSiblingBounds {
             let overlapX = selfBounds.max.x > otherBounds.min.x && selfBounds.min.x < otherBounds.max.x
             let overlapY = selfBounds.max.y > otherBounds.min.y && selfBounds.min.y < otherBounds.max.y
             let overlapZ = selfBounds.max.z > otherBounds.min.z && selfBounds.min.z < otherBounds.max.z
             guard overlapX && overlapY && overlapZ else { continue }
-            
+
             // Calculate penetration depths on all axes
             let penRight  = selfBounds.max.x  - otherBounds.min.x
             let penLeft   = otherBounds.max.x  - selfBounds.min.x
@@ -1908,15 +1904,15 @@ extension CanvasViewController {
             let penBottom = otherBounds.max.y  - selfBounds.min.y
             let penFront  = selfBounds.max.z  - otherBounds.min.z
             let penBack   = otherBounds.max.z  - selfBounds.min.z
-            
+
             // Find the minimum penetration direction
             let minPen = min(penRight, penLeft, penTop, penBottom, penFront, penBack)
-            
+
             // Apply a fraction (0.4) of the minimum penetration for smooth, gentle repulsion
             // instead of hard-blocking. This lets objects smoothly push apart.
             let repulsionFactor: Float = 0.4
             let gentleRepulsion = minPen * repulsionFactor
-            
+
             if minPen == penRight {
                 resolved.x += gentleRepulsion
             } else if minPen == penLeft {
@@ -1931,7 +1927,7 @@ extension CanvasViewController {
                 resolved.z -= gentleRepulsion
             }
         }
-        
+
         // Clamp Y floor — entity bottom must not go below ground
         // Skip for lights and cameras — they need to float freely.
         let skipYClamp: Bool = {
@@ -1957,7 +1953,6 @@ extension CanvasViewController {
         }
         return entity.position(relativeTo: nil)
     }
-
 
 }
 
@@ -1986,6 +1981,6 @@ extension CanvasViewController {
     static let editorOverlayPrefixes = [
         "PathRoot_",       // Motion path visualizations
         "RotationArc_",    // Rotation arc visualizations
-        "GizmoRoot",       // Transform gizmos
+        "GizmoRoot"       // Transform gizmos
     ]
 }

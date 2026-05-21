@@ -33,7 +33,7 @@ class ToolSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 11/255, green:  11/255, blue: 22/255, alpha: 1)
+        view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
 
         setupTitle()
         setupCollection()
@@ -42,10 +42,10 @@ class ToolSheetViewController: UIViewController {
         if tool == .background || tool == .prop {
             setupPlusButton()
         }
-        
+
         NotificationCenter.default.addObserver(self, selector: #selector(handlePropsUpdated), name: NSNotification.Name(NotificationNames.propsUpdated), object: nil)
     }
-    
+
     @objc private func handlePropsUpdated() {
         self.collectionView.reloadData()
     }
@@ -54,9 +54,8 @@ class ToolSheetViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
-
 
     func setupTitle() {
         titleLabel.text = tool.title
@@ -75,10 +74,10 @@ class ToolSheetViewController: UIViewController {
     func setupCollection() {
         collectionView.backgroundColor = .clear
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        
+
         // Register your existing ToolCell
         collectionView.register(ToolCell.self, forCellWithReuseIdentifier: "ToolCell")
-        
+
         collectionView.dataSource = self
         collectionView.delegate = self
 
@@ -91,20 +90,20 @@ class ToolSheetViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
-    
+
     func setupPlusButton() {
         let plusButton = UIButton(type: .system)
-        
+
         if tool == .prop {
             plusButton.setImage(UIImage(systemName: "plus"), for: .normal)
         } else {
             let largeConfig = UIImage.SymbolConfiguration(pointSize: 44, weight: .light, scale: .default)
             plusButton.setImage(UIImage(systemName: "plus.circle.fill", withConfiguration: largeConfig), for: .normal)
         }
-        
+
         plusButton.tintColor = tool == .prop ? UIColor(named: "AccentColor") ?? .systemBlue : .label
         plusButton.translatesAutoresizingMaskIntoConstraints = false
-        
+
         // Logic to open picker
         plusButton.addAction(UIAction { [weak self] _ in
             if self?.tool == .background {
@@ -119,18 +118,18 @@ class ToolSheetViewController: UIViewController {
         NSLayoutConstraint.activate([
             plusButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
             plusButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            
+
             plusButton.widthAnchor.constraint(equalToConstant: 60),
             plusButton.heightAnchor.constraint(equalToConstant: 60)
         ])
     }
-    
+
     func presentPropImportPicker() {
         let coordinator = PropImportCoordinator()
         self.importCoordinator = coordinator
         coordinator.start(presentingViewController: self)
     }
-    
+
     func presentBackgroundImagePicker() {
         var config = PHPickerConfiguration()
         config.filter = .images
@@ -150,22 +149,24 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ToolCell", for: indexPath) as! ToolCell
-        
+
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ToolCell", for: indexPath) as? ToolCell else {
+            return UICollectionViewCell()
+        }
+
         let item = tool.items[indexPath.item]
-        
+
         cell.configure(with: item)
-        
+
         if let customImage = item.customImage {
             cell.imageView.image = customImage
         }
-        
+
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        
+
         let item = tool.items[indexPath.item]
 
         // 1. Handle Background Logic
@@ -173,17 +174,16 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
             // FIX: Only call onSelect.
             // Do NOT call BackgroundStore.shared.selectBackground(item) here,
             // because onSelect already triggers the spawn via the Canvas.
-            
+
             onSelect(item)
-            
+
             dismiss(animated: true)
             return
         }
 
         // 2. Handle Character Logic
         if tool == .character {
-            let detailVC = CharacterDetailViewController(item: item){
-                (selectedItem: SpawnItem) in
+            let detailVC = CharacterDetailViewController(item: item) { (selectedItem: SpawnItem) in
                 self.onSelect(selectedItem)
                 self.dismiss(animated: true)
             }
@@ -212,39 +212,39 @@ extension ToolSheetViewController: PHPickerViewControllerDelegate {
         guard let provider = results.first?.itemProvider,
               provider.canLoadObject(ofClass: UIImage.self) else { return }
 
-        provider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
+        provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
             guard let self = self, let uiImage = image as? UIImage else { return }
-            
+
             DispatchQueue.main.async {
                 self.handleNewBackgroundImage(uiImage)
             }
         }
     }
-    
+
     func handleNewBackgroundImage(_ image: UIImage) {
         let alert = UIAlertController(title: "Name your Background",
                                       message: "Enter a name for this image",
                                       preferredStyle: .alert)
-        
+
         alert.addTextField { $0.placeholder = "Background Name" }
-        
+
         let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
             guard let self = self else { return }
             let name = alert.textFields?.first?.text ?? "New Background"
-            
+
             // Create and Add to Store
             let newItem = BackgroundItem(title: name, imageName: nil, customImage: image)
             BackgroundStore.shared.addBackground(newItem)
-            
+
             // Reload UI
             self.collectionView.reloadData()
         }
-        
+
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-        
+
         alert.addAction(saveAction)
         alert.addAction(cancelAction)
-        
+
         present(alert, animated: true)
     }
 }

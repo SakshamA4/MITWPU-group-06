@@ -1,0 +1,184 @@
+disabled_rules:
+  - vertical_parameter_alignment          # conflicts with Xcode auto-format
+  - inclusive_language                    # project-internal math variables
+
+opt_in_rules:
+  - for_where
+  - shorthand_operator
+
+included:
+  - FilmsPage
+
+excluded:
+  - FilmsPage.xcodeproj
+  - Assets.xcassets
+
+# ── Thresholds adjusted for project scale ───────────────────────────────────
+
+line_length:
+  warning: 250
+  error: 300
+  ignores_comments: true
+  ignores_urls: true
+
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1
+  max_length:
+    warning: 60
+    error: 60
+  excluded:
+    # Mathematical / loop / convention names that are acceptable
+    - i
+    - j
+    - k
+    - x
+    - y
+    - z
+    - t
+    - u
+    - v
+    - w
+    - h
+    - r
+    - g
+    - b
+    - a
+    - n
+    - m
+    - e
+    - p
+    - q
+    - d
+    - f
+    - s
+    - l
+    # Two-letter abbreviations used consistently across the project
+    - iv
+    - pb
+    - sf
+    - df
+    - rf
+    - ap
+    - ax
+    - zf
+    - ok
+    - bg
+    - av
+    - vc
+    - cv
+    - sv
+    - tv
+    - tf
+    - tf
+    - ct
+    - pc
+    - ps
+    - pe
+    - mm
+    - lm
+    - sh
+    - eh
+    - pu
+    - pv
+    - up
+    - lc
+    - nx
+    - ny
+    - cx
+    - cy
+    - bv
+    - dx
+    - dy
+    - dz
+    - rw
+    - rh
+    - rd
+    - cs
+    - me
+    - mc
+    - fb
+    - ip
+    - cg
+    - sb
+    - to
+    - tx
+    - ty
+    - tz
+    - sx
+    - sy
+    - sz
+    - qx
+    - qy
+    - qz
+    - qw
+    - tw
+    - th
+    - tt
+    - uu
+    - d0
+    - d1
+    - t0
+    - t1
+    - p0
+    - p1
+    - a0
+    - a1
+    - c1
+    - c2
+    - r1
+    - r2
+    - g1
+    - g2
+    - b1
+    - b2
+    - a1
+    - a2
+    - oX
+    - oY
+    - oZ
+    - nX
+    - nY
+    - nZ
+
+function_body_length:
+  warning: 400
+  error: 500
+
+type_body_length:
+  warning: 1200
+  error: 1500
+
+file_length:
+  warning: 2000
+  error: 2500
+  ignore_comment_only_lines: true
+
+cyclomatic_complexity:
+  warning: 40
+  error: 60
+
+function_parameter_count:
+  warning: 20
+  error: 25
+
+large_tuple:
+  warning: 3
+  error: 4
+
+nesting:
+  type_level:
+    warning: 3
+
+# ── Rule-specific configuration ──────────────────────────────────────────────
+
+force_cast: warning          # downgrade from error to warning
+force_try: warning           # downgrade from error to warning
+
+switch_case_alignment:
+  indented_cases: false
+
+multiple_closures_with_trailing_closure: warning
+
+closure_parameter_position: warning

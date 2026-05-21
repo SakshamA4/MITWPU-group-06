@@ -40,23 +40,21 @@ extension CanvasViewController {
 //        }
 //    }
 
-    
     @objc func undoTapped() {
         guard let previousState = undoStack.popLast() else { return }
-        
+
         // Save current state to redo before going back
         redoStack.append(createCurrentSnapshot())
         applySnapshot(previousState)
         refreshSidebarContent()
     }
 
-    
     @objc func redoTapped() {
         guard let nextState = redoStack.popLast() else { return }
-        
+
         // Save current state to undo before going forward
         undoStack.append(createCurrentSnapshot())
-        
+
         applySnapshot(nextState)
     }
 
@@ -69,7 +67,6 @@ extension CanvasViewController {
 //        }
 //    }
 
-    
     func restoreEntity(named name: String, with transform: Transform) {
         // 1. Detect category for all toolbar items based on your naming conventions
         let toolType: ToolType
@@ -86,7 +83,7 @@ extension CanvasViewController {
         } else {
             toolType = .prop
         }
-        
+
         // 2. Prepare the SpawnItem with all required compiler arguments
         let item = SpawnItem(
             title: name,
@@ -94,7 +91,7 @@ extension CanvasViewController {
             modelFileName: name,
             isBackground: name.contains("Background")
         )
-        
+
         Task {
             // 3. Re-spawn using your master logic
             // 📍 IMPORTANT: We pass 'isRestoring: true' so it doesn't create a new Undo point
@@ -104,7 +101,7 @@ extension CanvasViewController {
                 customName: name,
                 isRestoring: true
             )
-            
+
             // 4. 📍 THE FIX: Use a slight delay to ensure RealityKit has finished
             // adding the entity to the anchor before applying the transform
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -113,14 +110,13 @@ extension CanvasViewController {
                     reSpawned.transform = transform
                     print("✅ Redo Success: Restored \(name) to previous transform")
                 }
-                
+
                 // 5. Update Sidebar UI to show the restored item
                 self.refreshSidebarContent()
             }
         }
     }
 
-    
     func createCurrentSnapshot() -> SceneSnapshot {
         var snapshotDict: [String: Transform] = [:]
 
@@ -134,7 +130,6 @@ extension CanvasViewController {
         return SceneSnapshot(entityTransforms: snapshotDict)
     }
 
-    
     func saveStateForUndo() {
         undoStack.append(createCurrentSnapshot())
         redoStack.removeAll()

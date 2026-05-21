@@ -9,7 +9,6 @@ import ARKit
 
 extension CanvasViewController {
 
-
 //    func applySky(type: String) {
 //        guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 //
@@ -60,13 +59,9 @@ extension CanvasViewController {
 
     func removeSky() {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
-        var removed = false
-        for child in anchor.children {
-            if child.name.hasPrefix("ProceduralSky") {
-                child.removeFromParent()
-                removed = true
-            }
-        }
+        let skyEntities = anchor.children.filter { $0.name.hasPrefix("ProceduralSky") }
+        let removed = !skyEntities.isEmpty
+        skyEntities.forEach { $0.removeFromParent() }
         if removed {
             arView.environment.background = .color(.white)
             print("☁️ Sky removed")

@@ -5,9 +5,9 @@
 ////  Created by SDC-USER on 08/12/25.
 ////
 //
-//import UIKit
+// import UIKit
 //
-//class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
+// class AllCharactersViewController: UIViewController , UICollectionViewDataSource {
 //
 //    var characters: [FilmCharacter] = []
 //    var film: Film!
@@ -104,9 +104,9 @@
 //    }
 //    */
 //
-//}
+// }
 //
-//extension AllCharactersViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+// extension AllCharactersViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
 //    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
 //        let inset: CGFloat = 40
 //        let interItem: CGFloat = 40
@@ -119,12 +119,12 @@
 //    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
 //        return UIEdgeInsets(top: 16, left: 52, bottom: 16, right: 52)
 //    }
-//}
+// }
 //
 //
 //// Add this extension to AllCharactersViewController.swift
 //
-//extension AllCharactersViewController {
+// extension AllCharactersViewController {
 //    
 //    // MARK: - Context Menu
 //    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
@@ -154,6 +154,6 @@
 //        
 //        // The existing observer in viewWillAppear will catch this and call loadCharacters()
 //    }
-//}
+// }
 //
 //

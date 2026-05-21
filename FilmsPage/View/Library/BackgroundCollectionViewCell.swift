@@ -8,29 +8,29 @@
 import UIKit
 
 class BackgroundCollectionViewCell: UICollectionViewCell {
-    
+
     static let reuseIdentifier = "BackgroundCollectionViewCell"
-    
+
     @IBOutlet weak var backgroundImageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
-    
+
     private let gradientLayer = CAGradientLayer()
-       
+
        override func awakeFromNib() {
            super.awakeFromNib()
-           
+
            setupUI()
 //           setupGradient()
        }
-       
+
        override func layoutSubviews() {
            super.layoutSubviews()
            gradientLayer.frame = backgroundImageView.bounds
        }
-       
+
     func configure(with item: BackgroundItem) {
         titleLabel.text = item.title
-        
+
         if let customImg = item.customImage {
             backgroundImageView.image = customImg
         } else if let name = item.imageName {
@@ -41,20 +41,20 @@ class BackgroundCollectionViewCell: UICollectionViewCell {
 
    // MARK: - Setup
    private extension BackgroundCollectionViewCell {
-       
+
        func setupUI() {
            contentView.layer.cornerRadius = 12
            contentView.layer.masksToBounds = true
            contentView.backgroundColor = UIColor(hex: "#1A1A1A")
-           
+
            backgroundImageView.contentMode = .scaleAspectFill
            backgroundImageView.clipsToBounds = true
-           
+
 //           titleLabel.textColor = .white
 //           titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
 //           titleLabel.numberOfLines = 2
        }
-       
+
 //       func setupGradient() {
 //           gradientLayer.colors = [
 //               UIColor(hex: "#00000000").cgColor, // transparent top

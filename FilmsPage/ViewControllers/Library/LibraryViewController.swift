@@ -8,15 +8,14 @@
 import UIKit
 
 class LibraryViewController: UIViewController, UICollectionViewDelegate {
-    
-    
+
     @IBOutlet weak var libraryCollectionView: UICollectionView!
-    
+
     private let libraryData = LibraryModel.sections
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
-                
+
                 registerCell()
         libraryCollectionView.delegate = self
                 libraryCollectionView.dataSource = self
@@ -27,19 +26,18 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.libraryCollectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
-
         // Do any additional setup after loading the view.
-    
+
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
-        
+
         let sectionType = LibrarySection.allCases[indexPath.section]
         guard let items = LibraryModel.sections[sectionType] else { return }
         let item = items[indexPath.row]
-        
+
         let storyboard = UIStoryboard(name: "Library", bundle: nil)  // or "Main" if that's where it is
 
             switch item.destinationKey {
@@ -59,26 +57,26 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
                 navigationController?.pushViewController(scenesVC, animated: true)
 
             case "camerasAndMovements":
-                
+
                 guard let cameraVC = storyboard.instantiateViewController(
                     withIdentifier: "CameraViewController"   // storyboard ID
                 ) as? CameraViewController else { return }
 
                 navigationController?.pushViewController(cameraVC, animated: true)
-                
+
             case "props":
-                
+
                 guard let propsVC = storyboard.instantiateViewController(
                         withIdentifier: "LibraryPropsViewController"
                     ) as? LibraryPropsViewController else { return }
                     navigationController?.pushViewController(propsVC, animated: true)
-                    
+
             case "lights":
                     guard let lightsVC = storyboard.instantiateViewController(
                         withIdentifier: "LightsViewController"
                     ) as? LightsViewController else { return }
                     navigationController?.pushViewController(lightsVC, animated: true)
-                    
+
             case "characters":
                     guard let charactersVC = storyboard.instantiateViewController(
                         withIdentifier: "LibraryCharactersViewController"
@@ -89,10 +87,10 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
                 break
             }
         }
-    
+
     func generateLayout() -> UICollectionViewLayout {
-        let layout = UICollectionViewCompositionalLayout { sectionIndex, environment in
-            
+        let layout = UICollectionViewCompositionalLayout { sectionIndex, _ in
+
             // Common item configuration
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
@@ -112,7 +110,7 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
                     repeatingSubitem: item,
                     count: 2
                 )
-                
+
                 let section = NSCollectionLayoutSection(group: group)
                 section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 73, bottom: 0, trailing: 73)
 //                section.interGroupSpacing = 25
@@ -142,21 +140,18 @@ class LibraryViewController: UIViewController, UICollectionViewDelegate {
         // Disable vertical scrolling on the whole collection view by constraining its height later
         return layout
     }
-    
+
     private func registerCell() {
         libraryCollectionView.register(
             UINib(nibName: "ScenesAndCameraCollectionViewCell", bundle: nil),
             forCellWithReuseIdentifier: "featured_cell"
         )
-        
+
         libraryCollectionView.register(
             UINib(nibName: "CharactersPropsLightsBackgroundCollectionViewCell", bundle: nil),
             forCellWithReuseIdentifier: "assets_cell"
         )
     }
-    
-    
-    
 
     /*
     // MARK: - Navigation
@@ -189,24 +184,23 @@ extension LibraryViewController: UICollectionViewDataSource {
             }
             let item = items[indexPath.row]
 
-           switch sectionType {
-           case . featured:
-               guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as? ScenesAndCameraCollectionViewCell else {
-                   return UICollectionViewCell()
-               }
-               cell.configure(with: item)
-               return cell
+            switch sectionType {
+            case .featured:
+                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "featured_cell", for: indexPath) as? ScenesAndCameraCollectionViewCell else {
+                    return UICollectionViewCell()
+                }
+                cell.configure(with: item)
+                return cell
 
-           case .assets:
-                   guard let cell = collectionView.dequeueReusableCell(
-                       withReuseIdentifier: "assets_cell",
-                       for: indexPath
-                   ) as? CharactersPropsLightsBackgroundCollectionViewCell else {
-                       return UICollectionViewCell()
-                   }
-                   cell.configure(with: item)
-                   return cell
-               }
+            case .assets:
+                guard let cell = collectionView.dequeueReusableCell(
+                    withReuseIdentifier: "assets_cell",
+                    for: indexPath
+                ) as? CharactersPropsLightsBackgroundCollectionViewCell else {
+                    return UICollectionViewCell()
+                }
+                cell.configure(with: item)
+                return cell
+            }
             }
         }
-        

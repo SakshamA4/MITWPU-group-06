@@ -31,7 +31,6 @@ extension CanvasViewController {
         print("Error: No image found for background \(item.title)")
     }
 
-    
     func applySky(type: String) {
 
             // 1. Remove existing sky (check both naming conventions for backward compatibility)
@@ -41,23 +40,17 @@ extension CanvasViewController {
                 existingSky.removeFromParent()
 
             }
-            
+
             // Also remove any ProceduralSky_<type> entities
             if let anchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
-                for child in anchor.children {
-                    if child.name.hasPrefix("ProceduralSky_") {
-                        child.removeFromParent()
-                    }
+                for child in anchor.children where child.name.hasPrefix("ProceduralSky_") {
+                    child.removeFromParent()
                 }
             }
-
-            
 
             var skyMaterial = UnlitMaterial()
 
             var topColor: UIColor = .systemBlue
-
-            
 
             // 2. Load Texture or Color
 
@@ -67,13 +60,9 @@ extension CanvasViewController {
 
             let imageSkyTypes: Set<String> = ["Blue_sky", "Evening_sky", "Nighty_night"]  // add new names here
 
-
-
             if imageSkyTypes.contains(type) {
 
                 if let texture = try? TextureResource.load(named: type) {
-
-            
 
                     skyMaterial.color.texture = .init(texture)
 
@@ -100,8 +89,6 @@ extension CanvasViewController {
             // FIX: Name should include type for proper saving/loading
             skyEntity.name = "ProceduralSky_\(type)"
 
-            
-
             // 4. THE FIX FOR INVERSION:
 
             // Instead of just flipping scale, we also apply a 180-degree rotation
@@ -112,13 +99,9 @@ extension CanvasViewController {
 
             skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
 
-            
-
             // 5. Final Setup
 
             skyEntity.components.set(CategoryComponent(toolType: .sky))
-
-            
 
             if let anchor = arView.scene.findEntity(named: "MainAnchor") {
 
@@ -127,7 +110,7 @@ extension CanvasViewController {
             }
 
         }
-    
+
     func applyBackgroundImage(_ image: UIImage) {
         guard let anchor = mainAnchor else { return }
 
@@ -142,7 +125,7 @@ extension CanvasViewController {
             do {
                 let safeCG  = image.sRGBCGImage()
                 let texture = try await TextureResource(
-                    image:   safeCG,
+                    image: safeCG,
                     options: .init(semantic: .color)
                 )
                 var material = UnlitMaterial()
@@ -151,9 +134,9 @@ extension CanvasViewController {
                 backgroundCounter += 1
                 let uniqueName = "Background_\(backgroundCounter)"
 
-                let aspect:    Float = Float(image.size.width / image.size.height)
-                let height:    Float = 1.5
-                let width:     Float = height * aspect
+                let aspect: Float = Float(image.size.width / image.size.height)
+                let height: Float = 1.5
+                let width: Float = height * aspect
                 let thickness: Float = 0.05
 
                 let mesh  = MeshResource.generateBox(width: width, height: height, depth: thickness)
@@ -206,7 +189,7 @@ extension CanvasViewController {
         realLight.position  = [0, 0, 0]
 
         let lensGlow = ModelEntity(
-            mesh:      .generateSphere(radius: 0.1),
+            mesh: .generateSphere(radius: 0.1),
             materials: [UnlitMaterial(color: .yellow)]
         )
         lensGlow.position = [10, 10, 0.1]
@@ -215,7 +198,7 @@ extension CanvasViewController {
         var beamMat = UnlitMaterial(color: .white)
         beamMat.blending = .transparent(opacity: .init(floatLiteral: 0.2))
         let beamVisual = ModelEntity(
-            mesh:      MeshResource.generateCone(height: 4.0, radius: 1.0),
+            mesh: MeshResource.generateCone(height: 4.0, radius: 1.0),
             materials: [beamMat]
         )
         beamVisual.orientation = simd_quaternion(-Float.pi / 2, [1, 0, 0])
@@ -386,7 +369,7 @@ extension CanvasViewController {
             yoke.position = [0, 0.58, 0]
             root.addChild(yoke)
         }
-        root.scale = SIMD3<Float>(repeating: 0.25) //new line
+        root.scale = SIMD3<Float>(repeating: 0.25) // new line
         root.generateCollisionShapes(recursive: true)
         return root
     }
@@ -397,9 +380,9 @@ extension CanvasViewController {
 
         // ── 1. CLEAN UP ────────────────────────────────────────────────────
         for name in ["LightCore", "LensGlow", "BeamCone", "GlowAnchor",
-                     "DiffuseFill", "GoboCookie", "LED_Guts_Group",
-                     "Lantern_Guts_Group", "LanternInternalLight",
-                     "LanternGlowFallback"] {
+                     "DiffuseFill", "GoboCookie", "GoboBeam", "GoboGate",
+                     "LED_Guts_Group", "Lantern_Guts_Group",
+                     "LanternInternalLight", "LanternGlowFallback"] {
             model.findEntity(named: name)?.removeFromParent()
         }
 
@@ -412,7 +395,6 @@ extension CanvasViewController {
 
         switch config.lightKind {
 
-      
         case .point:
             // Place point light in the center of the lantern
             let glowY = b.min.y + (b.extents.y * 0.50)
@@ -420,7 +402,7 @@ extension CanvasViewController {
             let point = PointLight()
             point.name                    = "LightCore"
             point.light.intensity         = config.intensity
-            point.light.color             = config.uiColor
+            point.light.color             = config.effectiveColor
             point.light.attenuationRadius = config.attenuationRadius
             point.scale                   = SIMD3(repeating: cs)
             point.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
@@ -433,7 +415,7 @@ extension CanvasViewController {
 
             let bulb = ModelEntity(
                 mesh: .generateSphere(radius: bulbRadius),
-                materials: [UnlitMaterial(color: config.uiColor)]
+                materials: [UnlitMaterial(color: config.effectiveColor)]
             )
 
             bulb.name = "LanternBulb"
@@ -453,7 +435,7 @@ extension CanvasViewController {
                     for mat in mc.materials {
                         if var pbr = mat as? PhysicallyBasedMaterial {
                             if case .transparent = pbr.blending {
-                                pbr.emissiveColor     = .init(color: config.uiColor)
+                                pbr.emissiveColor     = .init(color: config.effectiveColor)
                                 pbr.emissiveIntensity = 3.0
                                 newMaterials.append(pbr)
                                 changed = true
@@ -491,7 +473,7 @@ extension CanvasViewController {
 
                 let glow = ModelEntity(
                     mesh: .generateSphere(radius: glowRadius),
-                    materials: [UnlitMaterial(color: config.uiColor)]
+                    materials: [UnlitMaterial(color: config.effectiveColor)]
                 )
 
                 glow.name = "LanternGlowFallback"
@@ -514,7 +496,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale    = SIMD3(repeating: cs)
@@ -545,6 +527,11 @@ extension CanvasViewController {
             print("SPOTLIGHT: lens at \(lensPos), aiming toward -X")
             model.addChild(spot)
 
+            // ── Gobo gate mask ───────────────────────────────────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
+
         // ════════════════════════════════════════════════════════════════════
         // LED PANEL — SpotLight at panel head (85% height), aimed forward-down
         // The panel head with 4×3 LED circles sits at the top of the tripod.
@@ -563,7 +550,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale                     = SIMD3(repeating: cs)
@@ -600,6 +587,11 @@ extension CanvasViewController {
 
             model.addChild(spot)
 
+            // ── Gobo gate mask (panels can also use gobos) ──────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
+
         } // end switch
 
         model.components.set(config)
@@ -615,7 +607,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
 
             if config.shadowEnabled {
@@ -627,21 +619,20 @@ extension CanvasViewController {
                 spot.shadow = nil
             }
 
-
-            // ============================================================
-            // UPDATE LANTERN LIGHT PROPERTIES
-            // ============================================================
-            case .point:
+        // ============================================================
+        // UPDATE LANTERN LIGHT PROPERTIES
+        // ============================================================
+        case .point:
                 guard let point = lightCore as? PointLight else { return }
 
                 point.light.intensity         = config.intensity
-                point.light.color             = config.uiColor
+                point.light.color             = config.effectiveColor
                 point.light.attenuationRadius = config.attenuationRadius
 
                 // Update visible bulb color
                 if let bulb = entity.findEntity(named: "LanternBulb") as? ModelEntity {
                     bulb.model?.materials = [
-                        UnlitMaterial(color: config.uiColor)
+                        UnlitMaterial(color: config.effectiveColor)
                     ]
                 }
 
@@ -654,7 +645,7 @@ extension CanvasViewController {
                         for mat in mc.materials {
                             if var pbr = mat as? PhysicallyBasedMaterial {
                                 if case .transparent = pbr.blending {
-                                    pbr.emissiveColor     = .init(color: config.uiColor)
+                                    pbr.emissiveColor     = .init(color: config.effectiveColor)
                                     pbr.emissiveIntensity = 3.0
                                     newMaterials.append(pbr)
                                     changed = true
@@ -681,7 +672,7 @@ extension CanvasViewController {
 
             // Update fallback glow sphere color if present
             if let fb = entity.findEntity(named: "LanternGlowFallback") as? ModelEntity {
-                fb.model?.materials = [UnlitMaterial(color: config.uiColor)]
+                fb.model?.materials = [UnlitMaterial(color: config.effectiveColor)]
             }
         }
 
@@ -690,13 +681,16 @@ extension CanvasViewController {
             updateProceduralEmissiveMaterials(on: entity, config: config)
         }
 
+        // ── Update gobo gate mask ────────────────────────────────────────────
+        updateGoboGateMask(on: entity, config: config)
+
         entity.components.set(config)
     }
 
     /// Updates emissive PBR materials on procedural light child entities
     /// when the user changes color temperature or intensity via the slider.
     private func updateProceduralEmissiveMaterials(on entity: Entity, config: LightConfigComponent) {
-        let color = config.uiColor
+        let color = config.effectiveColor
 
         // Practical Lantern — globe sphere
         if let globe = entity.findEntity(named: "ProceduralGlobe") as? ModelEntity {
@@ -719,6 +713,73 @@ extension CanvasViewController {
         }
     }
 
+    // MARK: - Gobo Gate Mask (Shadow-Casting Alpha Plane)
+    //
+    // RealityKit SpotLightComponent has NO projected-texture property.
+    // Correct workaround: a thin alpha-tested plane at the spotlight gate.
+    // With shadows enabled, the opaque parts cast gobo-shaped shadows onto
+    // scene surfaces (floor, walls, actors). The gate plane is paper-thin
+    // and invisible from the side — you only see the shaped light/shadows.
+    //
+    // REQUIREMENT: Shadows are auto-enabled when a gobo is active.
+
+    /// Adds an alpha-tested gate-mask plane as a child of the SpotLight entity.
+    private func addGoboGateMask(to spotEntity: Entity, config: LightConfigComponent) {
+        guard config.activeGobo != .none else { return }
+        guard let cgImage = config.activeGobo.generateTexture(
+            lightColor: config.effectiveColor, resolution: 512
+        ) else { return }
+
+        guard let texture = try? TextureResource.generate(
+            from: cgImage, options: .init(semantic: .color)
+        ) else {
+            print("GOBO: failed to create TextureResource")
+            return
+        }
+
+        // PBR material with opacityThreshold — shadow map respects alpha cutoff
+        var material = PhysicallyBasedMaterial()
+        material.baseColor = .init(tint: .black, texture: .init(texture))
+        material.opacityThreshold = 0.5
+        material.metallic = .init(floatLiteral: 0)
+        material.roughness = .init(floatLiteral: 1)
+
+        // Plane sized to cover beam cross-section at gate distance
+        let gateDistance: Float = 0.2
+        let outerRad = config.outerAngleDeg * (.pi / 180.0)
+        let planeHalf = gateDistance * tan(outerRad / 2.0) * 1.2
+        let gateSize = max(0.15, planeHalf * 2.0)
+
+        let gate = ModelEntity(
+            mesh: .generatePlane(width: gateSize, height: gateSize),
+            materials: [material]
+        )
+        gate.name = "GoboGate"
+        gate.position = SIMD3<Float>(0, 0, -gateDistance)
+
+        spotEntity.addChild(gate)
+
+        // Auto-enable shadows (required for gate mask to cast gobo pattern)
+        if let spot = spotEntity as? SpotLight, spot.shadow == nil {
+            var shadow = SpotLightComponent.Shadow()
+            shadow.depthBias = 0.01
+            spot.shadow = shadow
+        }
+
+        print("GOBO: gate mask '\(config.activeGobo.displayName)', size=\(gateSize)")
+    }
+
+    /// Updates or removes the gobo gate mask on a live entity.
+    private func updateGoboGateMask(on entity: Entity, config: LightConfigComponent) {
+        guard let lightCore = entity.findEntity(named: "LightCore") else { return }
+        lightCore.findEntity(named: "GoboGate")?.removeFromParent()
+
+        guard config.activeGobo != .none,
+              config.lightKind == .spot || config.lightKind == .panel else { return }
+
+        addGoboGateMask(to: lightCore, config: config)
+    }
+
     // MARK: Point light
 
     func spawnPointLight() {
@@ -728,7 +789,7 @@ extension CanvasViewController {
         lightEntity.light.attenuationRadius = 10.0
 
         let bulb = ModelEntity(
-            mesh:      .generateSphere(radius: 0.1),
+            mesh: .generateSphere(radius: 0.1),
             materials: [UnlitMaterial(color: .yellow)]
         )
         lightEntity.addChild(bulb)
@@ -1052,7 +1113,7 @@ extension CanvasViewController {
                 case "PNG":  self.captureCanvasAndShare(isPNG: true)
                 default:
                     let alert = UIAlertController(
-                        title:   "Info",
+                        title: "Info",
                         message: "\(format) export coming soon!",
                         preferredStyle: .alert
                     )
@@ -1130,13 +1191,13 @@ extension UIImage {
         let h  = Int(size.height * scale)
         let cs = CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(
-            data:             nil,
-            width:            max(w, 1),
-            height:           max(h, 1),
+            data: nil,
+            width: max(w, 1),
+            height: max(h, 1),
             bitsPerComponent: 8,
-            bytesPerRow:      0,
-            space:            cs,
-            bitmapInfo:       CGImageAlphaInfo.premultipliedLast.rawValue
+            bytesPerRow: 0,
+            space: cs,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
             fatalError("sRGBCGImage: failed to create CGContext for \(self)")
         }
@@ -1144,5 +1205,243 @@ extension UIImage {
         draw(in: CGRect(x: 0, y: 0, width: w, height: h))
         UIGraphicsPopContext()
         return ctx.makeImage()!
+    }
+}
+
+// MARK: - ExportVC
+
+class ExportVC: UIViewController {
+
+    // Closure to pass back the selected format (e.g., "JPEG", "PNG")
+    var onFormatSelected: ((String) -> Void)?
+    var projectName: String = "Untitled Scene"
+
+    private var selectedFormat: String = "JPEG"
+    private var selectedQuality: String = "High"
+
+    // MARK: - UI Components
+    private lazy var projectTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "PROJECT: \(projectName.uppercased())"
+        label.font = UIFont.systemFont(ofSize: 12, weight: .black)
+        label.textColor = .lightGray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private lazy var formatStackView: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.distribution = .fillEqually
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private lazy var qualityStackView: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private lazy var headerLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Export Options"
+        label.font = UIFont.systemFont(ofSize: 20, weight: .bold)
+        label.textColor = .white
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    // MARK: - Lifecycle & Setup
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1.0)
+
+        setupHeader()
+        setupFormatSelection()
+        setupQualitySelection()
+
+        updateFormatButtonAppearance(selectedFormat)
+        updateQualityButtonAppearance(selectedQuality)
+    }
+
+    private func setupHeader() {
+        view.addSubview(headerLabel)
+        view.addSubview(projectTitleLabel)
+        view.addSubview(formatStackView)
+
+        // Add a close button (top left corner)
+        let closeButton = UIButton(type: .system)
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
+        view.addSubview(closeButton)
+
+        NSLayoutConstraint.activate([
+            headerLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            headerLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+
+            projectTitleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            projectTitleLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 4),
+
+            closeButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            closeButton.centerYAnchor.constraint(equalTo: headerLabel.centerYAnchor)
+        ])
+    }
+
+    private func setupFormatSelection() {
+        let formatLabel = createSubtitleLabel(text: "Format:")
+        let formatContainer = UIView()
+        formatContainer.translatesAutoresizingMaskIntoConstraints = false
+        formatContainer.addSubview(formatStackView)
+        formatStackView.distribution = .fill // Change from .fillEqually if it feels too stretched
+        formatStackView.spacing = 16
+        let formats = ["JPEG", "PNG", "PDF", "MP4"]
+
+        for format in formats {
+            let button = createSelectionButton(title: format, action: #selector(didTapFormatButton(_:)))
+            formatStackView.addArrangedSubview(button)
+        }
+
+        view.addSubview(formatLabel)
+        view.addSubview(formatContainer)
+
+        NSLayoutConstraint.activate([
+            formatLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            formatLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 60),
+
+            formatContainer.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 12),
+            formatContainer.centerYAnchor.constraint(equalTo: formatLabel.centerYAnchor),
+
+            formatStackView.topAnchor.constraint(equalTo: formatContainer.topAnchor),
+            formatStackView.bottomAnchor.constraint(equalTo: formatContainer.bottomAnchor),
+            formatStackView.leadingAnchor.constraint(equalTo: formatContainer.leadingAnchor),
+            formatStackView.trailingAnchor.constraint(equalTo: formatContainer.trailingAnchor)
+        ])
+    }
+    private func setupQualitySelection() {
+        let qualityLabel = createSubtitleLabel(text: "Quality:")
+        view.addSubview(qualityLabel)
+        qualityStackView.distribution = .fill
+        qualityStackView.spacing = 16
+        view.addSubview(qualityStackView)
+        qualityStackView.isUserInteractionEnabled = true
+        qualityStackView.axis = .horizontal
+        qualityStackView.alignment = .fill
+        qualityStackView.distribution = .fill
+        qualityStackView.spacing = 16
+
+        let qualities = ["High", "Good"]
+        for quality in qualities {
+            let button = createSelectionButton(title: quality, action: #selector(didTapQualityButton(_:)))
+            button.accessibilityIdentifier = quality
+            qualityStackView.addArrangedSubview(button)
+        }
+
+        // 2. 📍 Ensure we have the top row buttons to match sizes
+        guard let jpegBtn = formatStackView.arrangedSubviews.first as? UIButton,
+              let pngBtn = formatStackView.arrangedSubviews.count > 1 ? formatStackView.arrangedSubviews[1] as? UIButton : nil
+        else { return }
+
+        NSLayoutConstraint.activate([
+            qualityLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            qualityLabel.topAnchor.constraint(equalTo: formatStackView.bottomAnchor, constant: 40),
+
+            // 3. 📍 Anchor the stack directly to the top row's leading edge
+            qualityStackView.leadingAnchor.constraint(equalTo: formatStackView.leadingAnchor),
+            qualityStackView.centerYAnchor.constraint(equalTo: qualityLabel.centerYAnchor),
+
+            // 4. 📍 Match High to JPEG and Good to PNG
+            (qualityStackView.arrangedSubviews[0]).widthAnchor.constraint(equalTo: jpegBtn.widthAnchor),
+            (qualityStackView.arrangedSubviews[1]).widthAnchor.constraint(equalTo: pngBtn.widthAnchor),
+
+            // 5. 📍 Match the height of the format stack
+            qualityStackView.heightAnchor.constraint(equalTo: formatStackView.heightAnchor)
+        ])
+    }
+
+    // MARK: - UI Helper Functions
+
+    private func createSubtitleLabel(text: String) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: 17, weight: .regular)
+        label.textColor = .lightGray
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }
+
+    private func createSelectionButton(title: String, action: Selector) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = UIColor(white: 0.1, alpha: 0.5)
+        button.layer.cornerRadius = 6
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.accessibilityIdentifier = title
+        button.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+
+    // MARK: - Action Handlers
+
+    @objc private func didTapClose() {
+        dismiss(animated: true)
+    }
+
+    @objc private func didTapFormatButton(_ sender: UIButton) {
+        guard let title = sender.accessibilityIdentifier else { return }
+        selectedFormat = title
+        updateFormatButtonAppearance(title)
+
+        onFormatSelected?(selectedFormat)
+    }
+
+    @objc private func didTapQualityButton(_ sender: UIButton) {
+        print("Button tapped with ID: \(sender.accessibilityIdentifier ?? "NIL")")
+
+        guard let title = sender.accessibilityIdentifier else { return }
+        selectedQuality = title
+        updateQualityButtonAppearance(title)
+    }
+
+    private func updateFormatButtonAppearance(_ selectedTitle: String) {
+        let appRed = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1.0)
+
+        formatStackView.arrangedSubviews.compactMap { $0 as? UIButton }.forEach { btn in
+            let isSelected = btn.accessibilityIdentifier == selectedTitle
+
+            btn.backgroundColor = isSelected ? appRed : UIColor.white.withAlphaComponent(0.05)
+            btn.layer.borderWidth = isSelected ? 0 : 1
+            btn.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
+
+            // Ensure text is white when selected for contrast
+            btn.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
+        }
+    }
+
+    private func updateQualityButtonAppearance(_ selectedTitle: String) {
+        let appRed = UIColor(red: 169/255, green: 32/255, blue: 57/255, alpha: 1.0)
+
+        qualityStackView.arrangedSubviews.compactMap { $0 as? UIButton }.forEach { btn in
+            let isSelected = btn.accessibilityIdentifier == selectedTitle
+
+            if isSelected { print("📍 UI Success: Selected \(selectedTitle)") }
+
+            btn.layer.borderWidth = isSelected ? 0 : 1
+            btn.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
+            btn.backgroundColor = isSelected ? appRed : UIColor.white.withAlphaComponent(0.05)
+
+            btn.setTitleColor(isSelected ? .white : .lightGray, for: .normal)
+        }
     }
 }

@@ -244,7 +244,7 @@ final class CameraViewOverlay: UIView {
             focalSlider.leadingAnchor.constraint(equalTo: focalLabel.trailingAnchor, constant: 12),
             focalSlider.centerYAnchor.constraint(equalTo: focalLabel.centerYAnchor),
             // Leave room for the focus segment (130pt) + margin (16pt + 16pt)
-            focalSlider.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -170),
+            focalSlider.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -170)
         ])
 
         updateFocalLabels(35)
@@ -285,9 +285,7 @@ final class CameraViewOverlay: UIView {
     /// Snap to common focal lengths when close (within ±2mm).
     private func snapToStandardFocalLength(_ mm: Float) -> Float {
         let standards: [Float] = [10, 14, 18, 24, 28, 35, 50, 70, 85, 100, 135, 200]
-        for s in standards {
-            if abs(mm - s) < 2.5 { return s }
-        }
+        for s in standards where abs(mm - s) < 2.5 { return s }
         return round(mm)
     }
 
@@ -311,7 +309,7 @@ final class CameraViewOverlay: UIView {
             gridButton.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 70),
             gridButton.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
             gridButton.widthAnchor.constraint(equalToConstant: 36),
-            gridButton.heightAnchor.constraint(equalToConstant: 36),
+            gridButton.heightAnchor.constraint(equalToConstant: 36)
         ])
 
         // ── Grid type picker (floating pill bar) ──
@@ -335,7 +333,7 @@ final class CameraViewOverlay: UIView {
             ("square.grid.4x3.fill", .fourByFour),
             ("arrow.up.right.and.arrow.down.left", .diagonal),
             ("square.grid.3x3.middleright.filled", .diagonalThirds),
-            ("plus", .centerCross),
+            ("plus", .centerCross)
         ]
         for (idx, (icon, type)) in gridIcons.enumerated() {
             let btn = UIButton(type: .system)
@@ -356,7 +354,7 @@ final class CameraViewOverlay: UIView {
         NSLayoutConstraint.activate([
             gridPicker.centerXAnchor.constraint(equalTo: centerXAnchor),
             gridPicker.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
-            gridPicker.heightAnchor.constraint(equalToConstant: 40),
+            gridPicker.heightAnchor.constraint(equalToConstant: 40)
         ])
 
         // ── Grid overlay layer ──
@@ -475,7 +473,7 @@ final class CameraViewOverlay: UIView {
             focusSegment.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -16),
             focusSegment.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -60),
             focusSegment.widthAnchor.constraint(equalToConstant: 130),
-            focusSegment.heightAnchor.constraint(equalToConstant: 28),
+            focusSegment.heightAnchor.constraint(equalToConstant: 28)
         ])
 
         // ── Left vertical slider (Aperture) ──
@@ -539,21 +537,21 @@ final class CameraViewOverlay: UIView {
             track.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 60),
             track.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -100),
             leading ? track.leadingAnchor.constraint(equalTo: side, constant: offset)
-                    : track.trailingAnchor.constraint(equalTo: side, constant: offset),
+                    : track.trailingAnchor.constraint(equalTo: side, constant: offset)
         ])
 
         // Slider rotated -90° to make it vertical
         NSLayoutConstraint.activate([
             slider.centerXAnchor.constraint(equalTo: track.centerXAnchor),
             slider.centerYAnchor.constraint(equalTo: track.centerYAnchor),
-            slider.widthAnchor.constraint(equalTo: track.heightAnchor),
+            slider.widthAnchor.constraint(equalTo: track.heightAnchor)
         ])
         slider.transform = CGAffineTransform(rotationAngle: -.pi / 2)
 
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: track.centerXAnchor),
             label.bottomAnchor.constraint(equalTo: track.bottomAnchor),
-            label.widthAnchor.constraint(greaterThanOrEqualToConstant: 40),
+            label.widthAnchor.constraint(greaterThanOrEqualToConstant: 40)
         ])
     }
 
@@ -637,7 +635,7 @@ final class CameraViewOverlay: UIView {
         let dist = rightSlider.value
         rightLabel.text = String(format: " %.1fm ", dist)
     }
-    
+
     /// Programmatically update focus distance (e.g. from AF raycast)
     func setFocusDistance(_ distance: Float) {
         rightSlider.value = max(rightSlider.minimumValue, min(rightSlider.maximumValue, distance))

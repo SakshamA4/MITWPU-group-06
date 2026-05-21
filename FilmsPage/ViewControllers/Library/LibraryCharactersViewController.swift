@@ -13,7 +13,7 @@ class LibraryCharactersViewController: UIViewController {
 
     private let characterService = CharacterService.shared
     private var characters: [CharacterItem] = []
-    
+
         override func viewDidLoad() {
             super.viewDidLoad()
             charactersCollectionView.dataSource = self
@@ -23,9 +23,8 @@ class LibraryCharactersViewController: UIViewController {
             charactersCollectionView.register(
                 UINib(nibName: "LibraryCharactersCollectionViewCell", bundle: nil),
                 forCellWithReuseIdentifier: "LibraryCharactersCollectionViewCell" )
-            
+
             characters = characterService.getCharacters()
-                
 
         }
 
@@ -38,7 +37,7 @@ class LibraryCharactersViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.charactersCollectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
     private func configureLayout() {
@@ -94,7 +93,6 @@ class LibraryCharactersViewController: UIViewController {
         layout.scrollDirection = .vertical
     }
 
-    
     }
 
     extension LibraryCharactersViewController: UICollectionViewDataSource {
@@ -118,9 +116,8 @@ class LibraryCharactersViewController: UIViewController {
          }
     }
 
-
 //
-//extension LibraryCharactersViewController: UICollectionViewDelegate {
+// extension LibraryCharactersViewController: UICollectionViewDelegate {
 //
 //    func collectionView(_ collectionView: UICollectionView,
 //                        didSelectItemAt indexPath: IndexPath) {
@@ -139,4 +136,4 @@ class LibraryCharactersViewController: UIViewController {
 //
 //        navigationController?.pushViewController(vc, animated: true)
 //    }
-//}
+// }

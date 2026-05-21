@@ -24,7 +24,7 @@ final class FilmCharacterService {
             )
         }
     }
-    
+
     enum StorageKeys {
         static let characters = "characters_library"
         static let filmCharacters = "film_characters"
@@ -33,7 +33,6 @@ final class FilmCharacterService {
         static let charactersUpdated = "charactersUpdated"
         static let filmCharactersUpdated = "filmCharactersUpdated"
     }
-
 
     private init() {
         load()
@@ -51,7 +50,7 @@ final class FilmCharacterService {
     func getFilmCharacter(by id: UUID) -> FilmCharacter? {
         filmCharacters.first { $0.id == id }
     }
-    
+
     func getCharacterCount(forFilmId filmId: UUID) -> Int {
         getCharacters(forFilmId: filmId).count
     }

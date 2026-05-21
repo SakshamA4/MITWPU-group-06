@@ -7,7 +7,7 @@
 
 import Foundation
 
-//Storage Keys for UserDefaults
+// Storage Keys for UserDefaults
 enum StorageKeys {
     static let films = "films_storage"
     static let favFilm = "fav_film_storage"

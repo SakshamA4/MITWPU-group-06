@@ -46,7 +46,7 @@ extension CanvasViewController {
         curve.scale       = .one
         pathRoot.addChild(curve)
 
-        var startHandle: ModelEntity? = nil
+        var startHandle: ModelEntity?
         if showStartHandle {
             let start = makePathHandle(color: .gray, name: "path.start")
             start.components.set(MotionPathHandleComponent(clipID: clip.id))
@@ -75,11 +75,11 @@ extension CanvasViewController {
         (pathAnchor ?? anchor).addChild(pathRoot)
 
         activeMotionPaths[clip.id] = MotionPathVisual(
-            root:           pathRoot,
-            startHandle:    startHandle,
+            root: pathRoot,
+            startHandle: startHandle,
             control1Handle: c1,
             control2Handle: c2,
-            endHandle:      end
+            endHandle: end
         )
     }
 
@@ -90,7 +90,7 @@ extension CanvasViewController {
         let clip = timeline.clips[clipIndex]
 
         let card = AnimationInputCard(mode: .editMoveTiming(
-            currentStart:    clip.startTime,
+            currentStart: clip.startTime,
             currentDuration: clip.duration
         ))
 
@@ -100,24 +100,24 @@ extension CanvasViewController {
             let oldClip = self.timeline.clips[clipIndex]
             let candidateClip = AnimationClip(
                 preservingID: oldClip,
-                startTime:    newStart,
-                duration:     newDuration
+                startTime: newStart,
+                duration: newDuration
             )
 
             if let conflictingClip = self.detectClipConflict(
-                editedClip:  candidateClip,
+                editedClip: candidateClip,
                 replacingID: oldClip.id
             ) {
                 self.presentClipConflictResolution(
-                    editedClip:      candidateClip,
-                    replacingID:     oldClip.id,
-                    conflicting:     conflictingClip,
-                    clipIndex:       clipIndex,
+                    editedClip: candidateClip,
+                    replacingID: oldClip.id,
+                    conflicting: conflictingClip,
+                    clipIndex: clipIndex,
                     originalEndTime: oldClip.startTime + oldClip.duration
                 )
             } else {
                 self.commitClipTimingChange(
-                    newClip:   candidateClip,
+                    newClip: candidateClip,
                     oldClipID: oldClip.id,
                     clipIndex: clipIndex
                 )
@@ -170,7 +170,7 @@ extension CanvasViewController {
 
             let lastTime = timeline.clips
                 .filter { $0.entityName == entityName }
-                .map    { $0.startTime + $0.duration }
+                .map { $0.startTime + $0.duration }
                 .max() ?? 0
 
             entity.transform = evaluateEntityTransform(entityName: entityName, at: lastTime)

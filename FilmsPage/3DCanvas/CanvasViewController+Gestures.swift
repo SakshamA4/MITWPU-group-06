@@ -6,7 +6,7 @@ import ARKit
 import ObjectiveC.runtime
 
 // MARK: - Stored properties for ring gesture (via ObjC associated objects)
-private var _ringPanGRKey:      UInt8 = 0
+private var _ringPanGRKey: UInt8 = 0
 private var _ringDragActiveKey: UInt8 = 0
 
 extension CanvasViewController {
@@ -154,14 +154,14 @@ extension CanvasViewController {
         let objectHit = hits.first { hit in
             var current: Entity? = hit.entity
             while let e = current {
-                if e.name == "GizmoRoot" || e.name.contains("Gizmo")       { return false }
+                if e.name == "GizmoRoot" || e.name.contains("Gizmo") { return false }
                 if e.name == "MotionPath" || e.name.hasPrefix("PathRoot_")
-                    || e.name.hasPrefix("path.")                            { return false }
+                    || e.name.hasPrefix("path.") { return false }
                 if e.name.hasPrefix("RotationArc_") || e.name == "startLine"
                     || e.name == "endLine" || e.name == "arcCurve"
-                    || e.name.hasPrefix("arcHandle.")                       { return false }
+                    || e.name.hasPrefix("arcHandle.") { return false }
                 if e.components[MotionPathHandleComponent.self] != nil
-                    || e.components[RotationArcComponent.self]  != nil      { return false }
+                    || e.components[RotationArcComponent.self]  != nil { return false }
                 if e.name == "MainAnchor" { break }
                 current = e.parent
             }
@@ -292,7 +292,7 @@ extension CanvasViewController {
         view.addSubview(menu)
         NSLayoutConstraint.activate([
             menu.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: point.x),
-            menu.bottomAnchor.constraint(equalTo: view.topAnchor,      constant: point.y - 40),
+            menu.bottomAnchor.constraint(equalTo: view.topAnchor, constant: point.y - 40)
         ])
         menu.onAction = { [weak self] action in
             guard let self else { return }
@@ -394,7 +394,7 @@ extension CanvasViewController {
                         // This fires on every slider drag — updates the live 3D scene in real time
                         self.updateLightProperties(for: entity, config: updatedConfig)
                     }
-                    
+
                     if self.view.bounds.width >= 375 {
                         panelVC.modalPresentationStyle = .custom
                         panelVC.transitioningDelegate = self.rightPanelTransitioningDelegate
@@ -522,7 +522,7 @@ extension CanvasViewController {
         let sensitivity: Float = max(0.001, distance * 0.0003)
         let dx =  Float(translation.x) * sensitivity
         let dy = -Float(translation.y) * sensitivity
-        
+
         if currentDragMode == .ground {
             let camPos      = activeCamera.position(relativeTo: nil)
             let scenePos    = entity.position(relativeTo: nil)
@@ -555,7 +555,7 @@ extension CanvasViewController {
         let dx = Float(translation.x) * 0.005
         let dz = Float(translation.y) * 0.005
         let camOri = activeCamera.orientation(relativeTo: nil)
-        return (camOri.act([1,0,0]) * dx) + (camOri.act([0,0,1]) * dz)
+        return (camOri.act([1, 0, 0]) * dx) + (camOri.act([0, 0, 1]) * dz)
     }
 
     @objc func toggleMovementTapped(_ sender: UIButton) {
@@ -572,15 +572,15 @@ extension CanvasViewController {
 
     func calculateAxisMovement(entity: Entity, axis: GizmoAxis,
                                 mouseDelta: SIMD2<Float>, view: ARView) -> SIMD3<Float> {
-        var axisVector: SIMD3<Float> = [0,0,0]
+        var axisVector: SIMD3<Float> = [0, 0, 0]
         switch axis {
-        case .x:    axisVector = [1,0,0]
-        case .y:    axisVector = [0,1,0]
-        case .z:    axisVector = [0,0,1]
-        case .none: return [0,0,0]
+        case .x:    axisVector = [1, 0, 0]
+        case .y:    axisVector = [0, 1, 0]
+        case .z:    axisVector = [0, 0, 1]
+        case .none: return [0, 0, 0]
         }
         let op = entity.position
-        guard let sp = view.project(op), let se = view.project(op + axisVector) else { return [0,0,0] }
+        guard let sp = view.project(op), let se = view.project(op + axisVector) else { return [0, 0, 0] }
         let screenDir  = simd_normalize(SIMD2<Float>(Float(se.x-sp.x), Float(se.y-sp.y)))
         let projection = simd_dot(mouseDelta, screenDir)
         return axisVector * (projection * 0.002)
@@ -681,7 +681,7 @@ extension CanvasViewController {
 
                 // Clockwise screen drag → clockwise Y rotation (negate UIKit angle convention)
                 var t = selected.transform
-                t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0,1,0]) * t.rotation)
+                t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0, 1, 0]) * t.rotation)
                 selected.transform = t
                 updateGizmoPosition()
             }
@@ -710,7 +710,7 @@ extension CanvasViewController {
             activeRotationAxis = nil
             activeGizmoPart    = .none
 
-            if let hit = hits.first(where: { ["xRing","yRing","zRing"].contains($0.entity.name) }) {
+            if let hit = hits.first(where: { ["xRing", "yRing", "zRing"].contains($0.entity.name) }) {
                 guard let selected = selectedEntity,
                       let gizmo = rotationGizmo else { return }
 

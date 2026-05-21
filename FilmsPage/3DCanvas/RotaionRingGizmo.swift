@@ -5,14 +5,9 @@
 //  Created by SDC-USER on 09/02/26.
 //
 
-
-
 import Foundation
 import RealityKit
 import UIKit
-
-
-
 
 final class RotationRingGizmo: Entity {
 
@@ -30,8 +25,6 @@ final class RotationRingGizmo: Entity {
     self.target = target
     super.init()
 
-
-   
     let bounds = computeBounds(for: target)
 
     // Move gizmo to true object center
@@ -39,10 +32,8 @@ final class RotationRingGizmo: Entity {
 
     // Pass radius to ring generator
     setupRings(radius: bounds.radius)
- 
 
     }
-
 
     required init() {
 //        fatalError()
@@ -50,7 +41,6 @@ final class RotationRingGizmo: Entity {
 
     private func setupRings(radius: Float) {
 
-   
     xRing = makeRing(color: .systemRed, axis: .x, radius: radius)
     yRing = makeRing(color: .systemGreen, axis: .y, radius: radius)
     zRing = makeRing(color: .systemBlue, axis: .z, radius: radius)
@@ -58,7 +48,6 @@ final class RotationRingGizmo: Entity {
     addChild(xRing)
     addChild(yRing)
     addChild(zRing)
-    
 
     }
 
@@ -82,10 +71,10 @@ final class RotationRingGizmo: Entity {
 
         switch axis {
         case .x:
-            ring.orientation = simd_quatf(angle: .pi/2, axis: [0,1,0])
+            ring.orientation = simd_quatf(angle: .pi/2, axis: [0, 1, 0])
             ring.name = "xRing"
         case .y:
-            ring.orientation = simd_quatf(angle: .pi/2, axis: [1,0,0])
+            ring.orientation = simd_quatf(angle: .pi/2, axis: [1, 0, 0])
             ring.name = "yRing"
         case .z:
             ring.orientation = simd_quatf(angle: 0, axis: [0, 0, 1])
@@ -137,12 +126,14 @@ final class RotationRingGizmo: Entity {
         descriptor.positions = MeshBuffers.Positions(positions)
         descriptor.primitives = .triangles(indices)
 
-        return try! MeshResource.generate(from: [descriptor])
+        guard let mesh = try? MeshResource.generate(from: [descriptor]) else {
+            return MeshResource.generateSphere(radius: ringRadius)
+        }
+        return mesh
     }
-    
+
     private func computeBounds(for entity: Entity) -> (center: SIMD3<Float>, radius: Float) {
 
-    
     let bounds = entity.visualBounds(relativeTo: entity)
 
     let center = bounds.center
@@ -155,7 +146,6 @@ final class RotationRingGizmo: Entity {
     let radius = maxDimension * 0.75
 
     return (center, radius)
-  
 
     }
 

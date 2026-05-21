@@ -12,27 +12,21 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
 
-    
-    
-    
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // Register custom ECS components
         LightConfigComponent.registerComponent()
-       
+
         guard let windowScene = (scene as? UIWindowScene) else { return }
-                
-                
-                
+
                 // NOTE: If the original code used Storyboard launch, it was usually below here
                 // and is commented out by this override block.
         self.window = UIWindow(windowScene: windowScene)
                 // Assume original project uses a Storyboard named "Main"
                 let storyboard = UIStoryboard(name: "Main", bundle: nil)
                 let rootVC = storyboard.instantiateInitialViewController()
-                
+
                 self.window?.rootViewController = rootVC
                 self.window?.makeKeyAndVisible()
-
 
     }
 
@@ -64,6 +58,4 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // to restore the scene back to its current state.
     }
 
-
 }
-

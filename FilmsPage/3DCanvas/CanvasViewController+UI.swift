@@ -5,12 +5,12 @@ import UIKit
 import ARKit
 
 extension CanvasViewController {
-    
+
     // ISSUE 5: Adaptive layout properties
     var isLargeIPad: Bool {
         max(UIScreen.main.bounds.width, UIScreen.main.bounds.height) >= 1024
     }
-    
+
     var layoutScale: CGFloat {
         isLargeIPad ? 1.0 : 0.88
     }
@@ -56,7 +56,7 @@ extension CanvasViewController {
                 constant: -16
             ),
             playButton.widthAnchor.constraint(equalToConstant: 44),
-            playButton.heightAnchor.constraint(equalToConstant: 44),
+            playButton.heightAnchor.constraint(equalToConstant: 44)
         ])
 
         shotBreakdownBtn.addTarget(
@@ -66,15 +66,12 @@ extension CanvasViewController {
         )
     }
 
-    
-    
-    
     func setupNavigationBar() {
 
         self.navigationItem.title = self.sceneName
 
         // 1. Back Button Logic
-        
+
         // This creates a custom back button that pops the view controller
         let backButton = UIBarButtonItem(
             image: UIImage(systemName: "chevron.left"),
@@ -82,7 +79,7 @@ extension CanvasViewController {
             target: self,
             action: #selector(backButtonTapped)
         )
-        
+
         // 2. Undo & Redo (Moved beside the back button)
         let undoBtn = UIBarButtonItem(
             image: UIImage(systemName: "arrow.uturn.backward"),
@@ -90,17 +87,17 @@ extension CanvasViewController {
             target: self,
             action: #selector(undoTapped)
         )
-        
+
         let redoBtn = UIBarButtonItem(
             image: UIImage(systemName: "arrow.uturn.forward"),
             style: .plain,
             target: self,
             action: #selector(redoTapped)
         )
-        
+
         // Combine Back, Undo, Redo on the left
         navigationItem.leftBarButtonItems = [backButton, undoBtn, redoBtn]
-        
+
         // 3. Right Side: Export and 3-Dots
         let exportBtn = UIBarButtonItem(
             image: UIImage(systemName: "square.and.arrow.up"),
@@ -108,14 +105,14 @@ extension CanvasViewController {
             target: self,
             action: #selector(exportTapped)  // Uses your existing export logic
         )
-        
+
         let moreBtn = UIBarButtonItem(
             image: UIImage(systemName: "ellipsis.circle"),
             style: .plain,
             target: self,
             action: #selector(moreTapped)
         )
-        
+
         let sceneSummaryBtn = UIBarButtonItem(
             image: UIImage(systemName: "list.bullet.rectangle"),
             style: .plain,
@@ -124,7 +121,7 @@ extension CanvasViewController {
         )
 
         navigationItem.rightBarButtonItems = [moreBtn, exportBtn, sceneSummaryBtn]
-        
+
         // 4. Configure Appearance (Dark background like your image)
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -137,7 +134,7 @@ extension CanvasViewController {
 
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: UIColor.white,
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
         ]
 
         appearance.titleTextAttributes = titleAttributes  // 📍 Apply here
@@ -146,15 +143,14 @@ extension CanvasViewController {
         navigationController?.navigationBar.tintColor = .systemBlue
         appearance.titleTextAttributes = [
             .foregroundColor: UIColor.white,
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
         ]
 
     }
 
-    
     @objc func moreTapped() {
         let infoVC = SceneInfoViewController()
-        
+
         // Pass tracked data to the modal
         infoVC.sceneName = self.sceneName
         infoVC.sequenceName = self.sequenceName
@@ -164,25 +160,25 @@ extension CanvasViewController {
         if let imageName = self.sceneImageName {
             infoVC.sceneImage = UIImage(named: imageName)
         }
-        
+
         infoVC.onSave = { [weak self] newName, newNotes in
             guard let self = self else { return }
-            
+
             // 1. Update local UI state
             self.sceneName = newName
             self.sceneNotes = newNotes
             self.lastEditedDate = Date()
             self.sceneNameLabel.text = newName.uppercased()
             self.navigationItem.title = newName
-            
+
             // 2. 📍 SAVE TO DATABASE: This now works because 'notes' is in ScenesModel
             if var sceneToUpdate = self.currentSceneObject {
                 sceneToUpdate.name = newName
                 sceneToUpdate.notes = newNotes
-                
+
                 // Use your service to save changes permanently
                 SceneService.shared.updateScene(sceneToUpdate)
-                
+
                 // Update local reference
                 self.currentSceneObject = sceneToUpdate
             }
@@ -193,20 +189,20 @@ extension CanvasViewController {
                 notes: newNotes
             )
             ScenesDataStore.shared.addToRecent(scene: updatedModel)
-            
+
             NotificationCenter.default.post(
                 name: NSNotification.Name("scenesUpdated"),
                 object: nil
             )
         }
-        
+
         // Snapshot logic
         arView.snapshot(saveToHDR: false) { image in
             DispatchQueue.main.async {
                 infoVC.sceneImage = image
             }
         }
-        
+
         infoVC.modalPresentationStyle = .overCurrentContext
         infoVC.modalTransitionStyle = .crossDissolve
         self.present(infoVC, animated: true)
@@ -218,7 +214,7 @@ extension CanvasViewController {
         summaryVC.sequenceName = self.sequenceName
         summaryVC.filmName = self.filmName
         summaryVC.rows = SceneSummaryViewController.makeRows(from: self)
-        
+
         summaryVC.modalPresentationStyle = .pageSheet
         if let sheet = summaryVC.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
@@ -228,7 +224,6 @@ extension CanvasViewController {
         present(summaryVC, animated: true)
     }
 
-
     func presentToolSheet(tool: ToolType) {
         let sheet = ToolSheetViewController(tool: tool) { [weak self] item in
             self?.spawnEntity(item: item, toolType: tool)
@@ -236,7 +231,6 @@ extension CanvasViewController {
         present(sheet, animated: true)
     }
 
-    
     @objc func toggleRotationMode(_ button: UIButton) {
         interactionMode = (interactionMode == .move) ? .rotate : .move
 
@@ -252,7 +246,6 @@ extension CanvasViewController {
         updateGizmoMode()
     }
 
-    
     func makeIconToolbarButton(title: String, systemImage: String) -> UIButton {
         var config = UIButton.Configuration.plain()
         config.image = UIImage(systemName: systemImage)?
@@ -263,15 +256,14 @@ extension CanvasViewController {
         config.imagePadding = 2
         config.title = title
         config.baseForegroundColor = .label
-        
+
         let button = UIButton(configuration: config)
         button.titleLabel?.font = .systemFont(ofSize: 10, weight: .medium)
         return button
     }
 
-    
     func makeViewModeButton(title: String) -> UIButton {
-        
+
         var config = UIButton.Configuration.plain()
         config.title = title
         config.baseForegroundColor = .label
@@ -281,10 +273,10 @@ extension CanvasViewController {
             bottom: 6,
             trailing: 14
         )
-        
+
         let button = UIButton(configuration: config)
         button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
-        
+
         return button
     }
 
@@ -341,28 +333,25 @@ extension CanvasViewController {
         applyOpacity(to: entity)
     }
 
-
-
-
     @objc func didTapLayersButton() {
         if !isSidebarVisible {
             refreshSidebarContent()
         }
-        
+
         isSidebarVisible.toggle()
         sidebarLeadingConstraint.constant = isSidebarVisible ? 0 : -sidebarWidth
-        
+
         UIView.animate(withDuration: 0.2) {
             // Hide the layer button if sidebar is visible, show it if not
             self.layersButton.alpha = self.isSidebarVisible ? 0 : 1
             self.playbackButtonStack.alpha = self.isSidebarVisible ? 0 : 1
             self.playbackButtonStack.isHidden = self.isSidebarVisible
+            // Hide compass while scene hierarchy is open
+            self.compassView.isHidden = self.isSidebarVisible
             self.view.layoutIfNeeded()
         }
     }
 
-
-    
     func refreshSidebarContent() {
         // FIX 8: Skip redundant rebuilds during batch load — the persistence service
         // resets isBatchLoading and calls us exactly once at Phase 9.
@@ -372,19 +361,19 @@ extension CanvasViewController {
         // Use mainAnchor directly — never arView.scene.anchors.flatMap, which would
         // include the Grid anchor (40,000+ line entities) and cause severe slowdowns.
         let allEntities: [Entity] = mainAnchor.map { Array($0.children) } ?? []
-        
+
         var itemsByCategory: [ToolType: [Entity]] = [:]
         ToolType.allCases.forEach { itemsByCategory[$0] = [] }
-        
+
         for entity in allEntities {
             guard
                 let category = entity.components[CategoryComponent.self]?
                     .toolType
             else { continue }
-            
+
             itemsByCategory[category]?.append(entity)
         }
-        
+
         for tool in ToolType.allCases {
             let entities = itemsByCategory[tool] ?? []
             let header = createHierarchyHeader(
@@ -392,7 +381,7 @@ extension CanvasViewController {
                 count: entities.count
             )
             hierarchyStackView.addArrangedSubview(header)
-            
+
             for entity in entities {
                 // For camera entities, show the human-readable "Camera N" name
                 // instead of the raw internal name (e.g. "SceneCamera_1_<UUID>").
@@ -409,8 +398,6 @@ extension CanvasViewController {
         }
     }
 
-
-    
     private func createHierarchyHeader(title: String, count: Int) -> UIView {
         let label = UILabel()
         label.text = "\(title) (\(count))"
@@ -431,43 +418,41 @@ extension CanvasViewController {
             label.bottomAnchor.constraint(
                 equalTo: container.bottomAnchor,
                 constant: -4
-            ),
+            )
         ])
         return container
     }
 
-
-    
     private func createHierarchyItemRow(title: String, entityName: String? = nil) -> UIView {
         // 1. Create a modern Plain configuration
         var config = UIButton.Configuration.plain()
-        
+
         // 2. Set the title and color
         config.title = title
         // Selection highlight uses the actual entity name for the match
         let nameForSelection = entityName ?? title
         let isSelected = selectedEntity?.name == nameForSelection
         config.baseForegroundColor = isSelected ? .systemRed : .label
-        
+
         config.contentInsets = NSDirectionalEdgeInsets(
             top: 4,
             leading: 32,
             bottom: 4,
             trailing: 0
         )
-        
+
         config.titleTextAttributesTransformer =
         UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
             outgoing.font = .systemFont(ofSize: 14)
             return outgoing
         }
-        
+
         let button = UIButton(configuration: config)
-        
+
         // Alignment still works on the button property
         button.contentHorizontalAlignment = .leading
-        
+
         // 6. Add the action — select by the real entity name, not the display label
         button.addAction(
             UIAction { [weak self] _ in
@@ -475,15 +460,12 @@ extension CanvasViewController {
             },
             for: .touchUpInside
         )
-        
+
         return button
     }
 
-
-    
-    
     func setupUI() {
-        
+
         // 1. TOP TOOLBAR (Floating)
         let toolbar = UIStackView()
         toolbar.tag = 8804
@@ -505,7 +487,7 @@ extension CanvasViewController {
         toolbar.layer.shadowColor = UIColor.black.cgColor
         toolbar.layer.shadowOpacity = 0.1
         toolbar.layer.shadowRadius = 8
-        
+
         for tool in ToolType.allCases {
             let btn = makeIconToolbarButton(
                 title: tool.title,
@@ -519,7 +501,7 @@ extension CanvasViewController {
             )
             toolbar.addArrangedSubview(btn)
         }
-        
+
         // 3. 2D / 3D BUTTONS (Bottom-Right)
         let viewModeControl = UISegmentedControl(items: ["2D", "3D"])
         viewModeControl.tag = 8805
@@ -541,7 +523,7 @@ extension CanvasViewController {
             [.foregroundColor: UIColor.label],
             for: .normal
         )
-        
+
         viewModeControl.addAction(
             UIAction { _ in
                 if viewModeControl.selectedSegmentIndex == 0 {
@@ -552,9 +534,9 @@ extension CanvasViewController {
             },
             for: .valueChanged
         )
-        
+
         view.addSubview(viewModeControl)
-        
+
         //         4. ROTATE BUTTON (Bottom-Left - Blue Button)
         let rotateBtn = UIButton(type: .system)
         rotateBtn.tag = 8806
@@ -563,22 +545,20 @@ extension CanvasViewController {
         rotateBtn.backgroundColor = .systemBlue
         rotateBtn.layer.cornerRadius = 22
         rotateBtn.translatesAutoresizingMaskIntoConstraints = false
-        
+
         rotateBtn.addAction(
             UIAction { _ in
                 self.toggleRotationMode(rotateBtn)
             },
             for: .touchUpInside
         )
-        
-      
+
         movementToggleButton.translatesAutoresizingMaskIntoConstraints = false
         movementToggleButton.addTarget(
             self,
             action: #selector(toggleMovementTapped(_:)),
             for: .touchUpInside
         )
-
 
         //                let undoBtn = UIButton(type: .system)
         //                undoBtn.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal) // Standard icon
@@ -607,17 +587,13 @@ extension CanvasViewController {
         //                view.addSubview(exportBtn)
         //                view.addSubview(undoBtn)
         //                view.addSubview(redoBtn)
-      
-        
-
 
         // 6. ADD TO VIEW
         view.addSubview(toolbar)
         view.addSubview(rotateBtn)
         view.addSubview(movementToggleButton)
 
-        
-        //undo redo
+        // undo redo
         //               NSLayoutConstraint.activate([
         //                    // Redo Button (Closest to Layers Button)
         //                    redoBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
@@ -639,20 +615,19 @@ extension CanvasViewController {
         //                            exportBtn.widthAnchor.constraint(equalToConstant: 40),
         //                            exportBtn.heightAnchor.constraint(equalToConstant: 40)
         //                        ])
-        
-        //new undo redo ends
-      
-        
+
+        // new undo redo ends
+
         // 7. CONSTRAINTS
         NSLayoutConstraint.activate([
-            
+
             // Toolbar (Top Center)
             toolbar.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor,
                 constant: 12
             ),
             toolbar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            
+
             // 2D / 3D Control (Bottom Right)
             viewModeControl.trailingAnchor.constraint(
                 equalTo: view.trailingAnchor,
@@ -675,8 +650,8 @@ extension CanvasViewController {
                 constant: -16
             ),
             rotateBtn.widthAnchor.constraint(equalToConstant: 40),
-            rotateBtn.heightAnchor.constraint(equalToConstant: 40),
-            
+            rotateBtn.heightAnchor.constraint(equalToConstant: 40)
+
         ])
         // 8. CAMERA PANEL (Right Side) — collapsible container with collection view
         let cameraPanel = UIView()
@@ -712,18 +687,18 @@ extension CanvasViewController {
         let availableHeight = view.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom - topControlsHeight
         let maxPanelHeight = min(availableHeight * 0.55, isLarge ? 420 : 340)
         let cellHeight = panelWidth * 0.75
-        
+
         // Update column width in collection view layout
         if let layout = cameraCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.itemSize = CGSize(width: panelWidth - 16, height: cellHeight)
         }
-        
+
         panelTrailingConstraint = cameraPanel.trailingAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.trailingAnchor,
             constant: panelWidth  // start fully off-screen (collapsed)
         )
         panelTrailingConstraint?.identifier = "panelTrailing"
-        
+
         panelWidthConstraint = cameraPanel.widthAnchor.constraint(equalToConstant: panelWidth)
         panelHeightConstraint = cameraPanel.heightAnchor.constraint(equalToConstant: maxPanelHeight)
 
@@ -736,7 +711,7 @@ extension CanvasViewController {
             cameraCollectionView.topAnchor.constraint(equalTo: cameraPanel.topAnchor),
             cameraCollectionView.leadingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
             cameraCollectionView.trailingAnchor.constraint(equalTo: cameraPanel.trailingAnchor),
-            cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor),
+            cameraCollectionView.bottomAnchor.constraint(equalTo: cameraPanel.bottomAnchor)
         ])
 
         cameraPanel.alpha = 1.0  // always opaque; visibility controlled by slide position
@@ -756,32 +731,31 @@ extension CanvasViewController {
         pullTab.alpha = 0.0  // hidden until first camera is added
         view.addSubview(pullTab)
 
-
         NSLayoutConstraint.activate([
             pullTab.trailingAnchor.constraint(equalTo: cameraPanel.leadingAnchor),
             pullTab.centerYAnchor.constraint(equalTo: cameraPanel.centerYAnchor),
             pullTab.widthAnchor.constraint(equalToConstant: 20),
-            pullTab.heightAnchor.constraint(equalToConstant: 44),
+            pullTab.heightAnchor.constraint(equalToConstant: 44)
         ])
-        
+
         // 9. SIDEBAR & HIERARCHY
         view.addSubview(sidebarView)
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.addSubview(scrollView)
         scrollView.addSubview(hierarchyStackView)
-        
+
         sidebarLeadingConstraint = sidebarView.leadingAnchor.constraint(
             equalTo: view.leadingAnchor,
             constant: -sidebarWidth
         )
-        
+
         NSLayoutConstraint.activate([
             sidebarView.topAnchor.constraint(equalTo: view.topAnchor),
             sidebarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             sidebarView.widthAnchor.constraint(equalToConstant: sidebarWidth),
             sidebarLeadingConstraint,
-            
+
             scrollView.topAnchor.constraint(
                 equalTo: sidebarView.safeAreaLayoutGuide.topAnchor,
                 constant: 60
@@ -795,7 +769,7 @@ extension CanvasViewController {
             scrollView.bottomAnchor.constraint(
                 equalTo: sidebarView.bottomAnchor
             ),
-            
+
             hierarchyStackView.topAnchor.constraint(
                 equalTo: scrollView.contentLayoutGuide.topAnchor
             ),
@@ -810,9 +784,9 @@ extension CanvasViewController {
             ),
             hierarchyStackView.widthAnchor.constraint(
                 equalTo: scrollView.frameLayoutGuide.widthAnchor
-            ),
+            )
         ])
-        
+
         view.addSubview(layersButton)
         layersButton.addTarget(
             self,
@@ -830,10 +804,9 @@ extension CanvasViewController {
             layersButton.widthAnchor.constraint(equalToConstant: 44),
             layersButton.heightAnchor.constraint(equalToConstant: 44),
             layersButton.widthAnchor.constraint(equalToConstant: 44),
-            layersButton.heightAnchor.constraint(equalToConstant: 44),
+            layersButton.heightAnchor.constraint(equalToConstant: 44)
         ])
-        
-        
+
         let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
         let closeBtn = UIButton(type: .system)
         closeBtn.setImage(
@@ -854,7 +827,7 @@ extension CanvasViewController {
             action: #selector(didTapLayersButton),
             for: .touchUpInside
         )
-        
+
         sidebarView.addSubview(closeBtn)
         NSLayoutConstraint.activate([
             closeBtn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
@@ -863,9 +836,9 @@ extension CanvasViewController {
                 constant: -16
             ),
             closeBtn.widthAnchor.constraint(equalToConstant: 44),
-            closeBtn.heightAnchor.constraint(equalToConstant: 40),
+            closeBtn.heightAnchor.constraint(equalToConstant: 40)
         ])
-        
+
         // Ensure the sidebar stays on top of the 3D scene
         view.bringSubviewToFront(sidebarView)
         view.bringSubviewToFront(layersButton)
@@ -873,14 +846,14 @@ extension CanvasViewController {
         // 10. COMPASS SETUP — Must be last so layersButton is in hierarchy
         compassView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(compassView)
-        
+
         NSLayoutConstraint.activate([
             compassView.topAnchor.constraint(equalTo: layersButton.bottomAnchor, constant: 16),
             compassView.centerXAnchor.constraint(equalTo: layersButton.centerXAnchor),
             compassView.widthAnchor.constraint(equalToConstant: 70),
             compassView.heightAnchor.constraint(equalToConstant: 70)
         ])
-        
+
         compassView.onNorthTap = { [weak self] in
             guard let self = self else { return }
             UIView.animate(withDuration: 0.4) {
@@ -888,20 +861,19 @@ extension CanvasViewController {
                 self.updateEditorCamera()
             }
         }
-        
+
         compassView.onPan = { [weak self] translation in
             self?.panCameraTarget(translation: translation)
         }
-        
-    }
 
+    }
 
 //    @objc func shotBreakdownTapped() {
 //        let generator = UIImpactFeedbackGenerator(style: .medium)
 //        generator.impactOccurred()
 //        print("🎬 Shot Breakdown Tapped")
 //    }
-    
+
     @objc func shotBreakdownTapped_DISABLED() {
         let vc = ShotBreakdownViewController()
         vc.sceneName        = self.sceneName
@@ -919,14 +891,14 @@ extension CanvasViewController {
         let picker = UIColorPickerViewController()
         picker.delegate = self
         picker.supportsAlpha = false
-        
+
         // Set initial color from the entity
         if let wallComp = entity.components[CanvasViewController.WallComponent.self] {
             picker.selectedColor = wallComp.uiColor
         } else if let groundComp = entity.components[CanvasViewController.GroundComponent.self] {
             picker.selectedColor = groundComp.uiColor
         }
-        
+
         // Add a custom done button with checkmark
         let doneButton = UIBarButtonItem(
             image: UIImage(systemName: "checkmark"),
@@ -935,7 +907,7 @@ extension CanvasViewController {
             action: #selector(colorPickerDoneTapped)
         )
         picker.navigationItem.rightBarButtonItem = doneButton
-        
+
         // Present in a navigation controller to show the custom bar button
         let navController = UINavigationController(rootViewController: picker)
         self.present(navController, animated: true)
@@ -952,7 +924,6 @@ extension CanvasViewController {
     @objc func colorPickerDoneTapped() {
         self.dismiss(animated: true)
     }
-
 
 }
 

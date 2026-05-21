@@ -28,9 +28,11 @@ class LightControlPanelViewController: UIViewController {
     private let diffuserSlider   = UISlider()
     private let diffuserLabel    = UILabel()
     private let shadowToggle     = UISwitch()
-    private var kelvinButtons:    [UIButton] = []
+    private var kelvinButtons: [UIButton] = []
     private var reflectorButtons: [UIButton] = []
-    private var goboButtons:      [UIButton] = []
+    private var goboButtons: [UIButton] = []
+    private let colorWell         = UIColorWell()
+    private let colorSection      = UIStackView()
 
     // Section containers (for conditional hiding)
     private let coneSection      = UIStackView()
@@ -43,9 +45,9 @@ class LightControlPanelViewController: UIViewController {
     private let accent = UIColor(red: 90/255, green: 130/255, blue: 255/255, alpha: 1)
 
     private let kelvinPresets: [(label: String, subtitle: String, kelvin: Float)] = [
-        ("2700K", "Tungsten",  2700),
-        ("5600K", "Daylight",  5600),
-        ("7000K", "Cool",      7000)
+        ("2700K", "Tungsten", 2700),
+        ("5600K", "Daylight", 5600),
+        ("7000K", "Cool", 7000)
     ]
 
     init(entity: Entity, config: LightConfigComponent, onUpdate: @escaping (LightConfigComponent) -> Void) {
@@ -63,7 +65,7 @@ class LightControlPanelViewController: UIViewController {
         view.backgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
         buildUI()
         populateFromConfig()
-        
+
         // Let the presentation controller know roughly how tall the content is.
         // It will be clamped by RightPanelPresentationController if it exceeds max bounds.
         preferredContentSize = CGSize(width: 300, height: 600)
@@ -100,16 +102,16 @@ class LightControlPanelViewController: UIViewController {
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             header.heightAnchor.constraint(equalToConstant: 44),
-            
+
             scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
+
             contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor),
             contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20)
         ])
 
         // ── Intensity ───────────────────────────────────────────────────
@@ -119,6 +121,10 @@ class LightControlPanelViewController: UIViewController {
 
         // ── Color Temperature ───────────────────────────────────────────
         contentStack.addArrangedSubview(buildKelvinSection())
+
+        // ── Custom Color ────────────────────────────────────────────────
+        buildColorSection()
+        contentStack.addArrangedSubview(colorSection)
 
         // ── Reflector Type (spot only) ──────────────────────────────────
         buildReflectorSection()
@@ -144,7 +150,7 @@ class LightControlPanelViewController: UIViewController {
         // ── Gobo (spot only) ────────────────────────────────────────────
         buildGoboSection()
         contentStack.addArrangedSubview(goboSection)
-        goboSection.isHidden = (config.lightKind != .spot)
+        goboSection.isHidden = (config.lightKind == .point)
 
         // ── Reach ───────────────────────────────────────────────────────
         contentStack.addArrangedSubview(buildSliderSection(
@@ -359,18 +365,37 @@ class LightControlPanelViewController: UIViewController {
         label.textColor = UIColor(white: 0.5, alpha: 1)
         goboSection.addArrangedSubview(label)
 
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 8
+        // Layout gobo buttons in rows of 4 for readability with 11 patterns
+        let allPatterns = GoboPattern.allCases
+        let buttonsPerRow = 4
+        var currentRow = UIStackView()
+        currentRow.axis = .horizontal
+        currentRow.distribution = .fillEqually
+        currentRow.spacing = 6
 
-        for (i, pattern) in GoboPattern.allCases.enumerated() {
+        for (i, pattern) in allPatterns.enumerated() {
             let btn = makePresetButton(mainText: pattern.displayName, subText: nil, tag: i)
             btn.addTarget(self, action: #selector(goboTapped(_:)), for: .touchUpInside)
-            row.addArrangedSubview(btn)
+            currentRow.addArrangedSubview(btn)
             goboButtons.append(btn)
+
+            // Start a new row after every `buttonsPerRow` buttons
+            if (i + 1) % buttonsPerRow == 0 || i == allPatterns.count - 1 {
+                // Pad incomplete rows with spacers
+                let remaining = buttonsPerRow - currentRow.arrangedSubviews.count
+                for _ in 0..<remaining {
+                    let spacer = UIView()
+                    currentRow.addArrangedSubview(spacer)
+                }
+                goboSection.addArrangedSubview(currentRow)
+                if i < allPatterns.count - 1 {
+                    currentRow = UIStackView()
+                    currentRow.axis = .horizontal
+                    currentRow.distribution = .fillEqually
+                    currentRow.spacing = 6
+                }
+            }
         }
-        goboSection.addArrangedSubview(row)
     }
 
     // MARK: - Preset Button Factory
@@ -405,7 +430,7 @@ class LightControlPanelViewController: UIViewController {
         titleStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             titleStack.centerXAnchor.constraint(equalTo: btn.centerXAnchor),
-            titleStack.centerYAnchor.constraint(equalTo: btn.centerYAnchor),
+            titleStack.centerYAnchor.constraint(equalTo: btn.centerYAnchor)
         ])
 
         btn.layer.cornerRadius = 8
@@ -437,6 +462,7 @@ class LightControlPanelViewController: UIViewController {
         updateKelvinHighlight()
         updateReflectorHighlight()
         updateGoboHighlight()
+        updateColorHighlight()
     }
 
     private func formatLumens(_ lumens: Float) -> String {
@@ -449,7 +475,8 @@ class LightControlPanelViewController: UIViewController {
 
     private func updateKelvinHighlight() {
         for btn in kelvinButtons {
-            let sel = btn.tag == Int(config.colorTemperatureKelvin)
+            // When a custom color is active, no Kelvin button should be highlighted
+            let sel = !config.hasCustomColor && btn.tag == Int(config.colorTemperatureKelvin)
             btn.backgroundColor = sel ? UIColor.white.withAlphaComponent(0.15) : .clear
             btn.layer.borderColor = sel ? accent.cgColor : UIColor(white: 0.3, alpha: 1).cgColor
         }
@@ -516,7 +543,10 @@ class LightControlPanelViewController: UIViewController {
 
     @objc private func kelvinTapped(_ sender: UIButton) {
         config.colorTemperatureKelvin = Float(sender.tag)
+        // Clear custom color when selecting a Kelvin preset
+        config.setCustomColor(nil)
         updateKelvinHighlight()
+        updateColorHighlight()
         onUpdate(config)
     }
 
@@ -552,11 +582,96 @@ class LightControlPanelViewController: UIViewController {
         let allCases = GoboPattern.allCases
         guard sender.tag < allCases.count else { return }
         config.activeGobo = allCases[sender.tag]
+
+        // Auto-enable shadows when a gobo is active (gate mask requires shadow casting)
+        if config.activeGobo != .none && !config.shadowEnabled {
+            config.shadowEnabled = true
+        }
+
         updateGoboHighlight()
         onUpdate(config)
     }
 
     @objc private func doneTapped() {
         dismiss(animated: true)
+    }
+
+    // MARK: - Color Section
+
+    private func buildColorSection() {
+        colorSection.axis = .vertical
+        colorSection.spacing = 8
+
+        let label = UILabel()
+        label.text = "COLOR"
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = UIColor(white: 0.5, alpha: 1)
+        colorSection.addArrangedSubview(label)
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 12
+        row.alignment = .center
+
+        // Color well (native iOS color picker)
+        colorWell.supportsAlpha = false
+        colorWell.selectedColor = config.effectiveColor
+        colorWell.addTarget(self, action: #selector(colorWellChanged(_:)), for: .valueChanged)
+        colorWell.translatesAutoresizingMaskIntoConstraints = false
+        colorWell.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        colorWell.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        row.addArrangedSubview(colorWell)
+
+        // Current color label
+        let colorDescLabel = UILabel()
+        colorDescLabel.text = config.hasCustomColor ? "Custom Color" : "From Temperature"
+        colorDescLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        colorDescLabel.textColor = .white
+        colorDescLabel.tag = 9901  // tag for updating later
+        row.addArrangedSubview(colorDescLabel)
+
+        row.addArrangedSubview(UIView()) // spacer
+
+        // Reset button — reverts to temperature mode
+        let resetBtn = UIButton(type: .system)
+        resetBtn.setTitle("Reset", for: .normal)
+        resetBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        resetBtn.tintColor = accent
+        resetBtn.addTarget(self, action: #selector(resetColorTapped), for: .touchUpInside)
+        resetBtn.tag = 9902  // tag for hiding when not needed
+        resetBtn.isHidden = !config.hasCustomColor
+        row.addArrangedSubview(resetBtn)
+
+        colorSection.addArrangedSubview(row)
+    }
+
+    @objc private func colorWellChanged(_ sender: UIColorWell) {
+        guard let color = sender.selectedColor else { return }
+        config.setCustomColor(color)
+        updateColorHighlight()
+        // De-highlight Kelvin buttons since we're using custom color
+        updateKelvinHighlight()
+        onUpdate(config)
+    }
+
+    @objc private func resetColorTapped() {
+        config.setCustomColor(nil)
+        colorWell.selectedColor = config.effectiveColor
+        updateColorHighlight()
+        updateKelvinHighlight()
+        onUpdate(config)
+    }
+
+    private func updateColorHighlight() {
+        // Update color description label
+        if let label = colorSection.viewWithTag(9901) as? UILabel {
+            label.text = config.hasCustomColor ? "Custom Color" : "From Temperature"
+        }
+        // Update reset button visibility
+        if let btn = colorSection.viewWithTag(9902) {
+            btn.isHidden = !config.hasCustomColor
+        }
+        // Update color well swatch
+        colorWell.selectedColor = config.effectiveColor
     }
 }

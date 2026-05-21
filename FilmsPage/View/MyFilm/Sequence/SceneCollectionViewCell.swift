@@ -11,12 +11,12 @@ class SceneCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var imageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
-    
+
     private var gradientLayer: CAGradientLayer?
 
     override func awakeFromNib() {
         super.awakeFromNib()
-        
+
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
 
@@ -25,18 +25,17 @@ class SceneCollectionViewCell: UICollectionViewCell {
 
         titleLabel.textColor = .white
     }
-    
+
     override func layoutSubviews() {
         super.layoutSubviews()
         updateGradientFrame()
     }
 
-
     func configureCell(scene: Scene) {
         let imageName = scene.image ?? "Image"
         imageView.setFilmImage(named: imageName)
 
-        if let image = imageView.image, let color = image.SceneCelldominantColor() {
+        if let image = imageView.image, let color = image.sceneCellDominantColor() {
             applyGradientBehindLabel(using: color)
         } else {
             gradientLayer?.removeFromSuperlayer()
@@ -44,31 +43,31 @@ class SceneCollectionViewCell: UICollectionViewCell {
 
         titleLabel.text = scene.name.capitalized
     }
-    
+
     func applyGradientBehindLabel(using color: UIColor) {
-        
+
         gradientLayer?.removeFromSuperlayer()
-        
+
         let gradient = CAGradientLayer()
-        
+
         gradient.colors = [
             UIColor.clear.cgColor,
             color.withAlphaComponent(0.6).cgColor,
             color.withAlphaComponent(0.9).cgColor
         ]
-        
+
         gradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         gradient.endPoint   = CGPoint(x: 0.5, y: 1.0)
 
         gradient.cornerRadius = contentView.layer.cornerRadius
-        
+
         // Insert gradient between image and label
         contentView.layer.insertSublayer(gradient, above: imageView.layer)
-        
+
         gradientLayer = gradient
-        
+
         updateGradientFrame()
-        
+
         // Keep label above gradient always
         contentView.bringSubviewToFront(titleLabel)
 
@@ -76,19 +75,18 @@ class SceneCollectionViewCell: UICollectionViewCell {
         contentView.layer.borderWidth = 1
         contentView.layer.borderColor = UIColor.lightGray.cgColor
     }
-    
-    
+
     private func updateGradientFrame() {
         guard let gradient = gradientLayer else { return }
-        
+
         contentView.layoutIfNeeded()
-        
+
         // Where gradient should start (slightly below the label)
         let labelY = titleLabel.frame.minY
         let safeOffset: CGFloat = 8
-        
+
         let gradientStartY = labelY + safeOffset
-        
+
         gradient.frame = CGRect(
             x: 0,
             y: gradientStartY,
@@ -98,27 +96,26 @@ class SceneCollectionViewCell: UICollectionViewCell {
     }
 }
 
-
 // MARK: - Dominant Color Extraction
 extension UIImage {
 
-    func SceneCelldominantColor() -> UIColor? {
+    func sceneCellDominantColor() -> UIColor? {
 
         let size = CGSize(width: 10, height: 10)
         UIGraphicsBeginImageContext(size)
         draw(in: CGRect(origin: .zero, size: size))
-        
+
         guard let resized = UIGraphicsGetImageFromCurrentImageContext() else {
             UIGraphicsEndImageContext()
             return nil
         }
         UIGraphicsEndImageContext()
-        
+
         guard let cgImage = resized.cgImage,
               let data = cgImage.dataProvider?.data,
               let ptr = CFDataGetBytePtr(data)
         else { return nil }
-        
+
         var r = 0, g = 0, b = 0
         let length = CFDataGetLength(data)
 
@@ -129,7 +126,7 @@ extension UIImage {
         }
 
         let count = length / 4
-        
+
         return UIColor(
             red: CGFloat(r / count) / 255,
             green: CGFloat(g / count) / 255,

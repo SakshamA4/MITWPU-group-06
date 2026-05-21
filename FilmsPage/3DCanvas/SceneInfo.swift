@@ -1,8 +1,7 @@
-
 import UIKit
 
 class SceneInfoViewController: UIViewController {
-    
+
     // MARK: - Tracking Properties
     var sceneImage: UIImage?
     var sceneName: String = ""
@@ -10,7 +9,7 @@ class SceneInfoViewController: UIViewController {
     var filmName: String?
     var lastEditedDate: Date = Date()
     var initialNotes: String = ""
-    
+
     var onSave: ((String, String) -> Void)?
 
     // MARK: - UI Components
@@ -25,7 +24,7 @@ class SceneInfoViewController: UIViewController {
             iv.translatesAutoresizingMaskIntoConstraints = false
             return iv
         }()
-    
+
     private let containerView: UIView = {
         let view = UIView()
         // Premium Dark Theme
@@ -44,7 +43,7 @@ class SceneInfoViewController: UIViewController {
             btn.addTarget(self, action: #selector(didTapSave), for: .touchUpInside)
             return btn
         }()
-    
+
     // Transparent layer to catch "Cancel" taps outside the card
     private let backgroundTapView: UIView = {
         let view = UIView()
@@ -52,7 +51,7 @@ class SceneInfoViewController: UIViewController {
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
-    
+
     private lazy var sceneNameField: UITextField = {
             let tf = UITextField()
             tf.text = sceneName
@@ -82,14 +81,13 @@ class SceneInfoViewController: UIViewController {
             tv.text = initialNotes
             tv.textColor = .white // White for real user content
         }
-        
+
         tv.font = .systemFont(ofSize: 18)
         tv.backgroundColor = UIColor.white.withAlphaComponent(0.08)
         tv.layer.cornerRadius = 15
         tv.textContainerInset = UIEdgeInsets(top: 15, left: 12, bottom: 15, right: 12)
         tv.translatesAutoresizingMaskIntoConstraints = false
-        
-      
+
         tv.delegate = self
         return tv
     }()
@@ -103,11 +101,11 @@ class SceneInfoViewController: UIViewController {
         setupLayout()
         configureDataLabels()
         setupCancelGesture()
-        
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissModal))
                 backgroundTapView.addGestureRecognizer(tap)
     }
-    
+
     private func setupCancelGesture() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(didTapOutside))
         backgroundTapView.addGestureRecognizer(tap)
@@ -116,7 +114,7 @@ class SceneInfoViewController: UIViewController {
     @objc private func didTapOutside() {
         dismiss(animated: true)
     }
-    
+
     private func configureDataLabels() {
             if let seq = sequenceName { labelsStack.addArrangedSubview(createLabel(text: "SEQUENCE: \(seq)")) }
             if let film = filmName { labelsStack.addArrangedSubview(createLabel(text: "FILM: \(film)")) }
@@ -133,9 +131,9 @@ class SceneInfoViewController: UIViewController {
             onSave?(sceneNameField.text ?? "", notesTextView.text)
             dismiss(animated: true)
         }
-    
+
     @objc private func dismissModal() { dismiss(animated: true) }
-    
+
     private func setupLayout() {
         view.addSubview(backgroundTapView)
                 view.addSubview(containerView)
@@ -190,7 +188,7 @@ extension Date {
 }
 // MARK: - UITextViewDelegate for Notes Placeholder
 extension SceneInfoViewController: UITextViewDelegate {
-    
+
     // Called when the user taps inside the Notes box
     func textViewDidBeginEditing(_ textView: UITextView) {
         if textView.textColor == .systemGray {
@@ -198,7 +196,7 @@ extension SceneInfoViewController: UITextViewDelegate {
             textView.textColor = .white // Set to normal typing color
         }
     }
-    
+
     // Called when the user stops typing/leaves the box
     func textViewDidEndEditing(_ textView: UITextView) {
         if textView.text.isEmpty {

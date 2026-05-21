@@ -143,7 +143,7 @@ final class SequenceExportSheet: UIViewController {
         let attrs: [NSAttributedString.Key: Any] = [
             .kern: 1.6,
             .font: scenesHeader.font as Any,
-            .foregroundColor: dimText,
+            .foregroundColor: dimText
         ]
         scenesHeader.attributedText = NSAttributedString(string: "SCENES IN ORDER", attributes: attrs)
         scenesHeader.translatesAutoresizingMaskIntoConstraints = false
@@ -158,7 +158,7 @@ final class SequenceExportSheet: UIViewController {
             sceneListLabel.topAnchor.constraint(equalTo: scenesHeader.bottomAnchor, constant: 8),
             sceneListLabel.leadingAnchor.constraint(equalTo: sceneCard.leadingAnchor, constant: 16),
             sceneListLabel.trailingAnchor.constraint(equalTo: sceneCard.trailingAnchor, constant: -16),
-            sceneListLabel.bottomAnchor.constraint(equalTo: sceneCard.bottomAnchor, constant: -14),
+            sceneListLabel.bottomAnchor.constraint(equalTo: sceneCard.bottomAnchor, constant: -14)
         ])
 
         // Settings card
@@ -200,7 +200,7 @@ final class SequenceExportSheet: UIViewController {
 
             exportButton.topAnchor.constraint(equalTo: settingsStack.bottomAnchor, constant: 28),
             exportButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            exportButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            exportButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 200)
         ])
     }
 
@@ -213,11 +213,11 @@ final class SequenceExportSheet: UIViewController {
         seg.selectedSegmentTintColor = accentRed
         seg.setTitleTextAttributes([
             .foregroundColor: UIColor.white.withAlphaComponent(0.50),
-            .font: UIFont.systemFont(ofSize: 13, weight: .medium),
+            .font: UIFont.systemFont(ofSize: 13, weight: .medium)
         ], for: .normal)
         seg.setTitleTextAttributes([
             .foregroundColor: UIColor.white,
-            .font: UIFont.systemFont(ofSize: 13, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 13, weight: .semibold)
         ], for: .selected)
         seg.translatesAutoresizingMaskIntoConstraints = false
         return seg
@@ -233,7 +233,7 @@ final class SequenceExportSheet: UIViewController {
         let attrs: [NSAttributedString.Key: Any] = [
             .kern: 1.6,
             .font: lbl.font as Any,
-            .foregroundColor: dimText,
+            .foregroundColor: dimText
         ]
         lbl.attributedText = NSAttributedString(string: text, attributes: attrs)
         lbl.translatesAutoresizingMaskIntoConstraints = false
@@ -251,7 +251,7 @@ final class SequenceExportSheet: UIViewController {
             control.leadingAnchor.constraint(equalTo: lbl.trailingAnchor, constant: 12),
             control.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
             control.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            control.heightAnchor.constraint(equalToConstant: 32),
+            control.heightAnchor.constraint(equalToConstant: 32)
         ])
 
         return container

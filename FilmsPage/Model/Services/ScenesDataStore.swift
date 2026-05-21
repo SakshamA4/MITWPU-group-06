@@ -1,21 +1,19 @@
-
 //  ScenesDataStore.swift
 //  FilmsPage
 //
 //  Created by SDC-USER on 17/12/25.
 
-
 import Foundation
 
 class ScenesDataStore {
-    
+
     static let shared = ScenesDataStore()
     static let scenesUpdatedNotification = Notification.Name("scenesDataStoreUpdated")
-    
+
     private let isPersistenceEnabled = true
-    
+
     private let kRecentScenesKey = "recentScenes"
-    
+
     private init() {
         if isPersistenceEnabled {
             loadData()
@@ -27,10 +25,9 @@ class ScenesDataStore {
     private static let houseID   = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440001")!
     private static let scene3ID  = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440002")!
     private static let scene4ID  = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440003")!
-    
-    
+
     // MARK: - Template Definition
-    
+
     /// Pairs a template's display model with optional bundled scene resources.
     /// When `bundledJSONName` is non-nil the template has a real pre-built scene
     /// that should be copied to Documents on open.
@@ -39,7 +36,7 @@ class ScenesDataStore {
         var bundledJSONName: String?   // bundle resource name without extension
         var bundledThumbName: String?  // bundle resource name without extension
     }
-    
+
     private var templateDefinitions: [TemplateDefinition] = [
         TemplateDefinition(
             scene: ScenesModel(id: outdoorID, name: "Outdoor Scene", image: "outdoor"),
@@ -50,7 +47,7 @@ class ScenesDataStore {
             scene: ScenesModel(id: houseID, name: "House Scene", image: "scene1"),
             bundledJSONName: "indoor_scene",
             bundledThumbName: "indoor_scene"
-        ),
+        )
 //        TemplateDefinition(
 //            scene: ScenesModel(id: scene3ID, name: "Diner Scene", image: "diner")
 //        ),
@@ -58,16 +55,16 @@ class ScenesDataStore {
 //            scene: ScenesModel(id: scene4ID, name: "Park Scene", image: "park")
 //        )
     ]
-    
+
     // MARK: - Getters
-    
+
     var currentRecentScenes: [ScenesModel] {
         return recentScenes
     }
-    
+
     var currentTemplates: [ScenesModel] {
         let savedNotes = UserDefaults.standard.dictionary(forKey: kTemplateNotesKey) as? [String: String] ?? [:]
-            
+
             return templateDefinitions.map { def in
                 var t = def.scene
                 // 📍 THE FIX: Attach the saved note to the template model
@@ -77,7 +74,7 @@ class ScenesDataStore {
                 return t
             }
     }
-    
+
     /// Returns the template definition for the given scene ID, or nil if the ID
     /// does not correspond to a template.
     func bundledTemplate(for sceneID: UUID) -> TemplateDefinition? {
@@ -92,8 +89,7 @@ class ScenesDataStore {
         allNotes[id.uuidString] = notes
         UserDefaults.standard.set(allNotes, forKey: kTemplateNotesKey)
     }
-    
-    
+
     func addToRecent(scene: ScenesModel) {
         // Template check: templates must never appear in the recents list.
         // Check by ID (stable) — not by name, since a user-created scene may
@@ -114,28 +110,26 @@ class ScenesDataStore {
         saveData() // Persist
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
-    
+
     func deleteScene(by id: UUID) {
         recentScenes.removeAll { $0.id == id }
         templateDefinitions.removeAll { $0.scene.id == id }  // ← add this line
         saveData()
         NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
     }
-    
-    
+
     func updateScene(_ updatedModel: ScenesModel) {
         // 1. Find the scene in the recents list
         if let index = recentScenes.firstIndex(where: { $0.id == updatedModel.id }) {
             // 2. Replace it with the new version (new name/notes)
             recentScenes[index] = updatedModel
-            
+
             // 3. Save and notify
             saveData()
             NotificationCenter.default.post(name: ScenesDataStore.scenesUpdatedNotification, object: nil)
         }
     }
-    
-    
+
     private func loadData() {
         guard let data = UserDefaults.standard.data(forKey: kRecentScenesKey),
               let decoded = try? JSONDecoder().decode([ScenesModel].self, from: data) else { return }

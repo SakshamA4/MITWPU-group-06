@@ -55,12 +55,12 @@ class RecentScenesCollectionViewCell: UICollectionViewCell {
         NSLayoutConstraint.activate([
             sequenceBadgeLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             sequenceBadgeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            sequenceBadgeLabel.heightAnchor.constraint(equalToConstant: 16),
+            sequenceBadgeLabel.heightAnchor.constraint(equalToConstant: 16)
         ])
         // Padding via content insets is not available on UILabel, so we add width constraint
         contentView.bringSubviewToFront(sequenceBadgeLabel)
     }
-    
+
     func configure(with item: ScenesModel) {
         recentImageView.setFilmImage(named: item.image ?? "Image")
         recentLabel.text = item.name

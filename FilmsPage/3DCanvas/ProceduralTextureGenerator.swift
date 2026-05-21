@@ -485,9 +485,9 @@ private extension UIColor {
         getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
         tint.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
         return UIColor(
-            red:   r1 * r2,
+            red: r1 * r2,
             green: g1 * g2,
-            blue:  b1 * b2,
+            blue: b1 * b2,
             alpha: a1
         )
     }
@@ -496,9 +496,9 @@ private extension UIColor {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         getRed(&r, green: &g, blue: &b, alpha: &a)
         return UIColor(
-            red:   max(0, min(1, r + amount)),
+            red: max(0, min(1, r + amount)),
             green: max(0, min(1, g + amount)),
-            blue:  max(0, min(1, b + amount)),
+            blue: max(0, min(1, b + amount)),
             alpha: a
         )
     }

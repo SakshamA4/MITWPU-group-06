@@ -12,16 +12,15 @@ extension CanvasViewController {
         // When looking through a scene camera, camera-view gestures handle movement
         if activeCamera !== editorCamera { return }
         let translation = gesture.translation(in: arView)
-        
+
         yaw -= Float(translation.x) * 0.005
         pitch += Float(translation.y) * 0.005
         pitch = max(0.05, min(1.4, pitch))
-        
+
         updateEditorCamera()
         gesture.setTranslation(.zero, in: arView)
     }
 
-    
     @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
         // When looking through a scene camera, pinch = truck Z (handled by camera-view gestures)
         if activeCamera !== editorCamera {
@@ -71,8 +70,8 @@ extension CanvasViewController {
                             // Free resize
                             wall.width  *= capturedScale
                             wall.height *= capturedScale
-                            wall.width  = max(0.3, min(wall.width,  10))
-                            wall.height = max(0.3, min(wall.height,  6))
+                            wall.width  = max(0.3, min(wall.width, 10))
+                            wall.height = max(0.3, min(wall.height, 6))
                         }
                         modelEntity.model?.mesh = MeshResource.generateBox(
                             width: wall.width, height: wall.height, depth: wall.thickness)
@@ -84,7 +83,7 @@ extension CanvasViewController {
                     if var bg = modelEntity.components[BackgroundComponent.self] {
                         bg.width  *= capturedScale
                         bg.height *= capturedScale
-                        bg.width  = max(0.5, min(bg.width,  15))
+                        bg.width  = max(0.5, min(bg.width, 15))
                         bg.height = max(0.5, min(bg.height, 10))
                         modelEntity.model?.mesh = MeshResource.generateBox(
                             width: bg.width, height: bg.height, depth: 0.05)
@@ -125,24 +124,23 @@ extension CanvasViewController {
         }
     }
 
-    
     func updateEditorCamera() {
         guard let camera = editorCamera else { return }
         let x = distance * cos(pitch) * sin(yaw)
         let y = distance * sin(pitch)
         let z = distance * cos(pitch) * cos(yaw)
-        
+
         // Apply position relative to the orbit pivot (cameraTarget)
         var camPos = SIMD3<Float>(x, y, z) + cameraTarget
         camPos.y = max(0.1, camPos.y)
         camera.position = camPos
-        
+
         // Always look at the current pivot point
         camera.look(at: cameraTarget, from: camera.position, relativeTo: nil)
 
         // Rescale gizmos so they stay a constant screen size as the camera moves
         updateGizmoScales()
-        
+
         // Sync navigation compass
         compassView.updateRotation(yaw: yaw)
     }
@@ -221,7 +219,6 @@ extension CanvasViewController {
         updateEditorCamera()
     }
 
-    
     func makeCameraVisual() -> ModelEntity {
         let body = ModelEntity(
             mesh: .generateBox(size: [0.2, 0.12, 0.1]),
@@ -236,7 +233,6 @@ extension CanvasViewController {
         return body
     }
 
-    
     func spawnSceneCamera(modelName: String = "cam1", displayName: String = "DSLR", aspectRatio: CameraAspectRatio = .default) {
         guard let anchor = arView.scene.findEntity(named: "MainAnchor") else { return }
 
@@ -325,7 +321,7 @@ extension CanvasViewController {
 
     func setupCameraPanelSwipeGestures() {
         guard let panel = view.viewWithTag(8800) else { return }
-        
+
         // Only add once
         if panel.gestureRecognizers?.contains(where: { $0 is UISwipeGestureRecognizer }) == true { return }
 
@@ -343,7 +339,7 @@ extension CanvasViewController {
 
     @objc private func handlePanelSwipe(_ gesture: UISwipeGestureRecognizer) {
         guard view.viewWithTag(8800) != nil else { return }
-        
+
         if gesture.direction == .right {
             // Swiped right on the panel → collapse it
             setCameraPanelExpanded(false, animated: true)
@@ -398,8 +394,7 @@ extension CanvasViewController {
         let width = collectionView.bounds.width - 16   // full panel width minus padding
         return CGSize(width: width, height: width * 0.75)  // 4:3 aspect, no extra label row
     }
-    
-    
+
     func activateEditorCamera() {
         for cam in sceneCameras { cam.isEnabled = false }
         editorCamera.isEnabled = true
@@ -519,13 +514,13 @@ extension CanvasViewController {
     }
 
     // MARK: - Auto Focus Raycasting
-    
+
     /// Called when the user taps the screen in AF mode while looking through a scene camera.
     func handleCameraViewAFTap(at screenPoint: CGPoint) {
         guard let arView = arView,
               activeCamera !== editorCamera,
               let camRoot = cameraToVisualMap[activeCamera] else { return }
-        
+
         // Raycast from the tapped point
         // Using .all so we can hit any model in the scene
         let hits = arView.hitTest(screenPoint, query: .nearest, mask: .all)
@@ -533,12 +528,12 @@ extension CanvasViewController {
             // Calculate distance from camera to hit point
             let camPos = activeCamera.position(relativeTo: nil)
             let distance = simd_distance(camPos, firstHit.position)
-            
+
             // Update ECS Component
             var comp = camRoot.components[CameraFocusComponent.self] ?? CameraFocusComponent()
             comp.focusDistance = distance
             camRoot.components.set(comp)
-            
+
             // Update UI Slider and labels
             cameraViewOverlay?.setFocusDistance(distance)
         }
@@ -629,7 +624,6 @@ extension CanvasViewController {
         view.viewWithTag(AspectRatioConstants.letterboxTag)?.removeFromSuperview()
     }
 
-    
     @objc func setTopView() {
         activateEditorCamera()
         yaw = 0
@@ -645,7 +639,6 @@ extension CanvasViewController {
         distance = 5
         updateEditorCamera()
     }
-
 
     // MARK: - Camera Preview (off-screen ARView, timer-driven)
     //
@@ -781,8 +774,8 @@ extension CanvasViewController {
 
          // 4. Hide editor overlays
          clonedAnchor.forEachDescendant { entity in
-             if entity.name.hasPrefix("GizmoRoot")     { entity.isEnabled = false }
-             if entity.name.hasPrefix("PathRoot_")     { entity.isEnabled = false }
+             if entity.name.hasPrefix("GizmoRoot") { entity.isEnabled = false }
+             if entity.name.hasPrefix("PathRoot_") { entity.isEnabled = false }
              if entity.name.hasPrefix("RotationArc_") { entity.isEnabled = false }
          }
 
@@ -834,10 +827,8 @@ extension CanvasViewController {
         let targetTrailing: CGFloat = expanded ? -8 : panelWidth
 
         // Find the trailing constraint by identifier on the parent view
-        for constraint in view.constraints {
-            if constraint.identifier == "panelTrailing" {
-                constraint.constant = targetTrailing
-            }
+        for constraint in view.constraints where constraint.identifier == "panelTrailing" {
+            constraint.constant = targetTrailing
         }
 
         // Update pull-tab chevron: right when expanded (panel visible, tap to collapse), left when collapsed (tap to expand)
@@ -865,7 +856,7 @@ extension CanvasViewController {
         } else {
             block()
         }
-        
+
         isCameraPanelExpanded = expanded
     }
     // MARK: - Exit Camera Button
@@ -915,7 +906,7 @@ extension CanvasViewController {
             btn.topAnchor.constraint(equalTo: container.topAnchor),
             btn.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             btn.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            btn.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            btn.bottomAnchor.constraint(equalTo: container.bottomAnchor)
         ])
     }
 
@@ -939,7 +930,6 @@ extension CanvasViewController {
             }
         }
     }
-
 
     // MARK: - Collection View (Camera Panel)
 
@@ -967,10 +957,10 @@ extension CanvasViewController {
         } else {
             cell.label.text = name
         }
-        
+
         // Apply aspect ratio bars over the thumbnail
         cell.updateAspectRatio(item.aspectRatio)
-        
+
         return cell
     }
 
@@ -983,7 +973,7 @@ extension CanvasViewController {
     }
 
     // MARK: - Motion Path Sync (On Exit Camera View)
-    
+
     /// Called when exiting camera view. Computes the total movement delta while in camera view
     /// and applies it to all animation clips (start, c1, c2, end) belonging to this camera.
     func syncCameraClipsAfterCameraView() {
@@ -992,44 +982,44 @@ extension CanvasViewController {
               let cameraEntity = mainAnchor?.findEntity(named: cameraName) else {
             return
         }
-        
+
         let newPos = cameraEntity.position(relativeTo: nil)
         let delta = newPos - oldPos
-        
+
         guard simd_length(delta) > 0.0001 else { return }
-        
+
         // Update ALL clip points by the same delta — whole path moves together
         for i in 0..<timeline.clips.count {
             let clip = timeline.clips[i]
             guard clip.entityName == cameraName,
                   clip.track == .position else { continue }
-            
+
             let newFrom = clip.fromValue + delta
             let newTo   = clip.toValue + delta
-            
-            var updatedPath: BezierMotionPath? = nil
+
+            var updatedPath: BezierMotionPath?
             if var path = clip.motionPath {
-                path.start    = path.start    + delta
-                path.control1 = path.control1 + delta
-                path.control2 = path.control2 + delta
-                path.end      = path.end      + delta
+                path.start    += delta
+                path.control1 += delta
+                path.control2 += delta
+                path.end      += delta
                 updatedPath = path
             }
-            
+
             timeline.clips[i] = AnimationClip(
                 preservingID: clip,
                 fromValue: newFrom,
                 toValue: newTo,
                 motionPath: updatedPath
             )
-            
+
             // Rebuild the visual path line so it shows up in the new position
             showMotionPath(for: timeline.clips[i])
         }
-        
+
         // Update baseTransform so playback starts from the new position
         baseTransforms[cameraName] = cameraEntity.transform
-        
+
         // Clear the stored entry state
         cameraViewEntryPos = nil
         cameraViewEntryCameraName = nil

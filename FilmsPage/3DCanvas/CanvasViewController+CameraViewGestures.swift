@@ -93,7 +93,7 @@ extension CanvasViewController {
             let pitchDelta =  Float(t.y) * sensitivity
 
             // Apply yaw around world Y, pitch around camera's local X
-            let yawQuat   = simd_quatf(angle: yawDelta,   axis: [0, 1, 0])
+            let yawQuat   = simd_quatf(angle: yawDelta, axis: [0, 1, 0])
             let currentOri = cameraRoot.orientation(relativeTo: nil)
 
             // Camera's local right axis for pitch
