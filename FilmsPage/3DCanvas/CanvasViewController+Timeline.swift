@@ -936,3 +936,94 @@ extension CanvasViewController {
         }
     }
 }
+
+// MARK: - Timeline Editor
+
+extension CanvasViewController {
+
+    @objc func openAnimationTimelineEditor() {
+        let editor = AnimationTimelineEditorViewController()
+        editor.lanes = buildTimelineEditorLanes()
+        editor.sceneDuration = max(timeline.duration, 10)
+        editor.currentTime = currentTimelineTime
+        editor.fps = 30
+
+        enterShotPlaybackMode()
+
+        editor.onScrub = { [weak self] t in
+            guard let self else { return }
+            self.currentTimelineTime = t
+            self.evaluateTimeline(at: t)
+        }
+
+        editor.onClipChanged = { [weak self, weak editor] clipID, start, duration in
+            guard let self else { return }
+            self.updateClipTiming(clipID: clipID, startTime: start, duration: duration)
+            if let editor {
+                editor.refresh(
+                    lanes: self.buildTimelineEditorLanes(),
+                    currentTime: self.currentTimelineTime,
+                    sceneDuration: max(self.timeline.duration, 10)
+                )
+            }
+        }
+
+        if let sheet = editor.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 22
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+        }
+        editor.presentationController?.delegate = self
+        editor.modalPresentationStyle = .pageSheet
+        animationTimelineEditorVC = editor
+        present(editor, animated: true)
+    }
+
+    func buildTimelineEditorLanes() -> [AnimationTimelineEditorViewController.TrackLane] {
+        let grouped = Dictionary(grouping: timeline.clips, by: { $0.entityName })
+        let sortedNames = grouped.keys.sorted()
+        return sortedNames.map { entityName in
+            let clips = (grouped[entityName] ?? [])
+                .sorted { $0.startTime < $1.startTime }
+                .map { clip in
+                    AnimationTimelineEditorViewController.ClipItem(
+                        id: clip.id,
+                        entityName: clip.entityName,
+                        track: clip.track,
+                        easing: clip.easing,
+                        startTime: clip.startTime,
+                        duration: clip.duration,
+                        type: clip.type
+                    )
+                }
+            return AnimationTimelineEditorViewController.TrackLane(
+                id: entityName,
+                title: entityName,
+                clips: clips
+            )
+        }
+    }
+
+    func updateClipTiming(clipID: UUID, startTime: Float, duration: Float) {
+        guard let idx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
+        let old = timeline.clips[idx]
+        timeline.clips[idx] = AnimationClip(
+            preservingID: old,
+            startTime: max(0, startTime),
+            duration: max(0.01, duration)
+        )
+        if timeline.clips[idx].motionPath != nil {
+            showMotionPath(for: timeline.clips[idx])
+        }
+    }
+    
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        if presentationController.presentedViewController === animationTimelineEditorVC {
+            exitShotPlaybackMode()
+            evaluateTimeline(at: 0)
+            currentTimelineTime = 0
+            animationTimelineEditorVC = nil
+        }
+    }
+}
