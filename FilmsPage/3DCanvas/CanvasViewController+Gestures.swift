@@ -402,6 +402,28 @@ extension CanvasViewController {
                     self.present(panelVC, animated: true)
                 }
 
+            case .animateLight:
+                // Open light animation card for light entities
+                menu.removeFromSuperview()
+                if let config = entity.components[LightConfigComponent.self] {
+                    let card = LightAnimationInputCard(
+                        entityName: entity.name,
+                        currentIntensity: config.intensity,
+                        currentKelvin: config.colorTemperatureKelvin
+                    )
+                    card.onConfirm = { [weak self] clip in
+                        guard let self else { return }
+                        self.saveCurrentStateToUndo()
+                        self.timeline.addClip(clip)
+                        // Ensure baseTransform exists so evaluateTimeline can work
+                        if self.baseTransforms[entity.name] == nil {
+                            self.baseTransforms[entity.name] = entity.transform
+                        }
+                        self.debugPrintTimeline()
+                    }
+                    self.present(card, animated: false)
+                }
+
             // ── Camera entity actions ───────────────────────────────────────
             case .addShot:
                 menu.removeFromSuperview()

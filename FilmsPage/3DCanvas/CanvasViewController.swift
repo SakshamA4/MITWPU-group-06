@@ -53,6 +53,7 @@ enum AnimationType: String, Codable {
     case rotate
     case walk
     case zoom
+    case light
 }
 
 enum EasingType: String, Codable {
@@ -67,6 +68,9 @@ enum AnimationTrack: String, Codable {
     case rotation
     case scale
     case fov
+    case visibility   // fromValue.x = 0 (OFF) or 1 (ON), toValue.x = target state
+    case intensity    // fromValue.x = start lumens, toValue.x = end lumens
+    case color        // fromValue.x = start Kelvin, toValue.x = end Kelvin
 }
 
 // MARK: - AnimationClip
@@ -566,6 +570,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var timelineEntityCache: [String: Entity] = [:]
     var baseTransforms: [String: Transform] = [:]
     var baseFOVs: [String: Float] = [:]
+    /// Snapshot of each light's LightConfigComponent taken on timeline entry.
+    /// Restored on timeline exit so lights return to their pre-playback state.
+    var baseLightConfigs: [String: LightConfigComponent] = [:]
     var activeWalkControllers: [String: AnimationPlaybackController] = [:]
 
     // MARK: - Editor Mode

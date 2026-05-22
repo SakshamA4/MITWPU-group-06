@@ -30,6 +30,7 @@ class EntityActionMenu: UIView {
         case changeColour   // standard: open color picker (walls/ground only)
         case editMaterial   // standard: open material editor (walls/ground only)
         case lightSettings  // standard: open light control panel (lights only)
+        case animateLight   // standard: open light animation card (lights only)
         case setRatio       // standard: open ratio lock input (walls/ground only)
         case addShot        // camera:   open shot/movement picker
         case aspectRatio    // camera:   open aspect ratio picker
@@ -116,6 +117,8 @@ class EntityActionMenu: UIView {
             addSeparator()
             if showLightOption {
                 addMenuButton(title: "Light Settings", action: .lightSettings)
+                addSeparator()
+                addMenuButton(title: "Animate Light", action: .animateLight)
                 addSeparator()
             }
             if showColorOption {

@@ -295,6 +295,10 @@ extension CanvasViewController {
             
         case .zoom:
             track = .fov
+
+        case .light:
+            // Light clips are created from LightAnimationInputCard; keep this path non-fatal.
+            return
         }
 
         if baseTransforms[entity.name] == nil {
