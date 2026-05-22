@@ -40,6 +40,11 @@ final class LightAnimationInputCard: UIViewController {
     private var fadeConfirmButton: UIButton?
     private var fadeSectionStack: UIStackView?
     private var activeFadePreset: FadePreset = .fadeIn
+    
+    // Instant ON/OFF timing fields (shown when ON / OFF is tapped)
+    private var instantStartField: UITextField?
+    private var instantSectionStack: UIStackView?
+    private var activeVisibilityPreset: Float = 1 // 1 = ON, 0 = OFF
 
     // Custom keyframe fields
     private var trackSegment: UISegmentedControl!
@@ -127,6 +132,9 @@ final class LightAnimationInputCard: UIViewController {
         NSLayoutConstraint.activate([
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            card.heightAnchor.constraint(greaterThanOrEqualToConstant: 420),
+            card.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.9),
             cardBottom,
         ])
 
@@ -181,11 +189,16 @@ final class LightAnimationInputCard: UIViewController {
             scrollView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: card.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+        ])
 
-            stack.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24),
-            stack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -16),
+        let contentGuide = scrollView.contentLayoutGuide
+        let frameGuide = scrollView.frameLayoutGuide
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: contentGuide.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: contentGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: contentGuide.trailingAnchor, constant: -24),
+            stack.bottomAnchor.constraint(equalTo: contentGuide.bottomAnchor, constant: -16),
+            stack.widthAnchor.constraint(equalTo: frameGuide.widthAnchor, constant: -48),
         ])
 
         // ── Quick Presets ────────────────────────────────────────────────
@@ -194,6 +207,12 @@ final class LightAnimationInputCard: UIViewController {
 
         let presetGrid = buildPresetGrid()
         stack.addArrangedSubview(presetGrid)
+        
+        // ── Instant section (hidden by default, shown on ON/OFF tap) ─────
+        let instantStack = buildInstantSection()
+        instantSectionStack = instantStack
+        instantStack.isHidden = true
+        stack.addArrangedSubview(instantStack)
 
         // ── Fade section (hidden by default, shown on Fade In/Out tap) ──
         let fadeStack = buildFadeSection()
@@ -358,6 +377,35 @@ final class LightAnimationInputCard: UIViewController {
 
         return stack
     }
+    
+    private func buildInstantSection() -> UIStackView {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 12
+
+        let title = UILabel()
+        title.text = "INSTANT TOGGLE SETTINGS"
+        title.font = .systemFont(ofSize: 11, weight: .medium)
+        title.textColor = UIColor.white.withAlphaComponent(0.45)
+        stack.addArrangedSubview(title)
+
+        let startTF = makeTextField(placeholder: "0.0", label: "Start Time (sec)")
+        instantStartField = startTF.textField
+        stack.addArrangedSubview(startTF.container)
+
+        let hint = UILabel()
+        hint.text = "Visibility switches ON/OFF instantly at the start time."
+        hint.font = .systemFont(ofSize: 12, weight: .regular)
+        hint.textColor = UIColor.white.withAlphaComponent(0.55)
+        hint.numberOfLines = 0
+        stack.addArrangedSubview(hint)
+
+        let button = buildConfirmButton(title: "Add Toggle to Timeline")
+        button.addAction(UIAction { [weak self] _ in self?.confirmInstantToggle() }, for: .touchUpInside)
+        stack.addArrangedSubview(button)
+
+        return stack
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // MARK: - Custom Keyframe Section
@@ -482,35 +530,43 @@ final class LightAnimationInputCard: UIViewController {
 
     private func handleInstantOn() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let clip = AnimationClip(
-            entityName: entityName,
-            type: .light,
-            track: .visibility,
-            easing: .linear,
-            startTime: 0,
-            duration: 0.01,
-            fromValue: SIMD3<Float>(0, 0, 0),
-            toValue:   SIMD3<Float>(1, 0, 0)
-        )
-        animateOut {
-            self.dismiss(animated: false) {
-                self.onConfirm?(clip)
-            }
+        activeVisibilityPreset = 1
+        instantStartField?.text = "0.0"
+        UIView.animate(withDuration: 0.25) {
+            self.fadeSectionStack?.isHidden = true
+            self.instantSectionStack?.isHidden = false
         }
     }
 
     private func handleInstantOff() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        activeVisibilityPreset = 0
+        instantStartField?.text = "0.0"
+        UIView.animate(withDuration: 0.25) {
+            self.fadeSectionStack?.isHidden = true
+            self.instantSectionStack?.isHidden = false
+        }
+    }
+    
+    private func confirmInstantToggle() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        view.endEditing(true)
+
+        let startTime = Float(instantStartField?.text ?? "0") ?? 0
+        let toValue = activeVisibilityPreset
+        let fromValue: Float = toValue >= 0.5 ? 0 : 1
+
         let clip = AnimationClip(
             entityName: entityName,
             type: .light,
             track: .visibility,
             easing: .linear,
-            startTime: 0,
+            startTime: startTime,
             duration: 0.01,
-            fromValue: SIMD3<Float>(1, 0, 0),
-            toValue:   SIMD3<Float>(0, 0, 0)
+            fromValue: SIMD3<Float>(fromValue, 0, 0),
+            toValue:   SIMD3<Float>(toValue, 0, 0)
         )
+
         animateOut {
             self.dismiss(animated: false) {
                 self.onConfirm?(clip)
@@ -524,6 +580,7 @@ final class LightAnimationInputCard: UIViewController {
         fadeStartField?.text = "0.0"
         fadeDurationField?.text = "1.0"
         UIView.animate(withDuration: 0.3) {
+            self.instantSectionStack?.isHidden = true
             self.fadeSectionStack?.isHidden = false
         }
     }
@@ -534,6 +591,7 @@ final class LightAnimationInputCard: UIViewController {
         fadeStartField?.text = "0.0"
         fadeDurationField?.text = "1.0"
         UIView.animate(withDuration: 0.3) {
+            self.instantSectionStack?.isHidden = true
             self.fadeSectionStack?.isHidden = false
         }
     }

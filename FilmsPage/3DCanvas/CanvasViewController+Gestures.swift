@@ -23,6 +23,38 @@ extension CanvasViewController {
 }
 
 extension CanvasViewController {
+    
+    func resolveLightEntity(from entity: Entity) -> Entity? {
+        if entity.components[LightConfigComponent.self] != nil { return entity }
+        if let childLight = entity.children.first(where: { $0.components[LightConfigComponent.self] != nil }) {
+            return childLight
+        }
+        var parent = entity.parent
+        while let p = parent, p.name != "MainAnchor" {
+            if p.components[LightConfigComponent.self] != nil { return p }
+            parent = p.parent
+        }
+        return nil
+    }
+
+    func presentLightAnimationCard(for lightEntity: Entity) {
+        guard let config = lightEntity.components[LightConfigComponent.self] else { return }
+        let card = LightAnimationInputCard(
+            entityName: lightEntity.name,
+            currentIntensity: config.intensity,
+            currentKelvin: config.colorTemperatureKelvin
+        )
+        card.onConfirm = { [weak self] clip in
+            guard let self else { return }
+            self.saveCurrentStateToUndo()
+            self.timeline.addClip(clip)
+            if self.baseTransforms[lightEntity.name] == nil {
+                self.baseTransforms[lightEntity.name] = lightEntity.transform
+            }
+            self.debugPrintTimeline()
+        }
+        present(card, animated: false)
+    }
 
     func setupGestures() {
         // ── 1. Single tap ─────────────────────────────────────────────────────
@@ -278,7 +310,8 @@ extension CanvasViewController {
         let showColorOption = isWall || isGround
 
         // ── Check if entity is a light (has LightConfigComponent) ────────────
-        let isLight = entity.components[LightConfigComponent.self] != nil
+        let resolvedLightEntity = resolveLightEntity(from: entity)
+        let isLight = resolvedLightEntity != nil
 
         let menu = EntityActionMenu()
         menu.configure(mode: isCamera ? .camera : .standard, isLocked: isCurrentlyLocked, showColorOption: showColorOption, showLightOption: isLight)
@@ -379,14 +412,15 @@ extension CanvasViewController {
             case .lightSettings:
                 // Open light control panel for light entities
                 menu.removeFromSuperview()
-                if var config = entity.components[LightConfigComponent.self] {
+                if let lightEntity = resolvedLightEntity,
+                   var config = lightEntity.components[LightConfigComponent.self] {
                     let panelVC = LightControlPanelViewController(
-                        entity: entity,
+                        entity: lightEntity,
                         config: config
                     ) { [weak self] updatedConfig in
                         guard let self else { return }
                         // This fires on every slider drag — updates the live 3D scene in real time
-                        self.updateLightProperties(for: entity, config: updatedConfig)
+                        self.updateLightProperties(for: lightEntity, config: updatedConfig)
                     }
                     
                     if self.view.bounds.width >= 375 {
@@ -400,28 +434,6 @@ extension CanvasViewController {
                         }
                     }
                     self.present(panelVC, animated: true)
-                }
-
-            case .animateLight:
-                // Open light animation card for light entities
-                menu.removeFromSuperview()
-                if let config = entity.components[LightConfigComponent.self] {
-                    let card = LightAnimationInputCard(
-                        entityName: entity.name,
-                        currentIntensity: config.intensity,
-                        currentKelvin: config.colorTemperatureKelvin
-                    )
-                    card.onConfirm = { [weak self] clip in
-                        guard let self else { return }
-                        self.saveCurrentStateToUndo()
-                        self.timeline.addClip(clip)
-                        // Ensure baseTransform exists so evaluateTimeline can work
-                        if self.baseTransforms[entity.name] == nil {
-                            self.baseTransforms[entity.name] = entity.transform
-                        }
-                        self.debugPrintTimeline()
-                    }
-                    self.present(card, animated: false)
                 }
 
             // ── Camera entity actions ───────────────────────────────────────
@@ -465,9 +477,19 @@ extension CanvasViewController {
     // ── Add Movement picker ───────────────────────────────────────────────────
 
     func presentAddMovementPicker(for entity: Entity) {
-        let alert = UIAlertController(title: "Add Movement",
-                                      message: "Choose the type of animation to add",
-                                      preferredStyle: .actionSheet)
+        let lightEntity = resolveLightEntity(from: entity)
+        let alert = UIAlertController(
+            title: lightEntity == nil ? "Add Movement" : "Add Animations",
+            message: lightEntity == nil
+                ? "Choose the type of animation to add"
+                : "Choose movement or light animation",
+            preferredStyle: .actionSheet
+        )
+        if let lightEntity {
+            alert.addAction(UIAlertAction(title: "Animate Light", style: .default) { [weak self] _ in
+                self?.presentLightAnimationCard(for: lightEntity)
+            })
+        }
         alert.addAction(UIAlertAction(title: "Move (Position Path)", style: .default) { [weak self] _ in
             self?.interactionMode = .move
             self?.presentAnimationPrompt(type: .move)
@@ -484,6 +506,11 @@ extension CanvasViewController {
             })
         }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let pop = alert.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.maxY - 120, width: 1, height: 1)
+            pop.permittedArrowDirections = []
+        }
         present(alert, animated: true)
     }
 
