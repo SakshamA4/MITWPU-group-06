@@ -10,15 +10,15 @@ import UIKit
 class PropsCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var imageView: UIImageView!
-    
+
     @IBOutlet weak var titleLabel: UILabel!
-    
+
     override func awakeFromNib() {
         super.awakeFromNib()
-        
+
         contentView.layer.cornerRadius = 20
         contentView.layer.masksToBounds = true
-        
+
         contentView.layer.borderWidth = 0.7
         contentView.layer.borderColor = UIColor.gray.cgColor
 
@@ -32,8 +32,7 @@ class PropsCollectionViewCell: UICollectionViewCell {
 
         // Initialization code
     }
-   
-    
+
     func configureCell(prop: PropItem) {
         if !prop.imageName.isEmpty {
             imageView.image = UIImage(named: prop.imageName)
@@ -42,6 +41,5 @@ class PropsCollectionViewCell: UICollectionViewCell {
         }
         titleLabel.text = prop.name.capitalized
     }
-
 
 }

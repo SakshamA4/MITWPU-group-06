@@ -125,7 +125,7 @@ extension CanvasViewController {
                self.refreshSidebarContent()
            }
        }
-         
+
          // ISSUE 2: Set prepareForCapture closure to hide gizmos, paths, and camera lens before capture
          vc.prepareForCapture = { [weak self] item in
              guard let self = self else { return }

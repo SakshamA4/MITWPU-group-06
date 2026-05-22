@@ -63,11 +63,11 @@ final class AnimationInputCard: UIViewController {
     private let card     = UIView()
     private var cardBottom: NSLayoutConstraint!
 
-    private var startField:    LabelledField?
+    private var startField: LabelledField?
     private var durationField: LabelledField?
-    private var degreesField:  LabelledField?
-    private var zoomField:     LabelledField?
-    private var axisPicker:    AxisSegmentedControl?
+    private var degreesField: LabelledField?
+    private var zoomField: LabelledField?
+    private var axisPicker: AxisSegmentedControl?
 
     // ── Drag-to-dismiss state ─────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ final class AnimationInputCard: UIViewController {
             dimView.topAnchor.constraint(equalTo: view.topAnchor),
             dimView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             dimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            dimView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dimView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
         dimView.addGestureRecognizer(
             UITapGestureRecognizer(target: self, action: #selector(dismiss_))
@@ -138,7 +138,7 @@ final class AnimationInputCard: UIViewController {
         NSLayoutConstraint.activate([
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            cardBottom,
+            cardBottom
         ])
 
         // ── Handle bar ───────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ final class AnimationInputCard: UIViewController {
             handle.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
             handle.centerXAnchor.constraint(equalTo: card.centerXAnchor),
             handle.widthAnchor.constraint(equalToConstant: 40),
-            handle.heightAnchor.constraint(equalToConstant: 5),
+            handle.heightAnchor.constraint(equalToConstant: 5)
         ])
 
         // ── Title + icon ─────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ final class AnimationInputCard: UIViewController {
         card.addSubview(titleRow)
         NSLayoutConstraint.activate([
             titleRow.topAnchor.constraint(equalTo: handle.bottomAnchor, constant: 20),
-            titleRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
+            titleRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24)
         ])
 
         // ── Content stack ────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ final class AnimationInputCard: UIViewController {
             stack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: 24),
             stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24),
-            stack.bottomAnchor.constraint(equalTo: card.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+            stack.bottomAnchor.constraint(equalTo: card.safeAreaLayoutGuide.bottomAnchor, constant: -24)
         ])
 
         // ── Fields by mode ───────────────────────────────────────────────────
@@ -198,14 +198,14 @@ final class AnimationInputCard: UIViewController {
         case .addMove:
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this move begins",
-                icon:  "clock",
+                hint: "seconds — when this move begins",
+                icon: "clock",
                 value: "0.0",
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long the move lasts",
-                icon:  "timer",
+                hint: "seconds — how long the move lasts",
+                icon: "timer",
                 value: "1.0",
                 keyboard: .decimalPad)
             startField    = sf
@@ -216,20 +216,20 @@ final class AnimationInputCard: UIViewController {
         case .addRotate:
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this rotation begins",
-                icon:  "clock",
+                hint: "seconds — when this rotation begins",
+                icon: "clock",
                 value: "0.0",
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long the rotation lasts",
-                icon:  "timer",
+                hint: "seconds — how long the rotation lasts",
+                icon: "timer",
                 value: "1.0",
                 keyboard: .decimalPad)
             let rf = LabelledField(
                 label: "Degrees",
-                hint:  "total rotation · positive = CCW · supports >360°",
-                icon:  "arrow.clockwise.circle",
+                hint: "total rotation · positive = CCW · supports >360°",
+                icon: "arrow.clockwise.circle",
                 value: "90",
                 keyboard: .numbersAndPunctuation)
             startField    = sf
@@ -247,8 +247,8 @@ final class AnimationInputCard: UIViewController {
         case .editRotate(let deg, let axis):
             let rf = LabelledField(
                 label: "Degrees",
-                hint:  "total rotation · positive = CCW · supports >360°",
-                icon:  "arrow.clockwise.circle",
+                hint: "total rotation · positive = CCW · supports >360°",
+                icon: "arrow.clockwise.circle",
                 value: String(format: "%.0f", deg),
                 keyboard: .numbersAndPunctuation)
             degreesField = rf
@@ -263,20 +263,20 @@ final class AnimationInputCard: UIViewController {
         case .editRotateFull(let start, let dur, let deg, let axis):
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this rotation begins",
-                icon:  "clock",
+                hint: "seconds — when this rotation begins",
+                icon: "clock",
                 value: String(format: "%.2f", start),
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long the rotation lasts",
-                icon:  "timer",
+                hint: "seconds — how long the rotation lasts",
+                icon: "timer",
                 value: String(format: "%.2f", dur),
                 keyboard: .decimalPad)
             let rf = LabelledField(
                 label: "Degrees",
-                hint:  "total rotation · positive = CCW · supports >360°",
-                icon:  "arrow.clockwise.circle",
+                hint: "total rotation · positive = CCW · supports >360°",
+                icon: "arrow.clockwise.circle",
                 value: String(format: "%.0f", deg),
                 keyboard: .numbersAndPunctuation)
             startField    = sf
@@ -295,14 +295,14 @@ final class AnimationInputCard: UIViewController {
         case .editMoveTiming(let start, let dur):
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this move begins",
-                icon:  "clock",
+                hint: "seconds — when this move begins",
+                icon: "clock",
                 value: String(format: "%.2f", start),
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long the move lasts",
-                icon:  "timer",
+                hint: "seconds — how long the move lasts",
+                icon: "timer",
                 value: String(format: "%.2f", dur),
                 keyboard: .decimalPad)
             startField    = sf
@@ -313,21 +313,21 @@ final class AnimationInputCard: UIViewController {
         case .addShot(let shotName, let defaultStart, let isZoom):
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this shot begins on the timeline",
-                icon:  "clock",
+                hint: "seconds — when this shot begins on the timeline",
+                icon: "clock",
                 value: String(format: "%.1f", defaultStart),
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long this shot lasts",
-                icon:  "timer",
+                hint: "seconds — how long this shot lasts",
+                icon: "timer",
                 value: "3.0",
                 keyboard: .decimalPad)
             startField    = sf
             durationField = df
             stack.addArrangedSubview(sf)
             stack.addArrangedSubview(df)
-            
+
             if isZoom {
                 // Zoom In  → target FOV lower  than current (e.g. 30° = telephoto)
                 // Zoom Out → target FOV higher than current (e.g. 80° = wide angle)
@@ -335,10 +335,10 @@ final class AnimationInputCard: UIViewController {
                 let defaultTarget = isZoomIn ? "30" : "80"
                 let zf = LabelledField(
                     label: "Target FOV",
-                    hint:  isZoomIn
+                    hint: isZoomIn
                         ? "Field of View in degrees — lower = more zoomed in (e.g. 20–50°)"
                         : "Field of View in degrees — higher = more zoomed out / wider (e.g. 70–90°)",
-                    icon:  "magnifyingglass",
+                    icon: "magnifyingglass",
                     value: defaultTarget,
                     keyboard: .numberPad)
                 zoomField = zf
@@ -348,14 +348,14 @@ final class AnimationInputCard: UIViewController {
         case .editShot(let title, let start, let duration):
             let sf = LabelledField(
                 label: "Start Time",
-                hint:  "seconds — when this shot begins on the timeline",
-                icon:  "clock",
+                hint: "seconds — when this shot begins on the timeline",
+                icon: "clock",
                 value: String(format: "%.2f", start),
                 keyboard: .decimalPad)
             let df = LabelledField(
                 label: "Duration",
-                hint:  "seconds — how long this shot lasts",
-                icon:  "timer",
+                hint: "seconds — how long this shot lasts",
+                icon: "timer",
                 value: String(format: "%.2f", duration),
                 keyboard: .decimalPad)
             startField    = sf
@@ -466,8 +466,8 @@ final class AnimationInputCard: UIViewController {
     // ── Card meta ─────────────────────────────────────────────────────────────
 
     private func cardMeta() -> (title: String, icon: String, tint: UIColor) {
-        let appRed   = UIColor(red: 177/255, green: 32/255,  blue: 57/255,  alpha: 1)
-        let softBlue = UIColor(red: 64/255,  green: 156/255, blue: 255/255, alpha: 1)
+        let appRed   = UIColor(red: 177/255, green: 32/255, blue: 57/255, alpha: 1)
+        let softBlue = UIColor(red: 64/255, green: 156/255, blue: 255/255, alpha: 1)
         switch mode {
         case .addMove:
             return ("Add Move", "arrow.up.right.circle.fill", softBlue)
@@ -523,14 +523,14 @@ final class AnimationInputCard: UIViewController {
 
         let startTime = Float(startField?.textField.text ?? "0") ?? 0
         let duration  = Float(durationField?.textField.text ?? "1") ?? 1
-        
+
         var mainValue: Float = 90
         if let degText = degreesField?.textField.text, let d = Float(degText) {
             mainValue = d
         } else if let zoomText = zoomField?.textField.text, let z = Float(zoomText) {
             mainValue = z
         }
-        
+
         let axis      = selectedAxis
 
         guard duration > 0 else {
@@ -714,7 +714,7 @@ final class LabelledField: UIView {
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
         translatesAutoresizingMaskIntoConstraints = false
     }
@@ -735,7 +735,7 @@ final class AxisSegmentedControl: UIView {
     private let axisColors: [RotationAxis: UIColor] = [
         .x: UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1),
         .y: UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1),
-        .z: UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1),
+        .z: UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1)
     ]
 
     init(selected: RotationAxis, onChange: @escaping (RotationAxis) -> Void) {
@@ -762,7 +762,7 @@ final class AxisSegmentedControl: UIView {
         let axisLabels: [(RotationAxis, String)] = [
             (.x, "X  Pitch"),
             (.y, "Y  Yaw"),
-            (.z, "Z  Roll"),
+            (.z, "Z  Roll")
         ]
 
         for (axis, label) in axisLabels {
@@ -791,18 +791,26 @@ final class AxisSegmentedControl: UIView {
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
         translatesAutoresizingMaskIntoConstraints = false
         updateAppearance()
     }
 
     private func axisTag(_ axis: RotationAxis) -> Int {
-        switch axis { case .x: return 0; case .y: return 1; case .z: return 2 }
+        switch axis {
+        case .x: return 0
+        case .y: return 1
+        case .z: return 2
+        }
     }
 
     private func axisForTag(_ tag: Int) -> RotationAxis {
-        switch tag { case 0: return .x; case 1: return .y; default: return .z }
+        switch tag {
+        case 0: return .x
+        case 1: return .y
+        default: return .z
+        }
     }
 
     private func updateAppearance() {

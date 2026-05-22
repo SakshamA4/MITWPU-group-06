@@ -25,26 +25,63 @@ struct LightConfigComponent: Component, Codable {
     var reflectorType: ReflectorType = .standard
     var activeGobo: GoboPattern = .none
     var diffuserAmount: Float = 0.0     // 0.0 = hard edge, 1.0 = full silk
-    var proceduralKind: ProceduralLightKind? = nil  // non-nil for procedural lights
+    var proceduralKind: ProceduralLightKind?  // non-nil for procedural lights
+
+    // ── Custom color (optional — overrides Kelvin when set) ─────────────
+    var customColorR: Float?
+    var customColorG: Float?
+    var customColorB: Float?
+    var customColorA: Float?
+
+    /// True when a custom RGB color has been set (non-nil).
+    var hasCustomColor: Bool {
+        customColorR != nil
+    }
+
+    /// The custom UIColor if set, otherwise nil.
+    var customColor: UIColor? {
+        guard let r = customColorR, let g = customColorG,
+              let b = customColorB, let a = customColorA else { return nil }
+        return UIColor(red: CGFloat(r), green: CGFloat(g), blue: CGFloat(b), alpha: CGFloat(a))
+    }
+
+    /// Sets the custom color from a UIColor. Pass nil to clear.
+    mutating func setCustomColor(_ color: UIColor?) {
+        guard let color = color else {
+            customColorR = nil; customColorG = nil
+            customColorB = nil; customColorA = nil
+            return
+        }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        customColorR = Float(r); customColorG = Float(g)
+        customColorB = Float(b); customColorA = Float(a)
+    }
 
     // Derived — not stored
     var uiColor: UIColor { .fromKelvin(colorTemperatureKelvin) }
     var counterScale: Float { 1.0 / modelScale }  // child entities must be scaled by this
 
+    /// Returns the custom color if set, otherwise the Kelvin-derived color.
+    /// Use this everywhere that applies color to lights, gobos, and emissive materials.
+    var effectiveColor: UIColor {
+        customColor ?? uiColor
+    }
+
     static func from(_ config: LightConfig, kind: LightKind, proceduralKind: ProceduralLightKind? = nil) -> LightConfigComponent {
         LightConfigComponent(
-            lightKind:              kind,
-            intensity:              config.intensity,
+            lightKind: kind,
+            intensity: config.intensity,
             colorTemperatureKelvin: config.colorTemperatureKelvin,
-            innerAngleDeg:          config.innerAngleDeg,
-            outerAngleDeg:          config.outerAngleDeg,
-            attenuationRadius:      config.attenuationRadius,
-            shadowEnabled:          config.shadowEnabled,
-            modelScale:             config.modelScale,
-            reflectorType:          config.reflectorType,
-            activeGobo:             config.activeGobo,
-            diffuserAmount:         config.diffuserAmount,
-            proceduralKind:         proceduralKind
+            innerAngleDeg: config.innerAngleDeg,
+            outerAngleDeg: config.outerAngleDeg,
+            attenuationRadius: config.attenuationRadius,
+            shadowEnabled: config.shadowEnabled,
+            modelScale: config.modelScale,
+            reflectorType: config.reflectorType,
+            activeGobo: config.activeGobo,
+            diffuserAmount: config.diffuserAmount,
+            proceduralKind: proceduralKind
         )
     }
 
@@ -55,6 +92,7 @@ struct LightConfigComponent: Component, Codable {
         case shadowEnabled, modelScale
         case reflectorType, activeGobo, diffuserAmount
         case proceduralKind
+        case customColorR, customColorG, customColorB, customColorA
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +110,10 @@ struct LightConfigComponent: Component, Codable {
         activeGobo     = try c.decodeIfPresent(GoboPattern.self, forKey: .activeGobo) ?? .none
         diffuserAmount = try c.decodeIfPresent(Float.self, forKey: .diffuserAmount) ?? 0.0
         proceduralKind = try c.decodeIfPresent(ProceduralLightKind.self, forKey: .proceduralKind)
+        customColorR   = try c.decodeIfPresent(Float.self, forKey: .customColorR)
+        customColorG   = try c.decodeIfPresent(Float.self, forKey: .customColorG)
+        customColorB   = try c.decodeIfPresent(Float.self, forKey: .customColorB)
+        customColorA   = try c.decodeIfPresent(Float.self, forKey: .customColorA)
     }
 
     init(lightKind: LightKind, intensity: Float, colorTemperatureKelvin: Float,
@@ -80,7 +122,11 @@ struct LightConfigComponent: Component, Codable {
          reflectorType: ReflectorType = .standard,
          activeGobo: GoboPattern = .none,
          diffuserAmount: Float = 0.0,
-         proceduralKind: ProceduralLightKind? = nil) {
+         proceduralKind: ProceduralLightKind? = nil,
+         customColorR: Float? = nil,
+         customColorG: Float? = nil,
+         customColorB: Float? = nil,
+         customColorA: Float? = nil) {
         self.lightKind = lightKind
         self.intensity = intensity
         self.colorTemperatureKelvin = colorTemperatureKelvin
@@ -93,6 +139,10 @@ struct LightConfigComponent: Component, Codable {
         self.activeGobo = activeGobo
         self.diffuserAmount = diffuserAmount
         self.proceduralKind = proceduralKind
+        self.customColorR = customColorR
+        self.customColorG = customColorG
+        self.customColorB = customColorB
+        self.customColorA = customColorA
     }
 }
 
@@ -108,12 +158,12 @@ struct SpawnItem {
     var modelFileName: String
     var isBackground: Bool = false
     var UUId: UUID = UUID()
-    var customImage: UIImage? = nil
-    var poses: [SpawnPose]? = nil
-    var detailText: String? = nil
-    var selectedPose: String? = nil
-    var proceduralKind: ProceduralLightKind? = nil
-    var customModelURL: URL? = nil
+    var customImage: UIImage?
+    var poses: [SpawnPose]?
+    var detailText: String?
+    var selectedPose: String?
+    var proceduralKind: ProceduralLightKind?
+    var customModelURL: URL?
 }
 
 // MARK: - BackgroundStore
@@ -142,64 +192,64 @@ extension SpawnItem {
     init(character: CharacterItem) {
         let poseItems = character.pose.map { pose in
             SpawnPose(
-                title:         pose.name,
-                imageName:     pose.imageName,
+                title: pose.name,
+                imageName: pose.imageName,
                 modelFileName: pose.modelFilename ?? ""
             )
         }
         let defaultModel = character.pose.first?.modelFilename ?? character.imageName
         self.init(
-            title:     character.name,
+            title: character.name,
             imageName: character.imageName,
             modelFileName: defaultModel,
-            isBackground:  false,
-            UUId:          character.id,
-            poses:         poseItems
+            isBackground: false,
+            UUId: character.id,
+            poses: poseItems
         )
     }
 
     init(prop: PropItem) {
         self.init(
-            title:         prop.name,
-            imageName:     prop.imageName,
+            title: prop.name,
+            imageName: prop.imageName,
             modelFileName: prop.modelFileName ?? "",
-            isBackground:  false,
-            UUId:          prop.id ?? UUID(),
-            detailText:    prop.description,
+            isBackground: false,
+            UUId: prop.id ?? UUID(),
+            detailText: prop.description,
             customModelURL: prop.localModelURL
         )
     }
 
     init(camera: CameraLibraryItem) {
         self.init(
-            title:         camera.name,
-            imageName:     camera.imageName,
+            title: camera.name,
+            imageName: camera.imageName,
             modelFileName: camera.modelFileName ?? "",
-            isBackground:  false,
-            UUId:          camera.id,
-            detailText:    camera.description
+            isBackground: false,
+            UUId: camera.id,
+            detailText: camera.description
         )
     }
 
     init(light: LightItem) {
         self.init(
-            title:         light.name,
-            imageName:     light.imageName,
+            title: light.name,
+            imageName: light.imageName,
             modelFileName: light.modelFileName ?? "",
-            isBackground:  false,
-            detailText:    light.description,
+            isBackground: false,
+            detailText: light.description,
             proceduralKind: light.proceduralKind
         )
     }
 
     init(background: BackgroundItem) {
         self.init(
-            title:         background.title,
-            imageName:     background.imageName,
+            title: background.title,
+            imageName: background.imageName,
             modelFileName: "plane",
-            isBackground:  true,
-            UUId:          background.id,
-            customImage:   background.customImage
+            isBackground: true,
+            UUId: background.id,
+            customImage: background.customImage
         )
     }
 }
@@ -211,8 +261,8 @@ extension SpawnItem {
     init(filmCharacter: FilmCharacter, template: CharacterItem) {
         let poseItems = template.pose.map { pose in
             SpawnPose(
-                title:         pose.name,
-                imageName:     pose.imageName,
+                title: pose.name,
+                imageName: pose.imageName,
                 modelFileName: pose.modelFilename ?? ""
             )
         }
@@ -222,12 +272,12 @@ extension SpawnItem {
             ?? ""
 
         self.init(
-            title:         filmCharacter.nameOverride ?? template.name,
-            imageName:     template.imageName,
+            title: filmCharacter.nameOverride ?? template.name,
+            imageName: template.imageName,
             modelFileName: selectedPoseModel,
-            isBackground:  false,
-            UUId:          filmCharacter.id,
-            poses:         poseItems
+            isBackground: false,
+            UUId: filmCharacter.id,
+            poses: poseItems
         )
     }
 }

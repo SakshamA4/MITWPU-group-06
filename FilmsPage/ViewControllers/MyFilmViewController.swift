@@ -14,22 +14,22 @@ class MyFilmViewController: UIViewController {
     @IBOutlet weak var collectionView: UICollectionView!
     @IBOutlet weak var filmName: UILabel!
     @IBOutlet weak var searchButton: UIBarButtonItem!
-    
+
     private let sequenceCellId = "sequence_cell"
     private let placeholderCellId = "placeholder_cell"
-    
+
     // MARK: - Data & Search State
     var sequence: [Sequence] = []
     private var filteredSequences: [Sequence] = []
     private var currentSearchText: String = ""
     private var savedSearchButton: UIBarButtonItem?
-    
+
     // Computed property to determine active data source
     private var isSearching: Bool { !currentSearchText.isEmpty }
     private var currentSequences: [Sequence] { isSearching ? filteredSequences : sequence }
 
     private let sequenceService = SequenceService.shared
-    
+
     // Search controller
     private let searchController = UISearchController(searchResultsController: nil)
 
@@ -56,28 +56,28 @@ class MyFilmViewController: UIViewController {
         registerCells()
         setupObservers()
         setupSearchController()
-        
+
         // Save the search button and ensure it's visible initially
         savedSearchButton = searchButton
         navigationItem.rightBarButtonItem = searchButton
 
         filmName.text = film?.name ?? "My Film"
+        setupReportButton()
     }
 
-    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
-        // Always hide search bar and show search button when view appears
+        // Always hide search bar and restore both nav buttons when view appears
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        setupReportButton()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
     // MARK: - Setup
@@ -110,24 +110,51 @@ class MyFilmViewController: UIViewController {
         searchController.isActive = false
         collectionView?.reloadData()
     }
-    
+
     @IBAction func searchAction(_ sender: Any) {
         // Show search controller in navigation bar
         navigationItem.searchController = searchController
-        
+
         // Hide the search button by removing it from nav bar
         navigationItem.rightBarButtonItem = nil
-        
+
         // Animate the search bar appearance
         UIView.animate(withDuration: 0.3) {
             self.view.layoutIfNeeded()
         }
-        
+
         // Activate and focus the search bar
         searchController.isActive = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.searchController.searchBar.becomeFirstResponder()
         }
+    }
+
+    // MARK: - Report
+
+    private func setupReportButton() {
+        let cfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        let reportBtn = UIBarButtonItem(
+            image: UIImage(systemName: "doc.text.magnifyingglass", withConfiguration: cfg),
+            style: .plain,
+            target: self,
+            action: #selector(showFilmReport)
+        )
+        // Keep the existing search button alongside the new report button
+        navigationItem.rightBarButtonItems = [searchButton, reportBtn]
+        savedSearchButton = navigationItem.rightBarButtonItem
+    }
+
+    @objc private func showFilmReport() {
+        let reportVC = FilmReportViewController()
+        reportVC.film = film
+        reportVC.modalPresentationStyle = .pageSheet
+        if let sheet = reportVC.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(reportVC, animated: true)
     }
 
     func registerCells() {
@@ -140,9 +167,9 @@ class MyFilmViewController: UIViewController {
             forCellWithReuseIdentifier: "placeholder_cell"
         )
     }
-    
+
     // MARK: - Filter Logic
-    
+
     private func filterSequences(for query: String) {
         currentSearchText = query.trimmingCharacters(in: .whitespaces)
         if currentSearchText.isEmpty {
@@ -228,7 +255,7 @@ extension MyFilmViewController: UICollectionViewDelegate, UICollectionViewDelega
         // When not searching, index 0 is placeholder (ignore it)
         // When searching, no placeholder, so all indices are valid
         guard !(!isSearching && indexPath.item == 0) else { return }
-        
+
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let selectedSequence = currentSequences[itemIndex]
         performSegue(withIdentifier: "sequenceSegue", sender: selectedSequence)
@@ -326,13 +353,13 @@ extension MyFilmViewController: UISearchBarDelegate {
         currentSearchText = ""
         filteredSequences = []
         collectionView.reloadData()
-        
+
         // Hide the search controller and remove from nav bar
         searchController.isActive = false
         navigationItem.searchController = nil
-        
-        // Restore the search button to nav bar
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+
+        // Restore both search + report buttons
+        setupReportButton()
     }
 }
 
@@ -345,10 +372,10 @@ extension MyFilmViewController: UISearchControllerDelegate {
         filteredSequences = []
         collectionView.reloadData()
     }
-    
+
     func didDismissSearchController(_ searchController: UISearchController) {
-        // Restore the search button when search controller is dismissed
+        // Restore both search + report buttons when search is dismissed
         navigationItem.searchController = nil
-        navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+        setupReportButton()
     }
 }

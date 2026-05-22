@@ -57,10 +57,10 @@ extension CanvasViewController {
     //     next point.
     // ─────────────────────────────────────────────────────────────────────────
     private func makeRing(
-        radius:       Float,
-        tubeRadius:   Float  = 0.008,   // thin — matches reference image
+        radius: Float,
+        tubeRadius: Float  = 0.008,   // thin — matches reference image
         segmentCount: Int    = 64,      // high count = smooth continuous ring
-        color:        UIColor
+        color: UIColor
     ) -> Entity {
         let container = Entity()
         container.name = "RingContainer"
@@ -80,7 +80,7 @@ extension CanvasViewController {
             guard segLen > 0.0001 else { continue }
 
             let seg = ModelEntity(
-                mesh:      MeshResource.generateCylinder(height: segLen, radius: tubeRadius),
+                mesh: MeshResource.generateCylinder(height: segLen, radius: tubeRadius),
                 materials: [mat]
             )
 
@@ -135,14 +135,14 @@ extension CanvasViewController {
         let whiteMat = UnlitMaterial(color: .systemRed)
 
         let shaft = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.85, radius: 0.016),
+            mesh: MeshResource.generateCylinder(height: 0.85, radius: 0.016),
             materials: [whiteMat]
         )
         shaft.name     = "ArrowShaft"
         shaft.position = [0, 0.425, 0]
 
         let cone = ModelEntity(
-            mesh:      MeshResource.generateCone(height: 0.20, radius: 0.065),
+            mesh: MeshResource.generateCone(height: 0.20, radius: 0.065),
             materials: [whiteMat]
         )
         cone.name     = "ArrowCone"
@@ -150,7 +150,7 @@ extension CanvasViewController {
 
         // Invisible wide collider so the arrow is easy to grab
         let arrowCollider = ModelEntity(
-            mesh:      MeshResource.generateBox(size: [0.15, 1.15, 0.15]),
+            mesh: MeshResource.generateBox(size: [0.15, 1.15, 0.15]),
             materials: [SimpleMaterial(color: .clear, isMetallic: false)]
         )
         arrowCollider.components.set(OpacityComponent(opacity: 0.0))
@@ -171,7 +171,7 @@ extension CanvasViewController {
         // Centre dot — solid red disc, XZ move target. Larger so it's clearly visible
         // and easy to grab even on small entities like cameras.
         let centreDot      = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.016, radius: 0.22),
+            mesh: MeshResource.generateCylinder(height: 0.016, radius: 0.22),
             materials: [redMat]
         )
         centreDot.name     = "CentreDot"
@@ -182,7 +182,7 @@ extension CanvasViewController {
         // for XZ-plane dragging, especially on small entities where the ring itself
         // may be larger than the object's footprint.
         let dotCollider    = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.06, radius: 0.75),
+            mesh: MeshResource.generateCylinder(height: 0.06, radius: 0.75),
             materials: [SimpleMaterial(color: .clear, isMetallic: false)]
         )
         dotCollider.components.set(OpacityComponent(opacity: 0.0))
@@ -231,7 +231,7 @@ extension CanvasViewController {
         planeDiscPBR.blending  = .transparent(opacity: .init(floatLiteral: 0.0))
 
         let planeDisc      = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.006, radius: 1.0),
+            mesh: MeshResource.generateCylinder(height: 0.006, radius: 1.0),
             materials: [planeDiscPBR]
         )
         planeDisc.name     = "PlaneDisc"
@@ -274,7 +274,7 @@ extension CanvasViewController {
 
         // ── Ghost arrow shaft ─────────────────────────────────────────────────
         let ghostShaft      = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.85, radius: 0.018),
+            mesh: MeshResource.generateCylinder(height: 0.85, radius: 0.018),
             materials: [ghostMat]
         )
         ghostShaft.name     = "GhostShaft"
@@ -283,7 +283,7 @@ extension CanvasViewController {
 
         // ── Ghost cone ────────────────────────────────────────────────────────
         let ghostCone      = ModelEntity(
-            mesh:      MeshResource.generateCone(height: 0.20, radius: 0.07),
+            mesh: MeshResource.generateCone(height: 0.20, radius: 0.07),
             materials: [ghostMat]
         )
         ghostCone.name     = "GhostCone"
@@ -307,7 +307,7 @@ extension CanvasViewController {
     func showGizmo(at entity: Entity) {
         // Do not show gizmos when viewing through a camera
         guard activeCamera === editorCamera else { return }
-        
+
         guard let anchor = arView.scene.findEntity(named: "MainAnchor"),
               let gizmo  = gizmoRoot else { return }
 
@@ -415,7 +415,7 @@ extension CanvasViewController {
         let circleMat  = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
 
         let line = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
+            mesh: MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
             materials: [lineMat]
         )
         line.position = SIMD3<Float>(worldPos.x, groundY + lineHeight * 0.5, worldPos.z)
@@ -424,7 +424,7 @@ extension CanvasViewController {
         anchor.addChild(line)
 
         let circle = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.006, radius: 0.07),
+            mesh: MeshResource.generateCylinder(height: 0.006, radius: 0.07),
             materials: [circleMat]
         )
         circle.position = SIMD3<Float>(worldPos.x, groundY + 0.003, worldPos.z)
@@ -440,7 +440,7 @@ extension CanvasViewController {
 
         hideDropShadow()
 
-        let baseY:   Float = worldPos.y
+        let baseY: Float = worldPos.y
         let groundY: Float = 0.0
         guard baseY > groundY + 0.02 else { return }
 
@@ -449,7 +449,7 @@ extension CanvasViewController {
         let circleMat  = UnlitMaterial(color: UIColor.systemYellow.withAlphaComponent(0.85))
 
         let line = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
+            mesh: MeshResource.generateCylinder(height: lineHeight, radius: 0.005),
             materials: [lineMat]
         )
         line.position = SIMD3<Float>(worldPos.x, groundY + lineHeight * 0.5, worldPos.z)
@@ -458,7 +458,7 @@ extension CanvasViewController {
         anchor.addChild(line)
 
         let circle = ModelEntity(
-            mesh:      MeshResource.generateCylinder(height: 0.006, radius: 0.07),
+            mesh: MeshResource.generateCylinder(height: 0.006, radius: 0.07),
             materials: [circleMat]
         )
         circle.position = SIMD3<Float>(worldPos.x, groundY + 0.003, worldPos.z)
@@ -493,16 +493,16 @@ extension CanvasViewController {
     }
 
     func getPlaneIntersection(
-        location:    CGPoint,
+        location: CGPoint,
         planeNormal: SIMD3<Float>,
-        planePoint:  SIMD3<Float>
+        planePoint: SIMD3<Float>
     ) -> SIMD3<Float>? {
         guard let ray = arView.ray(through: location) else { return nil }
         return rayPlaneIntersection(
-            rayOrigin:    ray.origin,
+            rayOrigin: ray.origin,
             rayDirection: ray.direction,
-            planePoint:   planePoint,
-            planeNormal:  planeNormal
+            planePoint: planePoint,
+            planeNormal: planeNormal
         )
     }
 
@@ -540,14 +540,21 @@ extension CanvasViewController {
         gizmo.scale = SIMD3<Float>(repeating: localScale)
     }
 
+    private struct RingConfig {
+        let ring: String
+        let disc: String
+        let color: UIColor
+        let axis: SIMD3<Float>
+        let angle: Float
+    }
+
     /// Injects hidden filled-disc entities alongside each rotation ring so they
     /// can be shown/coloured in highlightGizmoPart without modifying RotationRingGizmo.
     private func setupRotationDiscs(on gizmo: Entity) {
-        // (ringName → discName, colour, normal-axis rotation)
-        let ringConfigs: [(ring: String, disc: String, color: UIColor, axis: SIMD3<Float>, angle: Float)] = [
-            ("xRing", "xDisc", .systemRed,   [0, 0, 1], .pi / 2),   // X ring lives in YZ plane
-            ("yRing", "yDisc", .systemGreen, [0, 1, 0], 0),          // Y ring lives in XZ plane (flat)
-            ("zRing", "zDisc", .systemBlue,  [1, 0, 0], .pi / 2),   // Z ring lives in XY plane
+        let ringConfigs: [RingConfig] = [
+            RingConfig(ring: "xRing", disc: "xDisc", color: .systemRed, axis: [0, 0, 1], angle: .pi / 2),
+            RingConfig(ring: "yRing", disc: "yDisc", color: .systemGreen, axis: [0, 1, 0], angle: 0),
+            RingConfig(ring: "zRing", disc: "zDisc", color: .systemBlue, axis: [1, 0, 0], angle: .pi / 2)
         ]
 
         for cfg in ringConfigs {
@@ -566,7 +573,7 @@ extension CanvasViewController {
             discPBR.blending  = .transparent(opacity: .init(floatLiteral: 0.0))
 
             let disc = ModelEntity(
-                mesh:      MeshResource.generateCylinder(height: 0.004, radius: max(radius, 0.08)),
+                mesh: MeshResource.generateCylinder(height: 0.004, radius: max(radius, 0.08)),
                 materials: [discPBR]
             )
             disc.name       = cfg.disc
@@ -596,7 +603,7 @@ extension CanvasViewController {
             hideRotationGizmo()
             return
         }
-        
+
         guard let selected = selectedEntity else {
             hideRotationGizmo()
             hideGizmo()

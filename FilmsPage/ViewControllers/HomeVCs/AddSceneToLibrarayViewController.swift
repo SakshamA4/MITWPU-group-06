@@ -45,7 +45,7 @@ class AddSceneToLibrarayViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(presentImageSourceOptions))
         sceneImageView.addGestureRecognizer(tap)
-        
+
         sceneNotes.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
         sceneNotes.layer.borderWidth = 1.0
         sceneNameTextField.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
@@ -154,7 +154,7 @@ class AddSceneToLibrarayViewController: UIViewController {
                 id: newRecentModel.id,
                 name: name,
                 image: imageNameToStore,
-                SequenceId: seqId
+                sequenceId: seqId
             )
             SceneService.shared.addScene(projectScene)
         }
@@ -208,7 +208,6 @@ extension AddSceneToLibrarayViewController: PHPickerViewControllerDelegate {
         }
     }
 }
-
 
 extension AddSceneToLibrarayViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController,

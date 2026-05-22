@@ -1,10 +1,10 @@
-//import Combine
-//import PhotosUI
-//import RealityKit
-//import UIKit
-//import ARKit
+// import Combine
+// import PhotosUI
+// import RealityKit
+// import UIKit
+// import ARKit
 //
-//extension CanvasViewController {
+// extension CanvasViewController {
 //
 //    func setupAnimationPanel() {
 //        animationPanel = UIStackView()
@@ -169,7 +169,7 @@
 //                                startTime: startTime, duration: duration,
 //                                degrees: degrees, axis: .y)
 //    }
-//}
+// }
 
 //  CanvasViewController_Animation.swift
 //  3DCanvas
@@ -193,7 +193,7 @@ extension CanvasViewController {
         animationPanel.translatesAutoresizingMaskIntoConstraints = false
         animationPanel.alpha = 0
 
-        let moveBtn   = makeAnimButton(title: "Move",   action: #selector(animateMove))
+        let moveBtn   = makeAnimButton(title: "Move", action: #selector(animateMove))
         let rotateBtn = makeAnimButton(title: "Rotate", action: #selector(animateRotate))
 
         animationPanel.addArrangedSubview(moveBtn)
@@ -206,7 +206,7 @@ extension CanvasViewController {
             animationPanel.bottomAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -90),
             animationPanel.heightAnchor.constraint(equalToConstant: 44),
-            animationPanel.widthAnchor.constraint(equalToConstant: 220),
+            animationPanel.widthAnchor.constraint(equalToConstant: 220)
         ])
     }
 
@@ -274,12 +274,12 @@ extension CanvasViewController {
         card.onConfirm = { [weak self] startTime, duration, degrees, axis in
             guard let self else { return }
             self.handleAnimationConfirm(
-                type:      type,
-                entity:    entity,
+                type: type,
+                entity: entity,
                 startTime: startTime,
-                duration:  duration,
-                degrees:   degrees,
-                axis:      axis
+                duration: duration,
+                degrees: degrees,
+                axis: axis
             )
         }
 
@@ -289,19 +289,19 @@ extension CanvasViewController {
     // MARK: - Shared confirm handler (Move + Rotate + Walk)
 
     func handleAnimationConfirm(
-        type:      AnimationType,
-        entity:    Entity,
+        type: AnimationType,
+        entity: Entity,
         startTime: Float,
-        duration:  Float,
-        degrees:   Float,
-        axis:      RotationAxis
+        duration: Float,
+        degrees: Float,
+        axis: RotationAxis
     ) {
         guard duration > 0 else { return }
 
-        var track:      AnimationTrack
+        var track: AnimationTrack
         var fromValue   = SIMD3<Float>.zero
         var toValue     = SIMD3<Float>.zero
-        var motionPath: BezierMotionPath? = nil
+        var motionPath: BezierMotionPath?
 
         switch type {
 
@@ -314,17 +314,17 @@ extension CanvasViewController {
             let start = evaluated.translation
             let end   = start + SIMD3<Float>(2, 0, 0)
             motionPath = BezierMotionPath(
-                start:    start,
+                start: start,
                 control1: start + SIMD3<Float>(0.5, 0, 0),
                 control2: start + SIMD3<Float>(1.5, 0, 0),
-                end:      end
+                end: end
             )
 
         case .rotate:
             track     = .rotation
             fromValue = axis.simdAxis
             toValue   = SIMD3<Float>(degrees * (.pi / 180), 0, 0)
-            
+
         case .zoom:
             track = .fov
 
@@ -339,14 +339,14 @@ extension CanvasViewController {
 
         let clip = AnimationClip(
             entityName: entity.name,
-            entityID:   entity.components[EntityIDComponent.self]?.id,
-            type:       type,
-            track:      track,
-            easing:     type == .walk ? .linear : .easeInOut,
-            startTime:  startTime,
-            duration:   duration,
-            fromValue:  fromValue,
-            toValue:    toValue,
+            entityID: entity.components[EntityIDComponent.self]?.id,
+            type: type,
+            track: track,
+            easing: type == .walk ? .linear : .easeInOut,
+            startTime: startTime,
+            duration: duration,
+            fromValue: fromValue,
+            toValue: toValue,
             motionPath: motionPath
         )
 
@@ -362,9 +362,9 @@ extension CanvasViewController {
     // MARK: - Legacy shim (kept for any surviving call sites)
 
     func handleAnimationPromptConfirm(
-        type:   AnimationType,
+        type: AnimationType,
         entity: Entity,
-        alert:  UIAlertController
+        alert: UIAlertController
     ) {
         guard
             let s = alert.textFields?[0].text, let startTime = Float(s),
@@ -375,8 +375,7 @@ extension CanvasViewController {
         let degrees: Float
         if type == .rotate,
            let t = alert.textFields?[2].text,
-           let deg = Float(t) { degrees = deg }
-        else { degrees = 90 }
+           let deg = Float(t) { degrees = deg } else { degrees = 90 }
 
         handleAnimationConfirm(type: type, entity: entity,
                                startTime: startTime, duration: duration,
@@ -405,12 +404,12 @@ extension CanvasViewController {
         card.onConfirm = { [weak self] startTime, duration, _, _ in
             guard let self, duration > 0 else { return }
             self.handleAnimationConfirm(
-                type:      .walk,
-                entity:    entity,
+                type: .walk,
+                entity: entity,
                 startTime: startTime,
-                duration:  duration,
-                degrees:   0,
-                axis:      .y
+                duration: duration,
+                degrees: 0,
+                axis: .y
             )
         }
         present(card, animated: false)
@@ -509,7 +508,7 @@ extension CanvasViewController {
         dir.y = 0   // flatten to XZ — no tilting on hills
         let len = simd_length(dir)
         guard len > 0.0001 else { return }
-        dir = dir / len
+        dir /= len
 
         let forward = SIMD3<Float>(0, 0, 1)
         let dot     = simd_dot(forward, dir)

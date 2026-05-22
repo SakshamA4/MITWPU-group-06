@@ -49,7 +49,7 @@ enum ToolType: CaseIterable {
         case .sky: return "Sky"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .character: return "person.fill"
@@ -65,40 +65,27 @@ enum ToolType: CaseIterable {
     var items: [SpawnItem] {
         switch self {
 
-       case .character:
-           return CharacterService.shared.getCharacters().map { SpawnItem(character: $0) }
+        case .character:
+            return CharacterService.shared.getCharacters().map { SpawnItem(character: $0) }
 
-       case .prop:
+        case .prop:
             return PropService.shared.getProps().map { SpawnItem(prop: $0) }
 
         case .camera:
-                    // 1. Get the 'Cameras' section from your global data store
-                    guard let cameraSection = CameraLibraryDataStore.sections.first(where: { $0.type == .cameras }) else {
-                        return []
-                    }
+            guard let cameraSection = CameraLibraryDataStore.sections.first(where: { $0.type == .cameras }) else {
+                return []
+            }
             let playableCameras = cameraSection.items.filter { $0.modelFileName != nil }
+            return playableCameras.map { SpawnItem(camera: $0) }
 
-                        // 3. Convert them to SpawnItems
-                        return playableCameras.map { SpawnItem(camera: $0) }
-
-            // In DataStore.swift
-
-                    case .light:
-                        // 1. Access the items directly (since there are no sections)
-                        let allLights = LightsDataStore.items
-                        
-                        // 2. Filter for items that actually have a 3D model
-                        // This ensures only "Spotlight" shows up, and the text-only ones are hidden
-                        let playableLights = allLights.filter { $0.modelFileName != nil || $0.isProcedural }
-
-                        // 3. Convert them to SpawnItems
-                        return playableLights.map { SpawnItem(light: $0) }
-
+        case .light:
+            let allLights = LightsDataStore.items
+            let playableLights = allLights.filter { $0.modelFileName != nil || $0.isProcedural }
+            return playableLights.map { SpawnItem(light: $0) }
 
         case .background:
-                // CONNECT: Map global background items to SpawnItems
-                return BackgroundStore.shared.items.map { SpawnItem(background: $0) }
-            
+            return BackgroundStore.shared.items.map { SpawnItem(background: $0) }
+
         case .wall:
             return [
                 SpawnItem(
@@ -111,26 +98,10 @@ enum ToolType: CaseIterable {
                     imageName: "ground_img",
                     modelFileName: "ground"
                 )
-
             ]
-            
+
         case .sky:
             return [
-//                SpawnItem(
-//                    title: "Daylight Sky",
-//                    imageName: "cloud.sun",
-//                    modelFileName: "sky_day"
-//                ),
-//                SpawnItem(
-//                    title: "Sunset Sky",
-//                    imageName: "sunset",
-//                    modelFileName: "sky_sunset"
-//                ),
-//                SpawnItem(
-//                    title: "Midnight Sky",
-//                    imageName: "moon.stars",
-//                    modelFileName: "sky_night"
-//                ),
                 SpawnItem(
                     title: "Blue Sky",
                     imageName: "Blue_sky",
@@ -146,9 +117,7 @@ enum ToolType: CaseIterable {
                     imageName: "Evening_sky",
                     modelFileName: "Evening_sky"
                 )
-
             ]
-            
         }
     }
 }
@@ -166,4 +135,3 @@ extension ToolType {
         }
     }
 }
-

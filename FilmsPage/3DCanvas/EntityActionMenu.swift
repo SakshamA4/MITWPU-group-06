@@ -3,16 +3,7 @@ import RealityKit
 
 // MARK: - EntityActionMenu
 //
-// Context menu that appears when the user taps an entity.
-//
-// ⚠️  CRITICAL FIX — init-order bug from previous version:
-//     The old code set `showAddMovement` AFTER calling init(), but setupUI()
-//     ran inside init(frame:) — so the conditional button was ALWAYS built
-//     with showAddMovement == false (never shown).
-//
-//     Fix: setupUI() is now called from configure(mode:isLocked:), which the
-//     caller must invoke BEFORE addSubview. This guarantees the mode is set
-//     when the button list is built.
+// Context menu that appears when the user long-presses an entity.
 //
 // Three menu modes:
 //   .standard  → Add Movement | [Light Settings] | [Material tools] | Lock | Delete
@@ -35,6 +26,7 @@ class EntityActionMenu: UIView {
         case aspectRatio    // camera:   open aspect ratio picker
         case lock
         case delete
+        case duplicate      // duplicate the selected entity
     }
 
     enum MenuMode {
@@ -47,6 +39,7 @@ class EntityActionMenu: UIView {
     private var isCurrentlyLocked: Bool = false
     private var showColorOption: Bool = false
     private var showLightOption: Bool = false
+    private var isBackground: Bool = false
 
     private let stackView: UIStackView = {
         let sv = UIStackView()
@@ -60,7 +53,6 @@ class EntityActionMenu: UIView {
     }()
 
     // ── Init ─────────────────────────────────────────────────────────────────
-    // Sets up the container shell only. Buttons are built in configure().
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
@@ -74,17 +66,18 @@ class EntityActionMenu: UIView {
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
 
     // ── Configuration — MUST be called before addSubview ─────────────────────
-    func configure(mode: MenuMode, isLocked: Bool, showColorOption: Bool = false, showLightOption: Bool = false) {
+    func configure(mode: MenuMode, isLocked: Bool, showColorOption: Bool = false, showLightOption: Bool = false, isBackground: Bool = false) {
         self.mode = mode
         self.isCurrentlyLocked = isLocked
         self.showColorOption = showColorOption
         self.showLightOption = showLightOption
+        self.isBackground = isBackground
         buildButtons()
     }
 
@@ -102,9 +95,13 @@ class EntityActionMenu: UIView {
     private func buildButtons() {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        // When locked, only show the Unlock button — no other interaction allowed
+        // When locked, show only Unlock + Duplicate (no other interaction allowed)
         if isCurrentlyLocked {
             addMenuButton(title: "Unlock", action: .lock)
+            if !isBackground {
+                addSeparator()
+                addMenuButton(title: "Duplicate", action: .duplicate)
+            }
             return
         }
 
@@ -127,18 +124,24 @@ class EntityActionMenu: UIView {
                 addSeparator()
             }
             addMenuButton(title: "Lock", action: .lock)
+            if !isBackground {
+                addSeparator()
+                addMenuButton(title: "Duplicate", action: .duplicate)
+            }
             addSeparator()
-            addMenuButton(title: "Delete",       action: .delete, isDestructive: true)
+            addMenuButton(title: "Delete", action: .delete, isDestructive: true)
 
         case .camera:
-            // Add Shot | Aspect Ratio | Lock | Delete
-            addMenuButton(title: "Add Shot",       action: .addShot)
+            // Camera: Add Shot | Aspect Ratio | Lock | Duplicate | Delete
+            addMenuButton(title: "Add Shot", action: .addShot)
             addSeparator()
-            addMenuButton(title: "Aspect Ratio",   action: .aspectRatio)
+            addMenuButton(title: "Aspect Ratio", action: .aspectRatio)
             addSeparator()
             addMenuButton(title: "Lock", action: .lock)
             addSeparator()
-            addMenuButton(title: "Delete",         action: .delete, isDestructive: true)
+            addMenuButton(title: "Duplicate", action: .duplicate)
+            addSeparator()
+            addMenuButton(title: "Delete", action: .delete, isDestructive: true)
         }
     }
 

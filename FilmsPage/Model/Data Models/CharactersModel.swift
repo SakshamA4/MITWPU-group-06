@@ -22,7 +22,6 @@ struct FilmCharacter: Codable {
     var selectedPoseId: UUID?
 }
 
-
 struct CharacterPoseItem: Codable {
     var id: UUID?
     var name: String

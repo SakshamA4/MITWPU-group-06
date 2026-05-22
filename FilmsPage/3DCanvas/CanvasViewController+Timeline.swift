@@ -6,18 +6,17 @@ import ARKit
 
 extension CanvasViewController {
 
-    
     func setupTimelineControls() {
-        
+
         timelineContainer = UIView()
         timelineContainer.translatesAutoresizingMaskIntoConstraints = false
         timelineContainer.backgroundColor = UIColor.systemGray6
         timelineContainer.layer.borderWidth = 1
         timelineContainer.layer.borderColor = UIColor.systemGray3.cgColor
         timelineContainer.isHidden = true
-        
+
         view.addSubview(timelineContainer)
-        
+
         playButton = UIButton(type: .system)
         playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
         playButton.tintColor = .white
@@ -29,7 +28,7 @@ extension CanvasViewController {
             action: #selector(playTimeline),
             for: .touchUpInside
         )
-        
+
         pauseButton = UIButton(type: .system)
         pauseButton.setImage(UIImage(systemName: "pause.fill"), for: .normal)
         pauseButton.tintColor = .white
@@ -42,7 +41,7 @@ extension CanvasViewController {
             action: #selector(pauseTimeline),
             for: .touchUpInside
         )
-        
+
         stopButton = UIButton(type: .system)
         stopButton.setImage(UIImage(systemName: "stop.fill"), for: .normal)
         stopButton.tintColor = .white
@@ -55,24 +54,24 @@ extension CanvasViewController {
             action: #selector(stopTimeline),
             for: .touchUpInside
         )
-        
+
         playbackButtonStack = UIStackView(arrangedSubviews: [
             playButton,
             pauseButton,
-            stopButton,
+            stopButton
         ])
         playbackButtonStack.axis = .horizontal
         playbackButtonStack.spacing = 12
         playbackButtonStack.alignment = .center
         playbackButtonStack.distribution = .equalSpacing
         playbackButtonStack.translatesAutoresizingMaskIntoConstraints = false
-        
+
         view.addSubview(playbackButtonStack)
-        
+
         // Constraints
-        
+
         NSLayoutConstraint.activate([
-            
+
             // Timeline container (bottom)
             timelineContainer.leadingAnchor.constraint(
                 equalTo: view.leadingAnchor
@@ -84,7 +83,7 @@ extension CanvasViewController {
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor
             ),
             timelineContainer.heightAnchor.constraint(equalToConstant: 120),
-            
+
             // Playback buttons (bottom-left, above timeline)
             playbackButtonStack.leadingAnchor.constraint(
                 equalTo: view.leadingAnchor,
@@ -94,37 +93,36 @@ extension CanvasViewController {
                 equalTo: timelineContainer.topAnchor,
                 constant: -12
             ),
-            
+
             // Button sizes (explicit, consistent)
             playButton.widthAnchor.constraint(equalToConstant: 44),
             playButton.heightAnchor.constraint(equalToConstant: 44),
-            
+
             pauseButton.widthAnchor.constraint(equalToConstant: 44),
             pauseButton.heightAnchor.constraint(equalToConstant: 44),
-            
+
             stopButton.widthAnchor.constraint(equalToConstant: 44),
-            stopButton.heightAnchor.constraint(equalToConstant: 44),
+            stopButton.heightAnchor.constraint(equalToConstant: 44)
         ])
-        
+
         // Scrubber
-        
+
         setupScrubber()
     }
 
-    
     func updatePathSelection() {
-        
+
         for (clipID, visual) in activeMotionPaths {
-            
+
             guard
                 let pathEntity = visual.root
                     .findEntity(named: "MotionPath") as? ModelEntity
             else { continue }
-            
+
             // 🔒 Lock state lives on the PATH ROOT
             let isLocked =
             visual.root.components[LockComponent.self]?.isLocked ?? false
-            
+
             // 🎯 Color priority:
             // 1. Locked  → Gray
             // 2. Selected → Red
@@ -137,7 +135,7 @@ extension CanvasViewController {
             } else {
                 color = .systemBlue
             }
-            
+
             MotionPathRenderer.setPathColor(
                 entity: pathEntity,
                 color: color
@@ -145,7 +143,6 @@ extension CanvasViewController {
         }
     }
 
-    
     func shouldShowStartHandle(for clip: AnimationClip) -> Bool {
 
         // Only position clips with motion paths are relevant
@@ -164,8 +161,6 @@ extension CanvasViewController {
         return !hasPreviousPath
     }
 
-
-
     func previousPathClip(
         for clip: AnimationClip
     ) -> AnimationClip? {
@@ -178,37 +173,36 @@ extension CanvasViewController {
             .last
     }
 
-
     @objc func playTimeline() {
-        
+
         // RESUME FROM PAUSE
-        
+
         if playbackState == .paused {
             // Adjust start time so playback resumes correctly
             playbackStartTime =
             CACurrentMediaTime()
             - CFTimeInterval(currentTimelineTime)
-            
+
             startPlayback()
             playbackState = .playing
-            
+
             playButton.isHidden = true
             pauseButton.isHidden = true
             stopButton.isHidden = true
             // Show pause inside pill, hide play
             (view.viewWithTag(9503) as? UIButton)?.isHidden = false
             (view.viewWithTag(9505) as? UIButton)?.isHidden = true
-            
+
             return
         }
-        
+
         // START FROM BEGINNING
-        
+
         guard editorMode == .edit else { return }
         guard !timeline.clips.isEmpty else { return }
-        
+
         enterTimelineMode()
-        
+
         // Show floating scrubber pill instead of the old timelineContainer
         timelineContainer.isHidden = true
         view.viewWithTag(9500)?.isHidden = false
@@ -218,7 +212,7 @@ extension CanvasViewController {
         // Show pause in pill, hide play-in-pill
         (view.viewWithTag(9503) as? UIButton)?.isHidden = false
         (view.viewWithTag(9505) as? UIButton)?.isHidden = true
-        
+
         // Setup scrubber
         scrubber.minimumValue = 0
         scrubber.maximumValue = timeline.duration
@@ -231,33 +225,31 @@ extension CanvasViewController {
             let d = timeline.duration
             remainLbl.text = String(format: "%02d:%02d", Int(d) / 60, Int(d) % 60)
         }
-        
+
         // Reset timeline time
         currentTimelineTime = 0
         playbackStartTime = CACurrentMediaTime()
         playbackState = .playing
-        
+
         // Start playback loop
         startPlayback()
     }
 
-
     @objc func pauseTimeline() {
         guard playbackState == .playing else { return }
-        
+
         stopPlayback()
         playbackState = .paused
         stopAllWalkCycles()
-        
+
         pauseButton.isHidden = true
         playButton.isHidden = true
         // Inside pill: show play, hide pause
         (view.viewWithTag(9503) as? UIButton)?.isHidden = true
         (view.viewWithTag(9505) as? UIButton)?.isHidden = false
-        
+
     }
 
-    
     func startPlayback() {
         stopPlayback()  // safety
 
@@ -269,22 +261,20 @@ extension CanvasViewController {
         displayLink?.add(to: .main, forMode: .common)
     }
 
-    
     func stopPlayback() {
         displayLink?.invalidate()
         displayLink = nil
     }
 
-    
     @objc func updatePlayback() {
         let elapsed = Float(CACurrentMediaTime() - playbackStartTime)
         currentTimelineTime = elapsed
-        
+
         if currentTimelineTime >= timeline.duration {
             stopTimeline()
             return
         }
-        
+
         scrubber.value = currentTimelineTime
         // Update floating pill time labels
         if let elapsedLbl = view.viewWithTag(9501) as? UILabel {
@@ -298,54 +288,52 @@ extension CanvasViewController {
         evaluateTimeline(at: currentTimelineTime)
     }
 
-    
     @objc func stopTimeline() {
         guard editorMode == .timeline else { return }
-        
+
         stopPlayback()
         playbackState = .stopped
-        
+
         scrubber.value = 0
         currentTimelineTime = 0
         playbackStartTime = 0
-        
+
         stopAllWalkCycles()
         exitTimelineMode()
-        
+
         timelineContainer.isHidden = true
         view.viewWithTag(9500)?.isHidden = true
         playButton.isHidden = false
         stopButton.isHidden = true
         pauseButton.isHidden = true
-        
+
         // Reset pill buttons
         (view.viewWithTag(9503) as? UIButton)?.isHidden = false
         (view.viewWithTag(9505) as? UIButton)?.isHidden = true
-        
+
         // Re-evaluate timeline at t = 0 so objects
         // snap back to their initial transforms
         evaluateTimeline(at: 0)
     }
 
-    
     func evaluateTimeline(at time: Float) {
-        
+
         let clipsByEntity = Dictionary(
             grouping: timeline.effectiveClips(at: time),
             by: { $0.entityName }
         )
-        
+
         for (entityName, clips) in clipsByEntity {
-            
+
             guard
                 let entity = timelineEntityCache[entityName] ?? mainAnchor?.findEntity(named: entityName),
                 let baseTransform = baseTransforms[entityName]
             else { continue }
-            
+
             var translation = baseTransform.translation
             var rotation = baseTransform.rotation
             var scale = baseTransform.scale
-            var fov: Float? = nil
+            var fov: Float?
 
             // A zoom clip targets the cameraRoot (a plain Entity whose name starts with
             // "SceneCameraRoot_").  The actual PerspectiveCamera is a child of that root.
@@ -367,9 +355,9 @@ extension CanvasViewController {
             }
             
             for clip in sortedClips {
-                
+
                 let localTime = time - clip.startTime
-                
+
                 let progress: Float
                 if localTime <= 0 {
                     continue
@@ -378,17 +366,17 @@ extension CanvasViewController {
                 } else {
                     progress = localTime / clip.duration
                 }
-                
+
                 let eased = applyEasing(progress, easing: clip.easing)
-                
+
                 let value = simd_mix(
                     clip.fromValue,
                     clip.toValue,
                     SIMD3<Float>(repeating: eased)
                 )
-                
+
                 switch clip.track {
-                    
+
                 case .position:
                     if let path = clip.motionPath {
                         let t = max(0, min(1, (time - clip.startTime) / clip.duration))
@@ -403,7 +391,7 @@ extension CanvasViewController {
                             translation = path.evaluateConstantSpeed(t)
                         }
                     }
-                    
+
                 case .rotation:
                     // New model: fromValue = axis, toValue.x = totalRadians (unbounded)
                     // evaluateTimeline interpolates from 0 to totalRadians * eased
@@ -411,10 +399,10 @@ extension CanvasViewController {
                     let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
                     let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
                     rotation         = delta * rotation
-                    
+
                 case .scale:
                     scale *= value
-                    
+
                 case .fov:
                     // Interpolate FOV between fromValue.x and toValue.x
                     let scalarVal = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
@@ -450,7 +438,7 @@ extension CanvasViewController {
                     }
                 }
             }
-            
+
             entity.transform = Transform(
                 scale: scale,
                 rotation: rotation,
@@ -469,27 +457,27 @@ extension CanvasViewController {
         entityName: String,
         at time: Float
     ) -> Transform {
-        
+
         // Base transform before any animation
         guard let base = baseTransforms[entityName] else {
             return Transform()
         }
-        
+
         var translation = base.translation
         var rotation = base.rotation
         var scale = base.scale
-        
+
         // All clips affecting this entity before given time
         let clips = timeline.clips
             .filter {
                 $0.entityName == entityName && $0.startTime <= time
             }
             .sorted { $0.startTime < $1.startTime }
-        
+
         for clip in clips {
-            
+
             let localTime = time - clip.startTime
-            
+
             let progress: Float
             if localTime <= 0 {
                 continue
@@ -498,13 +486,13 @@ extension CanvasViewController {
             } else {
                 progress = localTime / clip.duration
             }
-            
+
             let eased = applyEasing(progress, easing: clip.easing)
-            
+
             switch clip.track {
-                
+
             case .position:
-                
+
                 if let path = clip.motionPath {
                     translation = path.evaluateConstantSpeed(eased)
                 } else {
@@ -514,20 +502,20 @@ extension CanvasViewController {
                         SIMD3<Float>(repeating: eased)
                     )
                 }
-                
+
             case .rotation:
                 let axis         = RotationPathRenderer.axisOf(clip)
                 let totalRadians = RotationPathRenderer.totalRadiansOf(clip)
                 let delta        = simd_quatf(angle: totalRadians * eased, axis: axis.simdAxis)
                 rotation         = delta * rotation
-                
+
             case .scale:
                 scale *= simd_mix(
                     clip.fromValue,
                     clip.toValue,
                     SIMD3<Float>(repeating: eased)
                 )
-                
+
             case .fov:
                 break
 
@@ -536,7 +524,7 @@ extension CanvasViewController {
                 break
             }
         }
-        
+
         return Transform(
             scale: scale,
             rotation: rotation,
@@ -544,7 +532,6 @@ extension CanvasViewController {
         )
     }
 
-    
     func setupScrubber() {
         // ── Floating pill container ──────────────────────────────────────
         let pill = UIView()
@@ -685,11 +672,10 @@ extension CanvasViewController {
             // Slider
             scrubber.leadingAnchor.constraint(equalTo: elapsed.trailingAnchor, constant: 8),
             scrubber.trailingAnchor.constraint(equalTo: remaining.leadingAnchor, constant: -8),
-            scrubber.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            scrubber.centerYAnchor.constraint(equalTo: pill.centerYAnchor)
         ])
     }
 
-    
     @objc func scrubberChanged(_ sender: UISlider) {
         let time = sender.value
         // Update floating pill time labels during manual scrub
@@ -704,23 +690,20 @@ extension CanvasViewController {
         evaluateTimeline(at: time)
     }
 
-    
     func makeRay(from screenPoint: CGPoint)
-    -> (origin: SIMD3<Float>, direction: SIMD3<Float>)
-    {
-        
+    -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+
         guard let ray = arView.ray(through: screenPoint) else {
-            
+
             // fallback forward ray
             let cam = arView.cameraTransform
             let forward = cam.rotation.act([0, 0, -1])
             return (cam.translation, forward)
         }
-        
+
         return (ray.origin, ray.direction)
     }
 
-    
     func hideAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = false
@@ -728,7 +711,6 @@ extension CanvasViewController {
         }
     }
 
-    
     func showAllMotionPaths() {
         for (_, visual) in activeMotionPaths {
             visual.root.isEnabled = true
@@ -736,14 +718,13 @@ extension CanvasViewController {
         }
     }
 
-    
     func enterTimelineMode() {
         editorMode = .timeline
         hideAllMotionPaths()
         hideAllRotationArcs()   // hide arcs during playback; restored in exitTimelineMode
         hideAnimationPanel()
         selectedEntity = nil
-        
+
         baseTransforms.removeAll()
         baseFOVs.removeAll()
         timelineEntityCache.removeAll()
@@ -772,7 +753,6 @@ extension CanvasViewController {
             }
     }
 
-    
     // MARK: - Shot Player Playback Context
     //
     // Called by ShotPlayerViewController (via closure) so that evaluateTimeline
@@ -864,7 +844,6 @@ extension CanvasViewController {
         timelineEntityCache.removeAll()
     }
 
-
     func moveLaterPaths(
         after clipIndex: Int,
         entityName: String,
@@ -874,32 +853,29 @@ extension CanvasViewController {
             guard i > clipIndex else { continue }
             guard timeline.clips[i].entityName == entityName else { continue }
             guard var p = timeline.clips[i].motionPath else { continue }
-            
+
             p.start += delta
             p.end += delta
             p.control1 += delta
             p.control2 += delta
             p.rebuildArcLengthTable()
             timeline.clips[i].motionPath = p
-            
+
             if let visual = activeMotionPaths[timeline.clips[i].id] {
                 visual.root.position = p.start
                 visual.startHandle?.position = .zero
                 visual.control1Handle.position = p.control1 - p.start
                 visual.control2Handle.position = p.control2 - p.start
                 visual.endHandle.position = p.end - p.start
-                
+
                 if let entity =
-                    visual.root.findEntity(named: "MotionPath") as? ModelEntity
-                {
+                    visual.root.findEntity(named: "MotionPath") as? ModelEntity {
                     MotionPathRenderer.updatePathMesh(entity: entity, path: p)
                 }
             }
         }
     }
 
-
-    
     func debugPrintTimeline() {
         print("Timeline Clips:")
         for clip in timeline.clips {

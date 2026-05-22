@@ -10,18 +10,16 @@ import UIKit
 class AddPropViewController: UIViewController {
 
     @IBOutlet weak var collectionView: UICollectionView!
-    
+
     var prop: [PropItem] = []
     private let propService = PropService.shared
     var film: Film?
     let propCellId = "prop_cell"
 
-    
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         prop = propService.getProps()
-        
+
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 20
@@ -30,25 +28,23 @@ class AddPropViewController: UIViewController {
         registerCells()
         collectionView.dataSource = self
         collectionView.delegate = self
-        
+
         collectionView.reloadData()
 
         // Do any additional setup after loading the view.
     }
-    
 
     func registerCells() {
 
             collectionView.register(UINib(nibName: "PropsCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: "prop_cell")
-        
-    }
 
+    }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView?.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
 
 }
@@ -76,7 +72,7 @@ extension AddPropViewController: UICollectionViewDataSource {
 }
 
 extension AddPropViewController: UICollectionViewDelegateFlowLayout {
-    
+
     func collectionView(_ collectionView: UICollectionView,
                         layout collectionViewLayout: UICollectionViewLayout,
                         sizeForItemAt indexPath: IndexPath) -> CGSize {

@@ -43,16 +43,16 @@ enum CameraMovementPreset: String, CaseIterable {
 
 enum StaticShotPreset: String, CaseIterable {
     case establishing = "Establishing Shot"
-    case Zoomin         = "Zoom-in Shot"
-    case Zoomout       = "Zoom-out Shot"
+    case zoomIn         = "Zoom-in Shot"
+    case zoomOut       = "Zoom-out Shot"
 //    case closeUp      = "Close-up"
 //    case insert       = "Insert/Cutaway"
 
     var description: String {
         switch self {
         case .establishing: return "Sets up location and context."
-        case .Zoomin:         return "Moves closer to subject."
-        case .Zoomout:       return "Moves away from subject."
+        case .zoomIn:         return "Moves closer to subject."
+        case .zoomOut:       return "Moves away from subject."
 //        case .closeUp:      return "Tight shot on face or detail."
 //        case .insert:       return "Cut to a supporting detail."
         }
@@ -60,8 +60,8 @@ enum StaticShotPreset: String, CaseIterable {
     var imageName: String {
         switch self {
         case .establishing: return "Establishing Shot"
-        case .Zoomin:         return "Zoom-in Shot"
-        case .Zoomout:       return "Zoom-out Shot"
+        case .zoomIn:         return "Zoom-in Shot"
+        case .zoomOut:       return "Zoom-out Shot"
 //        case .closeUp:      return "shot_closeup"
 //        case .insert:       return "shot_insert"
         }
@@ -69,8 +69,8 @@ enum StaticShotPreset: String, CaseIterable {
     var fallbackSFSymbol: String {
         switch self {
         case .establishing: return "mappin.and.ellipse"
-        case .Zoomin:         return "rectangle.expand.vertical"
-        case .Zoomout:       return "person.crop.rectangle"
+        case .zoomIn:         return "rectangle.expand.vertical"
+        case .zoomOut:       return "person.crop.rectangle"
 //        case .closeUp:      return "magnifyingglass"
 //        case .insert:       return "scissors"
         }
@@ -79,7 +79,7 @@ enum StaticShotPreset: String, CaseIterable {
 
 enum ShotSelection {
     case movement(CameraMovementPreset)
-    case static_(StaticShotPreset)
+    case staticShot(StaticShotPreset)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,38 +134,38 @@ extension CanvasViewController {
         let shotName: String
         switch selection {
         case .movement(let p): shotName = p.rawValue
-        case .static_(let p):  shotName = p.rawValue
+        case .staticShot(let p):  shotName = p.rawValue
         }
 
         let card: AnimationInputCard
 
         if isRotation {
             card = AnimationInputCard(mode: .editRotateFull(
-                currentStart:    timeline.duration,
+                currentStart: timeline.duration,
                 currentDuration: 3.0,
-                currentDegrees:  presetDegrees,
-                currentAxis:     presetAxis
+                currentDegrees: presetDegrees,
+                currentAxis: presetAxis
             ))
             card.onConfirm = { [weak self] startTime, duration, degrees, axis in
                 guard let self, duration > 0 else { return }
                 self.applyCameraRotationShot(
-                    selection:    selection,
+                    selection: selection,
                     cameraEntity: cameraEntity,
-                    startTime:    startTime,
-                    duration:     duration,
-                    degrees:      degrees,
-                    axis:         axis
+                    startTime: startTime,
+                    duration: duration,
+                    degrees: degrees,
+                    axis: axis
                 )
             }
         } else {
             var isZoom = false
-            if case .static_(let p) = selection, (p == .Zoomin || p == .Zoomout) {
+            if case .staticShot(let p) = selection, p == .zoomIn || p == .zoomOut {
                 isZoom = true
             }
             card = AnimationInputCard(mode: .addShot(
-                shotName:     shotName,
+                shotName: shotName,
                 defaultStart: timeline.duration,
-                isZoom:       isZoom
+                isZoom: isZoom
             ))
             card.onConfirm = { [weak self] startTime, duration, zoomAmount, _ in
                 guard let self, duration > 0 else { return }
@@ -173,7 +173,7 @@ extension CanvasViewController {
                 case .movement(let preset):
                     self.applyCameraMovementPreset(preset, to: cameraEntity,
                                                    startTime: startTime, duration: duration)
-                case .static_(let preset):
+                case .staticShot(let preset):
                     self.applyStaticShotPreset(preset, to: cameraEntity,
                                                startTime: startTime, duration: duration, zoomAmount: zoomAmount)
                 }
@@ -192,12 +192,12 @@ extension CanvasViewController {
     /// Applies a pan or tilt with user-specified degrees and axis.
     /// Includes clip conflict detection/resolution identical to motion-path clips.
     private func applyCameraRotationShot(
-        selection:    ShotSelection,
+        selection: ShotSelection,
         cameraEntity: Entity,
-        startTime:    Float,
-        duration:     Float,
-        degrees:      Float,
-        axis:         RotationAxis
+        startTime: Float,
+        duration: Float,
+        degrees: Float,
+        axis: RotationAxis
     ) {
         var cameraRoot: Entity = cameraEntity
         var cur: Entity? = cameraEntity.parent
@@ -212,14 +212,14 @@ extension CanvasViewController {
 
         let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
-            entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
-            type:       .rotate,
-            track:      .rotation,
-            easing:     .easeInOut,
-            startTime:  startTime,
-            duration:   duration,
-            fromValue:  axis.simdAxis,
-            toValue:    SIMD3<Float>(degrees * (.pi / 180), 0, 0)
+            entityID: cameraRoot.components[EntityIDComponent.self]?.id,
+            type: .rotate,
+            track: .rotation,
+            easing: .easeInOut,
+            startTime: startTime,
+            duration: duration,
+            fromValue: axis.simdAxis,
+            toValue: SIMD3<Float>(degrees * (.pi / 180), 0, 0)
         )
 
         // ── Conflict check ────────────────────────────────────────────────────
@@ -228,10 +228,10 @@ extension CanvasViewController {
             // commitClipTimingChange handles appending when index == clips.count.
             let insertIndex = timeline.clips.count
             presentClipConflictResolution(
-                editedClip:      candidateClip,
-                replacingID:     candidateClip.id,   // new clip — no old ID to replace
-                conflicting:     conflict,
-                clipIndex:       insertIndex,
+                editedClip: candidateClip,
+                replacingID: candidateClip.id,   // new clip — no old ID to replace
+                conflicting: conflict,
+                clipIndex: insertIndex,
                 originalEndTime: startTime           // no previous end; gap = conflict.start - startTime
             )
         } else {
@@ -273,9 +273,9 @@ extension CanvasViewController {
             origin: chainedOrigin
         )
 
-        let track:     AnimationTrack
+        let track: AnimationTrack
         let fromValue: SIMD3<Float>
-        let toValue:   SIMD3<Float>
+        let toValue: SIMD3<Float>
 
         switch preset {
         case .pan:
@@ -294,14 +294,14 @@ extension CanvasViewController {
 
         let candidateClip = AnimationClip(
             entityName: cameraRoot.name,
-            entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
-            type:       track == .rotation ? .rotate : .move,
-            track:      track,
-            easing:     .easeInOut,
-            startTime:  startTime,
-            duration:   duration,
-            fromValue:  fromValue,
-            toValue:    toValue,
+            entityID: cameraRoot.components[EntityIDComponent.self]?.id,
+            type: track == .rotation ? .rotate : .move,
+            track: track,
+            easing: .easeInOut,
+            startTime: startTime,
+            duration: duration,
+            fromValue: fromValue,
+            toValue: toValue,
             motionPath: motionPath
         )
 
@@ -309,10 +309,10 @@ extension CanvasViewController {
         if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {
             let insertIndex = timeline.clips.count
             presentClipConflictResolution(
-                editedClip:      candidateClip,
-                replacingID:     candidateClip.id,
-                conflicting:     conflict,
-                clipIndex:       insertIndex,
+                editedClip: candidateClip,
+                replacingID: candidateClip.id,
+                conflicting: conflict,
+                clipIndex: insertIndex,
                 originalEndTime: startTime
             )
         } else {
@@ -355,18 +355,18 @@ extension CanvasViewController {
         case .establishing:
             candidateClip = AnimationClip(
                 entityName: cameraRoot.name,
-                entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
-                type:       .move,
-                track:      .position,
-                easing:     .easeInOut,
-                startTime:  startTime,
-                duration:   duration,
-                fromValue:  .zero,
-                toValue:    .zero,
+                entityID: cameraRoot.components[EntityIDComponent.self]?.id,
+                type: .move,
+                track: .position,
+                easing: .easeInOut,
+                startTime: startTime,
+                duration: duration,
+                fromValue: .zero,
+                toValue: .zero,
                 motionPath: BezierMotionPath(start: pos, control1: pos, control2: pos, end: pos)
             )
-            
-        case .Zoomin, .Zoomout:
+
+        case .zoomIn, .zoomOut:
             // Read the camera's actual current FOV so the animation starts exactly
             // from the lens's current field of view, not a hard-coded value.
             let currentCamera = cameraRoot.children.compactMap { $0 as? PerspectiveCamera }.first
@@ -380,20 +380,20 @@ extension CanvasViewController {
             if zoomAmount > 0 {
                 endFOV = zoomAmount
             } else {
-                endFOV = (preset == .Zoomin) ? max(currentFOV * 0.5, 20.0)
-                                             : min(currentFOV * 1.5, 90.0)
+            endFOV = (preset == .zoomIn) ? max(currentFOV * 0.5, 20.0)
+                                         : min(currentFOV * 1.5, 90.0)
             }
 
             candidateClip = AnimationClip(
                 entityName: cameraRoot.name,
-                entityID:   cameraRoot.components[EntityIDComponent.self]?.id,
-                type:       .zoom,
-                track:      .fov,
-                easing:     .easeInOut,
-                startTime:  startTime,
-                duration:   duration,
-                fromValue:  SIMD3<Float>(currentFOV, 0, 0),
-                toValue:    SIMD3<Float>(endFOV,     0, 0),
+                entityID: cameraRoot.components[EntityIDComponent.self]?.id,
+                type: .zoom,
+                track: .fov,
+                easing: .easeInOut,
+                startTime: startTime,
+                duration: duration,
+                fromValue: SIMD3<Float>(currentFOV, 0, 0),
+                toValue: SIMD3<Float>(endFOV, 0, 0),
                 motionPath: nil
             )
         }
@@ -402,10 +402,10 @@ extension CanvasViewController {
         if let conflict = detectClipConflict(editedClip: candidateClip, replacingID: UUID()) {
             let insertIndex = timeline.clips.count
             presentClipConflictResolution(
-                editedClip:      candidateClip,
-                replacingID:     candidateClip.id,
-                conflicting:     conflict,
-                clipIndex:       insertIndex,
+                editedClip: candidateClip,
+                replacingID: candidateClip.id,
+                conflicting: conflict,
+                clipIndex: insertIndex,
                 originalEndTime: startTime
             )
         } else {
@@ -458,8 +458,8 @@ extension CanvasViewController {
         }
 
         let rot     = root.orientation(relativeTo: nil)
-        let forward = rot.act(SIMD3<Float>( 0,  0,  1))
-        let up      = rot.act(SIMD3<Float>( 0,  1,  0))
+        let forward = rot.act(SIMD3<Float>( 0, 0, 1))
+        let up      = rot.act(SIMD3<Float>( 0, 1, 0))
 
         switch preset {
         case .pan, .tilt: return nil
@@ -567,7 +567,7 @@ final class ShotPickerViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
         contentStack.axis      = .vertical
@@ -579,7 +579,7 @@ final class ShotPickerViewController: UIViewController {
             contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -24),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
         ])
     }
 
@@ -609,7 +609,7 @@ final class ShotPickerViewController: UIViewController {
                     label: preset.rawValue
                 ) { [weak self] in
                     self?.dismiss(animated: true) {
-                        self?.onSelect(.static_(preset))
+                        self?.onSelect(.staticShot(preset))
                     }
                 }
             }
@@ -644,7 +644,7 @@ final class ShotPickerViewController: UIViewController {
             card.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 card.widthAnchor.constraint(equalToConstant: cardSize.width),
-                card.heightAnchor.constraint(equalToConstant: cardSize.height),
+                card.heightAnchor.constraint(equalToConstant: cardSize.height)
             ])
             row.addArrangedSubview(card)
         }
@@ -663,7 +663,7 @@ final class ShotPickerViewController: UIViewController {
             row.leadingAnchor.constraint(equalTo: scroll.leadingAnchor, constant: inset),
             row.trailingAnchor.constraint(equalTo: scroll.trailingAnchor, constant: -inset),
             row.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
-            row.heightAnchor.constraint(equalTo: scroll.heightAnchor),
+            row.heightAnchor.constraint(equalTo: scroll.heightAnchor)
         ])
 
         return container
@@ -721,7 +721,7 @@ final class ShotCardView: UIView {
             nameLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             nameLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             nameLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
-            nameLabel.heightAnchor.constraint(equalToConstant: 36),
+            nameLabel.heightAnchor.constraint(equalToConstant: 36)
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
@@ -730,16 +730,20 @@ final class ShotCardView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     @objc private func handleTap() {
-        UIView.animate(withDuration: 0.08, animations: {
-            self.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
-            self.backgroundColor = UIColor(red: 40/255, green: 40/255, blue: 58/255, alpha: 1)
-        }) { _ in
-            UIView.animate(withDuration: 0.12) {
-                self.transform = .identity
-                self.backgroundColor = UIColor(red: 18/255, green: 18/255, blue: 28/255, alpha: 1)
+        UIView.animate(
+            withDuration: 0.08,
+            animations: {
+                self.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+                self.backgroundColor = UIColor(red: 40/255, green: 40/255, blue: 58/255, alpha: 1)
+            },
+            completion: { _ in
+                UIView.animate(withDuration: 0.12) {
+                    self.transform = .identity
+                    self.backgroundColor = UIColor(red: 18/255, green: 18/255, blue: 28/255, alpha: 1)
+                }
+                self.onTap()
             }
-            self.onTap()
-        }
+        )
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {

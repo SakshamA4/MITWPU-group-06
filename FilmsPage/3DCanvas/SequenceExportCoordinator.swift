@@ -103,8 +103,8 @@ final class SequenceExportCoordinator {
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: Int(bitrate),
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoMaxKeyFrameIntervalKey: fps * 2,
-            ] as [String: Any],
+                AVVideoMaxKeyFrameIntervalKey: fps * 2
+            ] as [String: Any]
         ]
 
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -116,7 +116,7 @@ final class SequenceExportCoordinator {
             sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: Int(size.width),
-                kCVPixelBufferHeightKey as String: Int(size.height),
+                kCVPixelBufferHeightKey as String: Int(size.height)
             ]
         )
         self.adaptor = pixelAdaptor

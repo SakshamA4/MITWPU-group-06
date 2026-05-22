@@ -8,16 +8,15 @@
 import UIKit
 
 class WelcomeViewController: UIViewController {
-    
+
     @IBOutlet weak var createAccountButton: UIButton!
-    
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         applyBorderToCreateAccountButton()
             }
-            
+
             // --- Helper function for cleanliness ---
             func applyBorderToCreateAccountButton() {
                 // 1. Set the Corner Radius (to match rounded edges)
@@ -33,7 +32,6 @@ class WelcomeViewController: UIViewController {
 
         // Do any additional setup after loading the view.
     }
-    
 
     /*
     // MARK: - Navigation
@@ -44,5 +42,3 @@ class WelcomeViewController: UIViewController {
         // Pass the selected object to the new view controller.
     }
     */
-
-

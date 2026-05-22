@@ -29,8 +29,8 @@ struct Shot {
     var clipID: UUID { clipIDs[0] }
 
     var displayName: String { "Shot \(index + 1)" }
-    var shortLabel: String  { "\(index + 1)" }
-    var endTime: Float      { startTime + duration }
+    var shortLabel: String { "\(index + 1)" }
+    var endTime: Float { startTime + duration }
 
     /// True when more than one animation track is active simultaneously
     /// (e.g. dolly-in + pan, or crane + tilt).
@@ -53,7 +53,7 @@ struct ShotDerived {
         guard totalDuration > 0 else { return [] }
 
         let cameraNameSet = Set(cameraItems.map { $0.cameraRoot.name })
-        var cameraIDMap:   [UUID: CanvasViewController.SceneCameraItem] = [:]
+        var cameraIDMap: [UUID: CanvasViewController.SceneCameraItem] = [:]
         var cameraNameMap: [String: CanvasViewController.SceneCameraItem] = [:]
         for item in cameraItems {
             cameraIDMap[item.id] = item
@@ -169,14 +169,14 @@ struct ShotDerived {
                 .map { $0.clip.id }
 
             return Shot(
-                id:         UUID(),
-                index:      index,
+                id: UUID(),
+                index: index,
                 cameraName: item.cameraRoot.name,
-                cameraID:   item.id,
-                startTime:  groupStart,
-                duration:   groupDuration,
-                thumbnail:  nil,
-                clipIDs:    orderedIDs
+                cameraID: item.id,
+                startTime: groupStart,
+                duration: groupDuration,
+                thumbnail: nil,
+                clipIDs: orderedIDs
             )
         }
     }
@@ -203,7 +203,7 @@ class ShotBreakdownViewController: UIViewController {
     var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
     var fetchTimeline: (() -> Timeline)?
     var enterPlaybackMode: (() -> Void)?
-    var exitPlaybackMode:  (() -> Void)?
+    var exitPlaybackMode: (() -> Void)?
     var commitClipTimingChange: ((AnimationClip, UUID, Int) -> Void)?
     var shiftSubsequentClips: ((String, Float, Float) -> Void)?
     var mergeConflictingClip: ((AnimationClip, Float, Float) -> Void)?
@@ -328,7 +328,7 @@ class ShotBreakdownViewController: UIViewController {
         coordinator.animate(alongsideTransition: { _ in
             self.collectionView.collectionViewLayout.invalidateLayout()
             self.rebuildTimelineStrip()
-        })
+        }, completion: nil)
     }
 
     // MARK: - Nav Setup
@@ -356,7 +356,7 @@ class ShotBreakdownViewController: UIViewController {
         let exportAllBtn = makeNavButton(title: "⬆  Export All", action: #selector(exportAllTapped))
         navigationItem.rightBarButtonItems = [
             UIBarButtonItem(customView: playAllBtn),
-            UIBarButtonItem(customView: exportAllBtn),
+            UIBarButtonItem(customView: exportAllBtn)
         ]
     }
 
@@ -421,7 +421,7 @@ class ShotBreakdownViewController: UIViewController {
             emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             emptyLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
-            emptyLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+            emptyLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40)
         ])
     }
 
@@ -433,7 +433,7 @@ class ShotBreakdownViewController: UIViewController {
         UIColor(red: 0.18, green: 0.44, blue: 0.78, alpha: 1),
         UIColor(red: 0.12, green: 0.65, blue: 0.45, alpha: 1),
         UIColor(red: 0.72, green: 0.45, blue: 0.12, alpha: 1),
-        UIColor(red: 0.55, green: 0.22, blue: 0.75, alpha: 1),
+        UIColor(red: 0.55, green: 0.22, blue: 0.75, alpha: 1)
     ]
 
     private func rebuildTimelineStrip() {
@@ -442,7 +442,7 @@ class ShotBreakdownViewController: UIViewController {
         let total = shots.reduce(0) { $0 + $1.duration }
         guard total > 0 else { return }
 
-        var prev: UIView? = nil
+        var prev: UIView?
         for (i, shot) in shots.enumerated() {
             let ratio = CGFloat(shot.duration / total)
             let seg = UIView()
@@ -920,11 +920,11 @@ extension ShotBreakdownViewController: UICollectionViewDataSource,
              self?.presentShotEditor(for: shot)
          }
          cell.configure(with: shot, accentColor: stripColors[ip.item % stripColors.count])
-         
+
          // Apply aspect ratio overlay
          let ratio = cameraItem(for: shot)?.aspectRatio ?? .default
          cell.updateAspectRatio(ratio)
-         
+
          return cell
      }
 
@@ -1172,7 +1172,7 @@ final class ShotCardCell: UICollectionViewCell {
             camNameLbl.bottomAnchor.constraint(lessThanOrEqualTo: infoContainer.bottomAnchor, constant: -8),
 
             durationLbl.centerYAnchor.constraint(equalTo: infoContainer.centerYAnchor),
-            durationLbl.trailingAnchor.constraint(equalTo: infoContainer.trailingAnchor, constant: -12),
+            durationLbl.trailingAnchor.constraint(equalTo: infoContainer.trailingAnchor, constant: -12)
         ])
     }
 

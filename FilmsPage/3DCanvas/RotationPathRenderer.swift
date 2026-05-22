@@ -25,7 +25,7 @@ import simd
 struct RotationArcComponent: Component {
     enum Role { case start, end }
     let clipID: UUID
-    let role:   Role
+    let role: Role
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,9 +48,9 @@ enum RotationAxis: String, CaseIterable {
     /// Two vectors spanning the plane perpendicular to this axis.
     var planeAxes: (u: SIMD3<Float>, v: SIMD3<Float>) {
         switch self {
-        case .x: return (u: [0,  0,  1], v: [0,  1,  0])
-        case .y: return (u: [1,  0,  0], v: [0,  0,  1])
-        case .z: return (u: [-1, 0,  0], v: [0,  1,  0])
+        case .x: return (u: [0, 0, 1], v: [0, 1, 0])
+        case .y: return (u: [1, 0, 0], v: [0, 0, 1])
+        case .z: return (u: [-1, 0, 0], v: [0, 1, 0])
         }
     }
 
@@ -68,10 +68,10 @@ enum RotationAxis: String, CaseIterable {
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct RotationArcVisual {
-    let root:        Entity
+    let root: Entity
     let startHandle: ModelEntity
-    let endHandle:   ModelEntity
-    let axis:        RotationAxis
+    let endHandle: ModelEntity
+    let axis: RotationAxis
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,19 +80,19 @@ struct RotationArcVisual {
 
 enum RotationPathRenderer {
 
-    static  let arcRadius:         Float = 0.6
+    static  let arcRadius: Float = 0.6
     private static let shaftWidth: Float = 0.012
-    private static let handleR:    Float = 0.055
-    private static let hitR:       Float = 0.15
-    private static let arcTube:    Float = 0.008
-    private static let baseSteps:  Int   = 64
+    private static let handleR: Float = 0.055
+    private static let hitR: Float = 0.15
+    private static let arcTube: Float = 0.008
+    private static let baseSteps: Int   = 64
 
     // Start = white/light (draggable reference — matches end handle style)
     // End   = orange      (draggable)
-    static let startShaftColor:  UIColor = UIColor(white: 0.85, alpha: 1)
-    static let endShaftColor:    UIColor = UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1)
+    static let startShaftColor: UIColor = UIColor(white: 0.85, alpha: 1)
+    static let endShaftColor: UIColor = UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1)
     static let startHandleColor: UIColor = UIColor(white: 0.80, alpha: 1)
-    static let endHandleColor:   UIColor = UIColor(red: 1.0, green: 0.6,  blue: 0.0, alpha: 1)
+    static let endHandleColor: UIColor = UIColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1)
 
     // ── Clip helpers ──────────────────────────────────────────────────────────
 
@@ -132,14 +132,14 @@ enum RotationPathRenderer {
         root.name     = "RotationArc_\(clip.id)"
         root.position = centreLocal
 
-        root.addChild(makeShaft(name: "startLine", angle: start,         axis: axis, color: startShaftColor))
-        root.addChild(makeShaft(name: "endLine",   angle: start + total, axis: axis, color: endShaftColor))
+        root.addChild(makeShaft(name: "startLine", angle: start, axis: axis, color: startShaftColor))
+        root.addChild(makeShaft(name: "endLine", angle: start + total, axis: axis, color: endShaftColor))
         root.addChild(makeArcCurve(startAngle: start, totalRadians: total, axis: axis))
 
         let sh = makeHandle(name: "arcHandle.start", angle: start,
                             axis: axis, color: startHandleColor, clipID: clip.id, role: .start)
-        let eh = makeHandle(name: "arcHandle.end",   angle: start + total,
-                            axis: axis, color: endHandleColor,   clipID: clip.id, role: .end)
+        let eh = makeHandle(name: "arcHandle.end", angle: start + total,
+                            axis: axis, color: endHandleColor, clipID: clip.id, role: .end)
         root.addChild(sh)
         root.addChild(eh)
 
@@ -295,7 +295,7 @@ enum RotationPathRenderer {
             let t     = Float(i) / Float(steps)
             let angle = startAngle + totalRadians * t
             let p0    = circlePoint(angle: prevAngle, axis: axis)
-            let p1    = circlePoint(angle: angle,     axis: axis)
+            let p1    = circlePoint(angle: angle, axis: axis)
             let diff  = p1 - p0
             let len   = simd_length(diff)
             guard len > 0.0001 else { prevAngle = angle; continue }
@@ -391,20 +391,20 @@ extension CanvasViewController {
         let totalDeg = RotationPathRenderer.totalRadiansOf(clip) * 180 / .pi
 
         let card = AnimationInputCard(mode: .editRotateFull(
-            currentStart:    clip.startTime,
+            currentStart: clip.startTime,
             currentDuration: clip.duration,
-            currentDegrees:  totalDeg,
-            currentAxis:     axis
+            currentDegrees: totalDeg,
+            currentAxis: axis
         ))
 
         card.onConfirm = { [weak self] startTime, duration, degrees, chosenAxis in
             guard let self else { return }
             self.applyFullRotationEdit(
-                clipIdx:      clipIdx,
-                clipID:       clipID,
-                startTime:    startTime,
-                duration:     duration,
-                axis:         chosenAxis,
+                clipIdx: clipIdx,
+                clipID: clipID,
+                startTime: startTime,
+                duration: duration,
+                axis: chosenAxis,
                 totalRadians: degrees * (.pi / 180)
             )
         }
@@ -421,10 +421,10 @@ extension CanvasViewController {
 
         let upd = AnimationClip(
             preservingID: old,
-            fromValue:  axis.simdAxis,
-            toValue:    SIMD3<Float>(totalRadians, startAngle, 0),
-            startTime:  startTime,
-            duration:   duration
+            fromValue: axis.simdAxis,
+            toValue: SIMD3<Float>(totalRadians, startAngle, 0),
+            startTime: startTime,
+            duration: duration
         )
         timeline.clips[clipIdx] = upd
 
@@ -439,7 +439,7 @@ extension CanvasViewController {
                            axis: RotationAxis, totalRadians: Float) {
         applyFullRotationEdit(clipIdx: clipIdx, clipID: clipID,
                               startTime: timeline.clips[clipIdx].startTime,
-                              duration:  timeline.clips[clipIdx].duration,
+                              duration: timeline.clips[clipIdx].duration,
                               axis: axis, totalRadians: totalRadians)
     }
 }

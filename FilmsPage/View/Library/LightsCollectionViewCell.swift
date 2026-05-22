@@ -11,7 +11,7 @@ class LightsCollectionViewCell: UICollectionViewCell {
 
     @IBOutlet weak var lightsLabel: UILabel!
     @IBOutlet weak var lightsImage: UIImageView!
-    
+
     override func awakeFromNib() {
         super.awakeFromNib()
         setupCellAppearance()
@@ -27,32 +27,31 @@ class LightsCollectionViewCell: UICollectionViewCell {
 }
 
 private extension LightsCollectionViewCell {
-    
+
     private func setupCellAppearance() {
             // Rounded corners on the whole card
             contentView.layer.cornerRadius = 12
             contentView.layer.masksToBounds = true
-            
+
             // Add border (stroke)
             contentView.layer.borderColor = UIColor(hex: "#D9D9D9").withAlphaComponent(0.3).cgColor
             contentView.layer.borderWidth = 1.0
-            
+
             // Shadow on the cell layer (outside contentView so it’s not clipped)
             layer.shadowColor = UIColor.black.cgColor
             layer.shadowOpacity = 0.25
             layer.shadowOffset = CGSize(width: 0, height: 6)
             layer.shadowRadius = 8
             layer.masksToBounds = false
-            
-            // Image setup
-            //featuredImageView.contentMode = .scaleAspectFill
-        lightsImage.clipsToBounds = true
-            
-            // Label style
-            //featuredLabel.textColor = .white
-//        lightsLabel.font = UIFont.systemFont(ofSize: 20, weight: .regular)
-            
-        }
 
+            // Image setup
+            // featuredImageView.contentMode = .scaleAspectFill
+        lightsImage.clipsToBounds = true
+
+            // Label style
+            // featuredLabel.textColor = .white
+//        lightsLabel.font = UIFont.systemFont(ofSize: 20, weight: .regular)
+
+        }
 
 }

@@ -8,15 +8,12 @@
 import UIKit
 
 class TemplatesCollectionViewCell: UICollectionViewCell {
-    
+
     private let gradientLayer = CAGradientLayer()
 
-    
     @IBOutlet weak var templatesImageView: UIImageView!
-    
+
     @IBOutlet weak var templateLabel: UILabel!
-    
-    
 
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -34,8 +31,7 @@ class TemplatesCollectionViewCell: UICollectionViewCell {
 
         setupGradient()
     }
-    
-    
+
     private func setupGradient() {
         gradientLayer.colors = [
             UIColor.black.withAlphaComponent(0.7).cgColor,

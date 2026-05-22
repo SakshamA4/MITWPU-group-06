@@ -24,7 +24,7 @@ extension CanvasViewController {
     ///                  Pass a fresh `UUID()` when adding a brand-new clip so
     ///                  nothing is accidentally excluded.
     func detectClipConflict(
-        editedClip:  AnimationClip,
+        editedClip: AnimationClip,
         replacingID: UUID
     ) -> AnimationClip? {
         let editedEnd = editedClip.startTime + editedClip.duration
@@ -54,14 +54,14 @@ extension CanvasViewController {
     /// `clipIndex` may equal `timeline.clips.count` when this is called for a
     /// brand-new clip that hasn't been inserted yet (camera shot addition).
     func presentClipConflictResolution(
-        editedClip:      AnimationClip,
-        replacingID:     UUID,
-        conflicting:     AnimationClip,
-        clipIndex:       Int,
+        editedClip: AnimationClip,
+        replacingID: UUID,
+        conflicting: AnimationClip,
+        clipIndex: Int,
         originalEndTime: Float
     ) {
         let alert = UIAlertController(
-            title:   "Animation Timing Conflict",
+            title: "Animation Timing Conflict",
             message: "The updated animation timing overlaps with another animation for this entity. Choose how you want to resolve the conflict.",
             preferredStyle: .alert
         )
@@ -77,7 +77,7 @@ extension CanvasViewController {
             guard let self else { return }
 
             self.commitClipTimingChange(
-                newClip:   editedClip,
+                newClip: editedClip,
                 oldClipID: replacingID,
                 clipIndex: clipIndex
             )
@@ -89,9 +89,9 @@ extension CanvasViewController {
 
             if shiftDelta > 0.0001 {
                 self.shiftSubsequentClips(
-                    entityName:    editedClip.entityName,
+                    entityName: editedClip.entityName,
                     startingAfter: conflicting.startTime,
-                    delta:         shiftDelta
+                    delta: shiftDelta
                 )
             }
         })
@@ -104,7 +104,7 @@ extension CanvasViewController {
             guard let self else { return }
 
             self.commitClipTimingChange(
-                newClip:   editedClip,
+                newClip: editedClip,
                 oldClipID: replacingID,
                 clipIndex: clipIndex
             )
@@ -114,9 +114,9 @@ extension CanvasViewController {
             let newDuration = max(0, originalEnd - editedEnd)
 
             self.mergeConflictingClip(
-                conflicting:  conflicting,
+                conflicting: conflicting,
                 newStartTime: editedEnd,
-                newDuration:  newDuration
+                newDuration: newDuration
             )
         })
 
@@ -131,7 +131,7 @@ extension CanvasViewController {
     /// sentinel used by camera shot additions). In that case `oldClipID` is
     /// ignored and visuals are shown fresh instead of re-keyed.
     func commitClipTimingChange(
-        newClip:   AnimationClip,
+        newClip: AnimationClip,
         oldClipID: UUID,
         clipIndex: Int
     ) {
@@ -184,7 +184,7 @@ extension CanvasViewController {
     /// Shifts every clip for `entityName` whose startTime is >= `startingAfter`
     /// forward by `delta` seconds, and repositions their motion path visuals.
     func shiftSubsequentClips(
-        entityName:    String,
+        entityName: String,
         startingAfter boundary: Float,
         delta: Float
     ) {
@@ -197,14 +197,14 @@ extension CanvasViewController {
 
             let shifted = AnimationClip(
                 entityName: clip.entityName,
-                entityID:   clip.entityID,
-                type:       clip.type,
-                track:      clip.track,
-                easing:     clip.easing,
-                startTime:  clip.startTime + delta,
-                duration:   clip.duration,
-                fromValue:  clip.fromValue,
-                toValue:    clip.toValue,
+                entityID: clip.entityID,
+                type: clip.type,
+                track: clip.track,
+                easing: clip.easing,
+                startTime: clip.startTime + delta,
+                duration: clip.duration,
+                fromValue: clip.fromValue,
+                toValue: clip.toValue,
                 motionPath: clip.motionPath
             )
             timeline.clips[index] = shifted
@@ -218,9 +218,9 @@ extension CanvasViewController {
     /// Adjusts the conflicting clip to start at `newStartTime` with `newDuration`,
     /// keeping its original end time.
     func mergeConflictingClip(
-        conflicting:  AnimationClip,
+        conflicting: AnimationClip,
         newStartTime: Float,
-        newDuration:  Float
+        newDuration: Float
     ) {
         guard let index = timeline.clips.firstIndex(where: { $0.id == conflicting.id })
         else { return }
@@ -228,14 +228,14 @@ extension CanvasViewController {
         let oldID  = conflicting.id
         let merged = AnimationClip(
             entityName: conflicting.entityName,
-            entityID:   conflicting.entityID,
-            type:       conflicting.type,
-            track:      conflicting.track,
-            easing:     conflicting.easing,
-            startTime:  newStartTime,
-            duration:   max(0.01, newDuration),
-            fromValue:  conflicting.fromValue,
-            toValue:    conflicting.toValue,
+            entityID: conflicting.entityID,
+            type: conflicting.type,
+            track: conflicting.track,
+            easing: conflicting.easing,
+            startTime: newStartTime,
+            duration: max(0.01, newDuration),
+            fromValue: conflicting.fromValue,
+            toValue: conflicting.toValue,
             motionPath: conflicting.motionPath
         )
         timeline.clips[index] = merged

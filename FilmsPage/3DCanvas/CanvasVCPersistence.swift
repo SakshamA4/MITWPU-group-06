@@ -13,7 +13,7 @@ extension CanvasViewController {
     func loadSceneIfSaved() {
         guard let id = currentSceneID else { return }
         guard ScenePersistenceService.shared.hasSave(for: id) else { return }
-        
+
         // FIX: Only load the scene once. When returning from navigation (e.g., shot breakdown),
         // viewDidAppear is called again but we should not reload the saved version,
         // as that would clear any unsaved entities and animations.
@@ -42,7 +42,7 @@ extension CanvasViewController {
             overlay.topAnchor.constraint(equalTo: view.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
         let spinner = UIActivityIndicatorView(style: .large)
@@ -51,7 +51,7 @@ extension CanvasViewController {
         overlay.addSubview(spinner)
         NSLayoutConstraint.activate([
             spinner.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            spinner.centerYAnchor.constraint(equalTo: overlay.centerYAnchor)
         ])
         spinner.startAnimating()
 
@@ -106,13 +106,13 @@ extension CanvasViewController {
 
     func promptSaveAndExit() {
         let alert = UIAlertController(
-            title:          "Save Scene?",
-            message:        "Do you want to save your changes before leaving?",
+            title: "Save Scene?",
+            message: "Do you want to save your changes before leaving?",
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "Save & Exit",         style: .default)     { [weak self] _ in self?.saveAndExit() })
+        alert.addAction(UIAlertAction(title: "Save & Exit", style: .default) { [weak self] _ in self?.saveAndExit() })
         alert.addAction(UIAlertAction(title: "Exit Without Saving", style: .destructive) { [weak self] _ in self?.commitExit()  })
-        alert.addAction(UIAlertAction(title: "Cancel",              style: .cancel))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }
 
@@ -211,14 +211,14 @@ extension CanvasViewController {
              ScenesDataStore.shared.saveTemplateNote(id: currentID, notes: sceneNotes)
          } else {
              let updatedRecent = ScenesModel(
-                 id:    currentID,
-                 name:  sceneName,
+                 id: currentID,
+                 name: sceneName,
                  image: sceneImageName ?? "Image",
                  notes: sceneNotes
              )
              ScenesDataStore.shared.addToRecent(scene: updatedRecent)
          }
-         
+
          // FIX: Reset the scene load flag so that if this scene is reopened later,
          // it will load properly. Without this, reopening a scene would skip loading
          // because hasSceneBeenLoaded would still be true.
@@ -232,7 +232,7 @@ extension CanvasViewController {
              name: UIApplication.willResignActiveNotification,
              object: nil
          )
-         
+
          // FIX: Mark the scene as exited instead of immediately evicting.
          // The cache retains the last N scenes so reopening is instant.
          // Eviction happens automatically when the retained count exceeds
@@ -245,4 +245,3 @@ extension CanvasViewController {
          dismiss(animated: true)
      }
 }
-

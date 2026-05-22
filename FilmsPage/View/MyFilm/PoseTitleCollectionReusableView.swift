@@ -9,15 +9,11 @@ import UIKit
 
 class PoseTitleCollectionReusableView: UICollectionReusableView {
 
+    // swiftlint:disable:next identifier_name
     @IBOutlet weak var HeaderLabel: UILabel!
-    
-    override func awakeFromNib() {
-        super.awakeFromNib()
-        // Initialization code
-    }
-    
+
     func configureCell() {
         HeaderLabel.text = "Character Poses"
     }
-    
+
 }

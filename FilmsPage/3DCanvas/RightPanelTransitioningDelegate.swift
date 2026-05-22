@@ -6,15 +6,15 @@
 import UIKit
 
 class RightPanelTransitioningDelegate: NSObject, UIViewControllerTransitioningDelegate {
-    
+
     func presentationController(forPresented presented: UIViewController, presenting: UIViewController?, source: UIViewController) -> UIPresentationController? {
         return RightPanelPresentationController(presentedViewController: presented, presenting: presenting)
     }
-    
+
     func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         return RightPanelAnimator(isPresenting: true)
     }
-    
+
     func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         return RightPanelAnimator(isPresenting: false)
     }
@@ -22,16 +22,16 @@ class RightPanelTransitioningDelegate: NSObject, UIViewControllerTransitioningDe
 
 class RightPanelAnimator: NSObject, UIViewControllerAnimatedTransitioning {
     let isPresenting: Bool
-    
+
     init(isPresenting: Bool) {
         self.isPresenting = isPresenting
         super.init()
     }
-    
+
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
         return isPresenting ? 0.32 : 0.24
     }
-    
+
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         // Use correctly-typed keys — viewController(forKey:) uses UITransitionContextViewControllerKey
         // while view(forKey:) uses UITransitionContextViewKey (different types).

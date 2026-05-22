@@ -15,7 +15,7 @@ class ToolCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        contentView.backgroundColor = UIColor(red: 20/255,green: 20/255,blue: 30/255,alpha: 1)
+        contentView.backgroundColor = UIColor(red: 20/255, green: 20/255, blue: 30/255, alpha: 1)
         contentView.layer.cornerRadius = 14
         contentView.clipsToBounds = true
 

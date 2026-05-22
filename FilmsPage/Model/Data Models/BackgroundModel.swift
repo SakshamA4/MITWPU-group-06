@@ -17,7 +17,7 @@ struct BackgroundItem: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
-    
+
     static func == (lhs: BackgroundItem, rhs: BackgroundItem) -> Bool {
         lhs.id == rhs.id
     }

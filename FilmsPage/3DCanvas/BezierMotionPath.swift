@@ -42,8 +42,6 @@ struct BezierMotionPath: Codable {
             ttt * end
     }
 
-
-
     // ─────────────────────────────
     // ARC LENGTH TABLE
     // ─────────────────────────────

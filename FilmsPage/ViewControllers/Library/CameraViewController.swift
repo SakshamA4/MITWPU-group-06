@@ -14,7 +14,6 @@ class CameraViewController: UIViewController {
       private let sections = CameraLibraryDataStore.sections
       private var selectedItem: CameraLibraryItem?
 
-
       override func viewDidLoad() {
           super.viewDidLoad()
           registerCells()
@@ -27,7 +26,7 @@ class CameraViewController: UIViewController {
           super.viewWillTransition(to: size, with: coordinator)
           coordinator.animate(alongsideTransition: { _ in
               self.cameraCollectionView?.collectionViewLayout.invalidateLayout()
-          })
+          }, completion: nil)
       }
 
       private func registerCells() {
@@ -57,7 +56,6 @@ class CameraViewController: UIViewController {
         }
     }
 
-    
   }
 extension CameraViewController: UICollectionViewDataSource {
 
@@ -107,7 +105,7 @@ extension CameraViewController: UICollectionViewDataSource {
              return cell
          }
      }
-    
+
     func collectionView(_ collectionView: UICollectionView,
                         viewForSupplementaryElementOfKind kind: String,
                         at indexPath: IndexPath) -> UICollectionReusableView {
@@ -131,7 +129,6 @@ extension CameraViewController: UICollectionViewDataSource {
         return header
     }
 
-    
 }
 
 extension CameraViewController: UICollectionViewDelegate {
@@ -153,7 +150,7 @@ private func createLayout() -> UICollectionViewCompositionalLayout {
     let sideInset: CGFloat = 75
     let verticalInset: CGFloat = 32
 
-    let layout = UICollectionViewCompositionalLayout { sectionIndex, environment in
+    let layout = UICollectionViewCompositionalLayout { _, environment in
 
         // 🔹 Use the effective width of the collection view
         let containerWidth = environment.container.effectiveContentSize.width
@@ -213,6 +210,3 @@ private func createLayout() -> UICollectionViewCompositionalLayout {
 
     return layout
 }
-
-
-

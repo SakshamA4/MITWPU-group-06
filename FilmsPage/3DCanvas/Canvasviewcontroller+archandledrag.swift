@@ -5,7 +5,6 @@
 //  Created by SDC-USER on 17/03/26.
 //
 
-
 import UIKit
 import RealityKit
 
@@ -131,23 +130,23 @@ extension CanvasViewController {
 
         timeline.clips[clipIdx] = AnimationClip(
             entityName: old.entityName,
-            entityID:   old.entityID,
-            type:       old.type,
-            track:      old.track,
-            easing:     old.easing,
-            startTime:  old.startTime,
-            duration:   old.duration,
-            fromValue:  from,
-            toValue:    to,
+            entityID: old.entityID,
+            type: old.type,
+            track: old.track,
+            easing: old.easing,
+            startTime: old.startTime,
+            duration: old.duration,
+            fromValue: from,
+            toValue: to,
             motionPath: old.motionPath
         )
 
         // ── 6. Rebuild arc curve between updated angles ───────────────────────
         let updated = timeline.clips[clipIdx]
         RotationPathRenderer.updateArcCurveOnly(
-            visual:    visual,
+            visual: visual,
             fromAngle: updated.fromValue.y,
-            toAngle:   updated.toValue.y
+            toAngle: updated.toValue.y
         )
 
         arcDragLastAngle = newAngle
@@ -188,7 +187,7 @@ extension CanvasViewController {
 
         // Plane: y = planeY, normal = (0,1,0)
         let planeNormal: SIMD3<Float> = [0, 1, 0]
-        let planePoint:  SIMD3<Float> = [0, planeY, 0]
+        let planePoint: SIMD3<Float> = [0, planeY, 0]
 
         let denom = simd_dot(planeNormal, rayDirection)
         guard abs(denom) > 0.0001 else { return nil }

@@ -9,8 +9,4 @@ import UIKit
 
 class AddSceneOrFilmViewController: UIViewController {
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-    }
-    
 }

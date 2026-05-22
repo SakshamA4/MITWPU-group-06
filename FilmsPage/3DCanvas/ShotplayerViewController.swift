@@ -7,7 +7,6 @@ import UIKit
 import RealityKit
 import AVFoundation
 
-
 final class ShotPlayerViewController: UIViewController {
 
     private let bgColor      = UIColor(red: 0.043, green: 0.043, blue: 0.086, alpha: 1)
@@ -19,12 +18,11 @@ final class ShotPlayerViewController: UIViewController {
 
     private let stripColors: [UIColor] = [
         UIColor(red: 0.694, green: 0.125, blue: 0.224, alpha: 1),
-        UIColor(red: 0.18,  green: 0.44,  blue: 0.78,  alpha: 1),
-        UIColor(red: 0.12,  green: 0.65,  blue: 0.45,  alpha: 1),
-        UIColor(red: 0.72,  green: 0.45,  blue: 0.12,  alpha: 1),
-        UIColor(red: 0.55,  green: 0.22,  blue: 0.75,  alpha: 1),
+        UIColor(red: 0.18, green: 0.44, blue: 0.78, alpha: 1),
+        UIColor(red: 0.12, green: 0.65, blue: 0.45, alpha: 1),
+        UIColor(red: 0.72, green: 0.45, blue: 0.12, alpha: 1),
+        UIColor(red: 0.55, green: 0.22, blue: 0.75, alpha: 1)
     ]
-
 
     init(shots: [Shot],
          startIndex: Int,
@@ -49,7 +47,6 @@ final class ShotPlayerViewController: UIViewController {
     }
     required init?(coder: NSCoder) { fatalError() }
 
- 
     var shots: [Shot]
     var currentIndex: Int
     var playAll: Bool
@@ -61,8 +58,8 @@ final class ShotPlayerViewController: UIViewController {
     var captureAtTime: ((Float, CanvasViewController.SceneCameraItem?, @escaping (UIImage?) -> Void) -> Void)?
     var cameraItems: [CanvasViewController.SceneCameraItem]
      var prepareForCapture: ((CanvasViewController.SceneCameraItem?) -> Void)?
-     var enterPlaybackMode:  (() -> Void)?
-     var exitPlaybackMode:   (() -> Void)?
+     var enterPlaybackMode: (() -> Void)?
+     var exitPlaybackMode: (() -> Void)?
 
      private var isPlaying        = false
      private var snapshotInFlight: UIImage?
@@ -79,7 +76,6 @@ final class ShotPlayerViewController: UIViewController {
          return s.width >= 1024 || s.height >= 1024
      }
 
-
     private lazy var previewContainer: UIView = {
         let v = UIView()
         v.backgroundColor    = .black
@@ -92,21 +88,21 @@ final class ShotPlayerViewController: UIViewController {
     }()
 
     private lazy var frameImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.clipsToBounds = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.clipsToBounds = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
     private lazy var framePlaceholder: UIImageView = {
-        let iv = UIImageView()
+        let imageView = UIImageView()
         let cfg = UIImage.SymbolConfiguration(pointSize: 40, weight: .ultraLight)
-        iv.image       = UIImage(systemName: "camera.aperture", withConfiguration: cfg)
-        iv.tintColor   = UIColor(white: 1, alpha: 0.07)
-        iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+        imageView.image       = UIImage(systemName: "camera.aperture", withConfiguration: cfg)
+        imageView.tintColor   = UIColor(white: 1, alpha: 0.07)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
     private lazy var loadingSpinner: UIActivityIndicatorView = {
@@ -119,7 +115,7 @@ final class ShotPlayerViewController: UIViewController {
 
     // HUD chips overlaid on preview corners
     private lazy var hudShotLbl: UILabel = makeHUDChip(size: 11, weight: .bold)
-    private lazy var hudCamLbl:  UILabel = makeHUDChip(size: 10, weight: .medium, alpha: 0.70)
+    private lazy var hudCamLbl: UILabel = makeHUDChip(size: 10, weight: .medium, alpha: 0.70)
     private lazy var hudTimeLbl: UILabel = {
         let l = makeHUDChip(size: 11, weight: .semibold)
         l.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
@@ -136,7 +132,6 @@ final class ShotPlayerViewController: UIViewController {
         return l
     }()
 
-
     private lazy var transportBar: UIView = {
         let v = UIView()
         v.backgroundColor = controlsBg
@@ -145,15 +140,14 @@ final class ShotPlayerViewController: UIViewController {
     }()
 
     private lazy var prevBtn = makeTransportBtn(icon: "backward.end.fill", symbolPt: 14)
-    private lazy var playBtn = makeTransportBtn(icon: "play.fill",          symbolPt: 20, primary: true)
-    private lazy var nextBtn = makeTransportBtn(icon: "forward.end.fill",   symbolPt: 14)
+    private lazy var playBtn = makeTransportBtn(icon: "play.fill", symbolPt: 20, primary: true)
+    private lazy var nextBtn = makeTransportBtn(icon: "forward.end.fill", symbolPt: 14)
 
     private lazy var currentTimeLbl: UILabel = makeMonoLabel()
-    private lazy var durationLbl:    UILabel = makeMonoLabel()
-    private lazy var timeSepLbl:     UILabel = {
+    private lazy var durationLbl: UILabel = makeMonoLabel()
+    private lazy var timeSepLbl: UILabel = {
         let l = makeMonoLabel(); l.text = "/"; l.textColor = labelFaded.withAlphaComponent(0.25); return l
     }()
-
 
     private lazy var scrubberBar: UIView = {
         let v = UIView()
@@ -166,14 +160,14 @@ final class ShotPlayerViewController: UIViewController {
         let s = PlayerSlider(accent: accentRed, track: trackColor)
         s.minimumValue = 0; s.maximumValue = 1; s.value = 0
         s.translatesAutoresizingMaskIntoConstraints = false
-        s.addTarget(self, action: #selector(scrubChanged),   for: .valueChanged)
+        s.addTarget(self, action: #selector(scrubChanged), for: .valueChanged)
         s.addTarget(self, action: #selector(scrubTouchDown), for: .touchDown)
-        s.addTarget(self, action: #selector(scrubTouchUp),   for: [.touchUpInside, .touchUpOutside])
+        s.addTarget(self, action: #selector(scrubTouchUp), for: [.touchUpInside, .touchUpOutside])
         return s
     }()
 
     private lazy var scrubStartLbl: UILabel = makeMonoLabel()
-    private lazy var scrubEndLbl:   UILabel = makeMonoLabel()
+    private lazy var scrubEndLbl: UILabel = makeMonoLabel()
 
     // Film strip row  —  SHOTS  N  [ ][ ][ ]…
     private lazy var filmStripContainer: UIView = {
@@ -257,7 +251,6 @@ final class ShotPlayerViewController: UIViewController {
         return cv
     }()
 
-
     private lazy var scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.backgroundColor = .clear
@@ -273,7 +266,6 @@ final class ShotPlayerViewController: UIViewController {
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
-
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -355,10 +347,8 @@ final class ShotPlayerViewController: UIViewController {
         coordinator.animate(alongsideTransition: { [weak self] _ in
             self?.applyOrientation(to: size)
             self?.filmStrip.collectionViewLayout.invalidateLayout()
-        })
+        }, completion: nil)
     }
-
-
 
     private func setupNav() {
         let appearance = UINavigationBarAppearance()
@@ -426,7 +416,7 @@ final class ShotPlayerViewController: UIViewController {
 
         // Main scrollView wraps all content to ensure nothing is cut off
         view.addSubview(scrollView)
-        
+
         // Add all content to the scrollView's content container
         scrollView.addSubview(previewContainer)
         scrollView.addSubview(sep1)
@@ -438,7 +428,7 @@ final class ShotPlayerViewController: UIViewController {
 
         let g = view.safeAreaLayoutGuide
         let big         = is13inch
-        
+
         // Adaptive button and bar sizing based on screen size
         let transportH  = CGFloat(big ? 62 : 54)
         let scrubberH   = CGFloat(big ? 50 : 44)
@@ -455,7 +445,7 @@ final class ShotPlayerViewController: UIViewController {
         }
 
         NSLayoutConstraint.activate([
-            
+
             // MARK: - Custom Nav Bar
             customNavBar.topAnchor.constraint(equalTo: g.topAnchor),
             customNavBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -583,7 +573,7 @@ final class ShotPlayerViewController: UIViewController {
             filmStrip.topAnchor.constraint(equalTo: shotsHeaderLbl.bottomAnchor, constant: 4),
             filmStrip.leadingAnchor.constraint(equalTo: filmStripContainer.leadingAnchor),
             filmStrip.trailingAnchor.constraint(equalTo: filmStripContainer.trailingAnchor),
-            filmStrip.bottomAnchor.constraint(equalTo: filmStripContainer.bottomAnchor, constant: -6),
+            filmStrip.bottomAnchor.constraint(equalTo: filmStripContainer.bottomAnchor, constant: -6)
         ])
 
         // Set fixed 16:9 container — never changes size.
@@ -679,7 +669,6 @@ final class ShotPlayerViewController: UIViewController {
         view.layoutIfNeeded()
     }
 
-
     private func syncToCurrentShot() {
         let shot   = currentShot
         let accent = stripColors[currentIndex % stripColors.count]
@@ -710,7 +699,7 @@ final class ShotPlayerViewController: UIViewController {
                  at: IndexPath(item: currentIndex, section: 0),
                  at: .centeredHorizontally, animated: true)
          }
-         
+
          let camItem = cameraItem(for: shot)
          prepareForCapture?(camItem)
          evaluateTimeline?(shot.startTime)
@@ -725,7 +714,6 @@ final class ShotPlayerViewController: UIViewController {
         ]
         shotsHeaderLbl.attributedText = NSAttributedString(string: "SHOTS", attributes: attrs)
     }
-
 
      private func cameraItem(for shot: Shot) -> CanvasViewController.SceneCameraItem? {
          if let camID = shot.cameraID {
@@ -767,9 +755,13 @@ final class ShotPlayerViewController: UIViewController {
                  playStart = CACurrentMediaTime()
                  syncToCurrentShot()
                  cutFlashLbl.text = "  \(from)  →  \(currentShot.displayName)  "
-                 UIView.animate(withDuration: 0.12, animations: { self.cutFlashLbl.alpha = 1 }) { _ in
-                     UIView.animate(withDuration: 0.30, delay: 1.0) { self.cutFlashLbl.alpha = 0 }
-                 }
+                 UIView.animate(
+                     withDuration: 0.12,
+                     animations: { self.cutFlashLbl.alpha = 1 },
+                     completion: { _ in
+                         UIView.animate(withDuration: 0.30, delay: 1.0) { self.cutFlashLbl.alpha = 0 }
+                     }
+                 )
                  return
              } else {
                  currentTime = duration; stopPlayback()
@@ -785,8 +777,6 @@ final class ShotPlayerViewController: UIViewController {
          evaluateTimeline?(currentShot.startTime + currentTime)
      }
 
-
-
     @objc private func scrubChanged(_ s: UISlider) {
         currentTime = s.value * currentShot.duration
         currentTimeLbl.text = fmt(currentTime)
@@ -797,8 +787,7 @@ final class ShotPlayerViewController: UIViewController {
     }
 
     @objc private func scrubTouchDown() { stopPlayback() }
-    @objc private func scrubTouchUp()   { startPlayback() }
-
+    @objc private func scrubTouchUp() { startPlayback() }
 
     @objc private func controlTapped(_ btn: UIButton) {
         switch btn {
@@ -821,7 +810,6 @@ final class ShotPlayerViewController: UIViewController {
         stopPlayback(); evaluateTimeline?(0)
         navigationController?.popViewController(animated: true)
     }
-
 
     private func makeHUDChip(size: CGFloat, weight: UIFont.Weight,
                               alpha: CGFloat = 1) -> UILabel {
@@ -869,7 +857,6 @@ final class ShotPlayerViewController: UIViewController {
         return String(format: "%02d:%02d", Int(t) / 60, Int(t) % 60)
     }
 
-
     @objc private func exportTapped() {
         let shot  = currentShot
         let sheet = UIAlertController(title: shot.displayName,
@@ -879,7 +866,7 @@ final class ShotPlayerViewController: UIViewController {
             self?.showExportSettings()
         })
         sheet.addAction(.init(title: "Export JPEG Frame", style: .default) { [weak self] _ in self?.exportFrame(png: false) })
-        sheet.addAction(.init(title: "Export PNG Frame",  style: .default) { [weak self] _ in self?.exportFrame(png: true) })
+        sheet.addAction(.init(title: "Export PNG Frame", style: .default) { [weak self] _ in self?.exportFrame(png: true) })
         sheet.addAction(.init(title: "Cancel", style: .cancel))
         if let pop = sheet.popoverPresentationController { pop.barButtonItem = navigationItem.rightBarButtonItem }
         present(sheet, animated: true)
@@ -970,13 +957,14 @@ final class ShotPlayerViewController: UIViewController {
     }
 }
 
-
 extension ShotPlayerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ cv: UICollectionView, numberOfItemsInSection _: Int) -> Int { shots.count }
 
     func collectionView(_ cv: UICollectionView, cellForItemAt ip: IndexPath) -> UICollectionViewCell {
-        let cell = cv.dequeueReusableCell(withReuseIdentifier: StripCell.reuseID, for: ip) as! StripCell
+        guard let cell = cv.dequeueReusableCell(withReuseIdentifier: StripCell.reuseID, for: ip) as? StripCell else {
+            return UICollectionViewCell()
+        }
         cell.configure(with: shots[ip.item],
                        isActive: ip.item == currentIndex,
                        accentColor: stripColors[ip.item % stripColors.count])
@@ -988,7 +976,6 @@ extension ShotPlayerViewController: UICollectionViewDataSource, UICollectionView
         syncToCurrentShot()
     }
 }
-
 
 final class PlayerSlider: UISlider {
     init(accent: UIColor, track: UIColor) {
@@ -1012,7 +999,6 @@ final class PlayerSlider: UISlider {
         bounds.insetBy(dx: -10, dy: -18).contains(point)
     }
 }
-
 
 final class StripCell: UICollectionViewCell {
 
@@ -1089,7 +1075,7 @@ final class StripCell: UICollectionViewCell {
             activeBar.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 4),
             activeBar.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -4),
             activeBar.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -2),
-            activeBar.heightAnchor.constraint(equalToConstant: 3),
+            activeBar.heightAnchor.constraint(equalToConstant: 3)
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -1112,7 +1098,6 @@ final class StripCell: UICollectionViewCell {
         activeBar.backgroundColor = isActive ? accentColor : .clear
     }
 }
-
 
 extension UIImage {
     func toPixelBuffer(size: CGSize) -> CVPixelBuffer? {

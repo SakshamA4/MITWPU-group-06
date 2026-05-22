@@ -31,7 +31,6 @@ extension CanvasViewController {
         print("Error: No image found for background \(item.title)")
     }
 
-    
     func applySky(type: String) {
 
             // 1. Remove existing sky (check both naming conventions for backward compatibility)
@@ -41,23 +40,17 @@ extension CanvasViewController {
                 existingSky.removeFromParent()
 
             }
-            
+
             // Also remove any ProceduralSky_<type> entities
             if let anchor = arView.scene.findEntity(named: "MainAnchor") as? AnchorEntity {
-                for child in anchor.children {
-                    if child.name.hasPrefix("ProceduralSky_") {
-                        child.removeFromParent()
-                    }
+                for child in anchor.children where child.name.hasPrefix("ProceduralSky_") {
+                    child.removeFromParent()
                 }
             }
-
-            
 
             var skyMaterial = UnlitMaterial()
 
             var topColor: UIColor = .systemBlue
-
-            
 
             // 2. Load Texture or Color
 
@@ -67,13 +60,9 @@ extension CanvasViewController {
 
             let imageSkyTypes: Set<String> = ["Blue_sky", "Evening_sky", "Nighty_night"]  // add new names here
 
-
-
             if imageSkyTypes.contains(type) {
 
                 if let texture = try? TextureResource.load(named: type) {
-
-            
 
                     skyMaterial.color.texture = .init(texture)
 
@@ -100,8 +89,6 @@ extension CanvasViewController {
             // FIX: Name should include type for proper saving/loading
             skyEntity.name = "ProceduralSky_\(type)"
 
-            
-
             // 4. THE FIX FOR INVERSION:
 
             // Instead of just flipping scale, we also apply a 180-degree rotation
@@ -112,13 +99,9 @@ extension CanvasViewController {
 
             skyEntity.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
 
-            
-
             // 5. Final Setup
 
             skyEntity.components.set(CategoryComponent(toolType: .sky))
-
-            
 
             if let anchor = arView.scene.findEntity(named: "MainAnchor") {
 
@@ -127,7 +110,7 @@ extension CanvasViewController {
             }
 
         }
-    
+
     func applyBackgroundImage(_ image: UIImage) {
         guard let anchor = mainAnchor else { return }
 
@@ -142,7 +125,7 @@ extension CanvasViewController {
             do {
                 let safeCG  = image.sRGBCGImage()
                 let texture = try await TextureResource(
-                    image:   safeCG,
+                    image: safeCG,
                     options: .init(semantic: .color)
                 )
                 var material = UnlitMaterial()
@@ -151,9 +134,9 @@ extension CanvasViewController {
                 backgroundCounter += 1
                 let uniqueName = "Background_\(backgroundCounter)"
 
-                let aspect:    Float = Float(image.size.width / image.size.height)
-                let height:    Float = 1.5
-                let width:     Float = height * aspect
+                let aspect: Float = Float(image.size.width / image.size.height)
+                let height: Float = 1.5
+                let width: Float = height * aspect
                 let thickness: Float = 0.05
 
                 let mesh  = MeshResource.generateBox(width: width, height: height, depth: thickness)
@@ -206,7 +189,7 @@ extension CanvasViewController {
         realLight.position  = [0, 0, 0]
 
         let lensGlow = ModelEntity(
-            mesh:      .generateSphere(radius: 0.1),
+            mesh: .generateSphere(radius: 0.1),
             materials: [UnlitMaterial(color: .yellow)]
         )
         lensGlow.position = [10, 10, 0.1]
@@ -215,7 +198,7 @@ extension CanvasViewController {
         var beamMat = UnlitMaterial(color: .white)
         beamMat.blending = .transparent(opacity: .init(floatLiteral: 0.2))
         let beamVisual = ModelEntity(
-            mesh:      MeshResource.generateCone(height: 4.0, radius: 1.0),
+            mesh: MeshResource.generateCone(height: 4.0, radius: 1.0),
             materials: [beamMat]
         )
         beamVisual.orientation = simd_quaternion(-Float.pi / 2, [1, 0, 0])
@@ -274,38 +257,37 @@ extension CanvasViewController {
         case .practicalLantern:
             let lanternColor = UIColor.fromKelvin(colorTemp)
 
-            // Main globe — emissive sphere
+            // Main globe — emissive sphere, OPAQUE so it doesn’t vanish under its own light
             var globeMat = PhysicallyBasedMaterial()
             globeMat.baseColor = .init(tint: lanternColor)
             globeMat.emissiveColor = .init(color: lanternColor)
-            globeMat.emissiveIntensity = 3.0
-            // Semi-translucent paper look
-            globeMat.blending = .transparent(opacity: .init(floatLiteral: 0.85))
+            globeMat.emissiveIntensity = 2.0
+            // No transparency — the model stays visible even when the point light is bright
 
             let globe = ModelEntity(
-                mesh: .generateSphere(radius: 0.15),
+                mesh: .generateSphere(radius: 0.30),
                 materials: [globeMat]
             )
             globe.name = "ProceduralGlobe"
             root.addChild(globe)
 
-            // Top cap — small dark fitting
+            // Top cap — small dark fitting (doubled proportionally)
             let capMat = SimpleMaterial(color: .darkGray, roughness: 0.8, isMetallic: true)
             let topCap = ModelEntity(
-                mesh: .generateCylinder(height: 0.025, radius: 0.04),
+                mesh: .generateCylinder(height: 0.05, radius: 0.08),
                 materials: [capMat]
             )
             topCap.name = "ProceduralTopCap"
-            topCap.position = [0, 0.14, 0]
+            topCap.position = [0, 0.28, 0]
             root.addChild(topCap)
 
-            // Bottom cap
+            // Bottom cap (doubled proportionally)
             let bottomCap = ModelEntity(
-                mesh: .generateCylinder(height: 0.015, radius: 0.03),
+                mesh: .generateCylinder(height: 0.03, radius: 0.06),
                 materials: [capMat]
             )
             bottomCap.name = "ProceduralBottomCap"
-            bottomCap.position = [0, -0.14, 0]
+            bottomCap.position = [0, -0.28, 0]
             root.addChild(bottomCap)
 
         // ════════════════════════════════════════════════════════════════════
@@ -387,7 +369,7 @@ extension CanvasViewController {
             yoke.position = [0, 0.58, 0]
             root.addChild(yoke)
         }
-        root.scale = SIMD3<Float>(repeating: 0.25) //new line
+        root.scale = SIMD3<Float>(repeating: 0.25) // new line
         root.generateCollisionShapes(recursive: true)
         return root
     }
@@ -398,9 +380,9 @@ extension CanvasViewController {
 
         // ── 1. CLEAN UP ────────────────────────────────────────────────────
         for name in ["LightCore", "LensGlow", "BeamCone", "GlowAnchor",
-                     "DiffuseFill", "GoboCookie", "LED_Guts_Group",
-                     "Lantern_Guts_Group", "LanternInternalLight",
-                     "LanternGlowFallback"] {
+                     "DiffuseFill", "GoboCookie", "GoboBeam", "GoboGate",
+                     "LED_Guts_Group", "Lantern_Guts_Group",
+                     "LanternInternalLight", "LanternGlowFallback"] {
             model.findEntity(named: name)?.removeFromParent()
         }
 
@@ -413,7 +395,6 @@ extension CanvasViewController {
 
         switch config.lightKind {
 
-      
         case .point:
             // Place point light in the center of the lantern
             let glowY = b.min.y + (b.extents.y * 0.50)
@@ -421,7 +402,7 @@ extension CanvasViewController {
             let point = PointLight()
             point.name                    = "LightCore"
             point.light.intensity         = config.intensity
-            point.light.color             = config.uiColor
+            point.light.color             = config.effectiveColor
             point.light.attenuationRadius = config.attenuationRadius
             point.scale                   = SIMD3(repeating: cs)
             point.position = SIMD3<Float>(b.center.x, glowY, b.center.z)
@@ -434,7 +415,7 @@ extension CanvasViewController {
 
             let bulb = ModelEntity(
                 mesh: .generateSphere(radius: bulbRadius),
-                materials: [UnlitMaterial(color: config.uiColor)]
+                materials: [UnlitMaterial(color: config.effectiveColor)]
             )
 
             bulb.name = "LanternBulb"
@@ -454,7 +435,7 @@ extension CanvasViewController {
                     for mat in mc.materials {
                         if var pbr = mat as? PhysicallyBasedMaterial {
                             if case .transparent = pbr.blending {
-                                pbr.emissiveColor     = .init(color: config.uiColor)
+                                pbr.emissiveColor     = .init(color: config.effectiveColor)
                                 pbr.emissiveIntensity = 3.0
                                 newMaterials.append(pbr)
                                 changed = true
@@ -492,7 +473,7 @@ extension CanvasViewController {
 
                 let glow = ModelEntity(
                     mesh: .generateSphere(radius: glowRadius),
-                    materials: [UnlitMaterial(color: config.uiColor)]
+                    materials: [UnlitMaterial(color: config.effectiveColor)]
                 )
 
                 glow.name = "LanternGlowFallback"
@@ -515,7 +496,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale    = SIMD3(repeating: cs)
@@ -546,6 +527,11 @@ extension CanvasViewController {
             print("SPOTLIGHT: lens at \(lensPos), aiming toward -X")
             model.addChild(spot)
 
+            // ── Gobo gate mask ───────────────────────────────────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
+
         // ════════════════════════════════════════════════════════════════════
         // LED PANEL — SpotLight at panel head (85% height), aimed forward-down
         // The panel head with 4×3 LED circles sits at the top of the tripod.
@@ -564,49 +550,47 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
             spot.shadow                    = nil
             spot.scale                     = SIMD3(repeating: cs)
 
             // Light originates from the front face of the LED panel
+            // The panel face is on the -Z side (min.z). We position the light
+            // at the panel head center and aim it straight forward along -Z.
             let lensPos = SIMD3<Float>(
                 b.center.x,
                 panelHeadY,
-                b.min.z - 2.0
+                b.min.z
             )
             spot.position = lensPos
 
             // Slight downward tilt
             let aimDownY = panelHeadY - (b.extents.y * 0.15)
 
-            // Move beam slightly to the LEFT from the panel's perspective
-            // Increase this value if you want more left shift
-            let leftCorrection: Float = 0.0
-            
+            // Aim straight forward (pure -Z, no X offset)
             let forwardDistance: Float = 500.0
             let target = SIMD3<Float>(
-                b.center.x,          // no left/right offset
+                b.center.x,
                 aimDownY,
                 b.min.z - forwardDistance
             )
-            
-            
-            
+
             spot.look(
                 at: target,
                 from: lensPos,
                 relativeTo: model
             )
-            // Debug
 
             print("LED PANEL: lens at \(lensPos)")
-
-            print("LED PANEL: leftCorrection = \(leftCorrection)")
-
             print("LED PANEL: aiming at \(target)")
 
             model.addChild(spot)
+
+            // ── Gobo gate mask (panels can also use gobos) ──────────────
+            if config.activeGobo != .none {
+                addGoboGateMask(to: spot, config: config)
+            }
 
         } // end switch
 
@@ -623,7 +607,7 @@ extension CanvasViewController {
             spot.light.intensity           = config.intensity
             spot.light.innerAngleInDegrees = config.innerAngleDeg
             spot.light.outerAngleInDegrees = config.outerAngleDeg
-            spot.light.color               = config.uiColor
+            spot.light.color               = config.effectiveColor
             spot.light.attenuationRadius   = config.attenuationRadius
 
             if config.shadowEnabled {
@@ -635,21 +619,20 @@ extension CanvasViewController {
                 spot.shadow = nil
             }
 
-
-            // ============================================================
-            // UPDATE LANTERN LIGHT PROPERTIES
-            // ============================================================
-            case .point:
+        // ============================================================
+        // UPDATE LANTERN LIGHT PROPERTIES
+        // ============================================================
+        case .point:
                 guard let point = lightCore as? PointLight else { return }
 
                 point.light.intensity         = config.intensity
-                point.light.color             = config.uiColor
+                point.light.color             = config.effectiveColor
                 point.light.attenuationRadius = config.attenuationRadius
 
                 // Update visible bulb color
                 if let bulb = entity.findEntity(named: "LanternBulb") as? ModelEntity {
                     bulb.model?.materials = [
-                        UnlitMaterial(color: config.uiColor)
+                        UnlitMaterial(color: config.effectiveColor)
                     ]
                 }
 
@@ -662,7 +645,7 @@ extension CanvasViewController {
                         for mat in mc.materials {
                             if var pbr = mat as? PhysicallyBasedMaterial {
                                 if case .transparent = pbr.blending {
-                                    pbr.emissiveColor     = .init(color: config.uiColor)
+                                    pbr.emissiveColor     = .init(color: config.effectiveColor)
                                     pbr.emissiveIntensity = 3.0
                                     newMaterials.append(pbr)
                                     changed = true
@@ -689,7 +672,7 @@ extension CanvasViewController {
 
             // Update fallback glow sphere color if present
             if let fb = entity.findEntity(named: "LanternGlowFallback") as? ModelEntity {
-                fb.model?.materials = [UnlitMaterial(color: config.uiColor)]
+                fb.model?.materials = [UnlitMaterial(color: config.effectiveColor)]
             }
         }
 
@@ -698,13 +681,16 @@ extension CanvasViewController {
             updateProceduralEmissiveMaterials(on: entity, config: config)
         }
 
+        // ── Update gobo gate mask ────────────────────────────────────────────
+        updateGoboGateMask(on: entity, config: config)
+
         entity.components.set(config)
     }
 
     /// Updates emissive PBR materials on procedural light child entities
     /// when the user changes color temperature or intensity via the slider.
     private func updateProceduralEmissiveMaterials(on entity: Entity, config: LightConfigComponent) {
-        let color = config.uiColor
+        let color = config.effectiveColor
 
         // Practical Lantern — globe sphere
         if let globe = entity.findEntity(named: "ProceduralGlobe") as? ModelEntity {
@@ -727,6 +713,73 @@ extension CanvasViewController {
         }
     }
 
+    // MARK: - Gobo Gate Mask (Shadow-Casting Alpha Plane)
+    //
+    // RealityKit SpotLightComponent has NO projected-texture property.
+    // Correct workaround: a thin alpha-tested plane at the spotlight gate.
+    // With shadows enabled, the opaque parts cast gobo-shaped shadows onto
+    // scene surfaces (floor, walls, actors). The gate plane is paper-thin
+    // and invisible from the side — you only see the shaped light/shadows.
+    //
+    // REQUIREMENT: Shadows are auto-enabled when a gobo is active.
+
+    /// Adds an alpha-tested gate-mask plane as a child of the SpotLight entity.
+    private func addGoboGateMask(to spotEntity: Entity, config: LightConfigComponent) {
+        guard config.activeGobo != .none else { return }
+        guard let cgImage = config.activeGobo.generateTexture(
+            lightColor: config.effectiveColor, resolution: 512
+        ) else { return }
+
+        guard let texture = try? TextureResource.generate(
+            from: cgImage, options: .init(semantic: .color)
+        ) else {
+            print("GOBO: failed to create TextureResource")
+            return
+        }
+
+        // PBR material with opacityThreshold — shadow map respects alpha cutoff
+        var material = PhysicallyBasedMaterial()
+        material.baseColor = .init(tint: .black, texture: .init(texture))
+        material.opacityThreshold = 0.5
+        material.metallic = .init(floatLiteral: 0)
+        material.roughness = .init(floatLiteral: 1)
+
+        // Plane sized to cover beam cross-section at gate distance
+        let gateDistance: Float = 0.2
+        let outerRad = config.outerAngleDeg * (.pi / 180.0)
+        let planeHalf = gateDistance * tan(outerRad / 2.0) * 1.2
+        let gateSize = max(0.15, planeHalf * 2.0)
+
+        let gate = ModelEntity(
+            mesh: .generatePlane(width: gateSize, height: gateSize),
+            materials: [material]
+        )
+        gate.name = "GoboGate"
+        gate.position = SIMD3<Float>(0, 0, -gateDistance)
+
+        spotEntity.addChild(gate)
+
+        // Auto-enable shadows (required for gate mask to cast gobo pattern)
+        if let spot = spotEntity as? SpotLight, spot.shadow == nil {
+            var shadow = SpotLightComponent.Shadow()
+            shadow.depthBias = 0.01
+            spot.shadow = shadow
+        }
+
+        print("GOBO: gate mask '\(config.activeGobo.displayName)', size=\(gateSize)")
+    }
+
+    /// Updates or removes the gobo gate mask on a live entity.
+    private func updateGoboGateMask(on entity: Entity, config: LightConfigComponent) {
+        guard let lightCore = entity.findEntity(named: "LightCore") else { return }
+        lightCore.findEntity(named: "GoboGate")?.removeFromParent()
+
+        guard config.activeGobo != .none,
+              config.lightKind == .spot || config.lightKind == .panel else { return }
+
+        addGoboGateMask(to: lightCore, config: config)
+    }
+
     // MARK: Point light
 
     func spawnPointLight() {
@@ -736,7 +789,7 @@ extension CanvasViewController {
         lightEntity.light.attenuationRadius = 10.0
 
         let bulb = ModelEntity(
-            mesh:      .generateSphere(radius: 0.1),
+            mesh: .generateSphere(radius: 0.1),
             materials: [UnlitMaterial(color: .yellow)]
         )
         lightEntity.addChild(bulb)
@@ -1060,7 +1113,7 @@ extension CanvasViewController {
                 case "PNG":  self.captureCanvasAndShare(isPNG: true)
                 default:
                     let alert = UIAlertController(
-                        title:   "Info",
+                        title: "Info",
                         message: "\(format) export coming soon!",
                         preferredStyle: .alert
                     )
@@ -1076,6 +1129,43 @@ extension CanvasViewController {
         }
 
         present(exportVC, animated: true)
+    }
+
+    // MARK: - Shadow Casting Fix
+
+    /// Ensures all ModelEntity descendants use shadow-casting materials.
+    /// Some USDZ exports (notably the male character "LewScene") bake materials
+    /// as UnlitMaterial which opts the mesh out of shadow rendering entirely.
+    /// This traverses the hierarchy and promotes any UnlitMaterial to a
+    /// PhysicallyBasedMaterial with the same base colour, enabling shadow casting.
+    /// Only called on character entities — intentional UnlitMaterial usage on
+    /// lights, gizmos, and beam visuals is unaffected.
+    func ensureShadowCasting(on entity: Entity) {
+        func walk(_ e: Entity) {
+            if let model = e as? ModelEntity, var mc = model.model {
+                var newMats: [any RealityKit.Material] = []
+                var changed = false
+                for mat in mc.materials {
+                    if let unlit = mat as? UnlitMaterial {
+                        // Promote to PBR — preserves base colour, gains shadow casting
+                        var pbr = PhysicallyBasedMaterial()
+                        pbr.baseColor = unlit.color
+                        pbr.roughness = .init(floatLiteral: 0.6)
+                        newMats.append(pbr)
+                        changed = true
+                        print("SHADOW FIX: promoted UnlitMaterial → PBR on \(e.name)")
+                    } else {
+                        newMats.append(mat)
+                    }
+                }
+                if changed {
+                    mc.materials = newMats
+                    model.model = mc
+                }
+            }
+            for child in e.children { walk(child) }
+        }
+        walk(entity)
     }
 }
 
@@ -1101,13 +1191,13 @@ extension UIImage {
         let h  = Int(size.height * scale)
         let cs = CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(
-            data:             nil,
-            width:            max(w, 1),
-            height:           max(h, 1),
+            data: nil,
+            width: max(w, 1),
+            height: max(h, 1),
             bitsPerComponent: 8,
-            bytesPerRow:      0,
-            space:            cs,
-            bitmapInfo:       CGImageAlphaInfo.premultipliedLast.rawValue
+            bytesPerRow: 0,
+            space: cs,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
             fatalError("sRGBCGImage: failed to create CGContext for \(self)")
         }
@@ -1117,3 +1207,5 @@ extension UIImage {
         return ctx.makeImage()!
     }
 }
+
+

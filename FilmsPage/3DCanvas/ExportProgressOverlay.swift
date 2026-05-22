@@ -169,7 +169,7 @@ final class ExportProgressOverlay: UIView {
 
             cancelButton.topAnchor.constraint(equalTo: etaLabel.bottomAnchor, constant: 16),
             cancelButton.centerXAnchor.constraint(equalTo: cardView.centerXAnchor),
-            cancelButton.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20),
+            cancelButton.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20)
         ])
     }
 
@@ -182,20 +182,27 @@ final class ExportProgressOverlay: UIView {
             topAnchor.constraint(equalTo: parent.topAnchor),
             leadingAnchor.constraint(equalTo: parent.leadingAnchor),
             trailingAnchor.constraint(equalTo: parent.trailingAnchor),
-            bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+            bottomAnchor.constraint(equalTo: parent.bottomAnchor)
         ])
-        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
-            self.alpha = 1
-        }
+        UIView.animate(
+            withDuration: 0.25,
+            delay: 0,
+            options: .curveEaseOut,
+            animations: { self.alpha = 1 }
+        )
     }
 
     func dismiss(completion: (() -> Void)? = nil) {
-        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn, animations: {
-            self.alpha = 0
-        }) { _ in
-            self.removeFromSuperview()
-            completion?()
-        }
+        UIView.animate(
+            withDuration: 0.2,
+            delay: 0,
+            options: .curveEaseIn,
+            animations: { self.alpha = 0 },
+            completion: { _ in
+                self.removeFromSuperview()
+                completion?()
+            }
+        )
     }
 
     func update(with progress: ExportProgress) {
