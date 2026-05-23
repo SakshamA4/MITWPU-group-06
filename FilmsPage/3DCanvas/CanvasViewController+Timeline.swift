@@ -346,10 +346,14 @@ extension CanvasViewController {
             if let pc = perspectiveCamera {
                 fov = baseFOVs[entityName] ?? pc.camera.fieldOfViewInDegrees
             }
-
-            // Sort clips by start time (important!)
-            let sortedClips = clips.sorted { $0.startTime < $1.startTime }
-
+            
+            // Sort clips by start time, then by track priority so visibility
+            // is evaluated before intensity/color (prevents flicker).
+            let sortedClips = clips.sorted {
+                if $0.startTime != $1.startTime { return $0.startTime < $1.startTime }
+                return lightTrackPriority($0.track) < lightTrackPriority($1.track)
+            }
+            
             for clip in sortedClips {
 
                 let localTime = time - clip.startTime
@@ -403,6 +407,35 @@ extension CanvasViewController {
                     // Interpolate FOV between fromValue.x and toValue.x
                     let scalarVal = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
                     fov = scalarVal
+
+                case .visibility:
+                    // ON/OFF — for instant switches (duration < 0.05s) use toValue directly.
+                    // For animated visibility, crossfade at the midpoint.
+                    if clip.duration < 0.05 {
+                        entity.isEnabled = clip.toValue.x >= 0.5
+                    } else {
+                        entity.isEnabled = eased >= 0.5
+                            ? (clip.toValue.x >= 0.5)
+                            : (clip.fromValue.x >= 0.5)
+                    }
+
+                case .intensity:
+                    // Interpolate lumens and live-update the RealityKit light
+                    let lumens = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
+                    if var lightConfig = entity.components[LightConfigComponent.self] {
+                        lightConfig.intensity = max(0, lumens)
+                        entity.components.set(lightConfig)
+                        updateLightProperties(for: entity, config: lightConfig)
+                    }
+
+                case .color:
+                    // Interpolate Kelvin temperature and live-update the RealityKit light
+                    let kelvin = simd_mix(clip.fromValue.x, clip.toValue.x, eased)
+                    if var lightConfig = entity.components[LightConfigComponent.self] {
+                        lightConfig.colorTemperatureKelvin = max(1800, min(12000, kelvin))
+                        entity.components.set(lightConfig)
+                        updateLightProperties(for: entity, config: lightConfig)
+                    }
                 }
             }
 
@@ -484,6 +517,10 @@ extension CanvasViewController {
                 )
 
             case .fov:
+                break
+
+            case .visibility, .intensity, .color:
+                // These are light-only scalar tracks and don't contribute to Transform.
                 break
             }
         }
@@ -703,13 +740,15 @@ extension CanvasViewController {
             .forEach { entity in
                 baseTransforms[entity.name] = entity.transform
                 timelineEntityCache[entity.name] = entity
-                // If this entity is a camera-root (SceneCameraRoot_), snapshot the FOV
-                // from its PerspectiveCamera child, keyed under the root's name — because
-                // zoom AnimationClips target the root name, not the camera child name.
+                // Snapshot FOV for camera entities
                 if let pc = entity as? PerspectiveCamera {
                     baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
                 } else if let pc = entity.children.compactMap({ $0 as? PerspectiveCamera }).first {
                     baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                }
+                // Snapshot light config for light entities
+                if let lightConfig = entity.components[LightConfigComponent.self] {
+                    baseLightConfigs[entity.name] = lightConfig
                 }
             }
     }
@@ -731,12 +770,15 @@ extension CanvasViewController {
             .forEach { entity in
                 baseTransforms[entity.name]     = entity.transform
                 timelineEntityCache[entity.name] = entity
-                // Zoom clips target the cameraRoot name; snapshot its child camera's FOV
-                // under the same key so evaluateTimeline can restore it correctly.
+                // Snapshot FOV for camera entities
                 if let pc = entity as? PerspectiveCamera {
                     baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
                 } else if let pc = entity.children.compactMap({ $0 as? PerspectiveCamera }).first {
                     baseFOVs[entity.name] = pc.camera.fieldOfViewInDegrees
+                }
+                // Snapshot light config for light entities
+                if let lightConfig = entity.components[LightConfigComponent.self] {
+                    baseLightConfigs[entity.name] = lightConfig
                 }
             }
     }
@@ -756,6 +798,15 @@ extension CanvasViewController {
         }
         baseTransforms.removeAll()
         baseFOVs.removeAll()
+        // Restore light configs and re-enable all lights
+        for (name, config) in baseLightConfigs {
+            if let entity = mainAnchor?.findEntity(named: name) {
+                entity.isEnabled = true
+                entity.components.set(config)
+                updateLightProperties(for: entity, config: config)
+            }
+        }
+        baseLightConfigs.removeAll()
         timelineEntityCache.removeAll()
     }
 
@@ -781,6 +832,15 @@ extension CanvasViewController {
         }
         baseTransforms.removeAll()
         baseFOVs.removeAll()
+        // Restore light configs and re-enable all lights
+        for (name, config) in baseLightConfigs {
+            if let entity = mainAnchor?.findEntity(named: name) {
+                entity.isEnabled = true
+                entity.components.set(config)
+                updateLightProperties(for: entity, config: config)
+            }
+        }
+        baseLightConfigs.removeAll()
         timelineEntityCache.removeAll()
     }
 
@@ -830,4 +890,116 @@ extension CanvasViewController {
         }
     }
 
+}
+
+// MARK: - Light Track Priority
+
+extension CanvasViewController {
+
+    /// Returns a priority value for track ordering during evaluation.
+    /// Lower values are evaluated first. This ensures visibility is processed
+    /// before intensity/color (prevents flickering), and light tracks are
+    /// processed before transform tracks.
+    func lightTrackPriority(_ track: AnimationTrack) -> Int {
+        switch track {
+        case .visibility: return 0
+        case .intensity:  return 1
+        case .color:      return 2
+        case .position:   return 3
+        case .rotation:   return 4
+        case .scale:      return 5
+        case .fov:        return 6
+        }
+    }
+}
+
+// MARK: - Timeline Editor
+
+extension CanvasViewController {
+
+    @objc func openAnimationTimelineEditor() {
+        let editor = AnimationTimelineEditorViewController()
+        editor.lanes = buildTimelineEditorLanes()
+        editor.sceneDuration = max(timeline.duration, 10)
+        editor.currentTime = currentTimelineTime
+        editor.fps = 30
+
+        enterShotPlaybackMode()
+
+        editor.onScrub = { [weak self] t in
+            guard let self else { return }
+            self.currentTimelineTime = t
+            self.evaluateTimeline(at: t)
+        }
+
+        editor.onClipChanged = { [weak self, weak editor] clipID, start, duration in
+            guard let self else { return }
+            self.updateClipTiming(clipID: clipID, startTime: start, duration: duration)
+            if let editor {
+                editor.refresh(
+                    lanes: self.buildTimelineEditorLanes(),
+                    currentTime: self.currentTimelineTime,
+                    sceneDuration: max(self.timeline.duration, 10)
+                )
+            }
+        }
+
+        if let sheet = editor.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 22
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+        }
+        editor.presentationController?.delegate = self
+        editor.modalPresentationStyle = .pageSheet
+        animationTimelineEditorVC = editor
+        present(editor, animated: true)
+    }
+
+    func buildTimelineEditorLanes() -> [AnimationTimelineEditorViewController.TrackLane] {
+        let grouped = Dictionary(grouping: timeline.clips, by: { $0.entityName })
+        let sortedNames = grouped.keys.sorted()
+        return sortedNames.map { entityName in
+            let clips = (grouped[entityName] ?? [])
+                .sorted { $0.startTime < $1.startTime }
+                .map { clip in
+                    AnimationTimelineEditorViewController.ClipItem(
+                        id: clip.id,
+                        entityName: clip.entityName,
+                        track: clip.track,
+                        easing: clip.easing,
+                        startTime: clip.startTime,
+                        duration: clip.duration,
+                        type: clip.type
+                    )
+                }
+            return AnimationTimelineEditorViewController.TrackLane(
+                id: entityName,
+                title: entityName,
+                clips: clips
+            )
+        }
+    }
+
+    func updateClipTiming(clipID: UUID, startTime: Float, duration: Float) {
+        guard let idx = timeline.clips.firstIndex(where: { $0.id == clipID }) else { return }
+        let old = timeline.clips[idx]
+        timeline.clips[idx] = AnimationClip(
+            preservingID: old,
+            startTime: max(0, startTime),
+            duration: max(0.01, duration)
+        )
+        if timeline.clips[idx].motionPath != nil {
+            showMotionPath(for: timeline.clips[idx])
+        }
+    }
+    
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        if presentationController.presentedViewController === animationTimelineEditorVC {
+            exitShotPlaybackMode()
+            evaluateTimeline(at: 0)
+            currentTimelineTime = 0
+            animationTimelineEditorVC = nil
+        }
+    }
 }

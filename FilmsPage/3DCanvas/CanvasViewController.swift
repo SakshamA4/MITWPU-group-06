@@ -53,6 +53,7 @@ enum AnimationType: String, Codable {
     case rotate
     case walk
     case zoom
+    case light
 }
 
 enum EasingType: String, Codable {
@@ -67,6 +68,9 @@ enum AnimationTrack: String, Codable {
     case rotation
     case scale
     case fov
+    case visibility   // fromValue.x = 0 (OFF) or 1 (ON), toValue.x = target state
+    case intensity    // fromValue.x = start lumens, toValue.x = end lumens
+    case color        // fromValue.x = start Kelvin, toValue.x = end Kelvin
 }
 
 // MARK: - AnimationClip
@@ -244,7 +248,7 @@ func applyEasing(_ t: Float, easing: EasingType) -> Float {
 
 // MARK: - CanvasViewController
 
-class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
+class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAdaptivePresentationControllerDelegate {
 
     // MARK: - AR Mode
     var isARModeActive: Bool = false
@@ -444,6 +448,24 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
         btn.layer.shadowRadius  = 4
         return btn
     }()
+    
+    let timelineEditorBtn: UIButton = {
+        let btn = UIButton(type: .system)
+        var config = UIButton.Configuration.filled()
+        config.image = UIImage(systemName: "timeline.selection")
+        config.preferredSymbolConfigurationForImage =
+            UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        config.baseBackgroundColor = UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1)
+        config.baseForegroundColor = .white
+        config.cornerStyle = .capsule
+        btn.configuration = config
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.layer.shadowColor   = UIColor.black.cgColor
+        btn.layer.shadowOpacity = 0.3
+        btn.layer.shadowOffset  = CGSize(width: 0, height: 2)
+        btn.layer.shadowRadius  = 4
+        return btn
+    }()
 
     //  PLACE THIS AT CLASS LEVEL (NOT INSIDE ANOTHER FUNC)
 
@@ -501,6 +523,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
      var pauseButton: UIButton!
      var playbackButtonStack: UIStackView!
      var scrubber: UISlider!
+     weak var animationTimelineEditorVC: AnimationTimelineEditorViewController?
 
      // FIX: displayLink is tracked as a property so it can be reliably invalidated on teardown.
      var displayLink: CADisplayLink?
@@ -564,6 +587,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate {
     var timelineEntityCache: [String: Entity] = [:]
     var baseTransforms: [String: Transform] = [:]
     var baseFOVs: [String: Float] = [:]
+    /// Snapshot of each light's LightConfigComponent taken on timeline entry.
+    /// Restored on timeline exit so lights return to their pre-playback state.
+    var baseLightConfigs: [String: LightConfigComponent] = [:]
     var activeWalkControllers: [String: AnimationPlaybackController] = [:]
 
     // MARK: - Editor Mode

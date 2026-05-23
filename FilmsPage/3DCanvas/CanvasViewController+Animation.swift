@@ -230,8 +230,40 @@ extension CanvasViewController {
 
     // MARK: - Move & Rotate
 
-    @objc func animateMove() { presentAnimationPrompt(type: .move) }
-    @objc func animateRotate() { presentAnimationPrompt(type: .rotate) }
+    @objc func animateMove()   { presentUnifiedAnimationPicker(preferredType: .move) }
+    @objc func animateRotate() { presentUnifiedAnimationPicker(preferredType: .rotate) }
+    
+    private func presentUnifiedAnimationPicker(preferredType: AnimationType) {
+        guard editorMode == .edit, let entity = selectedEntity else { return }
+        guard let lightEntity = resolveLightEntity(from: entity) else {
+            presentAnimationPrompt(type: preferredType)
+            return
+        }
+
+        let alert = UIAlertController(
+            title: "Add Animations",
+            message: "Choose movement or light animation",
+            preferredStyle: .actionSheet
+        )
+        alert.addAction(UIAlertAction(title: "Animate Light", style: .default) { [weak self] _ in
+            self?.presentLightAnimationCard(for: lightEntity)
+        })
+        alert.addAction(UIAlertAction(title: "Move (Position Path)", style: .default) { [weak self] _ in
+            self?.presentAnimationPrompt(type: .move)
+        })
+        alert.addAction(UIAlertAction(title: "Rotate", style: .default) { [weak self] _ in
+            self?.presentAnimationPrompt(type: .rotate)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        if let pop = alert.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.maxY - 120, width: 1, height: 1)
+            pop.permittedArrowDirections = []
+        }
+
+        present(alert, animated: true)
+    }
 
     func presentAnimationPrompt(type: AnimationType) {
         guard editorMode == .edit, let entity = selectedEntity else { return }
@@ -295,6 +327,10 @@ extension CanvasViewController {
 
         case .zoom:
             track = .fov
+
+        case .light:
+            // Light clips are created from LightAnimationInputCard; keep this path non-fatal.
+            return
         }
 
         if baseTransforms[entity.name] == nil {

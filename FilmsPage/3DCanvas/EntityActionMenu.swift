@@ -6,8 +6,8 @@ import RealityKit
 // Context menu that appears when the user long-presses an entity.
 //
 // Three menu modes:
-//   .standard  → Add Movement | [Light Settings] | [Edit Material | Change Colour | Set Ratio] | Lock | [Duplicate] | Delete
-//   .camera    → Add Shot | Aspect Ratio | Lock | Delete
+//   .standard  → Add Movement | [Light Settings] | [Material tools] | Lock | Delete
+//   .camera    → Add Shot | Lock | Delete
 
 class EntityActionMenu: UIView {
 
@@ -17,7 +17,7 @@ class EntityActionMenu: UIView {
     enum ActionType {
         case move           // standard: add move animation
         case rotate         // standard: add rotate animation
-        case addMovement    // standard: open animation-type picker (Move / Rotate)
+        case addMovement    // standard: unified animation picker (Move / Rotate / Light)
         case changeColour   // standard: open color picker (walls/ground only)
         case editMaterial   // standard: open material editor (walls/ground only)
         case lightSettings  // standard: open light control panel (lights only)
@@ -30,8 +30,8 @@ class EntityActionMenu: UIView {
     }
 
     enum MenuMode {
-        case standard   // any non-camera entity
-        case camera     // SceneCamera entity
+        case standard   // any non-camera entity  →  Add Movement/Animations | Lock | Delete (+ contextual actions)
+        case camera     // SceneCamera entity     →  Add Shot | Lock | Delete
     }
 
     // ── Private state ────────────────────────────────────────────────────────
@@ -108,8 +108,8 @@ class EntityActionMenu: UIView {
         switch mode {
 
         case .standard:
-            // Add Movement | [Light Settings] | [Edit Material | Change Colour | Set Ratio] | Lock | [Duplicate] | Delete
-            addMenuButton(title: "Add Movement", action: .addMovement)
+            // Add Movement / Add Animations | [Edit Material] | [Change Colour] | Lock | Delete
+            addMenuButton(title: showLightOption ? "Add Animations" : "Add Movement", action: .addMovement)
             addSeparator()
             if showLightOption {
                 addMenuButton(title: "Light Settings", action: .lightSettings)

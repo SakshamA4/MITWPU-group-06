@@ -140,10 +140,13 @@ struct ShotDerived {
         // other tracks last — so clipID (the primary) is always position/dolly.
         let trackPriority: (AnimationTrack) -> Int = { track in
             switch track {
-            case .position: return 0
-            case .rotation: return 1
-            case .fov:      return 2
-            case .scale:    return 3
+            case .position:   return 0
+            case .rotation:   return 1
+            case .fov:        return 2
+            case .visibility: return 3
+            case .intensity:  return 4
+            case .color:      return 5
+            case .scale:      return 6
             }
         }
 
