@@ -130,6 +130,30 @@ enum CinemaAspectRatioPreset: String, Codable, CaseIterable, Identifiable {
         let h = w / ratio
         return CGSize(width: CGFloat(w), height: CGFloat(h))
     }
+
+    /// Shortened label for compact UI (e.g. HUD pills)
+    var shortName: String {
+        switch self {
+        case .anamorphicScope: return "2.39"
+        case .univisium:       return "2.00"
+        case .flat:            return "1.85"
+        case .hdWidescreen:    return "16:9"
+        case .imax:            return "1.43"
+        case .academy4x3:      return "4:3"
+        case .fullFrame:       return "1.33"
+        case .openGate:        return "OG"
+        case .seventyMM:       return "2.20"
+        case .ultraPanavision: return "2.76"
+        }
+    }
+
+    /// Alias used by the integration layer
+    var legacyCameraAspectRatio: CameraAspectRatio {
+        return legacyAspectRatio
+    }
+
+    /// Convenience alias: `.scope239` == `.anamorphicScope`
+    static let scope239 = CinemaAspectRatioPreset.anamorphicScope
 }
 
 // MARK: - Safe Area Guide
