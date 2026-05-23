@@ -91,7 +91,7 @@ extension CanvasViewController {
         cameraRoot.components.set(CineSensorComponent(cameraBodyID: body.id))
         cameraRoot.components.set(CineLensComponent(
             lensFamilyID: lens.id,
-            selectedFocalLength: initialFL
+            selectedFocalLengthMM: initialFL
         ))
         
         if let look = look {
@@ -104,7 +104,7 @@ extension CanvasViewController {
             }
         }
         
-        cameraRoot.components.set(CineMotionComponent(style: motionStyle))
+        cameraRoot.components.set(CineMotionComponent(motionStyle: motionStyle))
         cameraRoot.components.set(CineAspectRatioComponent(preset: aspectRatio))
         cameraRoot.components.set(CineFrameGuideComponent())
         cameraRoot.components.set(CinematicCameraTag())
@@ -184,7 +184,7 @@ extension CanvasViewController {
         let fl = focalLength ?? lens.defaultFocalLength
         camRoot.components.set(CineLensComponent(
             lensFamilyID: lens.id,
-            selectedFocalLength: fl
+            selectedFocalLengthMM: fl
         ))
         cinematicPipeline.configure(lensFamily: lens, focalLength: fl)
         updateCinemaFOV(on: camRoot, camera: activeCamera)
@@ -197,7 +197,7 @@ extension CanvasViewController {
         guard let camRoot = cameraToVisualMap[activeCamera],
               var lensComp = camRoot.components[CineLensComponent.self] else { return }
         
-        lensComp.selectedFocalLength = focalLength
+        lensComp.selectedFocalLengthMM = focalLength
         camRoot.components.set(lensComp)
         cinematicPipeline.configure(focalLength: focalLength)
         updateCinemaFOV(on: camRoot, camera: activeCamera)
@@ -239,7 +239,7 @@ extension CanvasViewController {
         guard let camRoot = cameraToVisualMap[activeCamera],
               camRoot.components[CinematicCameraTag.self] != nil else { return }
         
-        camRoot.components.set(CineMotionComponent(style: style))
+        camRoot.components.set(CineMotionComponent(motionStyle: style))
         cinematicPipeline.configure(motionStyle: style)
         
         print("🎬 Motion → \(style.rawValue)")

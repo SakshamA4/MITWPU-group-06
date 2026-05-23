@@ -96,9 +96,9 @@ extension CanvasViewController {
             CinematicLookDatabase.allLooks.first { $0.id == comp.lookID }
         }
         
-        let focalLength = lensComp?.selectedFocalLength ?? 50
+        let focalLength = lensComp?.selectedFocalLengthMM ?? 50
         let aspect = aspectComp?.preset ?? .anamorphicScope
-        let motion = motionComp?.style ?? .tripod
+        let motion = motionComp?.motionStyle ?? .tripod
         
         // Calculate FOV and crop factor
         let fovDegrees = activeCamera.camera.fieldOfViewInDegrees
@@ -139,7 +139,7 @@ extension CanvasViewController {
         let currentLens = lensComp.flatMap { comp in
             CinemaLensDatabase.allFamilies.first { $0.id == comp.lensFamilyID }
         }
-        let currentFL = lensComp?.selectedFocalLength ?? 50
+        let currentFL = lensComp?.selectedFocalLengthMM ?? 50
         
         let picker = CinemaLensPicker(currentLens: currentLens, currentFocalLength: currentFL)
         picker.onLensSelected = { [weak self] lens, fl in
