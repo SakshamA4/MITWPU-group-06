@@ -7,22 +7,22 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		19D87C592EED6FE9002FC9F8 /* FilmsPage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmsPage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		19D87C592EED6FE9002FC9F8 /* SceneWiz.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SceneWiz.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */ = {
+		19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "SceneWiz" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"3DCanvas/Canvasviewcontroller+archandledrag.swift",
 				Info.plist,
 			);
-			target = 19075A4A2ED4646D00B3A488 /* FilmsPage */;
+			target = 19075A4A2ED4646D00B3A488 /* SceneWiz */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */ = {
+		197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "SceneWiz" target */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = 19075A492ED4646D00B3A488 /* Resources */;
 			membershipExceptions = (
@@ -35,8 +35,8 @@
 		19075A4D2ED4646D00B3A488 /* FilmsPage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "FilmsPage" target */,
-				197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "FilmsPage" target */,
+				19075A5D2ED4646E00B3A488 /* Exceptions for "FilmsPage" folder in "SceneWiz" target */,
+				197ECC652F698354009E0454 /* Exceptions for "FilmsPage" folder in "Copy Bundle Resources" phase from "SceneWiz" target */,
 			);
 			path = FilmsPage;
 			sourceTree = "<group>";
@@ -58,16 +58,16 @@
 			isa = PBXGroup;
 			children = (
 				19075A4D2ED4646D00B3A488 /* FilmsPage */,
-				19D87C592EED6FE9002FC9F8 /* FilmsPage.app */,
+				19D87C592EED6FE9002FC9F8 /* SceneWiz.app */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		19075A4A2ED4646D00B3A488 /* FilmsPage */ = {
+		19075A4A2ED4646D00B3A488 /* SceneWiz */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 19075A5E2ED4646E00B3A488 /* Build configuration list for PBXNativeTarget "FilmsPage" */;
+			buildConfigurationList = 19075A5E2ED4646E00B3A488 /* Build configuration list for PBXNativeTarget "SceneWiz" */;
 			buildPhases = (
 				19075A472ED4646D00B3A488 /* Sources */,
 				19075A482ED4646D00B3A488 /* Frameworks */,
@@ -80,11 +80,11 @@
 			fileSystemSynchronizedGroups = (
 				19075A4D2ED4646D00B3A488 /* FilmsPage */,
 			);
-			name = FilmsPage;
+			name = SceneWiz;
 			packageProductDependencies = (
 			);
 			productName = FilmsPage;
-			productReference = 19D87C592EED6FE9002FC9F8 /* FilmsPage.app */;
+			productReference = 19D87C592EED6FE9002FC9F8 /* SceneWiz.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -116,7 +116,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				19075A4A2ED4646D00B3A488 /* FilmsPage */,
+				19075A4A2ED4646D00B3A488 /* SceneWiz */,
 			);
 		};
 /* End PBXProject section */
@@ -345,7 +345,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		19075A5E2ED4646E00B3A488 /* Build configuration list for PBXNativeTarget "FilmsPage" */ = {
+		19075A5E2ED4646E00B3A488 /* Build configuration list for PBXNativeTarget "SceneWiz" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				19075A5F2ED4646E00B3A488 /* Debug */,
