@@ -69,7 +69,6 @@ final class CinemaCameraBodyPicker: UIViewController {
         modalPresentationStyle = .pageSheet
         if let sheet = sheetPresentationController {
             sheet.detents = [.medium()]
-            sheet.prefersGrabberIndicator = false
             sheet.preferredCornerRadius = 24
         }
     }
@@ -305,15 +304,15 @@ private final class CameraBodyCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError() }
     
     func configure(camera: CinemaCameraBody, isSelected: Bool, accent: UIColor) {
-        nameLabel.text = camera.name
+        nameLabel.text = camera.modelName
         sensorLabel.text = camera.sensor.format.rawValue
         sensorLabel.textColor = isSelected ? accent : UIColor.white.withAlphaComponent(0.5)
         resLabel.text = "\(camera.nativeResolution.width)×\(camera.nativeResolution.height)"
-        drLabel.text = "\(camera.dynamicRange)+ stops DR"
+        drLabel.text = "\(camera.dynamicRangeStops)+ stops DR"
         
         sensorDiagram.configure(
-            width: camera.sensor.sensorWidth,
-            height: camera.sensor.sensorHeight,
+            width: camera.sensor.sensorWidthMM,
+            height: camera.sensor.sensorHeightMM,
             accent: isSelected ? accent : UIColor.white.withAlphaComponent(0.2)
         )
         

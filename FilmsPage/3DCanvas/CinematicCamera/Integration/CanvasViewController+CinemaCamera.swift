@@ -76,12 +76,12 @@ extension CanvasViewController {
         let cameraRoot = Entity()
         let cameraID = UUID()
         cameraCounter += 1
-        let displayName = "\(body.name) #\(cameraCounter)"
+        let displayName = "\(body.modelName) #\(cameraCounter)"
         
         cameraRoot.name = "SceneCameraRoot_\(sceneCameras.count)"
         cameraRoot.components.set(CategoryComponent(toolType: .camera))
         cameraRoot.components.set(EntityIDComponent(id: cameraID))
-        cameraRoot.components.set(CameraVisualComponent(modelName: "cam1", displayName: body.name))
+        cameraRoot.components.set(CameraVisualComponent(modelName: "cam1", displayName: body.modelName))
         
         // Map cinema aspect ratio to existing CameraAspectRatio system
         let legacyAspect = aspectRatio.legacyCameraAspectRatio
@@ -117,7 +117,7 @@ extension CanvasViewController {
         
         // Calculate physically accurate FOV from sensor + lens
         let fov = SensorSimulationEngine.shared.calculateHorizontalFOV(
-            sensorWidth: body.sensor.sensorWidth,
+            sensorWidth: body.sensor.sensorWidthMM,
             focalLength: initialFL
         )
         camera.camera.fieldOfViewInDegrees = fov
@@ -173,7 +173,7 @@ extension CanvasViewController {
         cinematicPipeline.configure(cameraBody: body)
         updateCinemaFOV(on: camRoot, camera: activeCamera)
         
-        print("🎬 Camera body → \(body.name)")
+        print("🎬 Camera body → \(body.modelName)")
     }
     
     /// Changes the lens family on the active cinema camera.
@@ -258,7 +258,7 @@ extension CanvasViewController {
         }
         
         let fov = SensorSimulationEngine.shared.calculateHorizontalFOV(
-            sensorWidth: body.sensor.sensorWidth,
+            sensorWidth: body.sensor.sensorWidthMM,
             focalLength: lensComp.selectedFocalLength
         )
         

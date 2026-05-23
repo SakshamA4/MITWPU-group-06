@@ -288,7 +288,7 @@ final class CinematicCameraHUD: UIView {
         cropFactor: Float
     ) {
         // Top bar
-        cameraNameLabel.text = cameraBody?.name.uppercased() ?? "CINEMA CAMERA"
+        cameraNameLabel.text = cameraBody?.modelName.uppercased() ?? "CINEMA CAMERA"
         sensorFormatLabel.text = cameraBody?.sensor.format.rawValue.uppercased() ?? "—"
         if let body = cameraBody {
             resolutionLabel.text = "\(body.nativeResolution.width)×\(body.nativeResolution.height)"

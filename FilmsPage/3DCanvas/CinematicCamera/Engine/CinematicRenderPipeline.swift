@@ -127,7 +127,7 @@ final class CinematicRenderPipeline {
         
         // Base FOV from sensor + focal length
         var fov = sensorEngine.calculateHorizontalFOV(
-            sensorWidth: sensor.sensorWidth,
+            sensorWidth: sensor.sensorWidthMM,
             focalLength: focalLength
         )
         
@@ -295,7 +295,7 @@ final class CinematicRenderPipeline {
             return CGRect(origin: .zero, size: viewportSize)
         }
         
-        let sensorAspect = body.sensor.sensorWidth / body.sensor.sensorHeight
+        let sensorAspect = body.sensor.sensorWidthMM / body.sensor.sensorHeightMM
         let targetAspect = currentConfig.aspectRatio.ratio
         
         return sensorEngine.calculateFramingRect(
@@ -307,7 +307,7 @@ final class CinematicRenderPipeline {
     
     /// Returns a human-readable summary of the current camera configuration.
     var configurationSummary: String {
-        let camera = currentConfig.cameraBody?.name ?? "No Camera"
+        let camera = currentConfig.cameraBody?.modelName ?? "No Camera"
         let lens = currentConfig.lensFamily?.name ?? "No Lens"
         let fl = String(format: "%.0fmm", currentConfig.focalLength)
         let look = currentConfig.look?.name ?? "No Look"
@@ -329,8 +329,8 @@ final class CinematicRenderPipeline {
         // Recalculate crop factor relative to full frame
         if let body = currentConfig.cameraBody {
             currentConfig.effectiveCropFactor = sensorEngine.calculateCropFactor(
-                sensorWidth: body.sensor.sensorWidth,
-                sensorHeight: body.sensor.sensorHeight
+                sensorWidth: body.sensor.sensorWidthMM,
+                sensorHeight: body.sensor.sensorHeightMM
             )
         }
     }

@@ -75,7 +75,6 @@ final class CinemaLensPicker: UIViewController {
         modalPresentationStyle = .pageSheet
         if let sheet = sheetPresentationController {
             sheet.detents = [.medium()]
-            sheet.prefersGrabberIndicator = false
             sheet.preferredCornerRadius = 24
         }
     }
