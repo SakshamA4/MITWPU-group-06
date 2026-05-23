@@ -24,6 +24,8 @@ class EntityActionMenu: UIView {
         case setRatio       // standard: open ratio lock input (walls/ground only)
         case addShot        // camera:   open shot/movement picker
         case aspectRatio    // camera:   open aspect ratio picker
+        case rename         // rename entity
+        case notes          // add/edit notes
         case lock
         case delete
         case duplicate      // duplicate the selected entity
@@ -123,6 +125,10 @@ class EntityActionMenu: UIView {
                 addMenuButton(title: "Set Ratio", action: .setRatio)
                 addSeparator()
             }
+            addMenuButton(title: "Rename", action: .rename)
+            addSeparator()
+            addMenuButton(title: "Notes", action: .notes)
+            addSeparator()
             addMenuButton(title: "Lock", action: .lock)
             if !isBackground {
                 addSeparator()
@@ -136,6 +142,10 @@ class EntityActionMenu: UIView {
             addMenuButton(title: "Add Shot", action: .addShot)
             addSeparator()
             addMenuButton(title: "Aspect Ratio", action: .aspectRatio)
+            addSeparator()
+            addMenuButton(title: "Rename", action: .rename)
+            addSeparator()
+            addMenuButton(title: "Notes", action: .notes)
             addSeparator()
             addMenuButton(title: "Lock", action: .lock)
             addSeparator()

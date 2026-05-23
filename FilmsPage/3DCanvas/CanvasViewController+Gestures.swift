@@ -449,6 +449,15 @@ extension CanvasViewController {
             case .aspectRatio:
                 menu.removeFromSuperview()
                 self.presentAspectRatioPicker(for: entity)
+
+            // ── Rename & Notes ────────────────────────────────────────────────
+            case .rename:
+                menu.removeFromSuperview()
+                self.presentRenameAlert(for: entity)
+            case .notes:
+                menu.removeFromSuperview()
+                self.presentNotesEditor(for: entity)
+
             case .lock:
                 let newState = !isCurrentlyLocked
                 var lockComp = entity.components[LockComponent.self] ?? LockComponent()
