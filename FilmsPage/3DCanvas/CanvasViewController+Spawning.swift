@@ -684,6 +684,26 @@ extension CanvasViewController {
         // ── Update gobo gate mask ────────────────────────────────────────────
         updateGoboGateMask(on: entity, config: config)
 
+        // ── Per-light on/off toggle ──────────────────────────────────────────
+        if !config.isEnabled {
+            // Remove the actual RealityKit light component
+            entity.findEntity(named: "LightCore")?.removeFromParent()
+            // Hide emissive visuals
+            entity.findEntity(named: "LanternBulb")?.isEnabled = false
+            entity.findEntity(named: "LanternGlowFallback")?.isEnabled = false
+            entity.findEntity(named: "ProceduralGlobe")?.isEnabled = false
+            entity.findEntity(named: "ProceduralFace")?.isEnabled = false
+            entity.findEntity(named: "GoboGate")?.isEnabled = false
+        } else if entity.findEntity(named: "LightCore") == nil {
+            // Light was previously off — re-attach with current config
+            attachLight(to: entity, config: config)
+            // Re-show emissive visuals
+            entity.findEntity(named: "LanternBulb")?.isEnabled = true
+            entity.findEntity(named: "LanternGlowFallback")?.isEnabled = true
+            entity.findEntity(named: "ProceduralGlobe")?.isEnabled = true
+            entity.findEntity(named: "ProceduralFace")?.isEnabled = true
+        }
+
         entity.components.set(config)
     }
 

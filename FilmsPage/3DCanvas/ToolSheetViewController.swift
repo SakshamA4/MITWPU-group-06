@@ -10,6 +10,38 @@ class ToolSheetViewController: UIViewController {
     private let collectionView: UICollectionView
     private var importCoordinator: PropImportCoordinator?
 
+    // ── Grip segment support (Light modal only) ──────────────────────────
+    private var segmentedControl: UISegmentedControl?
+    private var gripItems: [GripItem] = []
+    private let userDefaultsSegmentKey = "lightModalLastSegment"
+
+    /// Represents a single reflector or diffuser card in the Grip tab.
+    struct GripItem {
+        enum Kind {
+            case reflector(SceneReflectorType)
+            case diffuser(DiffuserType)
+        }
+        let kind: Kind
+        var displayName: String {
+            switch kind {
+            case .reflector(let t): return t.displayName
+            case .diffuser(let t):  return t.displayName
+            }
+        }
+        var iconName: String {
+            switch kind {
+            case .reflector(let t): return t.iconName
+            case .diffuser(let t):  return t.iconName
+            }
+        }
+        var swatchColor: UIColor {
+            switch kind {
+            case .reflector(let t): return t.swatchColor
+            case .diffuser(let t):  return t.swatchColor
+            }
+        }
+    }
+
     init(tool: ToolType, onSelect: @escaping (SpawnItem) -> Void) {
         self.tool = tool
         self.onSelect = onSelect
@@ -37,6 +69,12 @@ class ToolSheetViewController: UIViewController {
 
         setupTitle()
         setupCollection()
+
+        // Light tool: add Sources/Grip segmented control
+        if tool == .light {
+            buildGripItems()
+            setupSegmentedControl()
+        }
 
         // Show Plus button for Background and Prop tools
         if tool == .background || tool == .prop {
@@ -83,12 +121,60 @@ class ToolSheetViewController: UIViewController {
 
         view.addSubview(collectionView)
 
+        let collectionTop = (tool == .light)
+            ? titleLabel.bottomAnchor  // will be updated after segment control is added
+            : titleLabel.bottomAnchor
+
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            collectionView.topAnchor.constraint(equalTo: collectionTop, constant: tool == .light ? 60 : 20),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+    }
+
+    // MARK: - Grip / Segmented Control (Light modal only)
+
+    /// Builds the data source for the Grip tab.
+    private func buildGripItems() {
+        gripItems = SceneReflectorType.allCases.map { GripItem(kind: .reflector($0)) }
+                  + DiffuserType.allCases.map { GripItem(kind: .diffuser($0)) }
+    }
+
+    /// Adds a Sources / Grip segmented control between the title and collection view.
+    private func setupSegmentedControl() {
+        let sc = UISegmentedControl(items: ["Sources", "Grip"])
+        sc.translatesAutoresizingMaskIntoConstraints = false
+        sc.selectedSegmentTintColor = UIColor(red: 90/255, green: 130/255, blue: 255/255, alpha: 1)
+        sc.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        sc.setTitleTextAttributes([.foregroundColor: UIColor.lightGray], for: .normal)
+        sc.backgroundColor = UIColor(white: 0.15, alpha: 1)
+
+        // Restore last segment
+        let lastSegment = UserDefaults.standard.integer(forKey: userDefaultsSegmentKey)
+        sc.selectedSegmentIndex = min(lastSegment, 1)
+
+        sc.addTarget(self, action: #selector(segmentChanged(_:)), for: .valueChanged)
+        view.addSubview(sc)
+
+        NSLayoutConstraint.activate([
+            sc.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            sc.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            sc.widthAnchor.constraint(equalToConstant: 240),
+            sc.heightAnchor.constraint(equalToConstant: 32)
+        ])
+
+        segmentedControl = sc
+
+        // If restoring to Grip tab, reload immediately
+        if sc.selectedSegmentIndex == 1 {
+            collectionView.reloadData()
+        }
+    }
+
+    @objc private func segmentChanged(_ sender: UISegmentedControl) {
+        UserDefaults.standard.set(sender.selectedSegmentIndex, forKey: userDefaultsSegmentKey)
+        collectionView.reloadData()
     }
 
     func setupPlusButton() {
@@ -145,10 +231,18 @@ class ToolSheetViewController: UIViewController {
 extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if tool == .light, segmentedControl?.selectedSegmentIndex == 1 {
+            return gripItems.count
+        }
         return tool.items.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+
+        // Grip tab: use grip-specific cell
+        if tool == .light, segmentedControl?.selectedSegmentIndex == 1 {
+            return gripCell(for: indexPath, in: collectionView)
+        }
 
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ToolCell", for: indexPath) as? ToolCell else {
             return UICollectionViewCell()
@@ -165,7 +259,58 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
         return cell
     }
 
+    /// Cell for Grip tab items (reflectors/diffusers).
+    private func gripCell(for indexPath: IndexPath, in collectionView: UICollectionView) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ToolCell", for: indexPath) as! ToolCell
+        let grip = gripItems[indexPath.item]
+
+        // Re-use ToolCell but configure with grip-specific display
+        let fakeItem = SpawnItem(
+            title: grip.displayName,
+            imageName: grip.iconName,
+            modelFileName: ""
+        )
+        cell.configure(with: fakeItem)
+
+        // Override image with a colored swatch
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 120))
+        let swatchImage = renderer.image { ctx in
+            let rect = CGRect(origin: .zero, size: CGSize(width: 120, height: 120))
+            ctx.cgContext.setFillColor(UIColor(red: 11/255, green: 11/255, blue: 22/255, alpha: 1).cgColor)
+            ctx.cgContext.fill(rect)
+
+            // Draw swatch circle
+            let circleRect = rect.insetBy(dx: 25, dy: 25)
+            ctx.cgContext.setFillColor(grip.swatchColor.cgColor)
+            ctx.cgContext.fillEllipse(in: circleRect)
+
+            // Draw border
+            ctx.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.3).cgColor)
+            ctx.cgContext.setLineWidth(2)
+            ctx.cgContext.strokeEllipse(in: circleRect)
+        }
+        cell.imageView.image = swatchImage
+
+        return cell
+    }
+
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+
+        // Grip tab: spawn reflector or diffuser
+        if tool == .light, segmentedControl?.selectedSegmentIndex == 1 {
+            let grip = gripItems[indexPath.item]
+            // Capture VC reference before dismiss — presentingViewController is nil in completion
+            guard let canvasVC = self.presentingViewController as? CanvasViewController
+                    ?? (self.presentingViewController as? UINavigationController)?.viewControllers.first(where: { $0 is CanvasViewController }) as? CanvasViewController
+            else { return }
+            dismiss(animated: true) {
+                switch grip.kind {
+                case .reflector(let type): canvasVC.spawnReflector(type: type)
+                case .diffuser(let type):  canvasVC.spawnDiffuser(type: type)
+                }
+            }
+            return
+        }
 
         let item = tool.items[indexPath.item]
 

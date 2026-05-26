@@ -33,6 +33,8 @@ class LightControlPanelViewController: UIViewController {
     private var goboButtons: [UIButton] = []
     private let colorWell         = UIColorWell()
     private let colorSection      = UIStackView()
+    private let enableSwitch      = UISwitch()
+    private let enableLabel       = UILabel()
 
     // Section containers (for conditional hiding)
     private let coneSection      = UIStackView()
@@ -40,6 +42,9 @@ class LightControlPanelViewController: UIViewController {
     private let reflectorSection = UIStackView()
     private let diffuserSection  = UIStackView()
     private let goboSection      = UIStackView()
+
+    /// Container for all controls below the on/off switch — used to batch-dim when light is off.
+    private let controlsContainer = UIStackView()
 
     // Accent color used throughout
     private let accent = UIColor(red: 90/255, green: 130/255, blue: 255/255, alpha: 1)
@@ -114,21 +119,49 @@ class LightControlPanelViewController: UIViewController {
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20)
         ])
 
+        // ── Light On/Off Toggle ─────────────────────────────────────────
+        let enableSection = UIStackView()
+        enableSection.axis = .horizontal
+        enableSection.spacing = 12
+        enableSection.alignment = .center
+
+        enableLabel.text = config.isEnabled ? "Light On" : "Light Off"
+        enableLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        enableLabel.textColor = config.isEnabled ? .white : UIColor(white: 0.5, alpha: 1)
+        enableSection.addArrangedSubview(enableLabel)
+        enableSection.addArrangedSubview(UIView()) // spacer
+        enableSwitch.onTintColor = accent
+        enableSwitch.isOn = config.isEnabled
+        enableSwitch.addTarget(self, action: #selector(enableToggled), for: .valueChanged)
+        enableSection.addArrangedSubview(enableSwitch)
+        contentStack.addArrangedSubview(enableSection)
+
+        // Thin separator
+        let separator = UIView()
+        separator.backgroundColor = UIColor(white: 0.2, alpha: 1)
+        separator.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        contentStack.addArrangedSubview(separator)
+
+        // ── All other controls go into controlsContainer ────────────────
+        controlsContainer.axis = .vertical
+        controlsContainer.spacing = 20
+        contentStack.addArrangedSubview(controlsContainer)
+
         // ── Intensity ───────────────────────────────────────────────────
-        contentStack.addArrangedSubview(buildSliderSection(
+        controlsContainer.addArrangedSubview(buildSliderSection(
             title: "INTENSITY", slider: intensitySlider, valueLabel: intensityLabel,
             minValue: 0, maxValue: 1, action: #selector(intensityChanged)))
 
         // ── Color Temperature ───────────────────────────────────────────
-        contentStack.addArrangedSubview(buildKelvinSection())
+        controlsContainer.addArrangedSubview(buildKelvinSection())
 
         // ── Custom Color ────────────────────────────────────────────────
         buildColorSection()
-        contentStack.addArrangedSubview(colorSection)
+        controlsContainer.addArrangedSubview(colorSection)
 
         // ── Reflector Type (spot only) ──────────────────────────────────
         buildReflectorSection()
-        contentStack.addArrangedSubview(reflectorSection)
+        controlsContainer.addArrangedSubview(reflectorSection)
         reflectorSection.isHidden = (config.lightKind != .spot)
 
         // ── Cone Angle (spot + panel) ───────────────────────────────────
@@ -140,20 +173,20 @@ class LightControlPanelViewController: UIViewController {
         coneSection.addArrangedSubview(buildSliderSection(
             title: "OUTER ANGLE", slider: outerAngleSlider, valueLabel: outerAngleLabel,
             minValue: 5, maxValue: 120, action: #selector(outerAngleChanged)))
-        contentStack.addArrangedSubview(coneSection)
+        controlsContainer.addArrangedSubview(coneSection)
         coneSection.isHidden = (config.lightKind == .point)
 
         // ── Diffusion (spot + panel, mapped differently for point) ──────
         buildDiffuserSection()
-        contentStack.addArrangedSubview(diffuserSection)
+        controlsContainer.addArrangedSubview(diffuserSection)
 
         // ── Gobo (spot only) ────────────────────────────────────────────
         buildGoboSection()
-        contentStack.addArrangedSubview(goboSection)
+        controlsContainer.addArrangedSubview(goboSection)
         goboSection.isHidden = (config.lightKind == .point)
 
         // ── Reach ───────────────────────────────────────────────────────
-        contentStack.addArrangedSubview(buildSliderSection(
+        controlsContainer.addArrangedSubview(buildSliderSection(
             title: "REACH", slider: reachSlider, valueLabel: reachLabel,
             minValue: 1, maxValue: 8, action: #selector(reachChanged)))
 
@@ -170,8 +203,11 @@ class LightControlPanelViewController: UIViewController {
         shadowToggle.onTintColor = accent
         shadowToggle.addTarget(self, action: #selector(shadowToggled), for: .valueChanged)
         shadowSection.addArrangedSubview(shadowToggle)
-        contentStack.addArrangedSubview(shadowSection)
+        controlsContainer.addArrangedSubview(shadowSection)
         shadowSection.isHidden = (config.lightKind != .spot)
+
+        // Apply initial enabled/disabled state
+        updateControlsEnabledState()
     }
 
     // MARK: - Header
@@ -594,6 +630,22 @@ class LightControlPanelViewController: UIViewController {
 
     @objc private func doneTapped() {
         dismiss(animated: true)
+    }
+
+    @objc private func enableToggled() {
+        config.isEnabled = enableSwitch.isOn
+        enableLabel.text = config.isEnabled ? "Light On" : "Light Off"
+        enableLabel.textColor = config.isEnabled ? .white : UIColor(white: 0.5, alpha: 1)
+        updateControlsEnabledState()
+        onUpdate(config)
+    }
+
+    /// Dims and disables all controls when the light is off so the user can see
+    /// current settings without accidentally changing them.
+    private func updateControlsEnabledState() {
+        let enabled = config.isEnabled
+        controlsContainer.alpha = enabled ? 1.0 : 0.4
+        controlsContainer.isUserInteractionEnabled = enabled
     }
 
     // MARK: - Color Section

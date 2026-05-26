@@ -26,6 +26,7 @@ struct LightConfigComponent: Component, Codable {
     var activeGobo: GoboPattern = .none
     var diffuserAmount: Float = 0.0     // 0.0 = hard edge, 1.0 = full silk
     var proceduralKind: ProceduralLightKind?  // non-nil for procedural lights
+    var isEnabled: Bool = true               // per-light on/off toggle
 
     // ── Custom color (optional — overrides Kelvin when set) ─────────────
     var customColorR: Float?
@@ -93,6 +94,7 @@ struct LightConfigComponent: Component, Codable {
         case reflectorType, activeGobo, diffuserAmount
         case proceduralKind
         case customColorR, customColorG, customColorB, customColorA
+        case isEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -114,6 +116,7 @@ struct LightConfigComponent: Component, Codable {
         customColorG   = try c.decodeIfPresent(Float.self, forKey: .customColorG)
         customColorB   = try c.decodeIfPresent(Float.self, forKey: .customColorB)
         customColorA   = try c.decodeIfPresent(Float.self, forKey: .customColorA)
+        isEnabled      = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 
     init(lightKind: LightKind, intensity: Float, colorTemperatureKelvin: Float,
@@ -126,7 +129,8 @@ struct LightConfigComponent: Component, Codable {
          customColorR: Float? = nil,
          customColorG: Float? = nil,
          customColorB: Float? = nil,
-         customColorA: Float? = nil) {
+         customColorA: Float? = nil,
+         isEnabled: Bool = true) {
         self.lightKind = lightKind
         self.intensity = intensity
         self.colorTemperatureKelvin = colorTemperatureKelvin
@@ -143,6 +147,7 @@ struct LightConfigComponent: Component, Codable {
         self.customColorG = customColorG
         self.customColorB = customColorB
         self.customColorA = customColorA
+        self.isEnabled = isEnabled
     }
 }
 

@@ -109,6 +109,12 @@ struct EntityRecord: Codable {
     var aspectRatioHeight: Float?
     /// Entity lock state. nil or false = unlocked.
     var isLocked: Bool?
+    /// Scene reflector type (physical reflector prop). nil for non-reflector entities.
+    var sceneReflectorType: String?
+    /// Diffuser type (physical diffuser prop). nil for non-diffuser entities.
+    var diffuserType: String?
+    /// Per-light on/off state. nil or true = enabled (default).
+    var lightIsEnabled: Bool?
 }
 
 // MARK: - AnimationClipRecord
@@ -439,7 +445,10 @@ final class ScenePersistenceService {
                  cameraFocusDistance: cameraFocusDistance,
                  aspectRatioWidth: aspectRatioWidth,
                  aspectRatioHeight: aspectRatioHeight,
-                 isLocked: entity.components[LockComponent.self]?.isLocked == true ? true : nil
+                 isLocked: entity.components[LockComponent.self]?.isLocked == true ? true : nil,
+                 sceneReflectorType: entity.components[SceneReflectorComponent.self]?.type.rawValue,
+                 diffuserType: entity.components[DiffuserComponent.self]?.type.rawValue,
+                 lightIsEnabled: entity.components[LightConfigComponent.self]?.isEnabled
              ))
         }
 
@@ -1174,6 +1183,39 @@ final class ScenePersistenceService {
             anchor.addChild(e)
             return
         }
+        // ── Scene Reflector prop (procedural — no .usdz) ──────────────────────
+        if let reflectorRaw = record.sceneReflectorType,
+           let reflectorType = SceneReflectorType(rawValue: reflectorRaw) {
+            let entity = buildReflectorEntity(type: reflectorType)
+            entity.name = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                entity.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
+            entity.components.set(CategoryComponent(toolType: .prop))
+            entity.components.set(InputTargetComponent())
+            entity.generateCollisionShapes(recursive: true)
+            entity.transform = t
+            anchor.addChild(entity)
+            print("✅ Restored scene reflector: \(record.name) (\(reflectorRaw))")
+            return
+        }
+
+        // ── Diffuser prop (procedural — no .usdz) ────────────────────────────
+        if let diffuserRaw = record.diffuserType,
+           let diffuserTypeVal = DiffuserType(rawValue: diffuserRaw) {
+            let entity = buildDiffuserEntity(type: diffuserTypeVal)
+            entity.name = record.name
+            if let savedID = record.id, let uuid = UUID(uuidString: savedID) {
+                entity.components.set(CanvasViewController.EntityIDComponent(id: uuid))
+            }
+            entity.components.set(CategoryComponent(toolType: .prop))
+            entity.components.set(InputTargetComponent())
+            entity.generateCollisionShapes(recursive: true)
+            entity.transform = t
+            anchor.addChild(entity)
+            print("✅ Restored diffuser: \(record.name) (\(diffuserRaw))")
+            return
+        }
 
         // ── Procedural light (no .usdz — rebuild geometry from primitives) ────
         if let procKindRaw = record.proceduralLightKind,
@@ -1207,9 +1249,14 @@ final class ScenePersistenceService {
                     customColorR: record.lightCustomColorR,
                     customColorG: record.lightCustomColorG,
                     customColorB: record.lightCustomColorB,
-                    customColorA: record.lightCustomColorA
+                    customColorA: record.lightCustomColorA,
+                    isEnabled: record.lightIsEnabled ?? true
                 )
                 vc.attachLight(to: entity, config: config)
+                // If light was saved as disabled, apply the off state
+                if !(record.lightIsEnabled ?? true) {
+                    vc.updateLightProperties(for: entity, config: config)
+                }
             }
 
             entity.transform = t
@@ -1266,9 +1313,14 @@ final class ScenePersistenceService {
                     customColorR: record.lightCustomColorR,
                     customColorG: record.lightCustomColorG,
                     customColorB: record.lightCustomColorB,
-                    customColorA: record.lightCustomColorA
+                    customColorA: record.lightCustomColorA,
+                    isEnabled: record.lightIsEnabled ?? true
                 )
                 vc.attachLight(to: entity, config: config)
+                // If light was saved as disabled, apply the off state
+                if !(record.lightIsEnabled ?? true) {
+                    vc.updateLightProperties(for: entity, config: config)
+                }
             } else if let lightItem = LightsDataStore.find(byModelFileName: record.modelFileName) {
                 // Fallback for scenes saved before this update — no lightKind in JSON
                 let config = LightConfigComponent.from(lightItem.defaultConfig, kind: lightItem.lightKind)
