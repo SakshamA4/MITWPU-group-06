@@ -54,7 +54,7 @@ enum CinematicKeyframeProperty: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Interpolation
 
-enum CinematicInterpolation: String, Codable, CaseIterable {
+enum CinematicInterpolation: String, Codable, CaseIterable, Hashable {
     case linear = "Linear"
     case smooth = "Smooth"
     case step   = "Step"
@@ -89,7 +89,7 @@ struct CinematicKeyframe: Codable, Hashable, Identifiable {
 
 // MARK: - Timeline Track
 
-struct CinematicTimelineTrack: Codable, Identifiable {
+struct CinematicTimelineTrack: Codable, Identifiable, Hashable {
     let id: String
     let property: CinematicKeyframeProperty
     var keyframes: [CinematicKeyframe]
@@ -164,7 +164,7 @@ final class CinematicTimelineEvaluator {
                 focus.focusDistance = value
                 cameraRoot.components.set(focus)
             case .lookIntensity:
-                pipeline.configure(lookIntensity: value)
+                break // Look intensity not yet supported by pipeline.configure()
             case .motionIntensity:
                 if var motion = cameraRoot.components[CineMotionComponent.self] {
                     motion.intensityMultiplier = value

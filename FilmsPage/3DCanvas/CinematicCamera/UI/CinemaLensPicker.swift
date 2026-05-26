@@ -211,7 +211,7 @@ final class CinemaLensPicker: UIViewController {
     private func updateBrandInfo() {
         guard selectedFamilyIndex < allLensFamilies.count else { return }
         let family = allLensFamilies[selectedFamilyIndex]
-        brandLabel.text = family.name
+        brandLabel.text = family.displayName
         
         let anamorphic = family.anamorphicMode.isAnamorphic
             ? " • Anamorphic \(family.anamorphicMode.squeezeRatio)×"
@@ -224,7 +224,7 @@ final class CinemaLensPicker: UIViewController {
         
         // Select current focal length
         let family = allLensFamilies[selectedFamilyIndex]
-        if let idx = family.focalLengths.firstIndex(where: { $0.focalLength == selectedFocalLength }) {
+        if let idx = family.focalLengths.firstIndex(where: { $0.focalLengthMM == selectedFocalLength }) {
             let indexPath = IndexPath(item: idx, section: 0)
             focalWheelCollectionView.selectItem(at: indexPath, animated: true, scrollPosition: .centeredHorizontally)
         }
@@ -257,8 +257,8 @@ extension CinemaLensPicker: UICollectionViewDataSource, UICollectionViewDelegate
         } else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "FocalCell", for: indexPath) as! FocalLengthCell
             let fl = currentFamily.focalLengths[indexPath.item]
-            let isSelected = fl.focalLength == selectedFocalLength
-            cell.configure(focalLength: fl.focalLength, isSelected: isSelected, accent: accentColor)
+            let isSelected = fl.focalLengthMM == selectedFocalLength
+            cell.configure(focalLength: fl.focalLengthMM, isSelected: isSelected, accent: accentColor)
             return cell
         }
     }
@@ -267,7 +267,7 @@ extension CinemaLensPicker: UICollectionViewDataSource, UICollectionViewDelegate
         if collectionView.tag == 100 {
             selectedFamilyIndex = indexPath.item
             let family = allLensFamilies[selectedFamilyIndex]
-            selectedFocalLength = family.defaultFocalLength
+            selectedFocalLength = family.defaultFocalLength.focalLengthMM
             
             familyCollectionView.reloadData()
             updateBrandInfo()
@@ -278,7 +278,7 @@ extension CinemaLensPicker: UICollectionViewDataSource, UICollectionViewDelegate
             onLensSelected?(family, selectedFocalLength)
         } else {
             let fl = currentFamily.focalLengths[indexPath.item]
-            selectedFocalLength = fl.focalLength
+            selectedFocalLength = fl.focalLengthMM
             focalReadout.text = "\(Int(selectedFocalLength))mm"
             focalWheelCollectionView.reloadData()
             
@@ -356,7 +356,7 @@ private final class LensFamilyCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError() }
     
     func configure(family: CinemaLensFamily, isSelected: Bool, accent: UIColor) {
-        nameLabel.text = family.name
+        nameLabel.text = family.displayName
         brandLabel.text = family.brand.rawValue
         brandLabel.textColor = isSelected ? accent.withAlphaComponent(0.8) : UIColor.white.withAlphaComponent(0.4)
         

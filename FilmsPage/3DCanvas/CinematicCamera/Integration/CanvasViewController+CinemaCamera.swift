@@ -70,7 +70,7 @@ extension CanvasViewController {
         }
         
         // Determine initial focal length
-        let initialFL = focalLength ?? lens.defaultFocalLength
+        let initialFL = focalLength ?? lens.defaultFocalLength.focalLengthMM
         
         // Create camera root entity
         let cameraRoot = Entity()
@@ -116,9 +116,9 @@ extension CanvasViewController {
         camera.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
         
         // Calculate physically accurate FOV from sensor + lens
-        let fov = SensorSimulationEngine.shared.calculateHorizontalFOV(
-            sensorWidth: body.sensor.sensorWidthMM,
-            focalLength: initialFL
+        let fov = SensorSimulationEngine.shared.horizontalFOV(
+            sensorWidthMM: body.sensor.sensorWidthMM,
+            focalLengthMM: initialFL
         )
         camera.camera.fieldOfViewInDegrees = fov
         
@@ -159,7 +159,7 @@ extension CanvasViewController {
             aspectRatio: aspectRatio
         )
         
-        print("🎬 Spawned cinema camera: \(displayName) — \(body.sensor.format.rawValue), \(lens.name) \(initialFL)mm")
+        print("🎬 Spawned cinema camera: \(displayName) — \(body.sensor.format.rawValue), \(lens.displayName) \(initialFL)mm")
     }
     
     // MARK: - Runtime Configuration Updates
@@ -181,7 +181,7 @@ extension CanvasViewController {
         guard let camRoot = cameraToVisualMap[activeCamera],
               camRoot.components[CinematicCameraTag.self] != nil else { return }
         
-        let fl = focalLength ?? lens.defaultFocalLength
+        let fl = focalLength ?? lens.defaultFocalLength.focalLengthMM
         camRoot.components.set(CineLensComponent(
             lensFamilyID: lens.id,
             selectedFocalLengthMM: fl
@@ -189,7 +189,7 @@ extension CanvasViewController {
         cinematicPipeline.configure(lensFamily: lens, focalLength: fl)
         updateCinemaFOV(on: camRoot, camera: activeCamera)
         
-        print("🎬 Lens → \(lens.name) \(fl)mm")
+        print("🎬 Lens → \(lens.displayName) \(fl)mm")
     }
     
     /// Changes the focal length on the active cinema camera.
@@ -257,16 +257,16 @@ extension CanvasViewController {
             return
         }
         
-        let fov = SensorSimulationEngine.shared.calculateHorizontalFOV(
-            sensorWidth: body.sensor.sensorWidthMM,
-            focalLength: lensComp.selectedFocalLength
+        let fov = SensorSimulationEngine.shared.horizontalFOV(
+            sensorWidthMM: body.sensor.sensorWidthMM,
+            focalLengthMM: lensComp.selectedFocalLengthMM
         )
         
         camera.camera.fieldOfViewInDegrees = fov
         
         // Update the CameraFocusComponent focal length for the HUD display
         var focusComp = cameraRoot.components[CameraFocusComponent.self] ?? CameraFocusComponent()
-        focusComp.focalLengthMM = lensComp.selectedFocalLength
+        focusComp.focalLengthMM = lensComp.selectedFocalLengthMM
         cameraRoot.components.set(focusComp)
     }
     

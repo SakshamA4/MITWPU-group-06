@@ -41,7 +41,7 @@ enum CinemaCameraPresetLibrary {
             cameras.first { $0.modelName.contains(name) } ?? cameras[0]
         }
         func lens(_ name: String) -> CinemaLensFamily {
-            lenses.first { $0.name.contains(name) } ?? lenses[0]
+            lenses.first { $0.displayName.contains(name) } ?? lenses[0]
         }
         func look(_ name: String) -> CinematicLook? {
             looks.first { $0.name.contains(name) }
@@ -69,7 +69,7 @@ enum CinemaCameraPresetLibrary {
                 lens: lens("Zeiss"),
                 focalLength: 50,
                 look: look("Clean"),
-                motionStyle: .handheldNatural,
+                motionStyle: .handheld,
                 aspectRatio: .hdWidescreen
             ),
             CinemaCameraPreset(

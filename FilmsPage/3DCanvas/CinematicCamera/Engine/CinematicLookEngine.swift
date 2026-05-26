@@ -81,19 +81,21 @@ final class CinematicLookEngine {
         // 3. Highlight rolloff
         result = applyHighlightRolloff(result, amount: look.highlightRolloff)
         
-        // 4. Shadow lift
+        // 4. Shadow liftKKK
         result = applyShadowLift(result, amount: look.shadowLift)
         
         // 5. Saturation
         result = applySaturation(result, amount: look.saturation)
         
         // 6. Split toning
+        let hlStrength = max(look.highlightTintR, max(look.highlightTintG, look.highlightTintB))
+        let shStrength = max(look.shadowTintR, max(look.shadowTintG, look.shadowTintB))
         result = applySplitToning(
             result,
-            highlightColor: look.highlightTintColor,
-            shadowColor: look.shadowTintColor,
-            highlightStrength: look.highlightTintStrength,
-            shadowStrength: look.shadowTintStrength
+            highlightColor: CIColor(red: CGFloat(look.highlightTintR), green: CGFloat(look.highlightTintG), blue: CGFloat(look.highlightTintB)),
+            shadowColor: CIColor(red: CGFloat(look.shadowTintR), green: CGFloat(look.shadowTintG), blue: CGFloat(look.shadowTintB)),
+            highlightStrength: hlStrength,
+            shadowStrength: shStrength
         )
         
         // 7. LUT application (if provided)
@@ -170,7 +172,7 @@ final class CinematicLookEngine {
         // Use highlight/shadow adjust for soft rolloff
         let filter = CIFilter.highlightShadowAdjust()
         filter.inputImage = image
-        filter.highlightAmount = CGFloat(1.0 - amount * 0.6)
+        filter.highlightAmount = 1.0 - amount * 0.6
         filter.shadowAmount = 0.0
         
         return filter.outputImage ?? image
@@ -205,7 +207,7 @@ final class CinematicLookEngine {
         
         let filter = CIFilter.colorControls()
         filter.inputImage = image
-        filter.saturation = CGFloat(amount)
+        filter.saturation = amount
         filter.brightness = 0
         filter.contrast = 1
         
@@ -304,13 +306,14 @@ final class CinematicLookEngine {
         to: CinematicLook,
         progress: Float
     ) -> CinematicLook {
-        let t = simd_clamp(progress, 0, 1)
+        let t = max(0.0, min(1.0, progress))
         let inv = 1.0 - t
         
         return CinematicLook(
             id: to.id,
             name: t < 0.5 ? from.name : to.name,
             category: to.category,
+            character: t < 0.5 ? from.character : to.character,
             warmth: from.warmth * inv + to.warmth * t,
             tint: from.tint * inv + to.tint * t,
             saturation: from.saturation * inv + to.saturation * t,
@@ -321,11 +324,13 @@ final class CinematicLookEngine {
             halationIntensity: from.halationIntensity * inv + to.halationIntensity * t,
             grainIntensity: from.grainIntensity * inv + to.grainIntensity * t,
             grainSize: from.grainSize * inv + to.grainSize * t,
-            highlightTintColor: interpolateColor(from.highlightTintColor, to.highlightTintColor, t: t),
-            highlightTintStrength: from.highlightTintStrength * inv + to.highlightTintStrength * t,
-            shadowTintColor: interpolateColor(from.shadowTintColor, to.shadowTintColor, t: t),
-            shadowTintStrength: from.shadowTintStrength * inv + to.shadowTintStrength * t,
-            lutFile: t < 0.5 ? from.lutFile : to.lutFile,
+            shadowTintR: from.shadowTintR * inv + to.shadowTintR * t,
+            shadowTintG: from.shadowTintG * inv + to.shadowTintG * t,
+            shadowTintB: from.shadowTintB * inv + to.shadowTintB * t,
+            highlightTintR: from.highlightTintR * inv + to.highlightTintR * t,
+            highlightTintG: from.highlightTintG * inv + to.highlightTintG * t,
+            highlightTintB: from.highlightTintB * inv + to.highlightTintB * t,
+            lutFileReference: t < 0.5 ? from.lutFileReference : to.lutFileReference,
             lutIntensity: from.lutIntensity * inv + to.lutIntensity * t
         )
     }
@@ -402,7 +407,7 @@ final class CinematicLookEngine {
         let filter = CIFilter.dissolveTransition()
         filter.inputImage = base
         filter.targetImage = overlay
-        filter.time = CGFloat(amount)
+        filter.time = amount
         return filter.outputImage ?? overlay
     }
     

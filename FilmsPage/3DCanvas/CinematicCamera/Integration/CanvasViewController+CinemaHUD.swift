@@ -11,6 +11,7 @@
 
 import UIKit
 import RealityKit
+import UniformTypeIdentifiers
 
 // MARK: - CanvasViewController + Cinema HUD
 
@@ -159,8 +160,8 @@ extension CanvasViewController {
             self?.setCinemaLook(look, animated: true)
             self?.refreshCinemaHUD()
         }
-        picker.onIntensityChanged = { [weak self] intensity in
-            self?.cinematicPipeline.configure(lookIntensity: intensity)
+        picker.onIntensityChanged = { _ in
+            // Look intensity adjustment reserved for future pipeline support
         }
         picker.onImportLUT = { [weak self] in
             self?.presentLUTImporter()
@@ -193,12 +194,12 @@ extension CanvasViewController {
     
     /// Cycles through motion styles on tap (no picker — just rotates).
     private func cycleMotionStyle() {
-        let styles: [CameraMotionStyle] = [.tripod, .handheldNatural, .handheldHeavy,
+        let styles: [CameraMotionStyle] = [.tripod, .handheld, .documentary,
                                             .steadicam, .dolly, .crane,
-                                            .vehicleMount, .shoulderRig]
+                                            .drone, .shoulderRig]
         
         guard let camRoot = cameraToVisualMap[activeCamera],
-              let current = camRoot.components[CineMotionComponent.self]?.style,
+              let current = camRoot.components[CineMotionComponent.self]?.motionStyle,
               let idx = styles.firstIndex(of: current) else { return }
         
         let nextIdx = (idx + 1) % styles.count
