@@ -515,6 +515,10 @@ extension CanvasViewController {
                 },
                 for: .touchUpInside
             )
+            // Tag the Props button for the onboarding spotlight (Step 8)
+            if tool == .prop {
+                btn.accessibilityIdentifier = "onb_propsToolButton"
+            }
             toolbar.addArrangedSubview(btn)
         }
 
@@ -561,6 +565,8 @@ extension CanvasViewController {
         rotateBtn.backgroundColor = .systemBlue
         rotateBtn.layer.cornerRadius = 22
         rotateBtn.translatesAutoresizingMaskIntoConstraints = false
+        // Tag for onboarding spotlight (Step 9 — move/rotate toggle)
+        rotateBtn.accessibilityIdentifier = "onb_rotateMoveButton"
 
         rotateBtn.addAction(
             UIAction { _ in

@@ -46,6 +46,16 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         refreshData() // Initial load
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Notify the onboarding manager that the Home screen is visible.
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "home"]
+        )
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
@@ -93,6 +103,9 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         collectionView.collectionViewLayout = createCompositionalLayout()
         collectionView.delegate = self
         collectionView.dataSource = self
+
+        // Tag for onboarding spotlight
+        collectionView.accessibilityIdentifier = "onb_homeTemplatesGrid"
     }
 
     private func setupObservers() {

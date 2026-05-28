@@ -73,6 +73,16 @@ class MyFilmViewController: UIViewController {
         setupReportButton()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Notify the onboarding manager that MyFilm screen is visible.
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "myFilm"]
+        )
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
@@ -209,6 +219,8 @@ extension MyFilmViewController: UICollectionViewDataSource {
             cell.onPlusButtonTapped = { [weak self] in
                 self?.performSegue(withIdentifier: "AddNewSequenceSegue", sender: nil)
             }
+            // Tag for onboarding spotlight (Step 4)
+            cell.accessibilityIdentifier = "onb_addSequenceButton"
             return cell
         }
 

@@ -710,6 +710,14 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+
+        // Notify the onboarding manager that the Canvas is visible (Steps 8–10).
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "canvas"]
+        )
+
         // In export mode, the coordinator loads scenes explicitly.
         guard !isExportMode else { return }
         // Defer scene load until the view is fully on screen.

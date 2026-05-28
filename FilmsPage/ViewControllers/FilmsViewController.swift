@@ -79,6 +79,9 @@ class FilmsViewController: UIViewController {
         collectionView.alwaysBounceVertical = true
 
         collectionView.reloadData()
+
+        // Tag the Films tab item so the onboarding spotlight can find it (Step 2)
+        tabBarItem.accessibilityIdentifier = "onb_filmsTabItem"
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -88,6 +91,16 @@ class FilmsViewController: UIViewController {
         // Always hide search bar and show search button when view appears
         navigationItem.searchController = nil
         navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Notify the onboarding manager that the Films screen is visible.
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "films"]
+        )
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -302,6 +315,8 @@ extension FilmsViewController: UICollectionViewDataSource, UICollectionViewDeleg
             cell.onPlusButtonTapped = { [weak self] in
                 self?.performSegue(withIdentifier: "addFilmSegue", sender: nil)
             }
+            // Tag for onboarding spotlight (Step 3 — Add Film button)
+            cell.accessibilityIdentifier = "onb_addFilmButton"
             return cell
         }
 

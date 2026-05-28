@@ -28,6 +28,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 self.window?.rootViewController = rootVC
                 self.window?.makeKeyAndVisible()
 
+                // ── First-launch onboarding walkthrough ──────────────────────
+                if let window = self.window {
+                    OnboardingManager.shared.startIfNeeded(from: window)
+                }
+
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

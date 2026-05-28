@@ -76,6 +76,11 @@ class ToolSheetViewController: UIViewController {
             setupSegmentedControl()
         }
 
+        // Sky tool: add "No Sky" button
+        if tool == .sky {
+            setupNoSkyButton()
+        }
+
         // Show Plus button for Background and Prop tools
         if tool == .background || tool == .prop {
             setupPlusButton()
@@ -121,15 +126,58 @@ class ToolSheetViewController: UIViewController {
 
         view.addSubview(collectionView)
 
-        let collectionTop = (tool == .light)
-            ? titleLabel.bottomAnchor  // will be updated after segment control is added
-            : titleLabel.bottomAnchor
+        // Offset the collection view top based on tool:
+        //  - .light  → 60pt (segment control)
+        //  - .sky    → 70pt ("No Sky" button)
+        //  - others  → 20pt
+        let topOffset: CGFloat = {
+            if tool == .light { return 60 }
+            if tool == .sky   { return 70 }
+            return 20
+        }()
 
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: collectionTop, constant: tool == .light ? 60 : 20),
+            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: topOffset),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
+    // MARK: - No Sky Button (Sky tool only)
+
+    private func setupNoSkyButton() {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+
+        // Icon + title
+        var config = UIButton.Configuration.filled()
+        config.title = "No Sky"
+        config.image = UIImage(systemName: "xmark.circle.fill")
+        config.imagePadding = 8
+        config.imagePlacement = .leading
+        config.baseForegroundColor = .white
+        config.baseBackgroundColor = UIColor(red: 50/255, green: 50/255, blue: 70/255, alpha: 1)
+        config.cornerStyle = .medium
+        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        button.configuration = config
+
+        button.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            // Find the canvas VC behind this sheet
+            let canvasVC = self.presentingViewController as? CanvasViewController
+                ?? (self.presentingViewController as? UINavigationController)?
+                    .viewControllers.first(where: { $0 is CanvasViewController }) as? CanvasViewController
+            self.dismiss(animated: true) {
+                canvasVC?.removeSky()
+            }
+        }, for: .touchUpInside)
+
+        view.addSubview(button)
+
+        NSLayoutConstraint.activate([
+            button.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            button.centerXAnchor.constraint(equalTo: view.centerXAnchor)
         ])
     }
 

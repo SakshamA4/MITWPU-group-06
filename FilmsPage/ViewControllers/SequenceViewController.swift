@@ -249,6 +249,16 @@ class SequenceViewController: UIViewController {
         restoreBarButtons()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Notify the onboarding manager that Sequence screen is visible.
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "sequence"]
+        )
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
@@ -308,6 +318,8 @@ extension SequenceViewController: UICollectionViewDataSource {
             cell.onPlusButtonTapped = { [weak self] in
                 self?.performSegue(withIdentifier: "addSceneSegue", sender: nil)
             }
+            // Tag for onboarding spotlight (Step 5 — New Scene button)
+            cell.accessibilityIdentifier = "onb_addSceneButton"
             return cell
         }
 
@@ -321,6 +333,10 @@ extension SequenceViewController: UICollectionViewDataSource {
         let itemIndex = isSearching ? indexPath.item : indexPath.item - 1
         let sceneToDisplay = currentScenes[itemIndex]
         cell.configureCell(scene: sceneToDisplay)
+
+        // Tag the first scene card for onboarding spotlight (Step 7)
+        cell.accessibilityIdentifier = (itemIndex == 0) ? "onb_sceneCard" : nil
+
         return cell
     }
 

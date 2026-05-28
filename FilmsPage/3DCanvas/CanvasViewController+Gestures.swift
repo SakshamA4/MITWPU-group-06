@@ -605,6 +605,9 @@ extension CanvasViewController {
         let clampedPosition = clampPositionAvoidingOverlap(entity: entity, proposedPosition: newPosition)
         entity.position = clampedPosition
         updateGizmoPosition()
+
+        // Notify onboarding that the user has interacted with an entity (Step 9 gate).
+        reportOnboardingPropGestureIfNeeded()
     }
 
     func calculateWorldDragDelta(_ gesture: UIPanGestureRecognizer) -> SIMD3<Float> {
@@ -742,6 +745,9 @@ extension CanvasViewController {
                 t.rotation = simd_normalize(simd_quatf(angle: -delta, axis: [0, 1, 0]) * t.rotation)
                 selected.transform = t
                 updateGizmoPosition()
+
+                // Notify onboarding that the user has interacted with an entity (Step 9 gate).
+                reportOnboardingPropGestureIfNeeded()
             }
             lastPanLocation = location
 

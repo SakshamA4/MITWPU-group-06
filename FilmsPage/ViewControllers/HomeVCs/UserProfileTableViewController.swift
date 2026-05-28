@@ -37,7 +37,12 @@ class UserProfileTableViewController: UITableViewController {
         } else if indexPath.section == 1 {
             switch indexPath.row {
             case 0: print("Section 1, Row 0 (e.g., Settings) tapped")
-            case 1: print("Section 1, Row 1 (e.g., Help) tapped")
+
+            case 1:
+                // ── Tutorial → Replay Walkthrough ─────────────────────────────
+                guard let window = view.window else { return }
+                OnboardingManager.shared.replayTutorial(from: window)
+
             case 2: print("Section 1, Row 2 (e.g., About us) tapped")
             default: break
             }

@@ -31,8 +31,21 @@ class AddSceneViewController: UIViewController {
         sceneNotes.layer.cornerRadius = 16
         sceneName.layer.cornerRadius = 16
 
+        // Tag for onboarding spotlight (Step 6 — scene name field)
+        sceneName.accessibilityIdentifier = "onb_sceneNameField"
+
         setupImageView()
         styleAddImageButton()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Notify the onboarding manager that the Add Scene modal is visible.
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: self,
+            userInfo: ["vcType": "addScene"]
+        )
     }
 
     // MARK: - Image View Setup
