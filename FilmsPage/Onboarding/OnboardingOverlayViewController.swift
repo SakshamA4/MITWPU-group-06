@@ -5,6 +5,35 @@
 
 import UIKit
 
+// MARK: - PassThroughView
+
+/// A view that intercepts touches for the overlay but allows touches inside
+/// the spotlight cutout to pass through to the underlying application.
+final class OnboardingPassThroughView: UIView {
+    var holeRect: () -> CGRect = { .zero }
+    var tooltipView: UIView?
+    var isInteractiveStep: Bool = false
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hitView = super.hitTest(point, with: event)
+
+        // 1. If the user taps the tooltip card (e.g., Next/Skip button), handle it normally.
+        if let tooltip = tooltipView, let hit = hitView, hit.isDescendant(of: tooltip) {
+            return hitView
+        }
+
+        // 2. If it's an interactive step and the tap is inside the spotlight hole,
+        // return nil to let the touch pass through to the window below.
+        if isInteractiveStep, holeRect().contains(point) {
+            return nil
+        }
+
+        // 3. Otherwise, swallow the touch by returning ourself/hitView
+        // (prevents interacting with the app behind the dark dim).
+        return hitView
+    }
+}
+
 /// Fullscreen view controller hosted in a dedicated UIWindow above all app UI.
 /// It renders the dim overlay, spotlight cutout, and the animated tooltip card.
 final class OnboardingOverlayViewController: UIViewController {
@@ -25,6 +54,15 @@ final class OnboardingOverlayViewController: UIViewController {
     private var tooltipWidthConstraint: NSLayoutConstraint?
 
     // MARK: - Lifecycle
+    
+    override func loadView() {
+        let ptView = OnboardingPassThroughView(frame: UIScreen.main.bounds)
+        ptView.holeRect = { [weak self] in
+            return self?.spotlight.currentHoleRect ?? .zero
+        }
+        ptView.tooltipView = tooltip
+        self.view = ptView
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -40,16 +78,15 @@ final class OnboardingOverlayViewController: UIViewController {
             spotlight.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
-        // Swallow taps outside the spotlight (non-interactive steps)
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleOverlayTap))
-        tapGesture.cancelsTouchesInView = false
-        spotlight.addGestureRecognizer(tapGesture)
-
         // ── Tooltip card ──────────────────────────────────────────────────────
         tooltip.translatesAutoresizingMaskIntoConstraints = false
         tooltip.alpha = 0
         tooltip.delegate = self
         view.addSubview(tooltip)
+        
+        if let ptView = self.view as? OnboardingPassThroughView {
+            ptView.tooltipView = tooltip
+        }
 
         // Fixed width — responsive but capped
         let tooltipWidth: CGFloat = min(520, view.bounds.width - 80)
@@ -71,6 +108,10 @@ final class OnboardingOverlayViewController: UIViewController {
     func show(step: OnboardingStep, spotlightFrame: CGRect) {
         currentStep = step
         tooltip.configure(step: step)
+        
+        if let ptView = self.view as? OnboardingPassThroughView {
+            ptView.isInteractiveStep = step.isInteractive
+        }
 
         if isFirstShow {
             isFirstShow = false
@@ -135,6 +176,11 @@ final class OnboardingOverlayViewController: UIViewController {
     private func applySpotlight(frame: CGRect, step: OnboardingStep, animated: Bool) {
         if step.isFullScreenGlow || frame == .zero {
             spotlight.showGlow()
+            if step.isInteractive {
+                // FAILSAFE: The target element was not found on screen.
+                // Reveal the Next button so the user isn't permanently soft-locked!
+                tooltip.revealNextButton()
+            }
         } else {
             // Inset the spotlight slightly so padding shows around the element
             let padding: CGFloat = 12
@@ -187,11 +233,6 @@ final class OnboardingOverlayViewController: UIViewController {
         } else {
             view.layoutIfNeeded()
         }
-    }
-
-    @objc private func handleOverlayTap() {
-        // Tapping outside does nothing — intentional UX choice.
-        // The only actions are Next / Skip buttons inside the tooltip card.
     }
 }
 

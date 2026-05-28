@@ -25,6 +25,17 @@ class AddFilmViewController: UIViewController {
         setupImageView()
         styleAddImageButton()
         notesTextField.delegate = self
+        
+        nameTextField.accessibilityIdentifier = "onb_filmNameField"
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: nil,
+            userInfo: ["vcType": "addFilm"]
+        )
     }
 
     private func styleAddImageButton() {

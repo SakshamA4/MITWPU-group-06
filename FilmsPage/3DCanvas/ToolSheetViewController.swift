@@ -93,6 +93,15 @@ class ToolSheetViewController: UIViewController {
         self.collectionView.reloadData()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: nil,
+            userInfo: ["vcType": "toolSheet"]
+        )
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in

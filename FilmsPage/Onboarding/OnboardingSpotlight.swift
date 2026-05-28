@@ -12,7 +12,7 @@ final class OnboardingSpotlight: UIView {
 
     // MARK: - Constants
 
-    private let amber = UIColor(hue: 0.10, saturation: 0.85, brightness: 0.98, alpha: 1)
+    private let amber = UIColor.white
 
     // MARK: - Layers
 
@@ -27,7 +27,8 @@ final class OnboardingSpotlight: UIView {
 
     // MARK: - State
 
-    private var currentHoleRect: CGRect = .zero
+    /// The frame of the hole in the overlay.
+    private(set) var currentHoleRect: CGRect = .zero
     private var isGlowMode: Bool = false
 
     // MARK: - Init

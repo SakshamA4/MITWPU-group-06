@@ -169,15 +169,39 @@ final class OnboardingManager {
             name: .onboardingGestureDetected,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleVCAppeared(_:)),
+            name: .onboardingVCAppeared,
+            object: nil
+        )
+    }
+
+    @objc private func handleVCAppeared(_ notification: Notification) {
+        guard isActive,
+              currentStepIndex < OnboardingStep.allSteps.count,
+              let userInfo = notification.userInfo,
+              let vcType = userInfo["vcType"] as? String else { return }
+        
+        let step = OnboardingStep.allSteps[currentStepIndex]
+        
+        // If the VC that just appeared matches what this step is waiting for, automatically advance!
+        if step.autoAdvancesOnVC == vcType {
+            // Add a tiny delay so the navigation animation can finish before we move the spotlight
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.advance()
+            }
+        }
     }
 
     @objc private func handleGestureDetected() {
-        // Step 9 requires a real interaction before Next is unlocked.
+        // Step 10 requires a real interaction before Next is unlocked (or we can just advance!)
         guard isActive,
-              currentStepIndex == 9,
-              let vc = overlayVC else { return }
-        DispatchQueue.main.async {
-            vc.unlockNextButton()
+              currentStepIndex == 10 else { return }
+              
+        // We can just automatically advance when they move the prop since it's fully interactive!
+        DispatchQueue.main.async { [weak self] in
+            self?.advance()
         }
     }
 }

@@ -31,6 +31,17 @@ class AddSequenceViewController: UIViewController {
 
         setupImageView()
         styleAddImageButton()
+        
+        nameTextField.accessibilityIdentifier = "onb_sequenceNameField"
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        NotificationCenter.default.post(
+            name: .onboardingVCAppeared,
+            object: nil,
+            userInfo: ["vcType": "addSequence"]
+        )
     }
 
     // MARK: - Image View Setup

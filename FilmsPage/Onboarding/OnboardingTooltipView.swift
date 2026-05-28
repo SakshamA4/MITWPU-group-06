@@ -17,9 +17,9 @@ protocol OnboardingTooltipDelegate: AnyObject {
 /// Glass-morphism tooltip card used in the onboarding overlay.
 final class OnboardingTooltipView: UIView {
 
-    // MARK: - Amber accent
+    // MARK: - Accent color
 
-    private let amber = UIColor(hue: 0.10, saturation: 0.85, brightness: 0.98, alpha: 1)
+    private let accentColor = UIColor.white
 
     // MARK: - Subviews
 
@@ -65,8 +65,8 @@ final class OnboardingTooltipView: UIView {
         tintOverlay.translatesAutoresizingMaskIntoConstraints = false
         addSubview(tintOverlay)
 
-        // ── Amber top accent line ─────────────────────────────────────────────
-        accentLine.backgroundColor = amber
+        // ── Top accent line ─────────────────────────────────────────────
+        accentLine.backgroundColor = accentColor
         accentLine.layer.cornerRadius = 1
         accentLine.translatesAutoresizingMaskIntoConstraints = false
         addSubview(accentLine)
@@ -164,7 +164,7 @@ final class OnboardingTooltipView: UIView {
         skipButton.isHidden = (step.stepIndex == OnboardingStep.allSteps.count - 1)
         buildDots(count: OnboardingStep.allSteps.count, current: step.stepIndex)
 
-        if step.requiresInteraction {
+        if step.isInteractive {
             nextButton.isHidden = true
             nextButton.alpha    = 0
         } else {
@@ -186,8 +186,8 @@ final class OnboardingTooltipView: UIView {
     private func styleNextButton(label: String) {
         var cfg = UIButton.Configuration.filled()
         cfg.title               = label
-        cfg.baseForegroundColor = UIColor(red: 20/255, green: 14/255, blue: 8/255, alpha: 1)
-        cfg.baseBackgroundColor = amber
+        cfg.baseForegroundColor = .black
+        cfg.baseBackgroundColor = accentColor
         cfg.cornerStyle         = .medium
         cfg.contentInsets       = NSDirectionalEdgeInsets(top: 9, leading: 20, bottom: 9, trailing: 20)
         cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
@@ -205,12 +205,12 @@ final class OnboardingTooltipView: UIView {
             dot.layer.cornerRadius = 4
             if i < current {
                 // Past
-                dot.backgroundColor = amber.withAlphaComponent(0.45)
+                dot.backgroundColor = accentColor.withAlphaComponent(0.45)
                 dot.widthAnchor.constraint(equalToConstant: 6).isActive  = true
                 dot.heightAnchor.constraint(equalToConstant: 6).isActive = true
             } else if i == current {
-                // Current — larger amber dot
-                dot.backgroundColor = amber
+                // Current — larger dot
+                dot.backgroundColor = accentColor
                 dot.widthAnchor.constraint(equalToConstant: 10).isActive  = true
                 dot.heightAnchor.constraint(equalToConstant: 8).isActive  = true
                 dot.layer.cornerRadius = 4

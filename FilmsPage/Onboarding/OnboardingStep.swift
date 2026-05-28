@@ -7,7 +7,7 @@ import UIKit
 
 /// A single step in the cinematic onboarding walkthrough.
 struct OnboardingStep {
-    /// Zero-based index (0…10 for the 11-step flow).
+    /// Zero-based index (0…12 for the 13-step flow).
     let stepIndex: Int
 
     /// Bold heading shown in the tooltip card.
@@ -20,18 +20,19 @@ struct OnboardingStep {
     /// `nil` means no specific element — the overlay uses a full-screen glow instead.
     let targetElementID: String?
 
-    /// Label for the primary action button.  "Next →" for most steps, "Let's Go" for the last.
+    /// Label for the primary action button. (Usually hidden if `isInteractive` is true).
     let nextButtonLabel: String
 
-    /// When `true` the Next button starts hidden and is only revealed after the user
-    /// performs a gesture inside the spotlight area.  Used for Step 10 (move/rotate prop).
-    let requiresInteraction: Bool
+    /// When `true`, the Next button is hidden and the spotlight cutout allows touches to pass through
+    /// so the user can interact directly with the app.
+    let isInteractive: Bool
+
+    /// If set, the manager waits for this VC type to appear (via `onboardingVCAppeared` notification)
+    /// to automatically advance to the next step.
+    let autoAdvancesOnVC: String?
 
     /// When `true` no cutout hole is drawn — the spotlight is a soft amber ring at screen centre.
-    /// Used for the Welcome (step 0) and Finale (step 10) steps.
     let isFullScreenGlow: Bool
-
-    // ── Factory ──────────────────────────────────────────────────────────────
 
     static let allSteps: [OnboardingStep] = [
 
@@ -39,10 +40,11 @@ struct OnboardingStep {
         OnboardingStep(
             stepIndex: 0,
             heading: "Welcome to SceneWiz.",
-            subtext: "Your personal director's toolkit. Let's take 2 minutes to show you around.",
+            subtext: "Your personal director's toolkit. Let's take a quick interactive tour.",
             targetElementID: nil,
             nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            isInteractive: false,
+            autoAdvancesOnVC: nil,
             isFullScreenGlow: true
         ),
 
@@ -50,32 +52,35 @@ struct OnboardingStep {
         OnboardingStep(
             stepIndex: 1,
             heading: "Your creative stage.",
-            subtext: "These are ready-made templates to spark your vision. Tap any to explore a scene layout instantly.",
+            subtext: "These are ready-made templates to spark your vision. But let's build from scratch.",
             targetElementID: "onb_homeTemplatesGrid",
             nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            isInteractive: false,
+            autoAdvancesOnVC: nil,
             isFullScreenGlow: false
         ),
 
-        // Step 2 — Films Tab
+        // Step 2 — Create a New Film
         OnboardingStep(
             stepIndex: 2,
-            heading: "Every great story starts with a film.",
-            subtext: "Head over to the Films tab — this is where your productions live.",
-            targetElementID: "onb_filmsTabItem",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Lights. Camera. Create.",
+            subtext: "Tap the + to start your first film project.",
+            targetElementID: "onb_addFilmButton",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "addFilm",
             isFullScreenGlow: false
         ),
 
-        // Step 3 — Create a New Film
+        // Step 3 — Name the Film
         OnboardingStep(
             stepIndex: 3,
-            heading: "Lights. Camera. Create.",
-            subtext: "Tap the + to start your first film. Give it a name — this is your project container.",
-            targetElementID: "onb_addFilmButton",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Name your production.",
+            subtext: "Give your film a name and tap 'Add' to jump inside.",
+            targetElementID: "onb_filmNameField",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "myFilm",
             isFullScreenGlow: false
         ),
 
@@ -83,76 +88,95 @@ struct OnboardingStep {
         OnboardingStep(
             stepIndex: 4,
             heading: "Break it down into sequences.",
-            subtext: "A film is built from sequences. Tap here to add your first one — think of it as a chapter.",
+            subtext: "A film is built from sequences. Tap here to add your first chapter.",
             targetElementID: "onb_addSequenceButton",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "addSequence",
             isFullScreenGlow: false
         ),
 
-        // Step 5 — Create a Scene
+        // Step 5 — Name the Sequence
         OnboardingStep(
             stepIndex: 5,
-            heading: "Now, build your scene.",
-            subtext: "Scenes are where the magic happens. Tap here to create one inside your sequence.",
-            targetElementID: "onb_addSceneButton",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Name your sequence.",
+            subtext: "Give it a title and tap 'Add' to enter the sequence.",
+            targetElementID: "onb_sequenceNameField",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "sequence",
             isFullScreenGlow: false
         ),
 
-        // Step 6 — Name the Scene
+        // Step 6 — Create a Scene
         OnboardingStep(
             stepIndex: 6,
-            heading: "Every scene needs a title.",
-            subtext: "Give your scene a name — something that captures the moment you're creating.",
-            targetElementID: "onb_sceneNameField",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Now, build your scene.",
+            subtext: "Scenes are where the magic happens. Tap here to create one.",
+            targetElementID: "onb_addSceneButton",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "addScene",
             isFullScreenGlow: false
         ),
 
-        // Step 7 — Open Scene on Canvas
+        // Step 7 — Name the Scene
         OnboardingStep(
             stepIndex: 7,
-            heading: "Tap to enter your canvas.",
-            subtext: "Tap your scene to open the director's canvas — where you'll stage everything.",
-            targetElementID: "onb_sceneCard",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Every scene needs a title.",
+            subtext: "Name your scene and tap 'Add' to place it in the sequence.",
+            targetElementID: "onb_sceneNameField",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "sequence",
             isFullScreenGlow: false
         ),
 
-        // Step 8 — Place a Prop
+        // Step 8 — Open Scene on Canvas
         OnboardingStep(
             stepIndex: 8,
-            heading: "Set the stage.",
-            subtext: "Pick a prop and place it on your canvas. Drag it anywhere you like.",
-            targetElementID: "onb_propsToolButton",
-            nextButtonLabel: "Next →",
-            requiresInteraction: false,
+            heading: "Tap to enter your canvas.",
+            subtext: "Tap your new scene card to open the director's canvas.",
+            targetElementID: "onb_sceneCard",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "canvas",
             isFullScreenGlow: false
         ),
 
-        // Step 9 — Move & Rotate the Prop
+        // Step 9 — Place a Prop
         OnboardingStep(
             stepIndex: 9,
-            heading: "Take control of your shot.",
-            subtext: "Move the prop around freely. Tap the bottom-left button to rotate it and perfect your composition.",
-            targetElementID: "onb_rotateMoveButton",
-            nextButtonLabel: "Next →",
-            requiresInteraction: true,
+            heading: "Set the stage.",
+            subtext: "Tap the Props tool at the bottom to open the library.",
+            targetElementID: "onb_propsToolButton",
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "toolSheet",
             isFullScreenGlow: false
         ),
 
-        // Step 10 — Finale
+        // Step 10 — Move & Rotate the Prop
         OnboardingStep(
             stepIndex: 10,
+            heading: "Take control of your shot.",
+            subtext: "Select any prop from the sheet. Once it's placed on the canvas, try dragging or rotating it.",
+            targetElementID: nil,
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: nil, // This one is advanced via onboardingGestureDetected
+            isFullScreenGlow: true // We use a glow here because the user is moving around
+        ),
+
+        // Step 11 — Finale
+        OnboardingStep(
+            stepIndex: 11,
             heading: "And… action.",
             subtext: "You're officially behind the lens. Your canvas is yours — go direct something extraordinary.",
             targetElementID: nil,
             nextButtonLabel: "Let's Go",
-            requiresInteraction: false,
+            isInteractive: false,
+            autoAdvancesOnVC: nil,
             isFullScreenGlow: true
         )
     ]
