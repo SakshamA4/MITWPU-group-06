@@ -152,6 +152,13 @@ final class OnboardingManager {
             guard let keyWindow = overlayWindow else { return nil }
             return view.convert(view.bounds, to: keyWindow)
         }
+        
+        // Fallback for iPadOS sidebar tabs (or other hidden elements) that use accessibilityLabel instead
+        if view.accessibilityLabel == id && view.isUserInteractionEnabled && !(view is UILabel) {
+            guard let keyWindow = overlayWindow else { return nil }
+            return view.convert(view.bounds, to: keyWindow)
+        }
+        
         for subview in view.subviews {
             if let found = findFrame(ofViewWithID: id, in: subview) {
                 return found
@@ -195,9 +202,9 @@ final class OnboardingManager {
     }
 
     @objc private func handleGestureDetected() {
-        // Step 10 requires a real interaction before Next is unlocked (or we can just advance!)
+        // Step 11 requires a real interaction before Next is unlocked (or we can just advance!)
         guard isActive,
-              currentStepIndex == 10 else { return }
+              currentStepIndex == 11 else { return }
               
         // We can just automatically advance when they move the prop since it's fully interactive!
         DispatchQueue.main.async { [weak self] in

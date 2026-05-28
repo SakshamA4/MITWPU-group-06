@@ -60,9 +60,21 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 2 — Create a New Film
+        // Step 2 — Films Tab
         OnboardingStep(
             stepIndex: 2,
+            heading: "Every great story starts with a film.",
+            subtext: "Tap the Films tab on the side or bottom to begin.",
+            targetElementID: "Films", // Fallback to accessibilityLabel for iPad sidebar
+            nextButtonLabel: "",
+            isInteractive: true,
+            autoAdvancesOnVC: "films",
+            isFullScreenGlow: false
+        ),
+
+        // Step 3 — Create a New Film
+        OnboardingStep(
+            stepIndex: 3,
             heading: "Lights. Camera. Create.",
             subtext: "Tap the + to start your first film project.",
             targetElementID: "onb_addFilmButton",
@@ -72,9 +84,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 3 — Name the Film
+        // Step 4 — Name the Film
         OnboardingStep(
-            stepIndex: 3,
+            stepIndex: 4,
             heading: "Name your production.",
             subtext: "Give your film a name and tap 'Add' to jump inside.",
             targetElementID: "onb_filmNameField",
@@ -84,9 +96,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 4 — Inside Film — Create a Sequence
+        // Step 5 — Inside Film — Create a Sequence
         OnboardingStep(
-            stepIndex: 4,
+            stepIndex: 5,
             heading: "Break it down into sequences.",
             subtext: "A film is built from sequences. Tap here to add your first chapter.",
             targetElementID: "onb_addSequenceButton",
@@ -96,9 +108,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 5 — Name the Sequence
+        // Step 6 — Name the Sequence
         OnboardingStep(
-            stepIndex: 5,
+            stepIndex: 6,
             heading: "Name your sequence.",
             subtext: "Give it a title and tap 'Add' to enter the sequence.",
             targetElementID: "onb_sequenceNameField",
@@ -108,9 +120,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 6 — Create a Scene
+        // Step 7 — Create a Scene
         OnboardingStep(
-            stepIndex: 6,
+            stepIndex: 7,
             heading: "Now, build your scene.",
             subtext: "Scenes are where the magic happens. Tap here to create one.",
             targetElementID: "onb_addSceneButton",
@@ -120,9 +132,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 7 — Name the Scene
+        // Step 8 — Name the Scene
         OnboardingStep(
-            stepIndex: 7,
+            stepIndex: 8,
             heading: "Every scene needs a title.",
             subtext: "Name your scene and tap 'Add' to place it in the sequence.",
             targetElementID: "onb_sceneNameField",
@@ -132,9 +144,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 8 — Open Scene on Canvas
+        // Step 9 — Open Scene on Canvas
         OnboardingStep(
-            stepIndex: 8,
+            stepIndex: 9,
             heading: "Tap to enter your canvas.",
             subtext: "Tap your new scene card to open the director's canvas.",
             targetElementID: "onb_sceneCard",
@@ -144,9 +156,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 9 — Place a Prop
+        // Step 10 — Place a Prop
         OnboardingStep(
-            stepIndex: 9,
+            stepIndex: 10,
             heading: "Set the stage.",
             subtext: "Tap the Props tool at the bottom to open the library.",
             targetElementID: "onb_propsToolButton",
@@ -156,9 +168,9 @@ struct OnboardingStep {
             isFullScreenGlow: false
         ),
 
-        // Step 10 — Move & Rotate the Prop
+        // Step 11 — Move & Rotate the Prop
         OnboardingStep(
-            stepIndex: 10,
+            stepIndex: 11,
             heading: "Take control of your shot.",
             subtext: "Select any prop from the sheet. Once it's placed on the canvas, try dragging or rotating it.",
             targetElementID: nil,
@@ -168,9 +180,9 @@ struct OnboardingStep {
             isFullScreenGlow: true // We use a glow here because the user is moving around
         ),
 
-        // Step 11 — Finale
+        // Step 12 — Finale
         OnboardingStep(
-            stepIndex: 11,
+            stepIndex: 12,
             heading: "And… action.",
             subtext: "You're officially behind the lens. Your canvas is yours — go direct something extraordinary.",
             targetElementID: nil,
