@@ -103,6 +103,11 @@ enum ToolType: CaseIterable {
         case .sky:
             return [
                 SpawnItem(
+                    title: "No Sky",
+                    imageName: "none",
+                    modelFileName: "none"
+                ),
+                SpawnItem(
                     title: "Blue Sky",
                     imageName: "Blue_sky",
                     modelFileName: "Blue_sky"

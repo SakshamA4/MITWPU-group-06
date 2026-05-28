@@ -10,6 +10,38 @@ class ToolSheetViewController: UIViewController {
     private let collectionView: UICollectionView
     private var importCoordinator: PropImportCoordinator?
 
+    private lazy var noSkyImage: UIImage = {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 226, height: 170))
+        return renderer.image { ctx in
+            let rect = CGRect(origin: .zero, size: CGSize(width: 226, height: 170))
+            let colors = [
+                UIColor(red: 30/255, green: 30/255, blue: 45/255, alpha: 1).cgColor,
+                UIColor(red: 15/255, green: 15/255, blue: 25/255, alpha: 1).cgColor
+            ] as CFArray
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0]) else { return }
+            ctx.cgContext.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: 170), options: [])
+            
+            ctx.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.15).cgColor)
+            ctx.cgContext.setLineWidth(1)
+            let path = UIBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), cornerRadius: 10)
+            ctx.cgContext.addPath(path.cgPath)
+            ctx.cgContext.strokePath()
+            
+            if let symbol = UIImage(systemName: "xmark.circle.fill")?
+                .withTintColor(.white, renderingMode: .alwaysOriginal) {
+                let symbolSize = CGSize(width: 50, height: 50)
+                let symbolRect = CGRect(
+                    x: (226 - symbolSize.width) / 2,
+                    y: (170 - symbolSize.height) / 2,
+                    width: symbolSize.width,
+                    height: symbolSize.height
+                )
+                symbol.draw(in: symbolRect)
+            }
+        }
+    }()
+
     // ── Grip segment support (Light modal only) ──────────────────────────
     private var segmentedControl: UISegmentedControl?
     private var gripItems: [GripItem] = []
@@ -76,10 +108,7 @@ class ToolSheetViewController: UIViewController {
             setupSegmentedControl()
         }
 
-        // Sky tool: add "No Sky" button
-        if tool == .sky {
-            setupNoSkyButton()
-        }
+
 
         // Show Plus button for Background and Prop tools
         if tool == .background || tool == .prop {
@@ -137,11 +166,9 @@ class ToolSheetViewController: UIViewController {
 
         // Offset the collection view top based on tool:
         //  - .light  → 60pt (segment control)
-        //  - .sky    → 70pt ("No Sky" button)
         //  - others  → 20pt
         let topOffset: CGFloat = {
             if tool == .light { return 60 }
-            if tool == .sky   { return 70 }
             return 20
         }()
 
@@ -153,42 +180,7 @@ class ToolSheetViewController: UIViewController {
         ])
     }
 
-    // MARK: - No Sky Button (Sky tool only)
 
-    private func setupNoSkyButton() {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-
-        // Icon + title
-        var config = UIButton.Configuration.filled()
-        config.title = "No Sky"
-        config.image = UIImage(systemName: "xmark.circle.fill")
-        config.imagePadding = 8
-        config.imagePlacement = .leading
-        config.baseForegroundColor = .white
-        config.baseBackgroundColor = UIColor(red: 50/255, green: 50/255, blue: 70/255, alpha: 1)
-        config.cornerStyle = .medium
-        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-        button.configuration = config
-
-        button.addAction(UIAction { [weak self] _ in
-            guard let self = self else { return }
-            // Find the canvas VC behind this sheet
-            let canvasVC = self.presentingViewController as? CanvasViewController
-                ?? (self.presentingViewController as? UINavigationController)?
-                    .viewControllers.first(where: { $0 is CanvasViewController }) as? CanvasViewController
-            self.dismiss(animated: true) {
-                canvasVC?.removeSky()
-            }
-        }, for: .touchUpInside)
-
-        view.addSubview(button)
-
-        NSLayoutConstraint.activate([
-            button.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
-            button.centerXAnchor.constraint(equalTo: view.centerXAnchor)
-        ])
-    }
 
     // MARK: - Grip / Segmented Control (Light modal only)
 
@@ -309,7 +301,9 @@ extension ToolSheetViewController: UICollectionViewDataSource, UICollectionViewD
 
         cell.configure(with: item)
 
-        if let customImage = item.customImage {
+        if tool == .sky, item.modelFileName == "none" {
+            cell.imageView.image = noSkyImage
+        } else if let customImage = item.customImage {
             cell.imageView.image = customImage
         }
 
