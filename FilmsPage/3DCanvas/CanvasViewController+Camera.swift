@@ -486,6 +486,15 @@ extension CanvasViewController {
 
     /// Creates (or reuses) the camera-through HUD and configures it for the given camera.
     private func showCameraViewOverlay(camera: PerspectiveCamera) {
+        // Remove any stale overlay before creating a new one.
+        // Without this guard, rapid calls to setActiveCamera (e.g. during sequential
+        // thumbnail captures in ShotBreakdown) can orphan earlier overlays in the
+        // view hierarchy — only the last stored reference is removed by
+        // activateEditorCamera(), leaving previous overlays permanently visible on
+        // the editor camera view after returning from Shot Player.
+        cameraViewOverlay?.removeFromSuperview()
+        cameraViewOverlay = nil
+
         // Ensure focus component exists on the camera root
         guard let camRoot = cameraToVisualMap[camera] else { return }
         if camRoot.components[CameraFocusComponent.self] == nil {

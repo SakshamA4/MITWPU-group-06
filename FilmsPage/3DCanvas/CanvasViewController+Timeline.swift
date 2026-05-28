@@ -193,6 +193,10 @@ extension CanvasViewController {
             (view.viewWithTag(9503) as? UIButton)?.isHidden = false
             (view.viewWithTag(9505) as? UIButton)?.isHidden = true
 
+            // Open the timeline panel if not already showing (panel persists through pause/stop).
+            if animationTimelineEditorVC == nil { openAnimationTimelineEditor() }
+            // Sync icon to playing state.
+            animationTimelineEditorVC?.updatePlaybackState(time: currentTimelineTime, isPlaying: true)
             return
         }
 
@@ -203,9 +207,9 @@ extension CanvasViewController {
 
         enterTimelineMode()
 
-        // Show floating scrubber pill instead of the old timelineContainer
+        // Floating scrubber pill suppressed — AnimationTimelineEditorViewController
+        // panel is the only scrubber UI. Pill stays hidden always.
         timelineContainer.isHidden = true
-        view.viewWithTag(9500)?.isHidden = false
         playButton.isHidden = true
         pauseButton.isHidden = true
         stopButton.isHidden = true
@@ -233,6 +237,10 @@ extension CanvasViewController {
 
         // Start playback loop
         startPlayback()
+
+        // Open the timeline side-panel automatically when play is first pressed.
+        // Panel stays open through pause/stop — user collapses it manually.
+        if animationTimelineEditorVC == nil { openAnimationTimelineEditor() }
     }
 
     @objc func pauseTimeline() {
@@ -247,6 +255,8 @@ extension CanvasViewController {
         // Inside pill: show play, hide pause
         (view.viewWithTag(9503) as? UIButton)?.isHidden = true
         (view.viewWithTag(9505) as? UIButton)?.isHidden = false
+        // Flip panel icon to play.fill.
+        animationTimelineEditorVC?.updatePlaybackState(time: currentTimelineTime, isPlaying: false)
 
     }
 
@@ -271,7 +281,9 @@ extension CanvasViewController {
         currentTimelineTime = elapsed
 
         if currentTimelineTime >= timeline.duration {
+            // Natural completion — auto-dismiss the timeline panel with its slide-out animation.
             stopTimeline()
+            animationTimelineEditorVC?.dismiss(animated: true)
             return
         }
 
@@ -286,6 +298,8 @@ extension CanvasViewController {
             remainLbl.text = String(format: "%02d:%02d", Int(r) / 60, Int(r) % 60)
         }
         evaluateTimeline(at: currentTimelineTime)
+        // Keep the panel scrubber and play/pause icon in sync with canvas playback.
+        animationTimelineEditorVC?.updatePlaybackState(time: currentTimelineTime, isPlaying: true)
     }
 
     @objc func stopTimeline() {
@@ -314,6 +328,8 @@ extension CanvasViewController {
         // Re-evaluate timeline at t = 0 so objects
         // snap back to their initial transforms
         evaluateTimeline(at: 0)
+        // Reset panel scrubber to 0 and flip icon back to play.fill.
+        animationTimelineEditorVC?.updatePlaybackState(time: 0, isPlaying: false)
     }
 
     func evaluateTimeline(at time: Float) {
@@ -918,6 +934,9 @@ extension CanvasViewController {
 extension CanvasViewController {
 
     @objc func openAnimationTimelineEditor() {
+        // Guard: don't open a second panel if one is already visible.
+        guard animationTimelineEditorVC == nil else { return }
+
         let editor = AnimationTimelineEditorViewController()
         editor.lanes = buildTimelineEditorLanes()
         editor.sceneDuration = max(timeline.duration, 10)
@@ -944,16 +963,27 @@ extension CanvasViewController {
             }
         }
 
-        if let sheet = editor.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
-            sheet.preferredCornerRadius = 22
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+        // Route the panel's play/pause button through the canvas playback engine.
+        editor.onPlayPause = { [weak self] in
+            guard let self else { return }
+            if self.playbackState == .playing {
+                self.pauseTimeline()
+            } else {
+                self.playTimeline()
+            }
         }
-        editor.presentationController?.delegate = self
-        editor.modalPresentationStyle = .pageSheet
+
+        // Present as a right-side panel — exactly matching LightControlPanelViewController.
+        // RightPanelTransitioningDelegate uses RightPanelPresentationController (corner radius,
+        // shadow, spring slide-in from right edge) and RightPanelAnimator (spring transition).
+        editor.modalPresentationStyle = .custom
+        editor.transitioningDelegate = rightPanelTransitioningDelegate
         animationTimelineEditorVC = editor
-        present(editor, animated: true)
+        present(editor, animated: true) { [weak self, weak editor] in
+            // Set delegate AFTER present() so presentationController is non-nil
+            // (with .custom style it is only created once the VC enters the hierarchy).
+            editor?.presentationController?.delegate = self
+        }
     }
 
     func buildTimelineEditorLanes() -> [AnimationTimelineEditorViewController.TrackLane] {

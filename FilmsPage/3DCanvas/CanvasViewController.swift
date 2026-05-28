@@ -719,6 +719,26 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
         loadSceneIfSaved()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // BUGFIX: When returning from ShotBreakdownViewController or
+        // ShotPlayerViewController, any CameraViewOverlay that was added to this
+        // view (by setActiveCamera → showCameraViewOverlay during thumbnail
+        // capture or shot playback) must not be visible in the editor camera
+        // context. The primary fix is in showCameraViewOverlay (which now removes
+        // stale overlays before creating new ones), but this is a defensive safety
+        // net that enforces the invariant at the view-lifecycle level.
+        //
+        // Only remove the overlay if we are in editor camera mode — looking through
+        // a scene camera legitimately shows the overlay, and we must not disturb that.
+        //
+        // NOTE: Animation path visibility logic is intentionally not touched here.
+        if activeCamera === editorCamera {
+            cameraViewOverlay?.removeFromSuperview()
+            cameraViewOverlay = nil
+        }
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         // FIX: Always invalidate the display link on disappear to prevent it from

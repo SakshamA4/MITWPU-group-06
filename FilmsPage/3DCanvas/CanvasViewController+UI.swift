@@ -18,7 +18,6 @@ extension CanvasViewController {
     func setupTopControlsUI() {
         // 1. Add Breakdown button
         view.addSubview(shotBreakdownBtn)
-        view.addSubview(timelineEditorBtn)
 
         // 2. Re-anchor Play Button from the old stack
         view.addSubview(playButton)
@@ -48,22 +47,12 @@ extension CanvasViewController {
             ),
             shotBreakdownBtn.widthAnchor.constraint(equalToConstant: 44),
             shotBreakdownBtn.heightAnchor.constraint(equalToConstant: 44),
-            
-            timelineEditorBtn.centerYAnchor.constraint(
-                equalTo: layersButton.centerYAnchor
-            ),
-            timelineEditorBtn.trailingAnchor.constraint(
-                equalTo: shotBreakdownBtn.leadingAnchor,
-                constant: -16
-            ),
-            timelineEditorBtn.widthAnchor.constraint(equalToConstant: 44),
-            timelineEditorBtn.heightAnchor.constraint(equalToConstant: 44),
 
             playButton.centerYAnchor.constraint(
                 equalTo: layersButton.centerYAnchor
             ),
             playButton.trailingAnchor.constraint(
-                equalTo: timelineEditorBtn.leadingAnchor,
+                equalTo: shotBreakdownBtn.leadingAnchor,
                 constant: -16
             ),
             playButton.widthAnchor.constraint(equalToConstant: 44),
@@ -73,11 +62,6 @@ extension CanvasViewController {
         shotBreakdownBtn.addTarget(
             self,
             action: #selector(shotBreakdownTapped),
-            for: .touchUpInside
-        )
-        timelineEditorBtn.addTarget(
-            self,
-            action: #selector(openAnimationTimelineEditor),
             for: .touchUpInside
         )
     }
