@@ -4,23 +4,6 @@
 //
 //  Singleton that orchestrates the entire mandatory pre-canvas onboarding flow.
 //
-//  Responsibilities
-//  ─────────────────
-//  • Persists current step via UserDefaults (resume after relaunch).
-//  • Drives tab-bar navigation between Home ↔ Films when steps require it.
-//  • Activates / deactivates TipKit @Parameter rules so TipKit properly tracks
-//    which tips have been shown (supports restart via Tips.resetDatastore()).
-//  • Owns the SpotlightOverlay instance shown in the key window.
-//  • Exposes a clean, event-driven API for ViewControllers:
-//      showSpotlightIfNeeded(targeting:for:)
-//      handleHomeSceneCreated(_:)
-//      handleFilmCreated(_:)
-//      handleSequenceCreated(_:)
-//      handleSceneCreatedInSequence(_:)
-//      handleSceneTappedOnHome()
-//      skipOnboarding()
-//      restartOnboarding()
-//
 
 import UIKit
 import TipKit
@@ -68,8 +51,9 @@ final class TutorialManager: NSObject {
 
     private var currentOverlay: SpotlightOverlay?
     private var isOverlayVisible: Bool { currentOverlay?.superview != nil }
-    /// Tracks whether the welcome overlay ("Welcome to SceneWiz") has been shown this session.
     private var hasShownWelcomeOverlay = false
+
+    private let totalSteps = 7   // display total for progress label
 
     // MARK: - Init
 
@@ -77,7 +61,6 @@ final class TutorialManager: NSObject {
 
     // MARK: - Entry Points
 
-    /// Call from SceneDelegate after the root view controller is visible.
     func startOnboardingIfNeeded() {
         guard !hasCompletedOnboarding else { return }
 
@@ -86,7 +69,6 @@ final class TutorialManager: NSObject {
             if self.currentStep == .notStarted {
                 self.showWelcomeModal()
             } else {
-                // Resume from an interrupted session
                 self.broadcastStep(self.currentStep)
             }
         }
@@ -94,15 +76,12 @@ final class TutorialManager: NSObject {
 
     // MARK: - Public API
 
-    /// Advance to `step`, update TipKit parameters, navigate if needed, and
-    /// broadcast the change so every registered VC can react.
     func advance(to step: TutorialStep) {
         currentStep = step
         PreCanvasTips.activate(for: step)
         dismissCurrentOverlay(animated: true) { [weak self] in
             guard let self else { return }
 
-            // On the very first step, show a full-screen welcome overlay first.
             if step == .homeCreateScene && !self.hasShownWelcomeOverlay {
                 self.hasShownWelcomeOverlay = true
                 self.showWelcomeOverlay()
@@ -113,8 +92,7 @@ final class TutorialManager: NSObject {
         }
     }
 
-    /// Show a spotlight for `step` anchored to `targetView` — no-op if the
-    /// current step doesn't match or an overlay is already on screen.
+    /// Standard spotlight — touches pass through the hole.
     func showSpotlightIfNeeded(targeting targetView: UIView, for step: TutorialStep) {
         guard currentStep == step,
               !hasCompletedOnboarding,
@@ -130,25 +108,63 @@ final class TutorialManager: NSObject {
             spotlightFrame: frame,
             step: step,
             currentStepIndex: step.displayIndex,
-            totalSteps: 6
+            totalSteps: totalSteps
         )
         overlay.show(in: window)
         currentOverlay = overlay
     }
 
-    /// Skip the entire tutorial immediately.
+    /// Showcase spotlight — spotlight visible but touches BLOCKED, tap to continue.
+    func showShowcaseIfNeeded(targeting targetView: UIView, for step: TutorialStep) {
+        guard currentStep == step,
+              !hasCompletedOnboarding,
+              !isOverlayVisible,
+              let window = keyWindow else { return }
+
+        let overlay = SpotlightOverlay()
+        overlay.targetView = targetView
+        overlay.delegate   = self
+
+        let frame = targetView.convert(targetView.bounds, to: window)
+        overlay.configureShowcase(
+            spotlightFrame: frame,
+            step: step,
+            currentStepIndex: step.displayIndex,
+            totalSteps: totalSteps
+        )
+        overlay.show(in: window)
+        currentOverlay = overlay
+    }
+
+    /// Full-dim hint — no spotlight hole, centered card, tap to continue.
+    func showHint(for step: TutorialStep) {
+        guard !isOverlayVisible,
+              let window = keyWindow else { return }
+
+        let overlay = SpotlightOverlay()
+        overlay.delegate = self
+        overlay.configureHint(
+            title: step.stepTitle,
+            message: step.coachMessage,
+            stepIndex: step.displayIndex,
+            totalSteps: totalSteps
+        )
+        overlay.show(in: window)
+        currentOverlay = overlay
+    }
+
     func skipOnboarding() {
         dismissCurrentOverlay(animated: true)
         PreCanvasTips.deactivateAll()
         markCompleted()
     }
 
-    /// Reset all persisted state and restart from the welcome screen.
     func restartOnboarding() {
         currentStep            = .notStarted
         hasCompletedOnboarding = false
         tutorialFilmID         = nil
         tutorialSequenceID     = nil
+        hasShownWelcomeOverlay = false
         UserDefaults.standard.removeObject(forKey: StorageKeys.tutorialStep)
 
         try? Tips.resetDatastore()
@@ -164,7 +180,6 @@ final class TutorialManager: NSObject {
     /// Called when the user taps the "+" nav bar button during step 1.
     func handlePlusButtonTapped() {
         guard currentStep == .homeCreateScene else { return }
-        // Dismiss the spotlight on "+" so the popover can appear cleanly.
         dismissCurrentOverlay(animated: true) {
             TutorialManager.shared.advance(to: .tapNewSceneButton)
         }
@@ -173,7 +188,7 @@ final class TutorialManager: NSObject {
     /// Called by AddSceneToLibrarayViewController when a scene is saved from the Home tab.
     func handleHomeSceneCreated(_ scene: ScenesModel) {
         guard currentStep == .homeCreateScene || currentStep == .tapNewSceneButton else { return }
-        advance(to: .createFilm)
+        advance(to: .showRecentScene)
     }
 
     /// Called by AddFilmViewController when a film is saved successfully.
@@ -193,12 +208,12 @@ final class TutorialManager: NSObject {
     /// Called by AddSceneViewController when a scene is saved inside a sequence.
     func handleSceneCreatedInSequence(_ scene: Scene) {
         guard currentStep == .createSceneInSequence else { return }
-        advance(to: .returnToHomeHighlight)
+        advance(to: .canvasHint)
     }
 
-    /// Called by HomeViewController when the user taps a scene card during Step 7.
-    func handleSceneTappedOnHome() {
-        guard currentStep == .enterScene else { return }
+    /// Called by HomeViewController when the user taps a template during highlightTemplate step.
+    func handleTemplateTappedOnHome() {
+        guard currentStep == .highlightTemplate else { return }
         advance(to: .completed)
     }
 
@@ -218,9 +233,15 @@ final class TutorialManager: NSObject {
             }
 
         case .tapNewSceneButton:
-            // The popover is already visible — just broadcast so
-            // AddSceneOrFilmViewController can spotlight the "New Scene" button.
             broadcastStep(step)
+
+        case .showRecentScene:
+            // Switch to Home tab, wait for collection view to reload, then broadcast
+            switchToTab(0) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self?.broadcastStep(step)
+                }
+            }
 
         case .createFilm:
             switchToTab(1) { [weak self] in
@@ -228,7 +249,6 @@ final class TutorialManager: NSObject {
             }
 
         case .createSequence:
-            // Switch to Films tab, then tell FilmsViewController to push MyFilmVC
             switchToTab(1) { [weak self] in
                 guard let self, let filmID = self.tutorialFilmID else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -242,7 +262,6 @@ final class TutorialManager: NSObject {
             }
 
         case .createSceneInSequence:
-            // Tell MyFilmViewController to push SequenceVC for the tutorial sequence
             guard let seqID = tutorialSequenceID else { broadcastStep(step); return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
                 NotificationCenter.default.post(
@@ -253,9 +272,17 @@ final class TutorialManager: NSObject {
                 self?.broadcastStep(step)
             }
 
-        case .returnToHomeHighlight, .enterScene:
+        case .canvasHint:
+            // Show a full-dim hint overlay wherever the user currently is.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.showHint(for: step)
+            }
+
+        case .highlightTemplate:
             switchToTab(0) { [weak self] in
-                self?.broadcastStep(step)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self?.broadcastStep(step)
+                }
             }
 
         case .completed:
@@ -282,7 +309,6 @@ final class TutorialManager: NSObject {
 
     private func showWelcomeOverlay() {
         guard let window = keyWindow else {
-            // Fallback: skip the welcome and go straight to navigation.
             handleNavigation(for: currentStep)
             return
         }
@@ -370,11 +396,22 @@ extension TutorialManager: SpotlightOverlayDelegate {
         skipOnboarding()
     }
 
-    func spotlightOverlayDidDismissWelcome(_ overlay: SpotlightOverlay) {
-        // Dismiss the welcome overlay, then proceed to the actual spotlight step.
+    func spotlightOverlayDidTapToContinue(_ overlay: SpotlightOverlay) {
         dismissCurrentOverlay(animated: true) { [weak self] in
             guard let self else { return }
-            self.handleNavigation(for: self.currentStep)
+            switch self.currentStep {
+            case .homeCreateScene:
+                // Welcome overlay dismissed → proceed to actual spotlight
+                self.handleNavigation(for: self.currentStep)
+            case .showRecentScene:
+                // User saw their recent scene → navigate to Films tab
+                self.advance(to: .createFilm)
+            case .canvasHint:
+                // User acknowledged canvas hint → navigate to template
+                self.advance(to: .highlightTemplate)
+            default:
+                break
+            }
         }
     }
 }

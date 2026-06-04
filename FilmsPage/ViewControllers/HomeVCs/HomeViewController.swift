@@ -28,6 +28,14 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         collectionView.cellForItem(at: IndexPath(item: 0, section: 1))
     }
 
+    /// Returns the template cell for the Outdoor Scene template (section 0).
+    var outdoorTemplateView: UIView? {
+        guard let index = currentTemplates.firstIndex(where: { $0.id == UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000") }) else {
+            return nil
+        }
+        return collectionView.cellForItem(at: IndexPath(item: index, section: 0))
+    }
+
     // Local Data Source (Mirrors the Store)
     private var templates: [ScenesModel] = []
     private var recentScenes: [ScenesModel] = []
@@ -175,13 +183,13 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
             if let target = createSceneButton {
                 tm.showSpotlightIfNeeded(targeting: target, for: .homeCreateScene)
             }
-        case .returnToHomeHighlight:
+        case .showRecentScene:
             if let cell = firstRecentSceneView {
-                tm.showSpotlightIfNeeded(targeting: cell, for: .returnToHomeHighlight)
+                tm.showShowcaseIfNeeded(targeting: cell, for: .showRecentScene)
             }
-        case .enterScene:
-            if let cell = firstRecentSceneView {
-                tm.showSpotlightIfNeeded(targeting: cell, for: .enterScene)
+        case .highlightTemplate:
+            if let cell = outdoorTemplateView {
+                tm.showSpotlightIfNeeded(targeting: cell, for: .highlightTemplate)
             }
         default:
             break
@@ -197,10 +205,15 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
             if let target = createSceneButton {
                 TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: step)
             }
-        case .returnToHomeHighlight, .enterScene:
+        case .showRecentScene:
             // Wait a tick for the collection view to reload after scene creation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 guard let self, let cell = self.firstRecentSceneView else { return }
+                TutorialManager.shared.showShowcaseIfNeeded(targeting: cell, for: step)
+            }
+        case .highlightTemplate:
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self, let cell = self.outdoorTemplateView else { return }
                 TutorialManager.shared.showSpotlightIfNeeded(targeting: cell, for: step)
             }
         default:
@@ -275,19 +288,32 @@ extension HomeViewController: UICollectionViewDataSource {
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let tm = TutorialManager.shared
+        if !tm.hasCompletedOnboarding {
+            if tm.currentStep == .highlightTemplate {
+                if indexPath.section == 0 {
+                    let selectedModel = currentTemplates[indexPath.row]
+                    if selectedModel.id != UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000") {
+                        return
+                    }
+                } else {
+                    return
+                }
+            } else {
+                // Block all taps during any other tutorial step
+                return
+            }
+        }
+
         // --- Recent Scenes (section 1) — open directly, unchanged ---
         if indexPath.section == 1 {
-            let isTutorialActive = (TutorialManager.shared.currentStep == .enterScene)
-            // Notify tutorial manager before opening the canvas (Step 7)
-            TutorialManager.shared.handleSceneTappedOnHome()
-
             let selectedModel = currentRecentScenes[indexPath.row]
             let vc = CanvasViewController()
             vc.currentSceneID = selectedModel.id
             vc.sceneName = selectedModel.name
             vc.sceneNotes = selectedModel.notes ?? ""
             vc.sceneImageName = selectedModel.image
-            vc.isOnboardingEntry = isTutorialActive
+            vc.isOnboardingEntry = false
             let navController = UINavigationController(rootViewController: vc)
             navController.modalPresentationStyle = .fullScreen
             self.present(navController, animated: true)
@@ -298,6 +324,11 @@ extension HomeViewController: UICollectionViewDataSource {
         let selectedModel = currentTemplates[indexPath.row]
         let templateDef = ScenesDataStore.shared.bundledTemplate(for: selectedModel.id)
 
+        let isTutorialActive = !tm.hasCompletedOnboarding && tm.currentStep == .highlightTemplate && selectedModel.id == UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")
+        if isTutorialActive {
+            tm.handleTemplateTappedOnHome()
+        }
+
         // If the template has no bundled scene, open exactly as today.
         guard let jsonName = templateDef?.bundledJSONName,
               let thumbName = templateDef?.bundledThumbName else {
@@ -306,6 +337,7 @@ extension HomeViewController: UICollectionViewDataSource {
             vc.sceneName = selectedModel.name
             vc.sceneNotes = selectedModel.notes ?? ""
             vc.sceneImageName = selectedModel.image
+            vc.isOnboardingEntry = isTutorialActive
             let navController = UINavigationController(rootViewController: vc)
             navController.modalPresentationStyle = .fullScreen
             self.present(navController, animated: true)
@@ -408,6 +440,7 @@ extension HomeViewController: UICollectionViewDataSource {
         vc.sceneNotes = ""
         vc.sceneImageName = thumbFilename
         vc.isTemplateCopy = true
+        vc.isOnboardingEntry = isTutorialActive
         let navController = UINavigationController(rootViewController: vc)
         navController.modalPresentationStyle = .fullScreen
         self.present(navController, animated: true)

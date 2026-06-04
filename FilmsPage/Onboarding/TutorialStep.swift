@@ -15,7 +15,6 @@ import Foundation
 enum TutorialStep: Int, CaseIterable, Codable {
 
     // ─── sentinel ────────────────────────────────────────────────────────────
-    /// Onboarding has not yet been triggered.
     case notStarted             = -1
 
     // ─── action steps ────────────────────────────────────────────────────────
@@ -26,10 +25,14 @@ enum TutorialStep: Int, CaseIterable, Codable {
     /// Step 1b – Popover: spotlight the "New Scene" button inside the popover.
     case tapNewSceneButton      = 10
 
-    /// Step 2 – Films tab: spotlight the "Create Film" (+) button.
+    /// Step 2 – Home tab: showcase the newly-created scene under Recent Scenes
+    ///          (no interaction allowed — tap anywhere to continue).
+    case showRecentScene        = 11
+
+    /// Step 3 – Films tab: spotlight the "Create Film" (+) button.
     case createFilm             = 1
 
-    /// Step 3 – Embedded in AddFilmVC: user must enter a film name (no spotlight).
+    /// Step 3b – Embedded in AddFilmVC: user must enter a film name (no spotlight).
     case filmNaming             = 2
 
     /// Step 4 – MyFilmViewController: spotlight the "New Sequence" placeholder.
@@ -38,13 +41,15 @@ enum TutorialStep: Int, CaseIterable, Codable {
     /// Step 5 – SequenceViewController: spotlight the "New Scene" placeholder.
     case createSceneInSequence  = 4
 
-    /// Step 6 – Return to Home: highlight the newly created scene card.
-    case returnToHomeHighlight  = 5
+    /// Step 6 – After scene created in sequence: full-screen hint telling user
+    ///          they can navigate to canvas from here (tap anywhere to continue).
+    case canvasHint             = 12
 
-    /// Step 7 – Home tab: coach mark prompting the user to tap the scene card.
-    case enterScene             = 6
+    /// Step 7 – Home tab: spotlight the Outdoor template card so the user can
+    ///          try a pre-built scene.
+    case highlightTemplate      = 13
 
-    /// Step 8 – Tutorial complete; signals CanvasTutorial to begin.
+    /// Tutorial complete.
     case completed              = 7
 
     // MARK: - Content
@@ -54,12 +59,13 @@ enum TutorialStep: Int, CaseIterable, Codable {
         case .notStarted:              return ""
         case .homeCreateScene:         return "Let's Begin"
         case .tapNewSceneButton:       return "New Scene"
+        case .showRecentScene:         return "Scene Created!"
         case .createFilm:              return "Start a Film Project"
         case .filmNaming:              return "Name Your Film"
         case .createSequence:          return "Add a Sequence"
         case .createSceneInSequence:   return "Add a Scene"
-        case .returnToHomeHighlight:   return "You're All Set!"
-        case .enterScene:              return "Open Your Canvas"
+        case .canvasHint:              return "Canvas Ready"
+        case .highlightTemplate:       return "Explore a Pre-Built Scene"
         case .completed:               return ""
         }
     }
@@ -69,12 +75,13 @@ enum TutorialStep: Int, CaseIterable, Codable {
         case .notStarted:              return ""
         case .homeCreateScene:         return "Tap the + button to start building your first scene."
         case .tapNewSceneButton:       return "Select \"New Scene\" to create a fresh scene for your project."
+        case .showRecentScene:         return "Your scene now appears here under Recent Scenes. Every scene you create will show up right here."
         case .createFilm:              return "Films are the backbone of your workflow. Tap here to create your first one."
         case .filmNaming:              return "Give your film a name to continue."
         case .createSequence:          return "Sequences keep your scenes organised within a film. Add one now."
         case .createSceneInSequence:   return "Place a scene inside this sequence to complete the structure."
-        case .returnToHomeHighlight:   return "Your first scene is ready and waiting for you right here."
-        case .enterScene:              return "Tap your scene to jump into the production canvas and start creating."
+        case .canvasHint:              return "From here you can navigate to the canvas of any scene and start designing. But first, let's try something fun."
+        case .highlightTemplate:       return "Try playing around with a pre-built scene to see what's possible."
         case .completed:               return ""
         }
     }
@@ -92,11 +99,12 @@ enum TutorialStep: Int, CaseIterable, Codable {
         switch self {
         case .homeCreateScene:          return 1
         case .tapNewSceneButton:        return 1
-        case .createFilm, .filmNaming:  return 2
-        case .createSequence:           return 3
-        case .createSceneInSequence:    return 4
-        case .returnToHomeHighlight:    return 5
-        case .enterScene:               return 6
+        case .showRecentScene:          return 2
+        case .createFilm, .filmNaming:  return 3
+        case .createSequence:           return 4
+        case .createSceneInSequence:    return 5
+        case .canvasHint:               return 6
+        case .highlightTemplate:        return 7
         default:                        return 0
         }
     }
