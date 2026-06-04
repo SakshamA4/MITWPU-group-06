@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="7dz-OZ-1vc">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24765" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="7dz-OZ-1vc">
     <device id="ipad10_9rounded" orientation="landscape" layout="fullscreen" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
-        <capability name="Image references" minToolsVersion="12.0"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24743"/>
         <capability name="Named colors" minToolsVersion="9.0"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
@@ -14,7 +13,7 @@
         <!--Home View Controller-->
         <scene sceneID="s0d-6b-0kx">
             <objects>
-                <viewController storyboardIdentifier="HomeViewControllerID" id="Y6W-OH-hqX" customClass="HomeViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="HomeViewControllerID" id="Y6W-OH-hqX" customClass="HomeViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="5EZ-qb-Rvc">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -51,21 +50,6 @@
                         </constraints>
                     </view>
                     <navigationItem key="navigationItem" id="Zpf-9L-JH0">
-                        <barButtonItem key="leftBarButtonItem" style="plain" id="1No-Oa-Ig3">
-                            <button key="customView" opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" id="nHO-wn-ofn">
-                                <rect key="frame" x="14" y="4.0000000000000009" width="41.5" height="36"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                <state key="normal" title="Button"/>
-                                <buttonConfiguration key="configuration" style="plain" cornerStyle="capsule">
-                                    <imageReference key="image" image="person.circle" catalog="system" symbolScale="large"/>
-                                    <preferredSymbolConfiguration key="preferredSymbolConfigurationForImage" configurationType="pointSize" pointSize="23" scale="large" weight="bold"/>
-                                </buttonConfiguration>
-                                <connections>
-                                    <segue destination="SfF-gc-t0k" kind="presentation" id="1f2-5z-jv2"/>
-                                </connections>
-                            </button>
-                        </barButtonItem>
                         <rightBarButtonItems>
                             <barButtonItem style="plain" systemItem="search" id="8I4-ab-4dz">
                                 <connections>
@@ -101,16 +85,16 @@
         <!--Add Scene Or Film View Controller-->
         <scene sceneID="2yb-tv-AzQ">
             <objects>
-                <viewController id="xln-3y-NOp" customClass="AddSceneOrFilmViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="xln-3y-NOp" customClass="AddSceneOrFilmViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="dZi-ej-twz">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="213"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" distribution="fillEqually" spacing="24" translatesAutoresizingMaskIntoConstraints="NO" id="yyd-WO-tdx">
-                                <rect key="frame" x="20" y="43" width="335" height="124"/>
+                                <rect key="frame" x="20" y="43" width="335" height="140"/>
                                 <subviews>
                                     <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="jhJ-cp-xVS">
-                                        <rect key="frame" x="0.0" y="0.0" width="335" height="50"/>
+                                        <rect key="frame" x="0.0" y="0.0" width="335" height="58"/>
                                         <color key="backgroundColor" red="0.63529413940000001" green="0.1843137443" blue="0.22745099660000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                         <constraints>
                                             <constraint firstAttribute="height" relation="greaterThanOrEqual" constant="50" id="3hp-mI-mk5"/>
@@ -126,7 +110,7 @@
                                         </connections>
                                     </button>
                                     <button opaque="NO" contentMode="scaleToFill" verticalHuggingPriority="249" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="sDN-GX-h40">
-                                        <rect key="frame" x="0.0" y="74" width="335" height="50"/>
+                                        <rect key="frame" x="0.0" y="82" width="335" height="58"/>
                                         <color key="backgroundColor" red="0.63529413940000001" green="0.1843137443" blue="0.22745099660000001" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                         <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                         <state key="normal" title="Button"/>
@@ -159,7 +143,7 @@
         <!--User Profile Table View Controller-->
         <scene sceneID="faa-H0-sPV">
             <objects>
-                <tableViewController storyboardIdentifier="UserProfileTableViewControllerID" useStoryboardIdentifierAsRestorationIdentifier="YES" id="Rtg-WJ-Tmt" customClass="UserProfileTableViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <tableViewController storyboardIdentifier="UserProfileTableViewControllerID" useStoryboardIdentifierAsRestorationIdentifier="YES" id="Rtg-WJ-Tmt" customClass="UserProfileTableViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <tableView key="view" clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="static" style="insetGrouped" rowHeight="-1" estimatedRowHeight="-1" sectionHeaderHeight="18" estimatedSectionHeaderHeight="-1" sectionFooterHeight="18" estimatedSectionFooterHeight="-1" id="Y7W-Nb-j5K">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -320,7 +304,7 @@
         <!--Welcome View Controller-->
         <scene sceneID="v85-tx-hWC">
             <objects>
-                <viewController storyboardIdentifier="WelcomeVCID" id="lwf-bY-03b" customClass="WelcomeViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="WelcomeVCID" id="lwf-bY-03b" customClass="WelcomeViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="N8g-Dw-1Me">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -460,7 +444,7 @@
         <!--Signup View Controller-->
         <scene sceneID="Nu5-NV-UHD">
             <objects>
-                <viewController storyboardIdentifier="SignupVCID" id="0E6-JZ-cye" customClass="SignupViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="SignupVCID" id="0E6-JZ-cye" customClass="SignupViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="rW5-3n-GTm">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -551,7 +535,7 @@
         <!--Login View Controller-->
         <scene sceneID="32N-9W-MDY">
             <objects>
-                <viewController storyboardIdentifier="LoginVCID" id="8s9-zv-DtK" customClass="LoginViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="LoginVCID" id="8s9-zv-DtK" customClass="LoginViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="xQ1-ao-kkG">
                         <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -643,13 +627,13 @@
         <!--ProfileViewController-->
         <scene sceneID="b0o-FA-hjj">
             <objects>
-                <viewController title="ProfileViewController" hidesBottomBarWhenPushed="YES" id="SfF-gc-t0k" customClass="ProfileViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController title="ProfileViewController" hidesBottomBarWhenPushed="YES" id="SfF-gc-t0k" customClass="ProfileViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="HUp-Cw-iMC">
-                        <rect key="frame" x="0.0" y="0.0" width="580" height="650"/>
+                        <rect key="frame" x="0.0" y="0.0" width="1180" height="820"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="beb-JO-d7E">
-                                <rect key="frame" x="0.0" y="0.0" width="580" height="650"/>
+                                <rect key="frame" x="300" y="85" width="580" height="650"/>
                                 <subviews>
                                     <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="ohZ-74-3Sg">
                                         <rect key="frame" x="246" y="28" width="88" height="88"/>
@@ -785,7 +769,7 @@
         <!--Add Scene To Libraray View Controller-->
         <scene sceneID="sA6-Fj-apx">
             <objects>
-                <viewController id="Hdn-cf-EUe" customClass="AddSceneToLibrarayViewController" customModule="FilmsPage" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="Hdn-cf-EUe" customClass="AddSceneToLibrarayViewController" customModule="SceneWiz" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="oCV-IH-9F0">
                         <rect key="frame" x="0.0" y="0.0" width="580" height="640"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -911,7 +895,6 @@
         <image name="Logo" width="846" height="810"/>
         <image name="checkmark" catalog="system" width="128" height="114"/>
         <image name="chevron.right" catalog="system" width="97" height="128"/>
-        <image name="person.circle" catalog="system" width="128" height="123"/>
         <namedColor name="AccentColor">
             <color red="0.0" green="0.46000000000000002" blue="0.89000000000000001" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
