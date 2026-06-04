@@ -130,7 +130,7 @@ final class TutorialManager: NSObject {
             spotlightFrame: frame,
             step: step,
             currentStepIndex: step.displayIndex,
-            totalSteps: 7
+            totalSteps: 6
         )
         overlay.show(in: window)
         currentOverlay = overlay
@@ -161,9 +161,18 @@ final class TutorialManager: NSObject {
 
     // MARK: - Event Handlers (called by ViewControllers)
 
+    /// Called when the user taps the "+" nav bar button during step 1.
+    func handlePlusButtonTapped() {
+        guard currentStep == .homeCreateScene else { return }
+        // Dismiss the spotlight on "+" so the popover can appear cleanly.
+        dismissCurrentOverlay(animated: true) {
+            TutorialManager.shared.advance(to: .tapNewSceneButton)
+        }
+    }
+
     /// Called by AddSceneToLibrarayViewController when a scene is saved from the Home tab.
     func handleHomeSceneCreated(_ scene: ScenesModel) {
-        guard currentStep == .homeCreateScene else { return }
+        guard currentStep == .homeCreateScene || currentStep == .tapNewSceneButton else { return }
         advance(to: .createFilm)
     }
 
@@ -207,6 +216,11 @@ final class TutorialManager: NSObject {
             switchToTab(0) { [weak self] in
                 self?.broadcastStep(step)
             }
+
+        case .tapNewSceneButton:
+            // The popover is already visible — just broadcast so
+            // AddSceneOrFilmViewController can spotlight the "New Scene" button.
+            broadcastStep(step)
 
         case .createFilm:
             switchToTab(1) { [weak self] in

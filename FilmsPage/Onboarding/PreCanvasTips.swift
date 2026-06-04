@@ -9,7 +9,7 @@
 
 import TipKit
 
-// MARK: - Step 1: Home – Create Scene
+// MARK: - Step 1: Home – Create Scene (+ button)
 
 struct HomeCreateSceneTip: Tip {
     @Parameter
@@ -17,6 +17,20 @@ struct HomeCreateSceneTip: Tip {
 
     var title: Text   { Text(TutorialStep.homeCreateScene.stepTitle) }
     var message: Text? { Text(TutorialStep.homeCreateScene.coachMessage) }
+
+    var rules: [Rule] {
+        #Rule(Self.$isActive) { $0 == true }
+    }
+}
+
+// MARK: - Step 1b: Popover – New Scene button
+
+struct TapNewSceneButtonTip: Tip {
+    @Parameter
+    static var isActive: Bool = false
+
+    var title: Text    { Text(TutorialStep.tapNewSceneButton.stepTitle) }
+    var message: Text? { Text(TutorialStep.tapNewSceneButton.coachMessage) }
 
     var rules: [Rule] {
         #Rule(Self.$isActive) { $0 == true }
@@ -99,6 +113,7 @@ extension PreCanvasTips {
     /// Deactivate all tip parameters in one call.
     static func deactivateAll() {
         HomeCreateSceneTip.isActive       = false
+        TapNewSceneButtonTip.isActive     = false
         CreateFilmTip.isActive            = false
         CreateSequenceTip.isActive        = false
         CreateSceneInSequenceTip.isActive = false
@@ -110,13 +125,14 @@ extension PreCanvasTips {
     static func activate(for step: TutorialStep) {
         deactivateAll()
         switch step {
-        case .homeCreateScene:          HomeCreateSceneTip.isActive       = true
-        case .createFilm, .filmNaming:  CreateFilmTip.isActive            = true
-        case .createSequence:           CreateSequenceTip.isActive        = true
-        case .createSceneInSequence:    CreateSceneInSequenceTip.isActive = true
-        case .returnToHomeHighlight:    ReturnToHomeTip.isActive          = true
-        case .enterScene:               EnterSceneTip.isActive            = true
-        default:                        break
+        case .homeCreateScene:                          HomeCreateSceneTip.isActive       = true
+        case .tapNewSceneButton:                        TapNewSceneButtonTip.isActive     = true
+        case .createFilm, .filmNaming:                  CreateFilmTip.isActive            = true
+        case .createSequence:                           CreateSequenceTip.isActive        = true
+        case .createSceneInSequence:                    CreateSceneInSequenceTip.isActive = true
+        case .returnToHomeHighlight:                    ReturnToHomeTip.isActive          = true
+        case .enterScene:                               EnterSceneTip.isActive            = true
+        default:                                        break
         }
     }
 }

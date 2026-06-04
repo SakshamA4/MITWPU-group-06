@@ -209,7 +209,10 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
     }
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // No delegate setup needed - using NotificationCenter
+        // Notify tutorial manager when the "+" popover opens during onboarding.
+        if TutorialManager.shared.currentStep == .homeCreateScene {
+            TutorialManager.shared.handlePlusButtonTapped()
+        }
     }
 
     // MARK: - Filter Logic
