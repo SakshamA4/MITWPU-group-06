@@ -366,6 +366,7 @@ extension CanvasViewController {
             self.compassView.isHidden = self.isSidebarVisible
             self.view.layoutIfNeeded()
         }
+        CanvasTutorialManager.shared.handleHierarchyToggled(isOpen: isSidebarVisible)
     }
 
     func refreshSidebarContent() {
@@ -825,6 +826,7 @@ extension CanvasViewController {
 
         let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
         let closeBtn = UIButton(type: .system)
+        closeBtn.tag = 9002
         closeBtn.setImage(
             UIImage(systemName: "xmark", withConfiguration: config),
             for: .normal
@@ -876,10 +878,12 @@ extension CanvasViewController {
                 self.yaw = 0
                 self.updateEditorCamera()
             }
+            CanvasTutorialManager.shared.handleCompassInteracted()
         }
 
         compassView.onPan = { [weak self] translation in
             self?.panCameraTarget(translation: translation)
+            CanvasTutorialManager.shared.handleCompassInteracted()
         }
 
     }

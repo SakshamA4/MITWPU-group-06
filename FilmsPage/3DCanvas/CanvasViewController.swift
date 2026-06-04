@@ -726,6 +726,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
         // start deserialising entities, preventing the black-screen stall
         // that occurred when loadSceneIfSaved() ran synchronously in viewDidLoad.
         loadSceneIfSaved()
+
+        // Initialize Canvas Onboarding Tutorial
+        CanvasTutorialManager.shared.startTutorialIfNeeded(on: self)
+        CanvasTutorialManager.shared.handleCanvasReturnedFromBreakdown()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -936,6 +940,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
             } else {
                 applySky(type: item.modelFileName)
             }
+            if !isRestoring {
+                self.notifyEntitySpawned(toolType: toolType)
+            }
             return
         }
 
@@ -994,7 +1001,13 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
                     spawnSceneCamera(modelName: item.modelFileName, displayName: item.title)
                     return
                 }
-                if item.isBackground { spawnBackgroundPlane(item); return }
+                if item.isBackground {
+                    spawnBackgroundPlane(item)
+                    if !isRestoring {
+                        self.notifyEntitySpawned(toolType: .background)
+                    }
+                    return
+                }
 
                 // ── Procedural light — no .usdz to load ──────────────────────
                 if toolType == .light, let kind = item.proceduralKind {
@@ -1036,6 +1049,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
                     if let anchor = mainAnchor {
                         anchor.addChild(entity)
                         self.refreshSidebarContent()
+                        if !isRestoring {
+                            self.notifyEntitySpawned(toolType: .light)
+                        }
                     }
                     return
                 }
@@ -1138,10 +1154,17 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
                     // store their animation on a child node, not the root entity.
                     pauseAllAnimations(in: entity)
                     self.refreshSidebarContent()
+                    if !isRestoring {
+                        self.notifyEntitySpawned(toolType: toolType)
+                    }
                 }            } catch {
                 print("Failed to load \(item.modelFileName): \(error)")
             }
         }
+    }
+
+    func notifyEntitySpawned(toolType: ToolType) {
+        CanvasTutorialManager.shared.handleEntitySpawned(toolType: toolType)
     }
 
     // MARK: - Undo / Redo
@@ -1614,6 +1637,10 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
             }
 
         case .ended, .cancelled:
+            if !isDraggingObject && draggingArcHandle == nil {
+                CanvasTutorialManager.shared.handlePanGestureEnded()
+            }
+
             // If the user just moved or rotated a scene camera, refresh its preview
             // so the cell reflects the new position/orientation.
             if let movedEntity = selectedEntity,
@@ -1869,6 +1896,7 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
         }
 
         showActionMenu(at: location)
+        CanvasTutorialManager.shared.handleLongPressMenuOpened()
     }
 }
 

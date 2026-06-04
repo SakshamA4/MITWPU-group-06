@@ -49,6 +49,7 @@ extension CanvasViewController {
             
             // Refresh sidebar if visible
             self.refreshSidebarContent()
+            CanvasTutorialManager.shared.handleEntityDuplicatedOrRenamed()
         })
         
         alert.addAction(UIAlertAction(title: "Clear Name", style: .destructive) { [weak self] _ in
@@ -60,6 +61,7 @@ extension CanvasViewController {
             }
             self.showAnnotationToast("Name cleared")
             self.refreshSidebarContent()
+            CanvasTutorialManager.shared.handleEntityDuplicatedOrRenamed()
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))

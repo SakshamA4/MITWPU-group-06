@@ -198,6 +198,7 @@ extension CanvasViewController {
         // 10. Add to scene
         anchor.addChild(clone)
         refreshSidebarContent()
+        CanvasTutorialManager.shared.handleEntityDuplicatedOrRenamed()
     }
 
     // MARK: - Camera Duplication
@@ -295,6 +296,7 @@ extension CanvasViewController {
         }
 
         refreshSidebarContent()
+        CanvasTutorialManager.shared.handleEntityDuplicatedOrRenamed()
     }
 
 }

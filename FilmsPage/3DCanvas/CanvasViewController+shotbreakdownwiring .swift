@@ -63,6 +63,7 @@ extension CanvasViewController {
      // MARK: - Shot Breakdown Entry Point
 
       @objc func shotBreakdownTapped() {
+          CanvasTutorialManager.shared.handleShotBreakdownOpened()
           let vc = ShotBreakdownViewController()
           vc.sceneName   = self.sceneName
           vc.timeline    = self.timeline

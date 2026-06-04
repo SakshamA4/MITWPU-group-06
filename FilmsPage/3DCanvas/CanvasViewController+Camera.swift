@@ -122,6 +122,10 @@ extension CanvasViewController {
             gesture.scale = 1.0
             return
         }
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            CanvasTutorialManager.shared.handleZoomGestureEnded()
+        }
     }
 
     func updateEditorCamera() {
@@ -275,6 +279,8 @@ extension CanvasViewController {
         startCameraPreviewUpdates()
         setCameraPanelExpanded(true, animated: true)
         setupCameraPanelSwipeGestures()
+
+        self.notifyEntitySpawned(toolType: .camera)
 
         // Load the visual model asset asynchronously.
         // Falls back to the procedural mesh visual if the asset is not found.

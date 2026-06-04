@@ -116,6 +116,10 @@ extension CanvasViewController {
         pitch  = max(0.05, min(1.4, pitch))
         gesture.setTranslation(.zero, in: arView)
         updateEditorCamera()
+
+        if gesture.state == .ended || gesture.state == .cancelled {
+            CanvasTutorialManager.shared.handleOrbitGestureEnded()
+        }
     }
 
     // ── Twist — yaw (empty) or entity Y-rotation (selected) ──────────────────
@@ -133,7 +137,9 @@ extension CanvasViewController {
             guard let startYaw = initialCameraYaw else { return }
             yaw = startYaw + Float(gesture.rotation)
             updateEditorCamera()
-        case .ended, .cancelled: initialCameraYaw = nil
+        case .ended, .cancelled:
+            initialCameraYaw = nil
+            CanvasTutorialManager.shared.handleOrbitGestureEnded()
         default: break
         }
     }
@@ -218,6 +224,7 @@ extension CanvasViewController {
                 hideRotationGizmo()
                 hideAnimationPanel()
                 refreshSidebarContent()
+                CanvasTutorialManager.shared.handleEntitySelected()
                 return
             }
 
@@ -228,6 +235,7 @@ extension CanvasViewController {
             activeHandleEntity = nil
             setEntityTransparency(root, alpha: 0.9)
             updateGizmoMode()
+            CanvasTutorialManager.shared.handleEntitySelected()
             // Menu is now triggered by long press, not tap
 
             // commented this to stop auto animation playing
@@ -748,6 +756,7 @@ extension CanvasViewController {
         case .ended, .cancelled:
             ringDragActive = false
             resetGizmoColors()
+            CanvasTutorialManager.shared.handlePropRotated()
         default: break
         }
     }
@@ -889,6 +898,7 @@ extension CanvasViewController {
             rotationSolver.endRotation()
             activeRotationAxis = nil
             resetGizmoColors()
+            CanvasTutorialManager.shared.handlePropRotated()
         default: break
         }
     }

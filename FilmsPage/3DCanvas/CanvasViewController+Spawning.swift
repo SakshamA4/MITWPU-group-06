@@ -909,6 +909,8 @@ extension CanvasViewController {
             await CinematicMaterialManager.shared.applyMaterial(materialConfig, to: wallRoot)
         }
 
+        self.notifyEntitySpawned(toolType: .wall)
+
         return wallRoot as? ModelEntity
     }
 
@@ -986,6 +988,8 @@ extension CanvasViewController {
         Task { @MainActor in
             await CinematicMaterialManager.shared.applyMaterial(materialConfig, to: ground)
         }
+
+        self.notifyEntitySpawned(toolType: .wall)
 
         return ground as? ModelEntity
     }
