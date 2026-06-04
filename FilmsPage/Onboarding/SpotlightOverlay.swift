@@ -4,10 +4,11 @@
 //
 //  Full-screen UIKit overlay that:
 //    • Dims everything outside a spotlight "hole" using CAShapeLayer + .evenOdd fill rule
-//    • Displays a TipKit-styled callout bubble above or below the hole
-//    • Pulses a glowing border around the spotlighted control
+//    • Displays a premium dark-themed callout card above or below the hole
+//    • Pulses a glowing white border around the spotlighted control
 //    • Passes touches through the hole so the user can interact with the real UI
 //    • Shows a "Skip" button to exit the tutorial at any point
+//    • Supports a full-screen welcome mode (no spotlight hole, centered card, tap-anywhere)
 //
 //  Usage (from TutorialManager):
 //    let overlay = SpotlightOverlay()
@@ -23,6 +24,12 @@ import UIKit
 
 protocol SpotlightOverlayDelegate: AnyObject {
     func spotlightOverlayDidRequestSkip(_ overlay: SpotlightOverlay)
+    func spotlightOverlayDidDismissWelcome(_ overlay: SpotlightOverlay)
+}
+
+// Default implementation so existing conformers don't need to add the new method
+extension SpotlightOverlayDelegate {
+    func spotlightOverlayDidDismissWelcome(_ overlay: SpotlightOverlay) {}
 }
 
 // MARK: - SpotlightOverlay
@@ -34,6 +41,10 @@ final class SpotlightOverlay: UIView {
     weak var delegate: SpotlightOverlayDelegate?
     /// Weak reference to the spotlighted view; used to recalculate position on layout.
     weak var targetView: UIView?
+
+    /// When true, the overlay shows a centered welcome card with no spotlight hole.
+    /// Tapping anywhere on the overlay dismisses it.
+    private(set) var isWelcomeMode = false
 
     // MARK: Private layers & views
 
@@ -47,8 +58,14 @@ final class SpotlightOverlay: UIView {
     private var calloutTopConstraint:    NSLayoutConstraint?
     private var calloutBottomConstraint: NSLayoutConstraint?
 
+    // Welcome-mode centering constraints
+    private var calloutCenterYConstraint: NSLayoutConstraint?
+
     // Current spotlight rect in the overlay's own coordinate space
     private var spotlightRect: CGRect = .zero
+
+    // Tap gesture for welcome mode
+    private var welcomeTapGesture: UITapGestureRecognizer?
 
     // MARK: - Init
 
@@ -77,15 +94,15 @@ final class SpotlightOverlay: UIView {
     // MARK: - Sub-view Setup
 
     private func setupDimmingLayer() {
-        dimmingLayer.fillColor = UIColor.black.withAlphaComponent(0.72).cgColor
+        dimmingLayer.fillColor = UIColor.black.withAlphaComponent(0.78).cgColor
         dimmingLayer.fillRule  = .evenOdd
         layer.addSublayer(dimmingLayer)
     }
 
     private func setupRingLayer() {
         ringLayer.borderColor  = UIColor.white.cgColor
-        ringLayer.borderWidth  = 2
-        ringLayer.opacity      = 0.9
+        ringLayer.borderWidth  = 2.5
+        ringLayer.opacity      = 0.0  // hidden until needed
         layer.addSublayer(ringLayer)
     }
 
@@ -95,15 +112,15 @@ final class SpotlightOverlay: UIView {
 
         NSLayoutConstraint.activate([
             calloutView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            calloutView.widthAnchor.constraint(equalToConstant: 340),
-            calloutView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
-            calloutView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20)
+            calloutView.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
+            calloutView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 24),
+            calloutView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -24)
         ])
     }
 
     private func setupProgressLabel() {
         progressLabel.font        = UIFont.systemFont(ofSize: 12, weight: .semibold)
-        progressLabel.textColor   = UIColor.white.withAlphaComponent(0.55)
+        progressLabel.textColor   = UIColor.white.withAlphaComponent(0.45)
         progressLabel.textAlignment = .center
         progressLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(progressLabel)
@@ -112,10 +129,10 @@ final class SpotlightOverlay: UIView {
     private func setupSkipButton() {
         var cfg = UIButton.Configuration.plain()
         cfg.title                 = "Skip Tutorial"
-        cfg.baseForegroundColor   = UIColor.white.withAlphaComponent(0.65)
+        cfg.baseForegroundColor   = UIColor.white.withAlphaComponent(0.55)
         cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var a = attrs
-            a.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            a.font = UIFont.systemFont(ofSize: 13, weight: .medium)
             return a
         }
         skipButton.configuration = cfg
@@ -129,7 +146,45 @@ final class SpotlightOverlay: UIView {
         ])
     }
 
-    // MARK: - Public Configuration
+    // MARK: - Welcome Mode Configuration
+
+    /// Configure the overlay for a full-screen welcome message (no spotlight hole).
+    func configureWelcomeMode() {
+        isWelcomeMode = true
+
+        // No spotlight ring
+        ringLayer.opacity = 0.0
+        ringLayer.isHidden = true
+        spotlightRect = .zero
+
+        // Full dimming (no hole)
+        dimmingLayer.fillRule = .nonZero
+
+        // Configure the callout for welcome content
+        calloutView.configureWelcome(
+            title: "Welcome to SceneWiz",
+            subtitle: "Your cinematic production toolkit.",
+            body: "We'll walk you through setting up your first project — from scenes to films to the production canvas.",
+            hint: "Tap anywhere to continue"
+        )
+
+        // Hide progress for welcome
+        progressLabel.isHidden = true
+        skipButton.isHidden    = false
+
+        // Center the callout vertically
+        calloutTopConstraint?.isActive    = false
+        calloutBottomConstraint?.isActive = false
+        calloutCenterYConstraint = calloutView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -20)
+        calloutCenterYConstraint?.isActive = true
+
+        // Add tap-anywhere gesture
+        let tap = UITapGestureRecognizer(target: self, action: #selector(didTapWelcome))
+        addGestureRecognizer(tap)
+        welcomeTapGesture = tap
+    }
+
+    // MARK: - Spotlight Mode Configuration
 
     /// Apply all visual state for the given step.
     func configure(
@@ -138,6 +193,14 @@ final class SpotlightOverlay: UIView {
         currentStepIndex: Int,
         totalSteps: Int
     ) {
+        isWelcomeMode = false
+
+        // Remove welcome tap gesture if present
+        if let tap = welcomeTapGesture {
+            removeGestureRecognizer(tap)
+            welcomeTapGesture = nil
+        }
+
         spotlightRect = spotlightFrame.insetBy(dx: -14, dy: -14)
         let radius: CGFloat = 16
 
@@ -145,16 +208,23 @@ final class SpotlightOverlay: UIView {
         calloutView.configure(title: step.stepTitle, message: step.coachMessage)
 
         // Progress
+        progressLabel.isHidden = false
         progressLabel.text = currentStepIndex > 0
             ? "Step \(currentStepIndex) of \(totalSteps)"
             : ""
 
-        // Dimming path
+        // Dimming path (with hole)
+        dimmingLayer.fillRule = .evenOdd
         updateDimmingPath(radius: radius)
 
-        // Ring
+        // Ring (visible & pulsing)
+        ringLayer.isHidden     = false
+        ringLayer.opacity      = 0.9
         ringLayer.frame        = spotlightRect
         ringLayer.cornerRadius = radius
+
+        // Deactivate welcome centering
+        calloutCenterYConstraint?.isActive = false
 
         // Position callout + progress label
         updateCalloutPosition()
@@ -168,6 +238,15 @@ final class SpotlightOverlay: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+
+        if isWelcomeMode {
+            // Full-screen dimming, no hole
+            let full = UIBezierPath(rect: bounds)
+            dimmingLayer.path  = full.cgPath
+            dimmingLayer.frame = bounds
+            return
+        }
+
         guard spotlightRect != .zero else { return }
 
         // Recalculate spotlight from live target view frame (handles rotation / scroll)
@@ -200,6 +279,7 @@ final class SpotlightOverlay: UIView {
         // Deactivate both, then pick the correct side
         calloutTopConstraint?.isActive    = false
         calloutBottomConstraint?.isActive = false
+        calloutCenterYConstraint?.isActive = false
 
         let spaceBelow = bounds.height - spotlightRect.maxY
         let useBelow   = spaceBelow >= 160
@@ -207,17 +287,15 @@ final class SpotlightOverlay: UIView {
         if useBelow {
             calloutTopConstraint = calloutView.topAnchor.constraint(
                 equalTo: topAnchor,
-                constant: spotlightRect.maxY + 24
+                constant: spotlightRect.maxY + 28
             )
             calloutTopConstraint?.isActive = true
-            calloutView.arrowPosition      = .top
         } else {
             calloutBottomConstraint = calloutView.bottomAnchor.constraint(
                 equalTo: topAnchor,
-                constant: spotlightRect.minY - 24
+                constant: spotlightRect.minY - 28
             )
             calloutBottomConstraint?.isActive = true
-            calloutView.arrowPosition          = .bottom
         }
     }
 
@@ -228,8 +306,8 @@ final class SpotlightOverlay: UIView {
         let cx = bounds.midX
         let useBelow = bounds.height - spotlightRect.maxY >= 160
         let y: CGFloat = useBelow
-            ? spotlightRect.maxY + 24 + 90
-            : spotlightRect.minY - 24 - 90 - h
+            ? spotlightRect.maxY + 28 + 100
+            : spotlightRect.minY - 28 - 100 - h
 
         progressLabel.frame = CGRect(
             x: cx - w / 2,
@@ -244,8 +322,8 @@ final class SpotlightOverlay: UIView {
         ringLayer.removeAllAnimations()
         let anim           = CABasicAnimation(keyPath: "opacity")
         anim.fromValue     = 0.9
-        anim.toValue       = 0.25
-        anim.duration      = 0.85
+        anim.toValue       = 0.3
+        anim.duration      = 1.0
         anim.autoreverses  = true
         anim.repeatCount   = .infinity
         anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -260,8 +338,24 @@ final class SpotlightOverlay: UIView {
 
         guard animated else { return }
         alpha = 0
-        UIView.animate(withDuration: 0.35, delay: 0, options: .curveEaseOut) {
+
+        // Fade in the overlay
+        UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseOut) {
             self.alpha = 1
+        }
+
+        // Scale-in the callout card for a premium feel
+        calloutView.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+        calloutView.alpha = 0
+        UIView.animate(
+            withDuration: 0.5,
+            delay: 0.15,
+            usingSpringWithDamping: 0.78,
+            initialSpringVelocity: 0.3,
+            options: .curveEaseOut
+        ) {
+            self.calloutView.transform = .identity
+            self.calloutView.alpha = 1
         }
     }
 
@@ -285,10 +379,18 @@ final class SpotlightOverlay: UIView {
         delegate?.spotlightOverlayDidRequestSkip(self)
     }
 
+    @objc private func didTapWelcome() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        delegate?.spotlightOverlayDidDismissWelcome(self)
+    }
+
     // MARK: - Hit Testing
 
     /// Allow taps inside the spotlight hole to fall through to the real UI.
+    /// In welcome mode, capture all taps.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if isWelcomeMode { return super.hitTest(point, with: event) }
         if spotlightRect.contains(point) { return nil }
         return super.hitTest(point, with: event)
     }
@@ -296,20 +398,24 @@ final class SpotlightOverlay: UIView {
 
 // MARK: - SpotlightCalloutView
 
-/// A TipKit-inspired callout card that shows a step's title and coach message.
+/// A premium dark-themed callout card used for onboarding coach marks.
 final class SpotlightCalloutView: UIView {
-
-    enum ArrowPosition { case top, bottom }
-
-    // MARK: Properties
-
-    var arrowPosition: ArrowPosition = .top
 
     // MARK: Private subviews
 
-    private let cardView      = UIView()
-    private let titleLabel    = UILabel()
-    private let messageLabel  = UILabel()
+    private let cardView        = UIView()
+    private let titleLabel      = UILabel()
+    private let messageLabel    = UILabel()
+    private let hintLabel       = UILabel()
+    private let accentBar       = UIView()
+    private let contentStack    = UIStackView()
+
+    // Separator line between body and hint
+    private let separatorLine   = UIView()
+
+    // Switchable leading constraints
+    private var contentLeadingAccent:   NSLayoutConstraint!
+    private var contentLeadingCard:     NSLayoutConstraint!
 
     // MARK: - Init
 
@@ -328,57 +434,164 @@ final class SpotlightCalloutView: UIView {
     private func setup() {
         backgroundColor = .clear
 
-        // Card
-        cardView.backgroundColor = UIColor(red: 0.64, green: 0.18, blue: 0.23, alpha: 0.95)
-        cardView.layer.cornerRadius  = 14
-        cardView.layer.borderWidth   = 1
-        cardView.layer.borderColor   = UIColor.white.withAlphaComponent(0.20).cgColor
+        // ── Card ──────────────────────────────────────────────────────────────
+        // Deep dark background matching the app's dark theme
+        cardView.backgroundColor = UIColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.97)
+        cardView.layer.cornerRadius  = 18
+        cardView.layer.cornerCurve   = .continuous
+        cardView.layer.borderWidth   = 1.0
+        cardView.layer.borderColor   = UIColor.white.withAlphaComponent(0.15).cgColor
+
+        // Premium shadow
         cardView.layer.shadowColor   = UIColor.black.cgColor
-        cardView.layer.shadowOpacity = 0.40
-        cardView.layer.shadowRadius  = 10
-        cardView.layer.shadowOffset  = CGSize(width: 0, height: 4)
+        cardView.layer.shadowOpacity = 0.65
+        cardView.layer.shadowRadius  = 28
+        cardView.layer.shadowOffset  = CGSize(width: 0, height: 8)
+
         cardView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(cardView)
 
-        // Title
-        titleLabel.font            = UIFont.systemFont(ofSize: 15, weight: .bold)
+        // ── Accent bar (left edge) ────────────────────────────────────────────
+        // A thin vertical accent strip matching the app's red/maroon accent
+        accentBar.backgroundColor = UIColor(red: 0.75, green: 0.12, blue: 0.18, alpha: 1.0)
+        accentBar.layer.cornerRadius = 2
+        accentBar.translatesAutoresizingMaskIntoConstraints = false
+        cardView.addSubview(accentBar)
+
+        // ── Title ─────────────────────────────────────────────────────────────
+        titleLabel.font            = roundedFont(size: 18, weight: .bold)
         titleLabel.textColor       = .white
         titleLabel.numberOfLines   = 0
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Message
-        messageLabel.font          = UIFont.systemFont(ofSize: 13, weight: .medium)
-        messageLabel.textColor     = .white
+        // ── Message ───────────────────────────────────────────────────────────
+        messageLabel.font          = UIFont.systemFont(ofSize: 15, weight: .regular)
+        messageLabel.textColor     = UIColor.white.withAlphaComponent(0.72)
         messageLabel.numberOfLines = 0
-        messageLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Content stack
-        let contentStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
+        // ── Separator ─────────────────────────────────────────────────────────
+        separatorLine.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+        separatorLine.translatesAutoresizingMaskIntoConstraints = false
+        separatorLine.isHidden = true
+
+        // ── Hint ──────────────────────────────────────────────────────────────
+        hintLabel.font           = UIFont.systemFont(ofSize: 12, weight: .medium)
+        hintLabel.textColor      = UIColor.white.withAlphaComponent(0.38)
+        hintLabel.numberOfLines  = 1
+        hintLabel.textAlignment  = .center
+        hintLabel.isHidden       = true
+
+        // ── Content Stack ─────────────────────────────────────────────────────
         contentStack.axis      = .vertical
-        contentStack.spacing   = 8
+        contentStack.spacing   = 10
+        contentStack.alignment = .fill
         contentStack.translatesAutoresizingMaskIntoConstraints = false
+        [titleLabel, messageLabel, separatorLine, hintLabel].forEach {
+            contentStack.addArrangedSubview($0)
+        }
         cardView.addSubview(contentStack)
 
+        // ── Switchable leading constraints ────────────────────────────────────
+        // Accent mode: content starts after the accent bar
+        contentLeadingAccent = contentStack.leadingAnchor.constraint(
+            equalTo: accentBar.trailingAnchor, constant: 14
+        )
+        // Welcome mode: content has equal padding on both sides
+        contentLeadingCard = contentStack.leadingAnchor.constraint(
+            equalTo: cardView.leadingAnchor, constant: 24
+        )
+
+        // ── Constraints ───────────────────────────────────────────────────────
+        contentLeadingAccent.isActive = true  // default: accent mode
+
         NSLayoutConstraint.activate([
-            // Card fills self (with 8 pt top/bottom for the callout arrow zone)
-            cardView.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            cardView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            // Card fills self
+            cardView.topAnchor.constraint(equalTo: topAnchor),
+            cardView.bottomAnchor.constraint(equalTo: bottomAnchor),
             cardView.leadingAnchor.constraint(equalTo: leadingAnchor),
             cardView.trailingAnchor.constraint(equalTo: trailingAnchor),
 
-            // Content insets
-            contentStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 14),
-            contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
-            contentStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
-            contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16)
+            // Accent bar (left edge)
+            accentBar.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
+            accentBar.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 18),
+            accentBar.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -18),
+            accentBar.widthAnchor.constraint(equalToConstant: 3),
+
+            // Content stack (top, bottom, trailing — leading is switchable)
+            contentStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 20),
+            contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20),
+            contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -20),
+
+            // Separator height
+            separatorLine.heightAnchor.constraint(equalToConstant: 0.5)
         ])
     }
 
-    // MARK: - Configuration
+    // MARK: - Configuration (Spotlight Steps)
 
     func configure(title: String, message: String) {
         titleLabel.text         = title
+        titleLabel.font         = roundedFont(size: 18, weight: .bold)
+        titleLabel.textAlignment = .natural
         messageLabel.text       = message
+        messageLabel.font       = UIFont.systemFont(ofSize: 15, weight: .regular)
+        messageLabel.textColor  = UIColor.white.withAlphaComponent(0.72)
+        messageLabel.textAlignment = .natural
         messageLabel.isHidden   = message.isEmpty
+
+        // Hide welcome-only elements
+        separatorLine.isHidden  = true
+        hintLabel.isHidden      = true
+
+        // Standard spacing
+        contentStack.spacing    = 8
+        contentStack.alignment  = .fill
+
+        // Show accent bar, use accent leading
+        accentBar.isHidden = false
+        contentLeadingCard.isActive   = false
+        contentLeadingAccent.isActive = true
+    }
+
+    // MARK: - Configuration (Welcome Mode)
+
+    func configureWelcome(title: String, subtitle: String, body: String, hint: String) {
+        // Title — app name
+        titleLabel.text      = title
+        titleLabel.font      = roundedFont(size: 26, weight: .bold)
+        titleLabel.textAlignment = .center
+
+        // Subtitle + body
+        messageLabel.text    = "\(subtitle)\n\n\(body)"
+        messageLabel.font    = UIFont.systemFont(ofSize: 15, weight: .regular)
+        messageLabel.textColor = UIColor.white.withAlphaComponent(0.65)
+        messageLabel.textAlignment = .center
+        messageLabel.isHidden = false
+
+        // Separator
+        separatorLine.isHidden = false
+
+        // Hint
+        hintLabel.text    = hint
+        hintLabel.isHidden = false
+
+        // Wider spacing for the welcome card
+        contentStack.spacing   = 14
+        contentStack.alignment = .center
+
+        // Hide accent bar, use card leading
+        accentBar.isHidden = true
+        contentLeadingAccent.isActive = false
+        contentLeadingCard.isActive   = true
+    }
+
+    // MARK: - Helpers
+
+    private func roundedFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        let descriptor = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor
+        if let rounded = descriptor.withDesign(.rounded) {
+            return UIFont(descriptor: rounded, size: size)
+        }
+        return UIFont.systemFont(ofSize: size, weight: weight)
     }
 }
+

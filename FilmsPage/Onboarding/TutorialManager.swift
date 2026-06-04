@@ -68,6 +68,8 @@ final class TutorialManager: NSObject {
 
     private var currentOverlay: SpotlightOverlay?
     private var isOverlayVisible: Bool { currentOverlay?.superview != nil }
+    /// Tracks whether the welcome overlay ("Welcome to SceneWiz") has been shown this session.
+    private var hasShownWelcomeOverlay = false
 
     // MARK: - Init
 
@@ -98,7 +100,16 @@ final class TutorialManager: NSObject {
         currentStep = step
         PreCanvasTips.activate(for: step)
         dismissCurrentOverlay(animated: true) { [weak self] in
-            self?.handleNavigation(for: step)
+            guard let self else { return }
+
+            // On the very first step, show a full-screen welcome overlay first.
+            if step == .homeCreateScene && !self.hasShownWelcomeOverlay {
+                self.hasShownWelcomeOverlay = true
+                self.showWelcomeOverlay()
+                return
+            }
+
+            self.handleNavigation(for: step)
         }
     }
 
@@ -253,6 +264,22 @@ final class TutorialManager: NSObject {
         )
     }
 
+    // MARK: - Welcome Overlay
+
+    private func showWelcomeOverlay() {
+        guard let window = keyWindow else {
+            // Fallback: skip the welcome and go straight to navigation.
+            handleNavigation(for: currentStep)
+            return
+        }
+
+        let overlay = SpotlightOverlay()
+        overlay.delegate = self
+        overlay.configureWelcomeMode()
+        overlay.show(in: window)
+        currentOverlay = overlay
+    }
+
     // MARK: - Overlay Lifecycle
 
     private func dismissCurrentOverlay(animated: Bool = true, completion: (() -> Void)? = nil) {
@@ -327,5 +354,13 @@ final class TutorialManager: NSObject {
 extension TutorialManager: SpotlightOverlayDelegate {
     func spotlightOverlayDidRequestSkip(_ overlay: SpotlightOverlay) {
         skipOnboarding()
+    }
+
+    func spotlightOverlayDidDismissWelcome(_ overlay: SpotlightOverlay) {
+        // Dismiss the welcome overlay, then proceed to the actual spotlight step.
+        dismissCurrentOverlay(animated: true) { [weak self] in
+            guard let self else { return }
+            self.handleNavigation(for: self.currentStep)
+        }
     }
 }
