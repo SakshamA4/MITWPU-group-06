@@ -83,7 +83,7 @@ final class SpotlightOverlay: UIView {
     }
 
     private func setupRingLayer() {
-        ringLayer.borderColor  = UIColor(red: 0.9, green: 0.25, blue: 0.25, alpha: 1).cgColor
+        ringLayer.borderColor  = UIColor.white.cgColor
         ringLayer.borderWidth  = 2
         ringLayer.opacity      = 0.9
         layer.addSublayer(ringLayer)
@@ -94,8 +94,10 @@ final class SpotlightOverlay: UIView {
         addSubview(calloutView)
 
         NSLayoutConstraint.activate([
-            calloutView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            calloutView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20)
+            calloutView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            calloutView.widthAnchor.constraint(equalToConstant: 340),
+            calloutView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
+            calloutView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20)
         ])
     }
 
@@ -306,7 +308,6 @@ final class SpotlightCalloutView: UIView {
     // MARK: Private subviews
 
     private let cardView      = UIView()
-    private let iconImageView = UIImageView()
     private let titleLabel    = UILabel()
     private let messageLabel  = UILabel()
 
@@ -328,48 +329,33 @@ final class SpotlightCalloutView: UIView {
         backgroundColor = .clear
 
         // Card
-        cardView.backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 0.97)
-        cardView.layer.cornerRadius  = 18
+        cardView.backgroundColor = UIColor(red: 0.64, green: 0.18, blue: 0.23, alpha: 0.95)
+        cardView.layer.cornerRadius  = 14
         cardView.layer.borderWidth   = 1
-        cardView.layer.borderColor   = UIColor.white.withAlphaComponent(0.10).cgColor
+        cardView.layer.borderColor   = UIColor.white.withAlphaComponent(0.20).cgColor
         cardView.layer.shadowColor   = UIColor.black.cgColor
-        cardView.layer.shadowOpacity = 0.55
-        cardView.layer.shadowRadius  = 14
-        cardView.layer.shadowOffset  = CGSize(width: 0, height: 5)
+        cardView.layer.shadowOpacity = 0.40
+        cardView.layer.shadowRadius  = 10
+        cardView.layer.shadowOffset  = CGSize(width: 0, height: 4)
         cardView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(cardView)
 
-        // Icon
-        let iconCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        iconImageView.image            = UIImage(systemName: "lightbulb.fill", withConfiguration: iconCfg)
-        iconImageView.tintColor        = UIColor.systemYellow
-        iconImageView.contentMode      = .scaleAspectFit
-        iconImageView.setContentHuggingPriority(.required, for: .horizontal)
-        iconImageView.translatesAutoresizingMaskIntoConstraints = false
-
         // Title
-        titleLabel.font            = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        titleLabel.font            = UIFont.systemFont(ofSize: 15, weight: .bold)
         titleLabel.textColor       = .white
-        titleLabel.numberOfLines   = 1
+        titleLabel.numberOfLines   = 0
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // Message
-        messageLabel.font          = UIFont.systemFont(ofSize: 13, weight: .regular)
-        messageLabel.textColor     = UIColor.white.withAlphaComponent(0.72)
+        messageLabel.font          = UIFont.systemFont(ofSize: 13, weight: .medium)
+        messageLabel.textColor     = .white
         messageLabel.numberOfLines = 0
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Header row
-        let headerStack = UIStackView(arrangedSubviews: [iconImageView, titleLabel])
-        headerStack.axis      = .horizontal
-        headerStack.spacing   = 8
-        headerStack.alignment = .center
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
-
         // Content stack
-        let contentStack = UIStackView(arrangedSubviews: [headerStack, messageLabel])
+        let contentStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
         contentStack.axis      = .vertical
-        contentStack.spacing   = 7
+        contentStack.spacing   = 8
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         cardView.addSubview(contentStack)
 
@@ -381,13 +367,10 @@ final class SpotlightCalloutView: UIView {
             cardView.trailingAnchor.constraint(equalTo: trailingAnchor),
 
             // Content insets
-            contentStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 16),
-            contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -16),
-            contentStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 18),
-            contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -18),
-
-            iconImageView.widthAnchor.constraint(equalToConstant: 22),
-            iconImageView.heightAnchor.constraint(equalToConstant: 22)
+            contentStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 14),
+            contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
+            contentStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16)
         ])
     }
 

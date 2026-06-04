@@ -15,14 +15,13 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
 
     /// The "+" nav bar button spotlighted in Step 1 of the onboarding.
     /// Exposed as internal so TutorialManager can read its frame.
-    private(set) var createSceneButton: UIButton = {
-        let btn = UIButton(type: .system)
-        let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        btn.setImage(UIImage(systemName: "plus", withConfiguration: cfg), for: .normal)
-        btn.tintColor = .white
-        btn.accessibilityLabel = "Create New Scene"
-        return btn
-    }()
+    var createSceneButton: UIView? {
+        guard let items = navigationItem.rightBarButtonItems else { return nil }
+        if let plusItem = items.first(where: { $0 != searchButton }) {
+            return plusItem.value(forKey: "view") as? UIView
+        }
+        return nil
+    }
 
     /// Returns the first visible cell in the Recent Scenes section (section 1).
     var firstRecentSceneView: UIView? {
@@ -56,7 +55,6 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
         setupCollectionView()
         setupObservers()
         setupSearchController()
-        setupCreateSceneButton()
 
         // Save the right bar button items and ensure they are visible initially
         savedRightBarButtonItems = navigationItem.rightBarButtonItems
@@ -170,38 +168,13 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
 
     // MARK: - Tutorial Helpers
 
-    /// Adds the "+" Create Scene button to the navigation bar.
-    private func setupCreateSceneButton() {
-        createSceneButton.addTarget(self, action: #selector(presentCreateScene), for: .touchUpInside)
-        let barItem = UIBarButtonItem(customView: createSceneButton)
-        // Insert before the existing search button
-        var items = navigationItem.rightBarButtonItems ?? []
-        items.append(barItem)
-        navigationItem.rightBarButtonItems = items
-        savedRightBarButtonItems = navigationItem.rightBarButtonItems
-    }
-
-    @objc private func presentCreateScene() {
-        // Present AddSceneToLibrarayViewController modally
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        if let vc = storyboard.instantiateViewController(
-            withIdentifier: "AddSceneToLibrarayViewController"
-        ) as? AddSceneToLibrarayViewController {
-            vc.modalPresentationStyle = .pageSheet
-            if let sheet = vc.sheetPresentationController {
-                sheet.detents                 = [.medium(), .large()]
-                sheet.prefersGrabberVisible   = true
-                sheet.preferredCornerRadius   = 24
-            }
-            present(vc, animated: true)
-        }
-    }
-
     private func showTutorialSpotlightIfNeeded() {
         let tm = TutorialManager.shared
         switch tm.currentStep {
         case .homeCreateScene:
-            tm.showSpotlightIfNeeded(targeting: createSceneButton, for: .homeCreateScene)
+            if let target = createSceneButton {
+                tm.showSpotlightIfNeeded(targeting: target, for: .homeCreateScene)
+            }
         case .returnToHomeHighlight:
             if let cell = firstRecentSceneView {
                 tm.showSpotlightIfNeeded(targeting: cell, for: .returnToHomeHighlight)
@@ -221,7 +194,9 @@ class HomeViewController: UIViewController, UICollectionViewDelegate {
 
         switch step {
         case .homeCreateScene:
-            TutorialManager.shared.showSpotlightIfNeeded(targeting: createSceneButton, for: step)
+            if let target = createSceneButton {
+                TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: step)
+            }
         case .returnToHomeHighlight, .enterScene:
             // Wait a tick for the collection view to reload after scene creation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -299,6 +274,7 @@ extension HomeViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         // --- Recent Scenes (section 1) — open directly, unchanged ---
         if indexPath.section == 1 {
+            let isTutorialActive = (TutorialManager.shared.currentStep == .enterScene)
             // Notify tutorial manager before opening the canvas (Step 7)
             TutorialManager.shared.handleSceneTappedOnHome()
 
@@ -308,6 +284,7 @@ extension HomeViewController: UICollectionViewDataSource {
             vc.sceneName = selectedModel.name
             vc.sceneNotes = selectedModel.notes ?? ""
             vc.sceneImageName = selectedModel.image
+            vc.isOnboardingEntry = isTutorialActive
             let navController = UINavigationController(rootViewController: vc)
             navController.modalPresentationStyle = .fullScreen
             self.present(navController, animated: true)

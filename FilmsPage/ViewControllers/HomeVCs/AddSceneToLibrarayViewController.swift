@@ -148,6 +148,9 @@ class AddSceneToLibrarayViewController: UIViewController {
         let newRecentModel = ScenesModel(name: name, image: imageNameToStore, notes: notes)
         ScenesDataStore.shared.addToRecent(scene: newRecentModel)
 
+        // Notify the tutorial manager that a scene was created from the Home tab (advances step 1 → 2)
+        TutorialManager.shared.handleHomeSceneCreated(newRecentModel)
+
         // 2. Create and save the Scene for the specific Film Sequence
         if let seqId = targetSequenceId {
             let projectScene = Scene(

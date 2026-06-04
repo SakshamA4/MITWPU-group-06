@@ -131,7 +131,7 @@ class AddSequenceViewController: UIViewController {
 
     // MARK: - Save Sequence
 
-    @IBAction func addNewSequence(_ sender: Any) {
+    @IBAction func AddNewSequence(_ sender: Any) {
         guard let film = film else { return }
         guard let name = nameTextField.text, !name.isEmpty else {
             shakeField(nameTextField)

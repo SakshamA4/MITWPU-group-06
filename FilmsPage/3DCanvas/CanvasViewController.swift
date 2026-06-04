@@ -290,6 +290,9 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
     /// instead of adding the scene to recents.
     var userDidSave: Bool = false
 
+    /// Set to true when Canvas is entered via the onboarding step 7 tap on the scene card.
+    var isOnboardingEntry: Bool = false
+
     // FIX: Track whether the scene has been loaded to prevent reloading it
     // multiple times when returning from navigation (e.g., shot breakdown).
     // Reset to false when exiting the scene.
@@ -712,6 +715,12 @@ class CanvasViewController: UIViewController, UIGestureRecognizerDelegate, UIAda
         super.viewDidAppear(animated)
         // In export mode, the coordinator loads scenes explicitly.
         guard !isExportMode else { return }
+
+        // Onboarding handoff: complete the pre-canvas tutorial if we entered from onboarding
+        if isOnboardingEntry {
+            TutorialManager.shared.markPreCanvasTutorialCompleted()
+        }
+
         // Defer scene load until the view is fully on screen.
         // This lets RealityKit finish its initial render pass before we
         // start deserialising entities, preventing the black-screen stall
