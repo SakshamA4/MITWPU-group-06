@@ -154,6 +154,10 @@ class AddSceneViewController: UIViewController {
         )
 
         SceneService.shared.addScene(scene)
+
+        // Notify the tutorial manager that a scene was created in a sequence (advances step 5 → 6)
+        TutorialManager.shared.handleSceneCreatedInSequence(scene)
+
         dismiss(animated: true)
     }
 

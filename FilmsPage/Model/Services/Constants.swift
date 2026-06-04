@@ -16,6 +16,13 @@ enum StorageKeys {
     static let characters = "characters_storage"
     static let props = "props_storage"
     static let poses = "poses_storage"
+
+    // Onboarding / Tutorial
+    static let tutorialStep       = "tutorial_current_step"
+    static let tutorialCompleted  = "pre_canvas_tutorial_completed"
+    static let tutorialFilmID     = "tutorial_film_id"
+    static let tutorialSequenceID = "tutorial_sequence_id"
+    static let tutorialSceneID    = "tutorial_scene_id"
 }
 
 // Notification Names
@@ -28,4 +35,9 @@ enum NotificationNames {
     static let filmCharactersUpdated = "filmCharactersUpdated"
     static let propsUpdated = "propsUpdated"
     static let posesUpdated = "posesUpdated"
+
+    // Onboarding / Tutorial
+    static let tutorialStepChanged        = "tutorialStepChanged"
+    static let tutorialNavigateToFilm     = "tutorialNavigateToFilm"
+    static let tutorialNavigateToSequence = "tutorialNavigateToSequence"
 }

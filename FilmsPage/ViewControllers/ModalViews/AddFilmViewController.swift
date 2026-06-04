@@ -157,6 +157,10 @@ class AddFilmViewController: UIViewController {
         )
 
         FilmService.shared.addFilm(film)
+
+        // Notify the tutorial manager that a film was created (advances step 2 → 4)
+        TutorialManager.shared.handleFilmCreated(film)
+
         dismiss(animated: true)
     }
 

@@ -11,7 +11,6 @@ class SequenceViewController: UIViewController {
 
     private let sceneService = SceneService.shared
     @IBOutlet weak var collectionView: UICollectionView!
-
     @IBOutlet weak var sequenceTitle: UILabel!
     @IBOutlet weak var serachButton: UIBarButtonItem!
 
@@ -22,6 +21,13 @@ class SequenceViewController: UIViewController {
     private var activeCoordinator: SequenceExportCoordinator?
     private var exportCanvas: CanvasViewController?
     private var progressOverlay: ExportProgressOverlay?
+
+    // MARK: - Tutorial Target View
+
+    /// The placeholder (+) cell spotlighted in Step 5 of the onboarding.
+    var tutorialTargetView: UIView? {
+        collectionView.cellForItem(at: IndexPath(item: 0, section: 0))
+    }
 
     // MARK: - Search State
     private var filteredScenes: [Scene] = []
@@ -227,6 +233,23 @@ class SequenceViewController: UIViewController {
             name: NSNotification.Name(NotificationNames.scenesUpdated),
             object: nil
         )
+        // Tutorial: step changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTutorialStepChanged(_:)),
+            name: NSNotification.Name(NotificationNames.tutorialStepChanged),
+            object: nil
+        )
+    }
+
+    @objc private func handleTutorialStepChanged(_ notification: Notification) {
+        guard let raw  = notification.userInfo?["step"] as? Int,
+              let step = TutorialStep(rawValue: raw),
+              step == .createSceneInSequence else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self, let target = self.tutorialTargetView else { return }
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createSceneInSequence)
+        }
     }
 
     @objc private func refreshData() {
@@ -247,6 +270,14 @@ class SequenceViewController: UIViewController {
         // Always hide search bar and show search button when view appears
         navigationItem.searchController = nil
         restoreBarButtons()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if TutorialManager.shared.currentStep == .createSceneInSequence,
+           let target = tutorialTargetView {
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createSceneInSequence)
+        }
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {

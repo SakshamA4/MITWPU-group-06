@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import TipKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -13,6 +14,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         UITabBar.appearance().tintColor = UIColor(named: "AccentColor")
+
+        // Configure TipKit for the onboarding coach marks.
+        // .displayFrequency(.immediate) ensures tips appear as soon as they become eligible.
+        try? Tips.configure([.displayFrequency(.immediate)])
 
         return true
     }

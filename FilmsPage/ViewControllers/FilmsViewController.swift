@@ -39,6 +39,13 @@ class FilmsViewController: UIViewController {
     @IBOutlet weak var collectionView: UICollectionView!
     @IBOutlet weak var searchButton: UIBarButtonItem!
 
+    // MARK: - Tutorial Target View
+
+    /// The placeholder (+) cell spotlighted in Step 2 of the onboarding.
+    var tutorialTargetView: UIView? {
+        collectionView.cellForItem(at: IndexPath(item: 0, section: 0))
+    }
+
     @IBAction func searchAction(_ sender: Any) {
         // Show search controller in navigation bar
         navigationItem.searchController = searchController
@@ -90,6 +97,14 @@ class FilmsViewController: UIViewController {
         navigationItem.rightBarButtonItem = savedSearchButton ?? searchButton
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if TutorialManager.shared.currentStep == .createFilm,
+           let target = tutorialTargetView {
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createFilm)
+        }
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
@@ -115,6 +130,20 @@ class FilmsViewController: UIViewController {
             self,
             selector: #selector(refreshData),
             name: NSNotification.Name(NotificationNames.filmsUpdated),
+            object: nil
+        )
+        // Tutorial: navigate to the tutorial film's MyFilmViewController
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTutorialNavigateToFilm(_:)),
+            name: NSNotification.Name(NotificationNames.tutorialNavigateToFilm),
+            object: nil
+        )
+        // Tutorial: step changes (show spotlight if we're on the right step)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTutorialStepChanged(_:)),
+            name: NSNotification.Name(NotificationNames.tutorialStepChanged),
             object: nil
         )
     }
@@ -271,6 +300,28 @@ class FilmsViewController: UIViewController {
            let film = sender as? Film,
            let vc = segue.destination as? FilmNotesViewController {
             vc.film = film
+        }
+    }
+
+    // MARK: - Tutorial Handlers
+
+    @objc private func handleTutorialNavigateToFilm(_ notification: Notification) {
+        guard TutorialManager.shared.currentStep == .createSequence,
+              let filmIDStr = notification.userInfo?["filmID"] as? String,
+              let filmID    = UUID(uuidString: filmIDStr),
+              let film      = filmService.getFilm(by: filmID) else { return }
+        // Push MyFilmVC for the tutorial film via the existing segue
+        performSegue(withIdentifier: "myFilmSegue", sender: film)
+    }
+
+    @objc private func handleTutorialStepChanged(_ notification: Notification) {
+        guard let raw  = notification.userInfo?["step"] as? Int,
+              let step = TutorialStep(rawValue: raw),
+              step == .createFilm else { return }
+        // Give the collection view time to settle before spotlighting
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self, let target = self.tutorialTargetView else { return }
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createFilm)
         }
     }
 }

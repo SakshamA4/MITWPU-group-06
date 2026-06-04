@@ -15,8 +15,15 @@ class MyFilmViewController: UIViewController {
     @IBOutlet weak var filmName: UILabel!
     @IBOutlet weak var searchButton: UIBarButtonItem!
 
-    private let sequenceCellId = "sequence_cell"
+    private let sequenceCellId    = "sequence_cell"
     private let placeholderCellId = "placeholder_cell"
+
+    // MARK: - Tutorial Target View
+
+    /// The placeholder (+) cell spotlighted in Step 4 of the onboarding.
+    var tutorialTargetView: UIView? {
+        collectionView.cellForItem(at: IndexPath(item: 0, section: 0))
+    }
 
     // MARK: - Data & Search State
     var sequence: [Sequence] = []
@@ -73,6 +80,14 @@ class MyFilmViewController: UIViewController {
         setupReportButton()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if TutorialManager.shared.currentStep == .createSequence,
+           let target = tutorialTargetView {
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createSequence)
+        }
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         coordinator.animate(alongsideTransition: { _ in
@@ -97,6 +112,20 @@ class MyFilmViewController: UIViewController {
             self,
             selector: #selector(refreshData),
             name: NSNotification.Name(NotificationNames.sequencesUpdated),
+            object: nil
+        )
+        // Tutorial: navigate to the tutorial sequence's SequenceViewController
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTutorialNavigateToSequence(_:)),
+            name: NSNotification.Name(NotificationNames.tutorialNavigateToSequence),
+            object: nil
+        )
+        // Tutorial: step changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTutorialStepChanged(_:)),
+            name: NSNotification.Name(NotificationNames.tutorialStepChanged),
             object: nil
         )
     }
@@ -180,6 +209,26 @@ class MyFilmViewController: UIViewController {
             }
         }
         collectionView.reloadData()
+    }
+
+    // MARK: - Tutorial Handlers
+
+    @objc private func handleTutorialNavigateToSequence(_ notification: Notification) {
+        guard TutorialManager.shared.currentStep == .createSceneInSequence,
+              let seqIDStr  = notification.userInfo?["sequenceID"] as? String,
+              let seqID     = UUID(uuidString: seqIDStr),
+              let targetSeq = sequence.first(where: { $0.id == seqID }) else { return }
+        performSegue(withIdentifier: "sequenceSegue", sender: targetSeq)
+    }
+
+    @objc private func handleTutorialStepChanged(_ notification: Notification) {
+        guard let raw  = notification.userInfo?["step"] as? Int,
+              let step = TutorialStep(rawValue: raw),
+              step == .createSequence else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self, let target = self.tutorialTargetView else { return }
+            TutorialManager.shared.showSpotlightIfNeeded(targeting: target, for: .createSequence)
+        }
     }
 }
 

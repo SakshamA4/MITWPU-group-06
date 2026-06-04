@@ -28,6 +28,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 self.window?.rootViewController = rootVC
                 self.window?.makeKeyAndVisible()
 
+                // Start (or resume) mandatory pre-canvas onboarding
+                TutorialManager.shared.startOnboardingIfNeeded()
+
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

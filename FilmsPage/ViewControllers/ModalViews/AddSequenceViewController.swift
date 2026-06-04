@@ -153,6 +153,10 @@ class AddSequenceViewController: UIViewController {
         )
 
         SequenceService.shared.addSequence(sequence)
+
+        // Notify the tutorial manager that a sequence was created (advances step 4 → 5)
+        TutorialManager.shared.handleSequenceCreated(sequence)
+
         dismiss(animated: true)
     }
 
