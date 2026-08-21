@@ -296,7 +296,7 @@ final class CinematicCameraHUD: UIView {
         
         // Bottom bar pills
         updatePillTitle(cameraBodyButton, title: cameraBody?.brand.rawValue.uppercased() ?? "BODY")
-        updatePillTitle(lensButton, title: lensFamily?.name ?? "LENS")
+        updatePillTitle(lensButton, title: lensFamily?.familyName ?? "LENS")
         focalLengthLabel.text = String(format: "%.0fmm", focalLength)
         updatePillTitle(lookButton, title: look?.name ?? "LOOK")
         updatePillTitle(aspectButton, title: aspectRatio.shortName)

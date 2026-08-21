@@ -72,7 +72,7 @@ inline float calculateEdgeSoftness(float2 centered, float amount) {
 // MARK: - Main Kernel
 
 kernel void cinematicLensKernel(
-    texture2d<float, access::read>  inTexture  [[texture(0)]],
+    texture2d<float, access::sample>  inTexture  [[texture(0)]],
     texture2d<float, access::write> outTexture [[texture(1)]],
     constant LensUniforms &uniforms            [[buffer(0)]],
     uint2 gid                                  [[thread_position_in_grid]]

@@ -89,7 +89,7 @@ struct CinematicKeyframe: Codable, Hashable, Identifiable {
 
 // MARK: - Timeline Track
 
-struct CinematicTimelineTrack: Codable, Identifiable {
+struct CinematicTimelineTrack: Codable, Hashable, Identifiable {
     let id: String
     let property: CinematicKeyframeProperty
     var keyframes: [CinematicKeyframe]
@@ -164,7 +164,10 @@ final class CinematicTimelineEvaluator {
                 focus.focusDistance = value
                 cameraRoot.components.set(focus)
             case .lookIntensity:
-                pipeline.configure(lookIntensity: value)
+                if var lookComp = cameraRoot.components[CineLookComponent.self] {
+                    lookComp.intensity = value
+                    cameraRoot.components.set(lookComp)
+                }
             case .motionIntensity:
                 if var motion = cameraRoot.components[CineMotionComponent.self] {
                     motion.intensityMultiplier = value

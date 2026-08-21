@@ -90,10 +90,10 @@ final class CinematicLookEngine {
         // 6. Split toning
         result = applySplitToning(
             result,
-            highlightColor: look.highlightTintColor,
-            shadowColor: look.shadowTintColor,
-            highlightStrength: look.highlightTintStrength,
-            shadowStrength: look.shadowTintStrength
+            highlightColor: CIColor(color: look.highlightTintColor),
+            shadowColor: CIColor(color: look.shadowTintColor),
+            highlightStrength: max(look.highlightTintR, max(look.highlightTintG, look.highlightTintB)),
+            shadowStrength: max(look.shadowTintR, max(look.shadowTintG, look.shadowTintB))
         )
         
         // 7. LUT application (if provided)
@@ -170,7 +170,7 @@ final class CinematicLookEngine {
         // Use highlight/shadow adjust for soft rolloff
         let filter = CIFilter.highlightShadowAdjust()
         filter.inputImage = image
-        filter.highlightAmount = CGFloat(1.0 - amount * 0.6)
+        filter.highlightAmount = Float(1.0 - amount * 0.6)
         filter.shadowAmount = 0.0
         
         return filter.outputImage ?? image
@@ -205,7 +205,7 @@ final class CinematicLookEngine {
         
         let filter = CIFilter.colorControls()
         filter.inputImage = image
-        filter.saturation = CGFloat(amount)
+        filter.saturation = Float(amount)
         filter.brightness = 0
         filter.contrast = 1
         
@@ -304,29 +304,49 @@ final class CinematicLookEngine {
         to: CinematicLook,
         progress: Float
     ) -> CinematicLook {
-        let t = simd_clamp(progress, 0, 1)
+        let t = min(max(progress, 0), 1)
         let inv = 1.0 - t
+        
+        // Pre-compute interpolated values to help the type checker
+        let iWarmth = from.warmth * inv + to.warmth * t
+        let iTint = from.tint * inv + to.tint * t
+        let iSaturation = from.saturation * inv + to.saturation * t
+        let iContrast = from.contrast * inv + to.contrast * t
+        let iHighlightRolloff = from.highlightRolloff * inv + to.highlightRolloff * t
+        let iShadowLift = from.shadowLift * inv + to.shadowLift * t
+        let iBloom = from.bloomIntensity * inv + to.bloomIntensity * t
+        let iHalation = from.halationIntensity * inv + to.halationIntensity * t
+        let iGrainIntensity = from.grainIntensity * inv + to.grainIntensity * t
+        let iGrainSize = from.grainSize * inv + to.grainSize * t
+        let iLutIntensity = from.lutIntensity * inv + to.lutIntensity * t
+        let iVibrance = from.vibrance * inv + to.vibrance * t
+        let iMidtoneShift = from.midtoneShift * inv + to.midtoneShift * t
         
         return CinematicLook(
             id: to.id,
             name: t < 0.5 ? from.name : to.name,
             category: to.category,
-            warmth: from.warmth * inv + to.warmth * t,
-            tint: from.tint * inv + to.tint * t,
-            saturation: from.saturation * inv + to.saturation * t,
-            contrast: from.contrast * inv + to.contrast * t,
-            highlightRolloff: from.highlightRolloff * inv + to.highlightRolloff * t,
-            shadowLift: from.shadowLift * inv + to.shadowLift * t,
-            bloomIntensity: from.bloomIntensity * inv + to.bloomIntensity * t,
-            halationIntensity: from.halationIntensity * inv + to.halationIntensity * t,
-            grainIntensity: from.grainIntensity * inv + to.grainIntensity * t,
-            grainSize: from.grainSize * inv + to.grainSize * t,
-            highlightTintColor: interpolateColor(from.highlightTintColor, to.highlightTintColor, t: t),
-            highlightTintStrength: from.highlightTintStrength * inv + to.highlightTintStrength * t,
-            shadowTintColor: interpolateColor(from.shadowTintColor, to.shadowTintColor, t: t),
-            shadowTintStrength: from.shadowTintStrength * inv + to.shadowTintStrength * t,
-            lutFile: t < 0.5 ? from.lutFile : to.lutFile,
-            lutIntensity: from.lutIntensity * inv + to.lutIntensity * t
+            character: to.character,
+            warmth: iWarmth,
+            tint: iTint,
+            saturation: iSaturation,
+            vibrance: iVibrance,
+            contrast: iContrast,
+            highlightRolloff: iHighlightRolloff,
+            shadowLift: iShadowLift,
+            midtoneShift: iMidtoneShift,
+            bloomIntensity: iBloom,
+            halationIntensity: iHalation,
+            grainIntensity: iGrainIntensity,
+            grainSize: iGrainSize,
+            shadowTintR: from.shadowTintR * inv + to.shadowTintR * t,
+            shadowTintG: from.shadowTintG * inv + to.shadowTintG * t,
+            shadowTintB: from.shadowTintB * inv + to.shadowTintB * t,
+            highlightTintR: from.highlightTintR * inv + to.highlightTintR * t,
+            highlightTintG: from.highlightTintG * inv + to.highlightTintG * t,
+            highlightTintB: from.highlightTintB * inv + to.highlightTintB * t,
+            lutFileReference: t < 0.5 ? from.lutFileReference : to.lutFileReference,
+            lutIntensity: iLutIntensity
         )
     }
     
@@ -402,7 +422,7 @@ final class CinematicLookEngine {
         let filter = CIFilter.dissolveTransition()
         filter.inputImage = base
         filter.targetImage = overlay
-        filter.time = CGFloat(amount)
+        filter.time = Float(amount)
         return filter.outputImage ?? overlay
     }
     

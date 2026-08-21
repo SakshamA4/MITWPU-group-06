@@ -54,10 +54,10 @@ final class CinematicRenderPipeline {
     // MARK: - Initialisation
     
     init() {
-        self.sensorEngine = SensorSimulationEngine()
-        self.lensEngine = LensSimulationEngine()
+        self.sensorEngine = SensorSimulationEngine.shared
+        self.lensEngine = LensSimulationEngine.shared
         self.lookEngine = CinematicLookEngine()
-        self.motionEngine = CameraMotionEngine()
+        self.motionEngine = CameraMotionEngine.shared
         self.currentConfig = PipelineConfiguration()
         
         // Create shared CIContext with Metal device if available
@@ -103,7 +103,6 @@ final class CinematicRenderPipeline {
         }
         if let motion = motionStyle {
             currentConfig.motionStyle = motion
-            motionEngine.configure(style: motion)
         }
         if let ar = aspectRatio {
             currentConfig.aspectRatio = ar
@@ -126,21 +125,20 @@ final class CinematicRenderPipeline {
         let focalLength = currentConfig.focalLength
         
         // Base FOV from sensor + focal length
-        var fov = sensorEngine.calculateHorizontalFOV(
-            sensorWidth: sensor.sensorWidthMM,
-            focalLength: focalLength
+        var fov = sensorEngine.horizontalFOV(
+            sensorWidthMM: sensor.sensorWidthMM,
+            focalLengthMM: focalLength
         )
         
         // Apply focus breathing if lens is configured
         if let lens = currentConfig.lensFamily {
-            let profile = lens.resolveProfile(for: focalLength)
-            let breathingShift = lensEngine.calculateBreathing(
-                focalLength: focalLength,
+            let profile = lens.opticalProfile(forFocalLength: focalLength)
+            fov = sensorEngine.applyBreathing(
+                baseFOV: fov,
                 focusDistance: focusDistance,
                 breathingAmount: profile.breathingAmount,
                 mode: .cinematic
             )
-            fov += breathingShift
         }
         
         return fov
@@ -150,8 +148,12 @@ final class CinematicRenderPipeline {
     
     /// Returns the current camera motion offset for procedural shake.
     /// Call each frame with the current time to get smooth motion.
-    func currentMotionOffset(time: TimeInterval) -> CameraMotionEngine.MotionOffset {
-        return motionEngine.generateOffset(time: time)
+    func currentMotionOffset(time: TimeInterval) -> MotionOffset {
+        return motionEngine.generateMotionOffset(
+            style: currentConfig.motionStyle,
+            time: Float(time),
+            seed: 0
+        )
     }
     
     // MARK: - Frame Processing (CoreImage Path)
@@ -299,8 +301,8 @@ final class CinematicRenderPipeline {
         let targetAspect = currentConfig.aspectRatio.ratio
         
         return sensorEngine.calculateFramingRect(
-            sensorAspectRatio: sensorAspect,
-            targetAspectRatio: targetAspect,
+            sensorAspect: sensorAspect,
+            targetAspect: targetAspect,
             viewportSize: viewportSize
         )
     }
@@ -308,7 +310,7 @@ final class CinematicRenderPipeline {
     /// Returns a human-readable summary of the current camera configuration.
     var configurationSummary: String {
         let camera = currentConfig.cameraBody?.modelName ?? "No Camera"
-        let lens = currentConfig.lensFamily?.name ?? "No Lens"
+        let lens = currentConfig.lensFamily?.familyName ?? "No Lens"
         let fl = String(format: "%.0fmm", currentConfig.focalLength)
         let look = currentConfig.look?.name ?? "No Look"
         let ar = currentConfig.aspectRatio.displayName
@@ -328,9 +330,8 @@ final class CinematicRenderPipeline {
     private func recalculateDerivedValues() {
         // Recalculate crop factor relative to full frame
         if let body = currentConfig.cameraBody {
-            currentConfig.effectiveCropFactor = sensorEngine.calculateCropFactor(
-                sensorWidth: body.sensor.sensorWidthMM,
-                sensorHeight: body.sensor.sensorHeightMM
+            currentConfig.effectiveCropFactor = sensorEngine.cropFactor(
+                sensorWidthMM: body.sensor.sensorWidthMM
             )
         }
     }
@@ -340,7 +341,7 @@ final class CinematicRenderPipeline {
             return MetalLensProcessor.LensUniforms()
         }
         
-        let profile = lens.resolveProfile(for: currentConfig.focalLength)
+        let profile = lens.opticalProfile(forFocalLength: currentConfig.focalLength)
         let squeeze: Float = lens.anamorphicMode.squeezeRatio
         
         return MetalLensProcessor.makeUniforms(
